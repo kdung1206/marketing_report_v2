@@ -5,6 +5,7 @@ import {
   DEFAULT_COMMENTS_KAROFI,
   MarketingReportData,
   BrandComments,
+  normalizeMarketingData,
 } from "./data";
 import {
   TrendingUp,
@@ -57,11 +58,67 @@ import {
 
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
-const TIMELINES = [
-  { id: "week4", label: "Tuần 4 (19/06 - 25/06/2026)", isPRWeek: false, date: "2026-06-25", startDate: "2026-06-19", endDate: "2026-06-26" },
-  { id: "week3", label: "Tuần 3 (12/06 - 18/06/2026)", isPRWeek: true, date: "2026-06-18", startDate: "2026-06-12", endDate: "2026-06-18" },
-  { id: "week2", label: "Tuần 2 (05/06 - 11/06/2026)", isPRWeek: false, date: "2026-06-11", startDate: "2026-06-05", endDate: "2026-06-11" },
-];
+
+export function getTimelines(marketingData: MarketingReportData) {
+  const weeksSet = new Set<string>();
+  
+  if (marketingData?.digital_marketing) {
+    marketingData.digital_marketing.forEach((row) => {
+      if (row.week) weeksSet.add(row.week);
+    });
+  }
+  if (marketingData?.kol_koc) {
+    marketingData.kol_koc.forEach((row) => {
+      if (row.week) weeksSet.add(row.week);
+    });
+  }
+  if (marketingData?.btl_trade) {
+    marketingData.btl_trade.forEach((row) => {
+      if (row.week) weeksSet.add(row.week);
+    });
+  }
+  if (marketingData?.monthly_ooh_pr) {
+    marketingData.monthly_ooh_pr.forEach((row) => {
+      if (row.week) weeksSet.add(row.week);
+    });
+  }
+
+  // Ensure "week4", "week3", "week2" are always present as fallback if empty
+  if (weeksSet.size === 0) {
+    ["week4", "week3", "week2"].forEach((w) => weeksSet.add(w));
+  }
+
+  // Sort weeks in descending order (latest first)
+  const sortedWeeks = Array.from(weeksSet).sort((a, b) => b.localeCompare(a));
+
+  const TIMELINE_LABELS_MAP: { [key: string]: string } = {
+    "week4": "Tuần 4 (19/06 - 25/06/2026)",
+    "week3": "Tuần 3 (12/06 - 18/06/2026)",
+    "week2": "Tuần 2 (05/06 - 11/06/2026)",
+    "week1": "Tuần 1 (01/06 - 04/06/2026)",
+  };
+
+  return sortedWeeks.map((wk) => {
+    let label = TIMELINE_LABELS_MAP[wk];
+    if (!label) {
+      if (wk.startsWith("week")) {
+        const num = wk.substring(4);
+        label = `Tuần ${num}`;
+      } else {
+        label = wk;
+      }
+    }
+    const isPRWeek = marketingData?.monthly_ooh_pr?.some(
+      (row) => row.week === wk && row.hạng_mục === "PR - báo chí" && (row.thực_tế_actual || 0) > 0
+    ) || false;
+
+    return {
+      id: wk,
+      label: label,
+      isPRWeek: isPRWeek,
+    };
+  });
+}
 
 export interface UserAccount {
   username: string;
@@ -104,10 +161,26 @@ export default function App() {
   // Navigation & Brand States
   const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel">("dashboard");
   const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">("Livotec");
-  const [selectedTimeline, setSelectedTimeline] = useState(TIMELINES[0]);
 
   // Core Data States
   const [marketingData, setMarketingData] = useState<MarketingReportData>(INITIAL_MARKETING_DATA);
+
+  // Compute dynamic timelines list from current marketingData
+  const timelines = getTimelines(marketingData);
+
+  const [selectedTimeline, setSelectedTimeline] = useState(() => {
+    const list = getTimelines(INITIAL_MARKETING_DATA);
+    return list[0];
+  });
+
+  // Automatically adjust selectedTimeline if it is no longer valid in the updated timelines list
+  useEffect(() => {
+    const exists = timelines.find((t) => t.id === selectedTimeline.id);
+    if (!exists && timelines.length > 0) {
+      setSelectedTimeline(timelines[0]);
+    }
+  }, [marketingData]);
+
   const [publishedComments, setPublishedComments] = useState<{ Livotec: BrandComments; Karofi: BrandComments }>({
     Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
     Karofi: { ...DEFAULT_COMMENTS_KAROFI },
@@ -193,10 +266,9 @@ export default function App() {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
 
-  // Sync Draft state with Published State on load
+  // Sync Draft state and load marketing data from database on load
   useEffect(() => {
     const savedPublished = localStorage.getItem("marketing_published_comments");
-    const savedData = localStorage.getItem("marketing_report_raw_data");
     
     if (savedPublished) {
       try {
@@ -207,23 +279,38 @@ export default function App() {
         console.error("Error reading saved comments", e);
       }
     }
-    if (savedData) {
+
+    const fetchServerData = async () => {
       try {
-        const parsed = JSON.parse(savedData);
-        if (parsed) {
-          const safeData = {
-            digital_marketing: parsed.digital_marketing || [],
-            kol_koc: parsed.kol_koc || [],
-            btl_trade: parsed.btl_trade || [],
-            monthly_ooh_pr: parsed.monthly_ooh_pr || [],
-          };
+        const response = await fetch("/api/get-data");
+        const result = await response.json();
+        if (response.ok && result.success) {
+          const safeData = normalizeMarketingData(result.data);
           setMarketingData(safeData);
           setPastedJson(JSON.stringify(safeData, null, 2));
+          localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        } else {
+          throw new Error(result.error || "Cannot retrieve data from server");
         }
-      } catch (e) {
-        console.error("Error reading saved data", e);
+      } catch (err) {
+        console.error("Failed to fetch database data from server, falling back to local storage:", err);
+        const savedData = localStorage.getItem("marketing_report_raw_data");
+        if (savedData) {
+          try {
+            const parsed = JSON.parse(savedData);
+            if (parsed) {
+              const safeData = normalizeMarketingData(parsed);
+              setMarketingData(safeData);
+              setPastedJson(JSON.stringify(safeData, null, 2));
+            }
+          } catch (e) {
+            console.error("Error reading saved data fallback", e);
+          }
+        }
       }
-    }
+    };
+
+    fetchServerData();
   }, []);
 
   const triggerNotification = (type: "success" | "error", message: string) => {
@@ -352,26 +439,39 @@ export default function App() {
     }
   };
 
-  // Google Drive connection
+  // Google Drive connection and Server DB sync
   const handleDriveImport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!driveUrl.trim()) return;
 
     setIsDriveLoading(true);
     try {
+      // 1. Fetch file content
       const response = await fetch("/api/fetch-drive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: driveUrl }),
       });
       const result = await response.json();
-      if (response.ok && result.success) {
-        setMarketingData(result.data);
-        setPastedJson(JSON.stringify(result.data, null, 2));
-        localStorage.setItem("marketing_report_raw_data", JSON.stringify(result.data));
-        triggerNotification("success", "Đã kết nối và đồng bộ dữ liệu từ Google Drive thành công!");
-      } else {
+      if (!response.ok || !result.success) {
         throw new Error(result.error || "Không thể tải dữ liệu từ Google Drive.");
+      }
+
+      // 2. Send retrieved data to /api/sync-data to merge with Server DB
+      const syncResponse = await fetch("/api/sync-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newData: result.data }),
+      });
+      const syncResult = await syncResponse.json();
+      if (syncResponse.ok && syncResult.success) {
+        const safeData = normalizeMarketingData(syncResult.data);
+        setMarketingData(safeData);
+        setPastedJson(JSON.stringify(safeData, null, 2));
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        triggerNotification("success", "Đã kết nối và đồng bộ, sáp nhập dữ liệu tuần mới từ Google Drive thành công!");
+      } else {
+        throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
       }
     } catch (err: any) {
       triggerNotification("error", err.message || "Lỗi kết nối tệp trực tuyến.");
@@ -380,41 +480,61 @@ export default function App() {
     }
   };
 
-  // Paste raw JSON submission
-  const handleJsonSubmit = (e: React.FormEvent) => {
+  // Paste raw JSON submission with Server DB sync
+  const handleJsonSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const parsed = JSON.parse(pastedJson);
-      // Basic validation
-      if (!parsed.digital_marketing || !parsed.kol_koc || !parsed.btl_trade || !parsed.monthly_ooh_pr) {
-        throw new Error("Dữ liệu JSON thiếu một trong các trường bắt buộc (digital_marketing, kol_koc, btl_trade, monthly_ooh_pr).");
+      
+      const syncResponse = await fetch("/api/sync-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newData: parsed }),
+      });
+      const syncResult = await syncResponse.json();
+      if (syncResponse.ok && syncResult.success) {
+        const safeData = normalizeMarketingData(syncResult.data);
+        setMarketingData(safeData);
+        setPastedJson(JSON.stringify(safeData, null, 2));
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        triggerNotification("success", "Đã sáp nhập và cập nhật dữ liệu tuần mới vào cơ sở dữ liệu thành công!");
+      } else {
+        throw new Error(syncResult.error || "Lỗi sáp nhập dữ liệu vào cơ sở dữ liệu.");
       }
-      setMarketingData(parsed);
-      localStorage.setItem("marketing_report_raw_data", JSON.stringify(parsed));
-      triggerNotification("success", "Cập nhật dữ liệu từ bảng soạn thảo JSON thành công!");
     } catch (err: any) {
-      triggerNotification("error", `Lỗi định dạng JSON: ${err.message}`);
+      triggerNotification("error", `Lỗi định dạng JSON hoặc Lỗi đồng bộ: ${err.message}`);
     }
   };
 
-  // Reset to default initial dataset
-  const handleResetData = () => {
+  // Reset to default initial dataset on Server DB
+  const handleResetData = async () => {
     if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ dữ liệu báo cáo và nhận định về mặc định ban đầu không?")) {
-      setMarketingData(INITIAL_MARKETING_DATA);
-      setPastedJson(JSON.stringify(INITIAL_MARKETING_DATA, null, 2));
-      
-      const defaultPublished = {
-        Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
-        Karofi: { ...DEFAULT_COMMENTS_KAROFI },
-      };
-      setPublishedComments(defaultPublished);
-      setDraftComments(JSON.parse(JSON.stringify(defaultPublished)));
-      
-      localStorage.removeItem("marketing_report_raw_data");
-      localStorage.removeItem("marketing_published_comments");
-      
-      setHasUnpublishedChanges(false);
-      triggerNotification("success", "Đã khôi phục dữ liệu và nhận định về trạng thái mặc định.");
+      try {
+        const response = await fetch("/api/reset-data", { method: "POST" });
+        const result = await response.json();
+        if (response.ok && result.success) {
+          const safeData = normalizeMarketingData(result.data);
+          setMarketingData(safeData);
+          setPastedJson(JSON.stringify(safeData, null, 2));
+          
+          const defaultPublished = {
+            Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
+            Karofi: { ...DEFAULT_COMMENTS_KAROFI },
+          };
+          setPublishedComments(defaultPublished);
+          setDraftComments(JSON.parse(JSON.stringify(defaultPublished)));
+          
+          localStorage.removeItem("marketing_report_raw_data");
+          localStorage.removeItem("marketing_published_comments");
+          
+          setHasUnpublishedChanges(false);
+          triggerNotification("success", "Đã khôi phục dữ liệu trên máy chủ và trình duyệt về trạng thái mặc định.");
+        } else {
+          throw new Error(result.error || "Lỗi khôi phục cơ sở dữ liệu máy chủ.");
+        }
+      } catch (err: any) {
+        triggerNotification("error", `Lỗi khôi phục: ${err.message}`);
+      }
     }
   };
 
@@ -488,22 +608,9 @@ export default function App() {
   // ------------------------------------------------------------
   
   // Helper to check if a record falls within the selected timeline
-  const isInSelectedTimeline = (ngày_báo_cáo: string | undefined) => {
-    if (!ngày_báo_cáo) return false;
-    
-    // Direct match (extremely safe and precise)
-    if (ngày_báo_cáo === selectedTimeline.date) return true;
-
-    // Parse date ranges
-    const recordDate = new Date(ngày_báo_cáo);
-    if (isNaN(recordDate.getTime())) return false;
-
-    // Get selectedTimeline's start and end dates
-    const start = new Date(selectedTimeline.startDate || "");
-    const end = new Date(selectedTimeline.endDate || "");
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) return false;
-
-    return recordDate >= start && recordDate <= end;
+  const isInSelectedTimeline = (week: string | undefined) => {
+    if (!week) return false;
+    return week === selectedTimeline.id;
   };
 
   // Safe Fallback Lists
@@ -514,19 +621,19 @@ export default function App() {
 
   // 1. Filtered data by active brand and selected timeline
   const brandDigital = digitalMarketingList.filter(
-    (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() && isInSelectedTimeline(row.ngày_báo_cáo)
+    (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() && isInSelectedTimeline(row.week)
   );
   const brandBtl = btlTradeList.filter(
-    (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() && isInSelectedTimeline(row.ngày_báo_cáo)
+    (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() && isInSelectedTimeline(row.week)
   );
   const brandOohPr = monthlyOohPrList.filter(
-    (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase()
+    (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() && isInSelectedTimeline(row.week)
   );
 
   // 2. Share of Voice calculation (Always show industry snapshot for selected timeline)
   // In our JSON, Livotec & Karofi share of voice are under brand "Karofi" with kênh_channel as brand name
   const sovRows = digitalMarketingList.filter(
-    (row) => row.hạng_mục === "Social Listening" && isInSelectedTimeline(row.ngày_báo_cáo)
+    (row) => row.hạng_mục === "Social Listening" && isInSelectedTimeline(row.week)
   );
   
   const sovData = sovRows.map((row) => ({
@@ -594,7 +701,7 @@ export default function App() {
     const isBrandMatch = ("brand" in row && (row as any).brand)
       ? (row as any).brand.toLowerCase() === selectedBrand.toLowerCase()
       : selectedBrand.toLowerCase() === "livotec";
-    return isBrandMatch && isInSelectedTimeline(row.ngày_báo_cáo);
+    return isBrandMatch && isInSelectedTimeline(row.week);
   });
 
   const totalKolKocKpi = brandKolKoc.reduce((sum, r) => sum + (r.kpi_toàn_chiến_dịch || 0), 0);
@@ -1029,12 +1136,12 @@ export default function App() {
                 id="timeline_select"
                 value={selectedTimeline.id}
                 onChange={(e) => {
-                  const found = TIMELINES.find((t) => t.id === e.target.value);
+                  const found = timelines.find((t) => t.id === e.target.value);
                   if (found) setSelectedTimeline(found);
                 }}
                 className="bg-transparent pr-2 font-medium text-slate-800 focus:outline-none cursor-pointer"
               >
-                {TIMELINES.map((t) => (
+                {timelines.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.label}
                   </option>
@@ -1667,15 +1774,17 @@ export default function App() {
                             >
                               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                               <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                              <YAxis tickFormatter={(val) => val >= 1000000 ? `${(val/1000000).toFixed(1)}M` : val.toLocaleString()} />
+                              <YAxis tickFormatter={(val) => val !== null && val !== undefined ? (val >= 1000000 ? `${(val/1000000).toFixed(1)}M` : val.toLocaleString()) : ""} />
                               <Tooltip 
                                 contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
                                 formatter={(value: any, name: any, props: any) => {
                                   const metricName = props.payload?.name || "";
+                                  const numVal = Number(value);
+                                  if (isNaN(numVal)) return ["—", name];
                                   if (metricName.includes("spent") || metricName.includes("Spent") || metricName.includes("VNĐ") || metricName.toUpperCase().includes("CPM")) {
-                                    return [`${Number(value).toLocaleString()} VNĐ`, name];
+                                    return [`${numVal.toLocaleString()} VNĐ`, name];
                                   }
-                                  return [Number(value).toLocaleString(), name];
+                                  return [numVal.toLocaleString(), name];
                                 }}
                               />
                               <Legend />
@@ -1821,8 +1930,8 @@ export default function App() {
                                     return (
                                       <tr key={idx}>
                                         <td className="px-4 py-3 font-sans font-semibold text-slate-900">{row.chỉ_số_metric}</td>
-                                        <td className="px-4 py-3 text-right font-medium">{target?.toLocaleString()}</td>
-                                        <td className="px-4 py-3 text-right font-semibold text-emerald-600">{actual?.toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right font-medium">{target !== null && target !== undefined ? target.toLocaleString() : "—"}</td>
+                                        <td className="px-4 py-3 text-right font-semibold text-emerald-600">{actual !== null && actual !== undefined ? actual.toLocaleString() : "—"}</td>
                                         <td className="px-4 py-3 text-right font-sans font-bold text-emerald-600">{rate}%</td>
                                       </tr>
                                     );
@@ -1965,9 +2074,9 @@ export default function App() {
                                     <td className="px-4 py-3 font-sans text-slate-500">
                                       {row.tần_suất} / <span className="font-mono text-[10px]">{row.đơn_vị_tính}</span>
                                     </td>
-                                    <td className="px-4 py-3 text-right font-mono font-medium">{row.thực_hiện_tháng_5 !== null ? row.thực_hiện_tháng_5.toLocaleString() : "—"}</td>
-                                    <td className="px-4 py-3 text-right font-mono font-medium">{row.kế_hoạch_tháng_6 !== null ? row.kế_hoạch_tháng_6.toLocaleString() : "—"}</td>
-                                    <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600">{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
+                                    <td className="px-4 py-3 text-right font-mono font-medium">{row.thực_hiện_tháng_5 !== null && row.thực_hiện_tháng_5 !== undefined ? row.thực_hiện_tháng_5.toLocaleString() : "—"}</td>
+                                    <td className="px-4 py-3 text-right font-mono font-medium">{row.kế_hoạch_tháng_6 !== null && row.kế_hoạch_tháng_6 !== undefined ? row.kế_hoạch_tháng_6.toLocaleString() : "—"}</td>
+                                    <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600">{row.tích_lũy_tháng !== null && row.tích_lũy_tháng !== undefined ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
                                     <td className="px-4 py-3 text-right font-mono font-bold">
                                       {rate !== null ? (
                                         <span className={rate >= 100 ? "text-emerald-600" : rate >= 70 ? "text-amber-500" : "text-rose-500"}>

@@ -1,8 +1,10 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { normalizeMarketingData } from "./src/data";
 
 dotenv.config();
 
@@ -10,6 +12,33 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: "20mb" }));
+
+// Persistent JSON Database Configuration
+const DB_FILE_PATH = path.join(process.cwd(), "src", "db_store.json");
+const INITIAL_DATA_PATH = path.join(process.cwd(), "src", "initial_data.json");
+
+function getDatabaseData() {
+  if (fs.existsSync(DB_FILE_PATH)) {
+    try {
+      const raw = fs.readFileSync(DB_FILE_PATH, "utf8");
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("Failed to read/parse db_store.json, falling back to initial data:", err);
+    }
+  }
+  
+  // Fallback to initial_data
+  try {
+    const raw = fs.readFileSync(INITIAL_DATA_PATH, "utf8");
+    const data = JSON.parse(raw);
+    // Write it initially so db_store.json exists
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(data, null, 2), "utf8");
+    return data;
+  } catch (err) {
+    console.error("Failed to read initial_data.json:", err);
+    return { digital_marketing: [], kol_koc: [], btl_trade: [], monthly_ooh_pr: [] };
+  }
+}
 
 // Initialize Gemini Client safely
 let ai: GoogleGenAI | null = null;
@@ -175,6 +204,75 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
   } catch (error: any) {
     console.error("Gemini API error:", error);
     return res.status(500).json({ error: error.message || "Lỗi xử lý phân tích AI" });
+  }
+});
+
+// GET /api/get-data
+app.get("/api/get-data", (req, res) => {
+  try {
+    const data = getDatabaseData();
+    const normalized = normalizeMarketingData(data);
+    return res.json({ success: true, data: normalized });
+  } catch (err: any) {
+    console.error("GET /api/get-data error:", err);
+    return res.status(500).json({ error: `Lỗi đọc cơ sở dữ liệu: ${err.message}` });
+  }
+});
+
+// POST /api/sync-data
+app.post("/api/sync-data", (req, res) => {
+  try {
+    const { newData } = req.body;
+    if (!newData) {
+      return res.status(400).json({ error: "Không tìm thấy dữ liệu đồng bộ mới." });
+    }
+
+    // 1. Normalize the incoming new data
+    const normalizedNew = normalizeMarketingData(newData);
+
+    // 2. Load the existing database data
+    const currentDb = normalizeMarketingData(getDatabaseData());
+
+    // 3. Helper to merge lists type-safely by replacing existing entries for matching weeks
+    function mergeCategory<T extends { week: string }>(currentList: T[], newList: T[]): T[] {
+      if (!newList || newList.length === 0) return currentList;
+      const incomingWeeks = new Set<string>();
+      newList.forEach((row) => {
+        if (row.week) incomingWeeks.add(row.week);
+      });
+      const filtered = currentList.filter((row) => !incomingWeeks.has(row.week));
+      return [...filtered, ...newList];
+    }
+
+    const mergedData = {
+      digital_marketing: mergeCategory(currentDb.digital_marketing, normalizedNew.digital_marketing),
+      kol_koc: mergeCategory(currentDb.kol_koc, normalizedNew.kol_koc),
+      btl_trade: mergeCategory(currentDb.btl_trade, normalizedNew.btl_trade),
+      monthly_ooh_pr: mergeCategory(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr),
+    };
+
+    // 4. Save the fully merged and normalized dataset back to the database file
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(mergedData, null, 2), "utf8");
+
+    return res.json({ success: true, data: mergedData });
+  } catch (err: any) {
+    console.error("POST /api/sync-data error:", err);
+    return res.status(500).json({ error: `Lỗi đồng bộ hóa dữ liệu vào DB: ${err.message}` });
+  }
+});
+
+// POST /api/reset-data
+app.post("/api/reset-data", (req, res) => {
+  try {
+    if (fs.existsSync(DB_FILE_PATH)) {
+      fs.unlinkSync(DB_FILE_PATH);
+    }
+    const data = getDatabaseData();
+    const normalized = normalizeMarketingData(data);
+    return res.json({ success: true, data: normalized });
+  } catch (err: any) {
+    console.error("POST /api/reset-data error:", err);
+    return res.status(500).json({ error: `Lỗi khôi phục cơ sở dữ liệu: ${err.message}` });
   }
 });
 
