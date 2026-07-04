@@ -166,7 +166,10 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
   "categoryAnalysis": {
     "sov": "Nhận xét phân tích ngắn gọn, súc tích kèm số liệu về thị phần thảo luận (Share of Voice) của thương hiệu ${brandName} so với các đối thủ cạnh tranh như Karofi, Kangaroo, Sunhouse, Hòa Phát...",
     "kol_koc": "Nhận xét về việc triển khai KOL/KOC trong tuần của ${brandName}. Đối chiếu KPI toàn chiến dịch, tích lũy chiến dịch và số thực hiện tuần này.",
-    "tvc": "Nhận xét ngắn gọn về tiến độ sản xuất và phát hành Clip TVC trong tuần. Nêu rõ ngành hàng nào đạt/không đạt KPI và tiến độ tích lũy.",
+    "content": "Nhận xét về hoạt động sản xuất, xuất bản các ấn phẩm Content & Sáng tạo nội dung (ví dụ: số lượng bài viết đăng tải, clip giới thiệu sản phẩm, ooh/led, các nội dung social media khác) trong tuần của ${brandName}.",
+    "tvc": "Phân tích và nhận xét chi tiết về hiệu quả phát sóng TVC (chỉ số metric là GRPS) trên các kênh truyền hình tại các thành phố/kênh sóng trọng điểm của ${brandName} như HAN, HCM, CAN, HTV & THVL.",
+    "pr": "Nhận xét chi tiết về hiệu quả hoạt động PR báo chí của ${brandName} trong tuần hoặc trong tháng (đối chiếu lượng bài viết Quantity và lượng người tiếp cận Views của bài viết).",
+    "ooh": "Nhận xét chi tiết hoạt động truyền thông ngoài trời OOH của thương hiệu ${brandName} theo các phân khúc: LCD Building, LED Cities, LED Airport, Pano.",
     "paid_ads": "Phân tích hiệu quả Paid Ads trong tuần (về Amount spent, Impressions, Reach, CPM, Frequency), đánh giá mức độ phủ thương hiệu và tối ưu chi phí.",
     "seo": "Phân tích hiệu quả SEO Website & SEO Content trong tuần (Traffic Organic, Impressions Organic, số lượng bài viết). So sánh thực tế đạt được so với mục tiêu đề ra.",
     "btl_trade": "Đánh giá chi tiết hoạt động BTL & Trade Marketing của thương hiệu ${brandName} (biển bảng POSM, quầy kệ, kiểm soát hình ảnh điểm bán, sự kiện activation/workshop). So sánh kế hoạch tháng 6, lũy kế đạt được và đối chiếu tăng trưởng so với thực tế thực hiện tháng 5."
@@ -210,12 +213,39 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
 // GET /api/get-data
 app.get("/api/get-data", (req, res) => {
   try {
-    const data = getDatabaseData();
-    const normalized = normalizeMarketingData(data);
-    return res.json({ success: true, data: normalized });
+    const rawDbData = getDatabaseData();
+    const normalized = normalizeMarketingData(rawDbData);
+    return res.json({
+      success: true,
+      data: normalized,
+      comments: rawDbData.comments || {}
+    });
   } catch (err: any) {
     console.error("GET /api/get-data error:", err);
     return res.status(500).json({ error: `Lỗi đọc cơ sở dữ liệu: ${err.message}` });
+  }
+});
+
+// POST /api/save-comments
+app.post("/api/save-comments", (req, res) => {
+  try {
+    const { week, comments } = req.body;
+    if (!week || !comments) {
+      return res.status(400).json({ error: "Thiếu thông tin tuần báo cáo hoặc nội dung nhận định." });
+    }
+
+    const rawDbData = getDatabaseData();
+    if (!rawDbData.comments) {
+      rawDbData.comments = {};
+    }
+
+    rawDbData.comments[week] = comments;
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(rawDbData, null, 2), "utf8");
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST /api/save-comments error:", err);
+    return res.status(500).json({ error: `Lỗi lưu nhận định vào cơ sở dữ liệu: ${err.message}` });
   }
 });
 
@@ -231,24 +261,72 @@ app.post("/api/sync-data", (req, res) => {
     const normalizedNew = normalizeMarketingData(newData);
 
     // 2. Load the existing database data
-    const currentDb = normalizeMarketingData(getDatabaseData());
+    const currentFullDb = getDatabaseData();
+    const currentDb = normalizeMarketingData(currentFullDb);
 
-    // 3. Helper to merge lists type-safely by replacing existing entries for matching weeks
-    function mergeCategory<T extends { week: string }>(currentList: T[], newList: T[]): T[] {
+    // 3. Helper to merge lists type-safely by identifying identical keys, updating matching ones, and appending new ones
+    function mergeRowsByKey<T>(currentList: T[], newList: T[], keyFn: (row: T) => string): T[] {
       if (!newList || newList.length === 0) return currentList;
-      const incomingWeeks = new Set<string>();
-      newList.forEach((row) => {
-        if (row.week) incomingWeeks.add(row.week);
+      const map = new Map<string, T>();
+      currentList.forEach((row) => {
+        map.set(keyFn(row), row);
       });
-      const filtered = currentList.filter((row) => !incomingWeeks.has(row.week));
-      return [...filtered, ...newList];
+      newList.forEach((row) => {
+        map.set(keyFn(row), row);
+      });
+      return Array.from(map.values());
     }
 
+    // Key extraction functions for identifying duplicates
+    const getDigitalKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const nhom = (row.nhóm_báo_cáo || "").toString().trim().toLowerCase();
+      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
+      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
+      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
+      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
+      return `${week}|${brand}|${nhom}|${hm}|${nganh}|${channel}|${metric}`;
+    };
+
+    const getKolKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
+      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
+      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
+      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
+      return `${week}|${brand}|${hm}|${nganh}|${channel}|${metric}`;
+    };
+
+    const getBtlKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const hml = (row.hạng_mục_lớn || "").toString().trim().toLowerCase();
+      const cthm = (row.chi_tiết_hạng_mục || "").toString().trim().toLowerCase();
+      const pl = (row.phân_loại || "").toString().trim().toLowerCase();
+      const ts = (row.tần_suất || "").toString().trim().toLowerCase();
+      const dvt = (row.đơn_vị_tính || "").toString().trim().toLowerCase();
+      return `${week}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
+    };
+
+    const getOohPrKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const tbc = (row.tháng_báo_cáo || "").toString().trim().toLowerCase();
+      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
+      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
+      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
+      return `${week}|${tbc}|${hm}|${brand}|${nganh}|${channel}|${metric}`;
+    };
+
     const mergedData = {
-      digital_marketing: mergeCategory(currentDb.digital_marketing, normalizedNew.digital_marketing),
-      kol_koc: mergeCategory(currentDb.kol_koc, normalizedNew.kol_koc),
-      btl_trade: mergeCategory(currentDb.btl_trade, normalizedNew.btl_trade),
-      monthly_ooh_pr: mergeCategory(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr),
+      digital_marketing: mergeRowsByKey(currentDb.digital_marketing, normalizedNew.digital_marketing, getDigitalKey),
+      kol_koc: mergeRowsByKey(currentDb.kol_koc, normalizedNew.kol_koc, getKolKey),
+      btl_trade: mergeRowsByKey(currentDb.btl_trade, normalizedNew.btl_trade, getBtlKey),
+      monthly_ooh_pr: mergeRowsByKey(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr, getOohPrKey),
+      comments: currentFullDb.comments || {} // Preserve existing comments!
     };
 
     // 4. Save the fully merged and normalized dataset back to the database file

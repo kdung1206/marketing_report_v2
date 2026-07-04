@@ -5,6 +5,7 @@ import {
   DEFAULT_COMMENTS_KAROFI,
   MarketingReportData,
   BrandComments,
+  CategoryComments,
   normalizeMarketingData,
 } from "./data";
 import {
@@ -134,6 +135,20 @@ const DEFAULT_USERS: UserAccount[] = [
   { username: "viewer1", password: "123", name: "Lê Người Xem", role: "Viewer" }
 ];
 
+export interface BrandKpiTarget {
+  id: string;
+  brandName: string;
+  sovTargetRank: string;
+  contentTarget: number;
+  prTarget: number;
+  comment: string;
+}
+
+const DEFAULT_BRAND_KPIS: BrandKpiTarget[] = [
+  { id: "livotec", brandName: "Livotec", sovTargetRank: "Rank #5", contentTarget: 14, prTarget: 5, comment: "Mục tiêu mặc định cho Livotec" },
+  { id: "karofi", brandName: "Karofi", sovTargetRank: "Rank #2", contentTarget: 24, prTarget: 1, comment: "Mục tiêu mặc định cho Karofi" }
+];
+
 export default function App() {
   // Authentication & Users State
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
@@ -145,6 +160,17 @@ export default function App() {
     const saved = localStorage.getItem("marketing_users_list");
     return saved ? JSON.parse(saved) : DEFAULT_USERS;
   });
+
+  // Brand KPI Targets States
+  const [brandKpis, setBrandKpis] = useState<BrandKpiTarget[]>(() => {
+    const saved = localStorage.getItem("marketing_brand_kpis");
+    return saved ? JSON.parse(saved) : DEFAULT_BRAND_KPIS;
+  });
+  const [kpiBrandId, setKpiBrandId] = useState<"livotec" | "karofi">("livotec");
+  const [kpiSovTargetRank, setKpiSovTargetRank] = useState("Rank #5");
+  const [kpiContentTarget, setKpiContentTarget] = useState(14);
+  const [kpiPrTarget, setKpiPrTarget] = useState(5);
+  const [kpiComment, setKpiComment] = useState("Mục tiêu mặc định cho Livotec");
 
   // Login form inputs
   const [loginUsername, setLoginUsername] = useState("");
@@ -181,15 +207,21 @@ export default function App() {
     }
   }, [marketingData]);
 
-  const [publishedComments, setPublishedComments] = useState<{ Livotec: BrandComments; Karofi: BrandComments }>({
-    Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
-    Karofi: { ...DEFAULT_COMMENTS_KAROFI },
-  });
+  const [publishedComments, setPublishedComments] = useState<{
+    [weekId: string]: { Livotec: BrandComments; Karofi: BrandComments };
+  }>({});
+
+  // Helper to get active comments for a given week and brand
+  const getActiveComments = (weekId: string, brand: "Livotec" | "Karofi"): BrandComments => {
+    if (publishedComments[weekId] && publishedComments[weekId][brand]) {
+      return publishedComments[weekId][brand];
+    }
+    return brand === "Livotec" ? DEFAULT_COMMENTS_LIVOTEC : DEFAULT_COMMENTS_KAROFI;
+  };
 
   // Control Panel Draft Comments States (allows editing before publishing)
-  const [draftComments, setDraftComments] = useState<{ Livotec: BrandComments; Karofi: BrandComments }>({
-    Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
-    Karofi: { ...DEFAULT_COMMENTS_KAROFI },
+  const [draftComments, setDraftComments] = useState<BrandComments>(() => {
+    return { ...DEFAULT_COMMENTS_LIVOTEC };
   });
 
   // UI / Interactive States
@@ -199,7 +231,7 @@ export default function App() {
   });
   
   // Category tab state in Box 3
-  const [activeCategoryTab, setActiveCategoryTab] = useState<"sov" | "kol" | "tvc" | "ads" | "seo" | "btl">("sov");
+  const [activeCategoryTab, setActiveCategoryTab] = useState<"sov" | "kol" | "content" | "tvc" | "pr" | "ooh" | "ads" | "seo" | "btl">("sov");
 
   // State for filtering Paid Ads by industry
   const [selectedAdsIndustry, setSelectedAdsIndustry] = useState<string>("Tất cả");
@@ -214,6 +246,7 @@ export default function App() {
     const rawDigital = marketingData?.digital_marketing || [];
     const rawBtl = marketingData?.btl_trade || [];
     const rawKol = marketingData?.kol_koc || [];
+    const monthlyOohPrList = marketingData?.monthly_ooh_pr || [];
 
     const digital = rawDigital.filter(
       (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase()
@@ -228,6 +261,10 @@ export default function App() {
       return selectedBrand.toLowerCase() === "livotec";
     });
 
+    const brandOohPr = monthlyOohPrList.filter(
+      (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase()
+    );
+
     const activeBrandSov = rawDigital.filter(
       (row) => row.hạng_mục === "Social Listening"
     ).find(
@@ -236,7 +273,10 @@ export default function App() {
 
     const hasSov = activeBrandSov ? (activeBrandSov.thực_tế_actual || 0) > 0 : false;
     const hasKol = kol.length > 0;
-    const hasContent = digital.some((row) => row.nhóm_báo_cáo === "Content");
+    const hasContent = digital.some((row) => row.nhóm_báo_cáo && row.nhóm_báo_cáo.toLowerCase() === "content");
+    const hasTvc = digital.some((row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "tvc" && row.chỉ_số_metric && row.chỉ_số_metric.toLowerCase() === "grps");
+    const hasPr = brandOohPr.some((row) => row.hạng_mục && (row.hạng_mục.toLowerCase() === "pr" || row.hạng_mục.toLowerCase() === "pr - báo chí"));
+    const hasOoh = brandOohPr.some((row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "ooh");
     const hasAds = digital.some((row) => row.hạng_mục === "Paid Ads");
     const hasSeo = digital.some((row) => row.hạng_mục === "SEO Website" || row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page");
     const hasBtl = btl.length > 0;
@@ -244,16 +284,19 @@ export default function App() {
     const tabsStatus = {
       sov: hasSov,
       kol: hasKol,
-      tvc: hasContent,
+      content: hasContent,
+      tvc: hasTvc,
+      pr: hasPr,
+      ooh: hasOoh,
       ads: hasAds,
       seo: hasSeo,
       btl: hasBtl
     };
 
-    if (!tabsStatus[activeCategoryTab]) {
+    if (!tabsStatus[activeCategoryTab as keyof typeof tabsStatus]) {
       const firstAvailable = (Object.keys(tabsStatus) as Array<keyof typeof tabsStatus>).find(k => tabsStatus[k]);
       if (firstAvailable) {
-        setActiveCategoryTab(firstAvailable);
+        setActiveCategoryTab(firstAvailable as any);
       }
     }
   }, [selectedBrand, marketingData, activeCategoryTab]);
@@ -266,20 +309,15 @@ export default function App() {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
 
-  // Sync Draft state and load marketing data from database on load
+  // Synchronize draftComments with published comments for current brand & week
   useEffect(() => {
-    const savedPublished = localStorage.getItem("marketing_published_comments");
-    
-    if (savedPublished) {
-      try {
-        const parsed = JSON.parse(savedPublished);
-        setPublishedComments(parsed);
-        setDraftComments(JSON.parse(JSON.stringify(parsed))); // Deep clone to draft
-      } catch (e) {
-        console.error("Error reading saved comments", e);
-      }
-    }
+    const active = getActiveComments(selectedTimeline.id, selectedBrand);
+    setDraftComments(JSON.parse(JSON.stringify(active)));
+    setHasUnpublishedChanges(false);
+  }, [selectedTimeline.id, selectedBrand, publishedComments]);
 
+  // Load marketing data and comments from database on load
+  useEffect(() => {
     const fetchServerData = async () => {
       try {
         const response = await fetch("/api/get-data");
@@ -289,6 +327,15 @@ export default function App() {
           setMarketingData(safeData);
           setPastedJson(JSON.stringify(safeData, null, 2));
           localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+
+          const serverComments = result.comments || {};
+          setPublishedComments(serverComments);
+          localStorage.setItem("marketing_published_comments", JSON.stringify(serverComments));
+
+          const list = getTimelines(safeData);
+          if (list.length > 0) {
+            setSelectedTimeline(list[0]);
+          }
         } else {
           throw new Error(result.error || "Cannot retrieve data from server");
         }
@@ -305,6 +352,15 @@ export default function App() {
             }
           } catch (e) {
             console.error("Error reading saved data fallback", e);
+          }
+        }
+
+        const savedPublished = localStorage.getItem("marketing_published_comments");
+        if (savedPublished) {
+          try {
+            setPublishedComments(JSON.parse(savedPublished));
+          } catch (e) {
+            console.error("Error reading saved comments fallback", e);
           }
         }
       }
@@ -324,6 +380,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("marketing_users_list", JSON.stringify(users));
   }, [users]);
+
+  // Persist brandKpis to localStorage
+  useEffect(() => {
+    localStorage.setItem("marketing_brand_kpis", JSON.stringify(brandKpis));
+  }, [brandKpis]);
 
   // Login handler
   const handleLogin = (e: React.FormEvent) => {
@@ -439,6 +500,35 @@ export default function App() {
     }
   };
 
+  const handleUpdateBrandKpi = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated = brandKpis.map(k => {
+      if (k.id === kpiBrandId) {
+        return {
+          ...k,
+          sovTargetRank: kpiSovTargetRank,
+          contentTarget: kpiContentTarget,
+          prTarget: kpiPrTarget,
+          comment: kpiComment
+        };
+      }
+      return k;
+    });
+    setBrandKpis(updated);
+    triggerNotification("success", `Đã cập nhật mục tiêu KPI cho nhãn hàng ${kpiBrandId.toUpperCase()} thành công!`);
+  };
+
+  const handleSelectKpiBrand = (brandId: "livotec" | "karofi") => {
+    setKpiBrandId(brandId);
+    const found = brandKpis.find(k => k.id === brandId);
+    if (found) {
+      setKpiSovTargetRank(found.sovTargetRank);
+      setKpiContentTarget(found.contentTarget);
+      setKpiPrTarget(found.prTarget);
+      setKpiComment(found.comment);
+    }
+  };
+
   // Google Drive connection and Server DB sync
   const handleDriveImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -551,18 +641,20 @@ export default function App() {
       if (response.ok && result.success) {
         const aiAnalysis = result.analysis;
         
-        // Update draft for current brand
-        const updatedDraft = { ...draftComments };
-        updatedDraft[selectedBrand] = {
+        // Update draft with all categories
+        const updatedDraft: BrandComments = {
           evaluation: aiAnalysis.executiveSummary.evaluation,
           proposals: aiAnalysis.executiveSummary.proposals,
           categories: {
-            sov: aiAnalysis.categoryAnalysis.sov,
-            kol_koc: aiAnalysis.categoryAnalysis.kol_koc,
-            tvc: aiAnalysis.categoryAnalysis.tvc,
-            paid_ads: aiAnalysis.categoryAnalysis.paid_ads,
-            seo: aiAnalysis.categoryAnalysis.seo,
-            btl_trade: aiAnalysis.categoryAnalysis.btl_trade,
+            sov: aiAnalysis.categoryAnalysis.sov || "",
+            kol_koc: aiAnalysis.categoryAnalysis.kol_koc || "",
+            content: aiAnalysis.categoryAnalysis.content || "",
+            tvc: aiAnalysis.categoryAnalysis.tvc || "",
+            pr: aiAnalysis.categoryAnalysis.pr || "",
+            ooh: aiAnalysis.categoryAnalysis.ooh || "",
+            paid_ads: aiAnalysis.categoryAnalysis.paid_ads || "",
+            seo: aiAnalysis.categoryAnalysis.seo || "",
+            btl_trade: aiAnalysis.categoryAnalysis.btl_trade || "",
           }
         };
 
@@ -582,25 +674,60 @@ export default function App() {
 
   // Draft changes
   const handleDraftCommentChange = (field: "evaluation" | "proposals", value: string) => {
-    const updated = { ...draftComments };
-    updated[selectedBrand][field] = value;
-    setDraftComments(updated);
+    setDraftComments((prev) => ({
+      ...prev,
+      [field]: value
+    }));
     setHasUnpublishedChanges(true);
   };
 
-  const handleDraftCategoryChange = (catKey: keyof typeof DEFAULT_COMMENTS_LIVOTEC.categories, value: string) => {
-    const updated = { ...draftComments };
-    updated[selectedBrand].categories[catKey] = value;
-    setDraftComments(updated);
+  const handleDraftCategoryChange = (catKey: keyof CategoryComments, value: string) => {
+    setDraftComments((prev) => ({
+      ...prev,
+      categories: {
+        ...prev.categories,
+        [catKey]: value
+      }
+    }));
     setHasUnpublishedChanges(true);
   };
 
-  // Publish Draft to live reporting dashboard
-  const handlePublish = () => {
-    setPublishedComments(JSON.parse(JSON.stringify(draftComments)));
-    localStorage.setItem("marketing_published_comments", JSON.stringify(draftComments));
-    setHasUnpublishedChanges(false);
-    triggerNotification("success", `Đã xuất bản thành công các nhận định mới của ${selectedBrand} lên báo cáo chính thức!`);
+  // Publish Draft to live reporting dashboard and save to server
+  const handlePublish = async () => {
+    const updatedWeekComments = {
+      ...(publishedComments[selectedTimeline.id] || {
+        Livotec: DEFAULT_COMMENTS_LIVOTEC,
+        Karofi: DEFAULT_COMMENTS_KAROFI,
+      }),
+      [selectedBrand]: draftComments,
+    };
+
+    const newPublishedComments = {
+      ...publishedComments,
+      [selectedTimeline.id]: updatedWeekComments,
+    };
+
+    try {
+      const response = await fetch("/api/save-comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          week: selectedTimeline.id,
+          comments: updatedWeekComments,
+        }),
+      });
+      if (response.ok) {
+        setPublishedComments(newPublishedComments);
+        localStorage.setItem("marketing_published_comments", JSON.stringify(newPublishedComments));
+        setHasUnpublishedChanges(false);
+        triggerNotification("success", `Đã xuất bản và lưu nhận định thành công cho tuần ${selectedTimeline.label}!`);
+      } else {
+        triggerNotification("error", "Có lỗi xảy ra khi lưu nhận định lên máy chủ.");
+      }
+    } catch (err) {
+      console.error("Failed to save comments:", err);
+      triggerNotification("error", "Không thể kết nối đến máy chủ để lưu nhận định.");
+    }
   };
 
   // ------------------------------------------------------------
@@ -669,6 +796,57 @@ export default function App() {
     item.tích_lũy_tháng += (row.tích_lũy_tháng || 0);
   });
   const contentByHạngMục = Array.from(contentByHạngMụcMap.values());
+
+  // 3.1 TVC (GRPS) - Filter TVC with metric GRPS
+  const tvcGrpsRows = brandDigital.filter(
+    (row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "tvc" && row.chỉ_số_metric && row.chỉ_số_metric.toLowerCase() === "grps"
+  );
+  const tvcGrpsChartData = tvcGrpsRows.map(row => ({
+    name: row.kênh_channel || "Khác",
+    "KPI Tuần": row.mục_tiêu_target || 0,
+    "Thực tế tuần": row.thực_tế_actual || 0,
+    "Tích lũy tháng": row.tích_lũy_tháng || 0,
+  }));
+
+  // PR charts data - split into quantity and views
+  const prQuantityRows = brandOohPr.filter(r => r.hạng_mục && (r.hạng_mục.toLowerCase() === "pr - báo chí" || r.hạng_mục.toLowerCase() === "pr") && r.chỉ_số_metric && r.chỉ_số_metric.toLowerCase() === "quantity");
+  const prViewsRows = brandOohPr.filter(r => r.hạng_mục && (r.hạng_mục.toLowerCase() === "pr - báo chí" || r.hạng_mục.toLowerCase() === "pr") && r.chỉ_số_metric && r.chỉ_số_metric.toLowerCase() === "views");
+
+  const prQuantityChartData = prQuantityRows.map(row => ({
+    name: row.ngành_hàng || "Ngành hàng",
+    "KPI Tuần": row.mục_tiêu_target || 0,
+    "Thực tế tuần": row.thực_tế_actual || 0,
+    "Tích lũy tháng": row.tích_lũy_tháng || 0,
+  }));
+
+  const prViewsChartData = prViewsRows.map(row => ({
+    name: row.ngành_hàng || "Ngành hàng",
+    "KPI Tuần": row.mục_tiêu_target || 0,
+    "Thực tế tuần": row.thực_tế_actual || 0,
+    "Tích lũy tháng": row.tích_lũy_tháng || 0,
+  }));
+
+  // OOH sub-categories charts data - LCD Building, LED Cities, LED Airport, Pano
+  const oohRows = brandOohPr.filter(row => row.hạng_mục && row.hạng_mục.toLowerCase() === "ooh");
+
+  const lcdBuildingRows = oohRows.filter(r => r.kênh_channel && r.kênh_channel.toLowerCase() === "lcd building");
+  const ledCitiesRows = oohRows.filter(r => r.kênh_channel && r.kênh_channel.toLowerCase() === "led cities");
+  const ledAirportRows = oohRows.filter(r => r.kênh_channel && r.kênh_channel.toLowerCase() === "led airport");
+  const panoRows = oohRows.filter(r => r.kênh_channel && r.kênh_channel.toLowerCase() === "pano");
+
+  const makeOohChartData = (rows: any[]) => {
+    return rows.map(r => ({
+      name: r.chỉ_số_metric || "Vị trí",
+      "KPI Tuần": r.mục_tiêu_target || 0,
+      "Thực tế tuần": r.thực_tế_actual || 0,
+      "Tích lũy tháng": r.tích_lũy_tháng || 0,
+    }));
+  };
+
+  const lcdBuildingChartData = makeOohChartData(lcdBuildingRows);
+  const ledCitiesChartData = makeOohChartData(ledCitiesRows);
+  const ledAirportChartData = makeOohChartData(ledAirportRows);
+  const panoChartData = makeOohChartData(panoRows);
 
   // 4. SEO Organic Traffic Weekly & Monthly
   const seoTrafficRow = brandDigital.find(
@@ -755,6 +933,9 @@ export default function App() {
   const hasSovData = sovPercentage > 0;
   const hasKolData = brandKolKoc.length > 0;
   const hasContentData = contentRows.length > 0;
+  const hasTvcData = tvcGrpsRows.length > 0;
+  const hasPrData = prQuantityRows.length > 0 || prViewsRows.length > 0;
+  const hasOohData = oohRows.length > 0;
   const hasAdsData = brandDigital.some((row) => row.hạng_mục === "Paid Ads");
   const hasSeoData = brandDigital.some(
     (row) => row.hạng_mục === "SEO Website" || row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page"
@@ -764,11 +945,20 @@ export default function App() {
   const tabsStatus: { [key: string]: boolean } = {
     sov: hasSovData,
     kol: hasKolData,
-    tvc: hasContentData,
+    content: hasContentData,
+    tvc: hasTvcData,
+    pr: hasPrData,
+    ooh: hasOohData,
     ads: hasAdsData,
     seo: hasSeoData,
     btl: hasBtlData,
   };
+
+  const hasPreviousWeek = (() => {
+    const sorted = timelines.map(t => t.id).sort((a, b) => b.localeCompare(a));
+    const idx = sorted.indexOf(selectedTimeline.id);
+    return idx !== -1 && idx + 1 < sorted.length;
+  })();
 
   // Render scorecard lists dynamically based on rules:
   // - Fixed: Share of Voice (SOV), Content, SEO (Organic Traffic)
@@ -776,6 +966,12 @@ export default function App() {
   // - Fixed: Ads. Amount Spent, Ads. Impression, Ads. Frequency
   // - Ads. Reach is added ONLY if scorecard count is less than 8.
   
+  const currentBrandKpi = brandKpis.find(k => k.brandName.toLowerCase() === selectedBrand.toLowerCase()) || {
+    sovTargetRank: selectedBrand === "Livotec" ? "Rank #5" : "Rank #2",
+    contentTarget: selectedBrand === "Livotec" ? 14 : 24,
+    prTarget: selectedBrand === "Livotec" ? 5 : 1
+  };
+
   const scorecards: {
     id: string;
     title: string;
@@ -795,7 +991,7 @@ export default function App() {
       title: "Share Of Voice (SOV)",
       value: `${sovPercentage.toFixed(1)}%`,
       targetLabel: "Thị phần thảo luận",
-      targetVal: selectedBrand === "Livotec" ? "Rank #5" : "Rank #2",
+      targetVal: currentBrandKpi.sovTargetRank,
       icon: Percent,
       color: "text-indigo-600 border-indigo-100",
       bg: "bg-indigo-50/50",
@@ -809,8 +1005,8 @@ export default function App() {
       title: "Content (Ấn phẩm)",
       value: `${weeklyContentSum} bài/video`,
       targetLabel: "Kế hoạch tuần",
-      targetVal: selectedBrand === "Livotec" ? "14 bài" : "24 bài",
-      percent: Math.min(Math.round((weeklyContentSum / (selectedBrand === "Livotec" ? 14 : 24)) * 100), 150),
+      targetVal: `${currentBrandKpi.contentTarget} bài`,
+      percent: Math.min(Math.round((weeklyContentSum / currentBrandKpi.contentTarget) * 100), 150),
       icon: Video,
       color: "text-pink-600 border-pink-100",
       bg: "bg-pink-50/50",
@@ -852,8 +1048,8 @@ export default function App() {
       id: "pr",
       title: "PR - Bài viết",
       value: `${prQuantitySum} bài báo`,
-      targetLabel: `Target: ${selectedBrand === "Livotec" ? "5 bài" : "1 bài"}`,
-      percent: Math.round((prQuantitySum / (selectedBrand === "Livotec" ? 5 : 1)) * 100),
+      targetLabel: `Target: ${currentBrandKpi.prTarget} bài`,
+      percent: Math.round((prQuantitySum / currentBrandKpi.prTarget) * 100),
       icon: FileText,
       color: "text-purple-600 border-purple-100",
       bg: "bg-purple-50/50",
@@ -884,7 +1080,7 @@ export default function App() {
     scorecards.push({
       id: "ads_spent",
       title: "Ads. Amount Spent",
-      value: `${(weeklyAdsSpent / 1000000).toFixed(1)}M VNĐ`,
+      value: `${(weeklyAdsSpent / 1000000).toFixed(1)}M Đ`,
       targetLabel: "Chi tiêu lũy kế tháng",
       targetVal: `${(monthlyAdsSpent / 1000000).toFixed(0)}M/${(monthlyAdsSpentTarget / 1000000).toFixed(0)}M`,
       percent: Math.round((monthlyAdsSpent / monthlyAdsSpentTarget) * 100),
@@ -940,8 +1136,128 @@ export default function App() {
     });
   }
 
+  // WoW Comparison Helper
+  const getWowComparison = (
+    category: "sov" | "ads" | "seo",
+    rowMetric: string,
+    rowChannel?: string,
+    rowIndustry?: string,
+    rowHangMuc?: string
+  ) => {
+    // 1. Find previous week ID
+    const sorted = timelines.map(t => t.id).sort((a, b) => b.localeCompare(a));
+    const idx = sorted.indexOf(selectedTimeline.id);
+    if (idx === -1 || idx + 1 >= sorted.length) return null; // No previous week
+    const prevWeekId = sorted[idx + 1];
+
+    // 2. Query previous week value
+    let currentVal: number | null = null;
+    let prevVal: number | null = null;
+
+    if (category === "sov") {
+      // rowChannel is the Brand name (e.g. "Livotec", "Karofi", "Sunhouse" etc.)
+      const currentRows = digitalMarketingList.filter(
+        (row) => row.hạng_mục === "Social Listening" && row.week === selectedTimeline.id
+      );
+      const prevRows = digitalMarketingList.filter(
+        (row) => row.hạng_mục === "Social Listening" && row.week === prevWeekId
+      );
+
+      const currentMatch = currentRows.find(
+        (row) => row.kênh_channel && row.kênh_channel.toLowerCase() === rowChannel?.toLowerCase()
+      );
+      const prevMatch = prevRows.find(
+        (row) => row.kênh_channel && row.kênh_channel.toLowerCase() === rowChannel?.toLowerCase()
+      );
+
+      currentVal = currentMatch ? (currentMatch.thực_tế_actual || 0) * 100 : 0;
+      prevVal = prevMatch ? (prevMatch.thực_tế_actual || 0) * 100 : 0;
+      
+      const diff = currentVal - prevVal;
+      return {
+        prevVal,
+        diff,
+        formatted: `${diff >= 0 ? "+" : ""}${diff.toFixed(1)}%`
+      };
+    } else if (category === "ads") {
+      // Find row in current and prev week
+      const currentRows = digitalMarketingList.filter(
+        (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+                 row.hạng_mục === "Paid Ads" && row.week === selectedTimeline.id
+      );
+      const prevRows = digitalMarketingList.filter(
+        (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+                 row.hạng_mục === "Paid Ads" && row.week === prevWeekId
+      );
+
+      const currentMatch = currentRows.find((p) => 
+        p.kênh_channel === rowChannel && 
+        p.ngành_hàng === rowIndustry && 
+        p.chỉ_số_metric === rowMetric
+      );
+      const prevMatch = prevRows.find((p) => 
+        p.kênh_channel === rowChannel && 
+        p.ngành_hàng === rowIndustry && 
+        p.chỉ_số_metric === rowMetric
+      );
+
+      if (!currentMatch || !prevMatch) return null;
+
+      const isWeek = categoryTimeViews.paidAds === "week";
+      currentVal = isWeek ? currentMatch.thực_tế_actual : currentMatch.tích_lũy_tháng;
+      prevVal = isWeek ? prevMatch.thực_tế_actual : prevMatch.tích_lũy_tháng;
+
+      if (currentVal === null || prevVal === null || prevVal === 0) return null;
+
+      const percent = ((currentVal - prevVal) / prevVal) * 100;
+      return {
+        prevVal,
+        percent,
+        formatted: `${percent >= 0 ? "+" : ""}${percent.toFixed(1)}%`
+      };
+    } else if (category === "seo") {
+      // Find row in current and prev week for SEO Website / Content
+      const currentRows = digitalMarketingList.filter(
+        (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+                 row.week === selectedTimeline.id
+      );
+      const prevRows = digitalMarketingList.filter(
+        (row) => row.brand && row.brand.toLowerCase() === selectedBrand.toLowerCase() &&
+                 row.week === prevWeekId
+      );
+
+      const currentMatch = currentRows.find((p) => 
+        p.hạng_mục === rowHangMuc && 
+        (rowMetric ? p.chỉ_số_metric === rowMetric : true) &&
+        (rowIndustry ? p.ngành_hàng === rowIndustry : true)
+      );
+      const prevMatch = prevRows.find((p) => 
+        p.hạng_mục === rowHangMuc && 
+        (rowMetric ? p.chỉ_số_metric === rowMetric : true) &&
+        (rowIndustry ? p.ngành_hàng === rowIndustry : true)
+      );
+
+      if (!currentMatch || !prevMatch) return null;
+
+      const isWeek = categoryTimeViews.seo === "week";
+      currentVal = isWeek ? currentMatch.thực_tế_actual : currentMatch.tích_lũy_tháng;
+      prevVal = isWeek ? prevMatch.thực_tế_actual : prevMatch.tích_lũy_tháng;
+
+      if (currentVal === null || prevVal === null || prevVal === 0) return null;
+
+      const percent = ((currentVal - prevVal) / prevVal) * 100;
+      return {
+        prevVal,
+        percent,
+        formatted: `${percent >= 0 ? "+" : ""}${percent.toFixed(1)}%`
+      };
+    }
+
+    return null;
+  };
+
   // Active brand comments for display in Box 2 and Box 3
-  const activeComments = publishedComments[selectedBrand];
+  const activeComments = getActiveComments(selectedTimeline.id, selectedBrand);
 
   // Helper to render formatting of Proposals in Box 2
   const renderFormattedText = (text: string) => {
@@ -1401,11 +1717,14 @@ export default function App() {
                     {[
                       { id: "sov", label: "Share Of Voice (SOV)" },
                       { id: "kol", label: "KOL / KOC" },
-                      { id: "tvc", label: "Content & Sáng tạo" },
+                      { id: "content", label: "Content & Sáng tạo" },
+                      { id: "tvc", label: "TVC (GRPS)" },
+                      { id: "pr", label: "PR - Báo chí" },
+                      { id: "ooh", label: "Quảng cáo OOH" },
                       { id: "ads", label: "Paid Ads (Quảng Cáo)" },
                       { id: "seo", label: "SEO Website & Content" },
                       { id: "btl", label: "BTL & Trade Marketing" },
-                    ].filter(tab => tabsStatus[tab.id]).map((tab) => (
+                    ].filter(tab => tabsStatus[tab.id as keyof typeof tabsStatus]).map((tab) => (
                       <button
                         key={tab.id}
                         id={`cat_tab_${tab.id}`}
@@ -1464,7 +1783,23 @@ export default function App() {
                       <span className="font-bold text-slate-900 block text-xs uppercase tracking-wider">
                         Đánh giá của nhà phân tích chuyên sâu:
                       </span>
-                      <p>{activeComments.categories[activeCategoryTab]}</p>
+                      <p>
+                        {(() => {
+                          const tabKeyMap: Record<string, keyof CategoryComments> = {
+                            sov: "sov",
+                            kol: "kol_koc",
+                            content: "content",
+                            tvc: "tvc",
+                            pr: "pr",
+                            ooh: "ooh",
+                            ads: "paid_ads",
+                            seo: "seo",
+                            btl: "btl_trade"
+                          };
+                          const commentKey = tabKeyMap[activeCategoryTab];
+                          return activeComments.categories[commentKey] || "Chưa có nhận định.";
+                        })()}
+                      </p>
                     </div>
                   </div>
 
@@ -1519,41 +1854,54 @@ export default function App() {
                               <tr>
                                 <th className="px-4 py-3">Thương hiệu</th>
                                 <th className="px-4 py-3 text-right">Thị phần SOV</th>
+                                {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
                                 <th className="px-4 py-3 text-right">Trạng thái</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 text-slate-700 font-mono">
-                              {sovData.map((row) => (
-                                <tr
-                                  key={row.name}
-                                  className={`${
-                                    row.name.toLowerCase() === selectedBrand.toLowerCase()
-                                      ? "bg-slate-50 font-semibold text-slate-950"
-                                      : ""
-                                  }`}
-                                >
-                                  <td className="px-4 py-3 font-sans flex items-center gap-2">
-                                    <span
-                                      className="h-2.5 w-2.5 rounded-full shrink-0"
-                                      style={{
-                                        backgroundColor:
-                                          row.name.toLowerCase() === "livotec" ? "#0d9488" :
-                                          row.name.toLowerCase() === "karofi" ? "#2563eb" :
-                                          row.name.toLowerCase() === "kang" ? "#ea580c" :
-                                          row.name.toLowerCase() === "sunhouse" ? "#dc2626" :
-                                          row.name.toLowerCase() === "hòa phát" ? "#4f46e5" : "#94a3b8"
-                                      }}
-                                    />
-                                    {row.name}
-                                  </td>
-                                  <td className="px-4 py-3 text-right font-medium">{row.formatted}</td>
-                                  <td className="px-4 py-3 text-right font-sans">
-                                    {row.name.toLowerCase() === "livotec" && <span className="text-[10px] text-teal-600 font-bold uppercase">Nhãn hàng xem</span>}
-                                    {row.name.toLowerCase() === "karofi" && <span className="text-[10px] text-blue-600 font-bold uppercase">Nhãn hàng xem</span>}
-                                    {row.name.toLowerCase() !== "livotec" && row.name.toLowerCase() !== "karofi" && <span className="text-[10px] text-slate-400">Đối thủ</span>}
-                                  </td>
-                                </tr>
-                              ))}
+                              {sovData.map((row) => {
+                                const wow = hasPreviousWeek ? getWowComparison("sov", "", row.name) : null;
+                                return (
+                                  <tr
+                                    key={row.name}
+                                    className={`${
+                                      row.name.toLowerCase() === selectedBrand.toLowerCase()
+                                        ? "bg-slate-50 font-semibold text-slate-950"
+                                        : ""
+                                    }`}
+                                  >
+                                    <td className="px-4 py-3 font-sans flex items-center gap-2">
+                                      <span
+                                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                                        style={{
+                                          backgroundColor:
+                                            row.name.toLowerCase() === "livotec" ? "#0d9488" :
+                                            row.name.toLowerCase() === "karofi" ? "#2563eb" :
+                                            row.name.toLowerCase() === "kang" ? "#ea580c" :
+                                            row.name.toLowerCase() === "sunhouse" ? "#dc2626" :
+                                            row.name.toLowerCase() === "hòa phát" ? "#4f46e5" : "#94a3b8"
+                                        }}
+                                      />
+                                      {row.name}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-medium">{row.formatted}</td>
+                                    {hasPreviousWeek && (
+                                      <td className="px-4 py-3 text-right font-sans font-bold">
+                                        {wow ? (
+                                          <span className={wow.diff >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                                            {wow.formatted}
+                                          </span>
+                                        ) : "—"}
+                                      </td>
+                                    )}
+                                    <td className="px-4 py-3 text-right font-sans">
+                                      {row.name.toLowerCase() === "livotec" && <span className="text-[10px] text-teal-600 font-bold uppercase">Nhãn hàng xem</span>}
+                                      {row.name.toLowerCase() === "karofi" && <span className="text-[10px] text-blue-600 font-bold uppercase">Nhãn hàng xem</span>}
+                                      {row.name.toLowerCase() !== "livotec" && row.name.toLowerCase() !== "karofi" && <span className="text-[10px] text-slate-400">Đối thủ</span>}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -1639,7 +1987,7 @@ export default function App() {
                   {/* ------------------------------------------------------------
                       CATEGORY VIEW: 3. CONTENT & SÁNG TẠO
                      ------------------------------------------------------------ */}
-                  {activeCategoryTab === "tvc" && (
+                  {activeCategoryTab === "content" && (
                     <div className="space-y-6">
                       <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
                         <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
@@ -1683,6 +2031,265 @@ export default function App() {
                                     <div className="font-medium text-slate-800">{row.ngành_hàng}</div>
                                     <div className="text-slate-400 font-mono whitespace-pre-line">{row.kênh_channel}</div>
                                   </td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium">{row.mục_tiêu_target !== null ? row.mục_tiêu_target : "—"}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual : "—"}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium text-indigo-600">{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng : "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------------------
+                      CATEGORY VIEW: 3.1 TVC (GRPS)
+                     ------------------------------------------------------------ */}
+                  {activeCategoryTab === "tvc" && (
+                    <div className="space-y-6">
+                      <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                        <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                          Biểu Đồ Kênh TVC (GRPS) - So Sánh Kênh Sóng
+                        </span>
+                        <ResponsiveContainer width="100%" height="85%">
+                          <BarChart data={tvcGrpsChartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                            <YAxis />
+                            <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                            <Legend />
+                            <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Data table */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                          Bảng Dữ Liệu Chi Tiết TVC (Chỉ số GRPS)
+                        </span>
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3">Kênh Sóng (Channel)</th>
+                                <th className="px-4 py-3">Ngành hàng</th>
+                                <th className="px-4 py-3 text-right">KPI Tuần (GRPS)</th>
+                                <th className="px-4 py-3 text-right">Thực tế Tuần (GRPS)</th>
+                                <th className="px-4 py-3 text-right">Tích lũy Tháng (GRPS)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {tvcGrpsRows.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-3 font-semibold text-slate-900">{row.kênh_channel}</td>
+                                  <td className="px-4 py-3 text-slate-600 font-sans">{row.ngành_hàng}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium">{row.mục_tiêu_target !== null ? row.mục_tiêu_target : "—"}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual : "—"}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium text-indigo-600">{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng : "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------------------
+                      CATEGORY VIEW: PR - BÁO CHÍ
+                     ------------------------------------------------------------ */}
+                  {activeCategoryTab === "pr" && (
+                    <div className="space-y-6">
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {/* PR Quantity Chart */}
+                        <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                          <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                            Biểu Đồ PR - Số Bài Viết (Quantity)
+                          </span>
+                          <ResponsiveContainer width="100%" height="80%">
+                            <BarChart data={prQuantityChartData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                              <YAxis />
+                              <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                              <Legend />
+                              <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* PR Views Chart */}
+                        <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                          <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                            Biểu Đồ PR - Số Lượt Xem (Views)
+                          </span>
+                          <ResponsiveContainer width="100%" height="80%">
+                            <BarChart data={prViewsChartData}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                              <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                              <YAxis />
+                              <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                              <Legend />
+                              <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                              <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Data table */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                          Bảng Dữ Liệu Chi Tiết PR & Báo Chí
+                        </span>
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3">Ngành hàng</th>
+                                <th className="px-4 py-3">Hạng mục (Kênh)</th>
+                                <th className="px-4 py-3">Metric</th>
+                                <th className="px-4 py-3 text-right">KPI Tuần</th>
+                                <th className="px-4 py-3 text-right">Thực tế Tuần</th>
+                                <th className="px-4 py-3 text-right">Tích lũy Tháng</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {[...prQuantityRows, ...prViewsRows].map((row, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-3 font-semibold text-slate-900">{row.ngành_hàng}</td>
+                                  <td className="px-4 py-3 text-slate-600">{row.hạng_mục} ({row.kênh_channel || "Báo chí"})</td>
+                                  <td className="px-4 py-3 uppercase font-mono text-[10px] bg-slate-100 text-slate-700 rounded px-1.5 py-0.5 inline-block my-2">{row.chỉ_số_metric}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium">{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                  <td className="px-4 py-3 text-right font-mono font-medium text-indigo-600">{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ------------------------------------------------------------
+                      CATEGORY VIEW: QUẢNG CÁO OOH
+                     ------------------------------------------------------------ */}
+                  {activeCategoryTab === "ooh" && (
+                    <div className="space-y-6">
+                      {/* Grid of charts, hiding those with no data */}
+                      <div className="grid gap-6 md:grid-cols-2">
+                        {lcdBuildingChartData.length > 0 && (
+                          <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                            <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                              Biểu Đồ LCD Building
+                            </span>
+                            <ResponsiveContainer width="100%" height="80%">
+                              <BarChart data={lcdBuildingChartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                <YAxis />
+                                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                                <Legend />
+                                <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+
+                        {ledCitiesChartData.length > 0 && (
+                          <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                            <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                              Biểu Đồ LED Cities
+                            </span>
+                            <ResponsiveContainer width="100%" height="80%">
+                              <BarChart data={ledCitiesChartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                <YAxis />
+                                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                                <Legend />
+                                <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+
+                        {ledAirportChartData.length > 0 && (
+                          <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                            <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                              Biểu Đồ LED Airport
+                            </span>
+                            <ResponsiveContainer width="100%" height="80%">
+                              <BarChart data={ledAirportChartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                <YAxis />
+                                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                                <Legend />
+                                <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+
+                        {panoChartData.length > 0 && (
+                          <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm">
+                            <span className="text-xs font-bold text-slate-400 block pb-4 uppercase tracking-wide">
+                              Biểu Đồ Pano
+                            </span>
+                            <ResponsiveContainer width="100%" height="80%">
+                              <BarChart data={panoChartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                <YAxis />
+                                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                                <Legend />
+                                <Bar dataKey="KPI Tuần" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Thực tế tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Tích lũy tháng" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Data table */}
+                      <div className="space-y-2">
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                          Bảng Dữ Liệu Chi Tiết Quảng Cáo Ngoài Trời (OOH)
+                        </span>
+                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3">Hạng mục (Kênh)</th>
+                                <th className="px-4 py-3">Vị trí & Chi tiết</th>
+                                <th className="px-4 py-3">Ngành hàng</th>
+                                <th className="px-4 py-3 text-right">KPI Tuần</th>
+                                <th className="px-4 py-3 text-right">Thực tế Tuần</th>
+                                <th className="px-4 py-3 text-right">Tích lũy Tháng</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                              {oohRows.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-3 font-semibold text-slate-900 uppercase text-[11px]">{row.kênh_channel}</td>
+                                  <td className="px-4 py-3 font-medium text-slate-700">{row.chỉ_số_metric}</td>
+                                  <td className="px-4 py-3 text-slate-500">{row.ngành_hàng}</td>
                                   <td className="px-4 py-3 text-right font-mono font-medium">{row.mục_tiêu_target !== null ? row.mục_tiêu_target : "—"}</td>
                                   <td className="px-4 py-3 text-right font-mono font-medium text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual : "—"}</td>
                                   <td className="px-4 py-3 text-right font-mono font-medium text-indigo-600">{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng : "—"}</td>
@@ -1782,7 +2389,7 @@ export default function App() {
                                   const numVal = Number(value);
                                   if (isNaN(numVal)) return ["—", name];
                                   if (metricName.includes("spent") || metricName.includes("Spent") || metricName.includes("VNĐ") || metricName.toUpperCase().includes("CPM")) {
-                                    return [`${numVal.toLocaleString()} VNĐ`, name];
+                                    return [`${numVal.toLocaleString()} Đ`, name];
                                   }
                                   return [numVal.toLocaleString(), name];
                                 }}
@@ -1807,6 +2414,7 @@ export default function App() {
                                   <th className="px-4 py-3">Chỉ số đo lường</th>
                                   <th className="px-4 py-3 text-right">KPI Mục tiêu</th>
                                   <th className="px-4 py-3 text-right">Kết quả Đạt được</th>
+                                  {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
                                   <th className="px-4 py-3 text-right">Tỷ lệ Đạt</th>
                                 </tr>
                               </thead>
@@ -1833,7 +2441,7 @@ export default function App() {
 
                                   if (target !== null && target !== undefined) {
                                     if (isAmountSpent || isCPM) {
-                                      formattedTarget = `${target.toLocaleString()} VNĐ`;
+                                      formattedTarget = `${target.toLocaleString()} Đ`;
                                     } else {
                                       formattedTarget = target.toLocaleString();
                                     }
@@ -1841,11 +2449,13 @@ export default function App() {
 
                                   if (actual !== null && actual !== undefined) {
                                     if (isAmountSpent || isCPM) {
-                                      formattedActual = `${actual.toLocaleString()} VNĐ`;
+                                      formattedActual = `${actual.toLocaleString()} Đ`;
                                     } else {
                                       formattedActual = actual.toLocaleString();
                                     }
                                   }
+
+                                  const wow = hasPreviousWeek ? getWowComparison("ads", row.chỉ_số_metric, row.kênh_channel, row.ngành_hàng) : null;
 
                                   return (
                                     <tr key={idx} className="hover:bg-slate-50/50">
@@ -1853,11 +2463,33 @@ export default function App() {
                                       <td className="px-4 py-3 font-sans text-slate-500">{row.chỉ_số_metric}</td>
                                       <td className="px-4 py-3 text-right font-medium">{formattedTarget}</td>
                                       <td className="px-4 py-3 text-right font-semibold text-blue-600">{formattedActual}</td>
+                                      {hasPreviousWeek && (
+                                        <td className="px-4 py-3 text-right font-sans font-bold">
+                                          {wow ? (
+                                            <span className={wow.percent >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                                              {wow.formatted}
+                                            </span>
+                                          ) : "—"}
+                                        </td>
+                                      )}
                                       <td className="px-4 py-3 text-right font-sans font-bold">
                                         {rate !== null ? (
-                                          <span className={rate >= 100 ? "text-emerald-600" : rate >= 70 ? "text-amber-500" : "text-rose-500"}>
-                                            {rate}%
-                                          </span>
+                                          isCPM ? (
+                                            (() => {
+                                              const isOptimal = actual <= target;
+                                              return (
+                                                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                                  isOptimal ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-700 border border-rose-200"
+                                                }`}>
+                                                  {isOptimal ? "Tối ưu" : "Cần xem xét"} ({rate}%)
+                                                </span>
+                                              );
+                                            })()
+                                          ) : (
+                                            <span className={rate >= 100 ? "text-emerald-600" : rate >= 70 ? "text-amber-500" : "text-rose-500"}>
+                                              {rate}%
+                                            </span>
+                                          )
                                         ) : "—"}
                                       </td>
                                     </tr>
@@ -1916,6 +2548,7 @@ export default function App() {
                                   <th className="px-4 py-3">Chỉ số</th>
                                   <th className="px-4 py-3 text-right">KPI Mục tiêu</th>
                                   <th className="px-4 py-3 text-right">Thực tế đạt</th>
+                                  {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
                                   <th className="px-4 py-3 text-right">Tỷ lệ</th>
                                 </tr>
                               </thead>
@@ -1927,11 +2560,21 @@ export default function App() {
                                     const target = isWeek ? row.mục_tiêu_target : row.target_tháng;
                                     const actual = isWeek ? row.thực_tế_actual : row.tích_lũy_tháng;
                                     const rate = target && actual ? Math.round((actual / target) * 100) : 0;
+                                    const wow = hasPreviousWeek ? getWowComparison("seo", row.chỉ_số_metric, undefined, undefined, "SEO Website") : null;
                                     return (
                                       <tr key={idx}>
                                         <td className="px-4 py-3 font-sans font-semibold text-slate-900">{row.chỉ_số_metric}</td>
                                         <td className="px-4 py-3 text-right font-medium">{target !== null && target !== undefined ? target.toLocaleString() : "—"}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-emerald-600">{actual !== null && actual !== undefined ? actual.toLocaleString() : "—"}</td>
+                                        {hasPreviousWeek && (
+                                          <td className="px-4 py-3 text-right font-sans font-bold">
+                                            {wow ? (
+                                              <span className={wow.percent >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                                                {wow.formatted}
+                                              </span>
+                                            ) : "—"}
+                                          </td>
+                                        )}
                                         <td className="px-4 py-3 text-right font-sans font-bold text-emerald-600">{rate}%</td>
                                       </tr>
                                     );
@@ -1953,22 +2596,35 @@ export default function App() {
                                   <th className="px-4 py-3">Ngành hàng</th>
                                   <th className="px-4 py-3 text-right">Mục tiêu tuần</th>
                                   <th className="px-4 py-3 text-right">Đã xuất bản</th>
+                                  {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
                                   <th className="px-4 py-3 text-right">Tích lũy tháng</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-slate-700 font-mono">
                                 {brandDigital
                                   .filter((row) => row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page")
-                                  .map((row, idx) => (
-                                    <tr key={idx}>
-                                      <td className="px-4 py-3 font-sans font-semibold text-slate-900">
-                                        {row.hạng_mục} ({row.ngành_hàng})
-                                      </td>
-                                      <td className="px-4 py-3 text-right font-medium">{row.mục_tiêu_target || "—"}</td>
-                                      <td className="px-4 py-3 text-right font-semibold text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual : "—"}</td>
-                                      <td className="px-4 py-3 text-right font-medium text-indigo-600">{row.tích_lũy_tháng || "—"}</td>
-                                    </tr>
-                                  ))}
+                                  .map((row, idx) => {
+                                    const wow = hasPreviousWeek ? getWowComparison("seo", row.chỉ_số_metric, undefined, row.ngành_hàng, row.hạng_mục) : null;
+                                    return (
+                                      <tr key={idx}>
+                                        <td className="px-4 py-3 font-sans font-semibold text-slate-900">
+                                          {row.hạng_mục} ({row.ngành_hàng})
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-medium">{row.mục_tiêu_target || "—"}</td>
+                                        <td className="px-4 py-3 text-right font-semibold text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual : "—"}</td>
+                                        {hasPreviousWeek && (
+                                          <td className="px-4 py-3 text-right font-sans font-bold">
+                                            {wow ? (
+                                              <span className={wow.percent >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                                                {wow.formatted}
+                                              </span>
+                                            ) : "—"}
+                                          </td>
+                                        )}
+                                        <td className="px-4 py-3 text-right font-medium text-indigo-600">{row.tích_lũy_tháng || "—"}</td>
+                                      </tr>
+                                    );
+                                  })}
                               </tbody>
                             </table>
                           </div>
@@ -2391,6 +3047,149 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Section 4: Brand KPI Targets Database (Only Admin) */}
+                {currentUser && currentUser.role === "Admin" && (
+                  <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in">
+                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                        <Award className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-sm">
+                          Bảng mục tiêu KPI thương hiệu
+                        </h3>
+                        <p className="text-[11px] text-slate-500">Thiết lập mục tiêu so sánh hiển thị trên Scorecards</p>
+                      </div>
+                    </div>
+
+                    {/* Inline Edit Form */}
+                    <form onSubmit={handleUpdateBrandKpi} className="space-y-3 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider block">
+                          ✏️ Hiệu chỉnh KPI: {kpiBrandId.toUpperCase()}
+                        </span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectKpiBrand("livotec")}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${kpiBrandId === "livotec" ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
+                          >
+                            Livotec
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectKpiBrand("karofi")}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${kpiBrandId === "karofi" ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
+                          >
+                            Karofi
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block">SOV Target Rank</label>
+                          <input
+                            type="text"
+                            required
+                            value={kpiSovTargetRank}
+                            onChange={(e) => setKpiSovTargetRank(e.target.value)}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block">Content Target</label>
+                          <input
+                            type="number"
+                            required
+                            min={1}
+                            value={kpiContentTarget}
+                            onChange={(e) => setKpiContentTarget(Number(e.target.value))}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-500 uppercase block">PR Target</label>
+                          <input
+                            type="number"
+                            required
+                            min={0}
+                            value={kpiPrTarget}
+                            onChange={(e) => setKpiPrTarget(Number(e.target.value))}
+                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Ghi chú / Comment</label>
+                        <input
+                          type="text"
+                          value={kpiComment}
+                          onChange={(e) => setKpiComment(e.target.value)}
+                          placeholder="Nhập ghi chú mục tiêu..."
+                          className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="w-full rounded bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
+                      >
+                        Lưu cấu hình KPI
+                      </button>
+                    </form>
+
+                    {/* Brand KPIs list table */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Danh sách mục tiêu trong Cơ sở dữ liệu ({brandKpis.length})
+                      </span>
+                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
+                            <tr>
+                              <th className="px-3 py-2 text-[10px]">Thương hiệu</th>
+                              <th className="px-3 py-2 text-[10px] text-center">SOV Rank</th>
+                              <th className="px-3 py-2 text-[10px] text-center">Content</th>
+                              <th className="px-3 py-2 text-[10px] text-center">PR</th>
+                              <th className="px-3 py-2 text-right text-[10px]">Thao tác</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
+                            {brandKpis.map((k) => (
+                              <tr key={k.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-3 py-2">
+                                  <span className="font-semibold text-slate-900 block leading-tight">{k.brandName}</span>
+                                  <span className="text-[10px] text-slate-400 block truncate max-w-[120px]" title={k.comment}>{k.comment || "Không có ghi chú"}</span>
+                                </td>
+                                <td className="px-3 py-2 text-center font-mono font-medium text-slate-600">
+                                  {k.sovTargetRank}
+                                </td>
+                                <td className="px-3 py-2 text-center font-mono font-medium text-slate-600">
+                                  {k.contentTarget} bài
+                                </td>
+                                <td className="px-3 py-2 text-center font-mono font-medium text-slate-600">
+                                  {k.prTarget} bài
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectKpiBrand(k.id as any)}
+                                    className="text-indigo-600 hover:text-indigo-900 text-[11px] font-semibold cursor-pointer"
+                                  >
+                                    Chọn sửa
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </div>
 
               {/* RIGHT COLUMN: REVIEWS & SUGGESTIONS WRITER (7 Cols) */}
@@ -2445,7 +3244,7 @@ export default function App() {
                       <textarea
                         id="edit_eval_textarea"
                         rows={3}
-                        value={draftComments[selectedBrand].evaluation}
+                        value={draftComments.evaluation}
                         onChange={(e) => handleDraftCommentChange("evaluation", e.target.value)}
                         className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                       />
@@ -2459,7 +3258,7 @@ export default function App() {
                       <textarea
                         id="edit_prop_textarea"
                         rows={3}
-                        value={draftComments[selectedBrand].proposals}
+                        value={draftComments.proposals}
                         onChange={(e) => handleDraftCommentChange("proposals", e.target.value)}
                         className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                       />
@@ -2481,7 +3280,7 @@ export default function App() {
                           <textarea
                             id="edit_sov_textarea"
                             rows={3}
-                            value={draftComments[selectedBrand].categories.sov}
+                            value={draftComments.categories.sov || ""}
                             onChange={(e) => handleDraftCategoryChange("sov", e.target.value)}
                             className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                           />
@@ -2496,8 +3295,23 @@ export default function App() {
                           <textarea
                             id="edit_kol_textarea"
                             rows={3}
-                            value={draftComments[selectedBrand].categories.kol_koc}
+                            value={draftComments.categories.kol_koc || ""}
                             onChange={(e) => handleDraftCategoryChange("kol_koc", e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Content & Creative */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <FileText className="h-3.5 w-3.5 text-indigo-500" />
+                            Nhận xét Content & Sáng tạo
+                          </label>
+                          <textarea
+                            id="edit_content_textarea"
+                            rows={3}
+                            value={draftComments.categories.content || ""}
+                            onChange={(e) => handleDraftCategoryChange("content", e.target.value)}
                             className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                           />
                         </div>
@@ -2506,13 +3320,43 @@ export default function App() {
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
                             <Video className="h-3.5 w-3.5 text-indigo-500" />
-                            Nhận xét Clip TVC
+                            Nhận xét TVC (GRPS)
                           </label>
                           <textarea
                             id="edit_tvc_textarea"
                             rows={3}
-                            value={draftComments[selectedBrand].categories.tvc}
+                            value={draftComments.categories.tvc || ""}
                             onChange={(e) => handleDraftCategoryChange("tvc", e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* PR - Báo chí */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <Award className="h-3.5 w-3.5 text-indigo-500" />
+                            Nhận xét PR - Báo chí
+                          </label>
+                          <textarea
+                            id="edit_pr_textarea"
+                            rows={3}
+                            value={draftComments.categories.pr || ""}
+                            onChange={(e) => handleDraftCategoryChange("pr", e.target.value)}
+                            className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* OOH */}
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <Store className="h-3.5 w-3.5 text-indigo-500" />
+                            Nhận xét Quảng cáo OOH
+                          </label>
+                          <textarea
+                            id="edit_ooh_textarea"
+                            rows={3}
+                            value={draftComments.categories.ooh || ""}
+                            onChange={(e) => handleDraftCategoryChange("ooh", e.target.value)}
                             className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                           />
                         </div>
@@ -2526,7 +3370,7 @@ export default function App() {
                           <textarea
                             id="edit_ads_textarea"
                             rows={3}
-                            value={draftComments[selectedBrand].categories.paid_ads}
+                            value={draftComments.categories.paid_ads || ""}
                             onChange={(e) => handleDraftCategoryChange("paid_ads", e.target.value)}
                             className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                           />
@@ -2541,7 +3385,7 @@ export default function App() {
                           <textarea
                             id="edit_seo_textarea"
                             rows={3}
-                            value={draftComments[selectedBrand].categories.seo}
+                            value={draftComments.categories.seo || ""}
                             onChange={(e) => handleDraftCategoryChange("seo", e.target.value)}
                             className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                           />
@@ -2556,7 +3400,7 @@ export default function App() {
                           <textarea
                             id="edit_btl_textarea"
                             rows={3}
-                            value={draftComments[selectedBrand].categories.btl_trade}
+                            value={draftComments.categories.btl_trade || ""}
                             onChange={(e) => handleDraftCategoryChange("btl_trade", e.target.value)}
                             className="w-full rounded-lg border border-slate-300 p-2.5 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
                           />
@@ -2569,8 +3413,8 @@ export default function App() {
                   <div className="border-t border-slate-100 pt-5 flex items-center justify-end gap-3">
                     <button
                       onClick={() => {
-                        // Revert draft changes back to published
-                        setDraftComments(JSON.parse(JSON.stringify(publishedComments)));
+                        const active = getActiveComments(selectedTimeline.id, selectedBrand);
+                        setDraftComments(JSON.parse(JSON.stringify(active)));
                         setHasUnpublishedChanges(false);
                         triggerNotification("success", "Đã hủy bỏ toàn bộ các thay đổi nháp.");
                       }}
