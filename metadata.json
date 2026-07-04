@@ -1,0 +1,8 @@
+{
+  "name": "Báo cáo Marketing Livotec & Karofi",
+  "description": "Hệ thống báo cáo dữ liệu chiến dịch Marketing tuần và tháng của thương hiệu Livotec và Karofi, tích hợp Control Panel biên tập và phân tích dữ liệu chuyên sâu.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
