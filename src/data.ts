@@ -35,9 +35,10 @@ export interface BtlTradeRow {
   phân_loại: string | null;
   tần_suất: string;
   đơn_vị_tính: string;
-  thực_hiện_tháng_5: number | null;
-  kế_hoạch_tháng_6: number | null;
+  thực_hiện_tháng: number | null;
+  kế_hoạch_tháng: number | null;
   tích_lũy_tháng: number | null;
+  [key: string]: any;
 }
 
 export interface MonthlyOohPrRow {
@@ -193,7 +194,26 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
         let normalizedHangMucLon = rawHangMucLon.toString().trim();
         if (rawHangMucLonUpper === "POSM") normalizedHangMucLon = "POSM";
 
-        return {
+        const getBtlField = (keysToCheck: string[]) => {
+          for (const k of keysToCheck) {
+            const val = getNumVal(row, [k]);
+            if (val !== null) return val;
+          }
+          // Search key prefix/suffixes
+          for (const rawK of Object.keys(row)) {
+            const normalizedK = rawK.toLowerCase().replace(/\s+/g, "_").trim();
+            for (const expected of keysToCheck) {
+              const expectedClean = expected.toLowerCase().replace(/\s+/g, "_").trim();
+              if (normalizedK === expectedClean || normalizedK.startsWith(expectedClean)) {
+                const val = Number(row[rawK]);
+                if (!isNaN(val) && row[rawK] !== "" && row[rawK] !== null) return val;
+              }
+            }
+          }
+          return null;
+        };
+
+        const resultRow: BtlTradeRow = {
           week: (getVal(row, ["week"]) || "").toString().trim(),
           brand: normalizedBrand,
           hạng_mục_lớn: normalizedHangMucLon,
@@ -201,10 +221,12 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
           phân_loại: getVal(row, ["phân_loại", "phân loại"]) || null,
           tần_suất: (getVal(row, ["tần_suất", "tần suất"]) || "").toString().trim(),
           đơn_vị_tính: (getVal(row, ["đơn_vị_tính", "đơn vị tính"]) || "").toString().trim(),
-          thực_hiện_tháng_5: getNumVal(row, ["thực_hiện_tháng_5", "thực hiện tháng 5"]),
-          kế_hoạch_tháng_6: getNumVal(row, ["kế_hoạch_tháng_6", "kế hoạch tháng 6"]),
-          tích_lũy_tháng: getNumVal(row, ["tích_lũy_tháng", "tích lũy tháng"]),
+          thực_hiện_tháng: getBtlField(["thực_hiện_tháng", "thực hiện tháng", "thực_hiện_tháng_5", "thực hiện tháng 5"]),
+          kế_hoạch_tháng: getBtlField(["kế_hoạch_tháng", "kế hoạch tháng", "kế_hoạch_tháng_6", "kế hoạch tháng 6"]),
+          tích_lũy_tháng: getBtlField(["tích_lũy_tháng", "tích lũy tháng"])
         };
+
+        return resultRow;
       })
     : [];
 

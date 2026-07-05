@@ -8,6 +8,7 @@ import {
   CategoryComments,
   normalizeMarketingData,
 } from "./data";
+import { exportToExcel, exportToJSON } from "./lib/export";
 import {
   TrendingUp,
   Award,
@@ -42,6 +43,8 @@ import {
   Edit3,
   LogOut,
   UserMinus,
+  Printer,
+  Mail,
 } from "lucide-react";
 import {
   PieChart,
@@ -121,6 +124,102 @@ export function getTimelines(marketingData: MarketingReportData) {
   });
 }
 
+export function getEndOfWeekDate(weekStr: string) {
+  let str = weekStr || "";
+  const TIMELINE_LABELS_MAP: { [key: string]: string } = {
+    "week4": "19/06 - 25/06/2026",
+    "week3": "12/06 - 18/06/2026",
+    "week2": "05/06 - 11/06/2026",
+    "week1": "01/06 - 04/06/2026",
+  };
+  if (TIMELINE_LABELS_MAP[str]) {
+    str = TIMELINE_LABELS_MAP[str];
+  }
+  
+  const parts = str.split(/-|\s+-\s+/);
+  if (parts.length >= 2) {
+    const endDateStr = parts[parts.length - 1].trim();
+    const cleaned = endDateStr.replace(/[^0-9/]/g, "");
+    const dateParts = cleaned.split("/");
+    if (dateParts.length === 3) {
+      const day = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10);
+      const year = parseInt(dateParts[2], 10);
+      return { day, month, year };
+    }
+  } else {
+    const cleanStr = str.replace(/[^0-9/\-]/g, "");
+    const p = cleanStr.split("-");
+    if (p.length >= 2) {
+      const endDateStr = p[p.length - 1];
+      const dateParts = endDateStr.split("/");
+      if (dateParts.length === 3) {
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10);
+        const year = parseInt(dateParts[2], 10);
+        return { day, month, year };
+      }
+    }
+  }
+  return { day: 25, month: 6, year: 2026 };
+}
+
+export function getBtlReportMonth(weekStr: string): { month: number; year: number } {
+  const endInfo = getEndOfWeekDate(weekStr);
+  return { month: endInfo.month, year: endInfo.year };
+}
+
+export function getBtlRowDataValues(row: any) {
+  if (!row) {
+    return {
+      thisMonth: 6,
+      lastMonth: 5,
+      lastMonthVal: null,
+      planVal: null,
+      accVal: null,
+      lastMonthKey: "thực_hiện_tháng",
+      thisMonthPlanKey: "kế_hoạch_tháng",
+      thisMonthAccumulatedKey: "tích_lũy_tháng"
+    };
+  }
+  const info = getBtlReportMonth(row.week || "");
+  const thisMonth = info.month;
+  const lastMonth = thisMonth === 1 ? 12 : thisMonth - 1;
+  
+  const lastMonthKey = "thực_hiện_tháng";
+  const thisMonthPlanKey = "kế_hoạch_tháng";
+  const thisMonthAccumulatedKey = "tích_lũy_tháng";
+
+  let lastMonthVal = row.thực_hiện_tháng;
+  if (lastMonthVal === undefined || lastMonthVal === null) {
+    const fallbackKey = `thực_hiện_tháng_${lastMonth}`;
+    lastMonthVal = row[fallbackKey] !== undefined && row[fallbackKey] !== null ? row[fallbackKey] : row.thực_hiện_tháng_5;
+  }
+
+  let planVal = row.kế_hoạch_tháng;
+  if (planVal === undefined || planVal === null) {
+    const fallbackKey = `kế_hoạch_tháng_${thisMonth}`;
+    planVal = row[fallbackKey] !== undefined && row[fallbackKey] !== null ? row[fallbackKey] : row.kế_hoạch_tháng_6;
+  }
+
+  let accVal = row.tích_lũy_tháng;
+  if (accVal === undefined || accVal === null) {
+    const fallbackKey = `tích_lũy_tháng_${thisMonth}`;
+    accVal = row[fallbackKey] !== undefined && row[fallbackKey] !== null ? row[fallbackKey] : row.tích_lũy_tháng;
+  }
+
+  return {
+    thisMonth,
+    lastMonth,
+    lastMonthVal: lastMonthVal !== undefined && lastMonthVal !== null && lastMonthVal !== "" ? Number(lastMonthVal) : null,
+    planVal: planVal !== undefined && planVal !== null && planVal !== "" ? Number(planVal) : null,
+    accVal: accVal !== undefined && accVal !== null && accVal !== "" ? Number(accVal) : null,
+    lastMonthKey,
+    thisMonthPlanKey,
+    thisMonthAccumulatedKey
+  };
+}
+
 export interface UserAccount {
   username: string;
   password: string;
@@ -171,6 +270,15 @@ export default function App() {
   const [kpiContentTarget, setKpiContentTarget] = useState(14);
   const [kpiPrTarget, setKpiPrTarget] = useState(5);
   const [kpiComment, setKpiComment] = useState("Mục tiêu mặc định cho Livotec");
+
+  // Database Editor States
+  const [dbActiveTab, setDbActiveTab] = useState<"digital" | "kol" | "btl" | "ooh">("digital");
+  const [dbSearchQuery, setDbSearchQuery] = useState("");
+  const [dbBrandFilter, setDbBrandFilter] = useState<"Tất cả" | "Livotec" | "Karofi">("Tất cả");
+  const [dbEditingRowIndex, setDbEditingRowIndex] = useState<number | null>(null);
+  const [dbEditingRowData, setDbEditingRowData] = useState<any | null>(null);
+  const [dbPage, setDbPage] = useState(1);
+  const dbLimit = 15; // Number of rows per page in database manager
 
   // Login form inputs
   const [loginUsername, setLoginUsername] = useState("");
@@ -308,6 +416,36 @@ export default function App() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
+
+  // Mail configuration states
+  const [mailHost, setMailHost] = useState("");
+  const [mailPort, setMailPort] = useState("587");
+  const [mailUser, setMailUser] = useState("");
+  const [mailPass, setMailPass] = useState("");
+  const [mailRecipient, setMailRecipient] = useState("");
+  const [mailEnabled, setMailEnabled] = useState(true);
+  const [isMailLoading, setIsMailLoading] = useState(false);
+
+  // Load mail configuration from server on load
+  useEffect(() => {
+    const fetchMailConfig = async () => {
+      try {
+        const response = await fetch("/api/get-mail-config");
+        const result = await response.json();
+        if (response.ok && result.success && result.config) {
+          setMailHost(result.config.smtp_host || "");
+          setMailPort(result.config.smtp_port || "587");
+          setMailUser(result.config.smtp_user || "");
+          setMailPass(result.config.smtp_pass || "");
+          setMailRecipient(result.config.notification_email || "ntkdung1206@gmail.com");
+          setMailEnabled(result.config.enabled !== false);
+        }
+      } catch (err) {
+        console.error("Failed to load mail config:", err);
+      }
+    };
+    fetchMailConfig();
+  }, [currentUser]);
 
   // Synchronize draftComments with published comments for current brand & week
   useEffect(() => {
@@ -529,6 +667,168 @@ export default function App() {
     }
   };
 
+  // Database Editor handlers
+  const handleDbDelete = async (tab: "digital" | "kol" | "btl" | "ooh", indexInOriginal: number) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa dòng dữ liệu này không? Hành động này sẽ được lưu ngay vào CSDL.")) return;
+
+    const updatedData = { ...marketingData };
+    if (tab === "digital") {
+      updatedData.digital_marketing = updatedData.digital_marketing.filter((_, i) => i !== indexInOriginal);
+    } else if (tab === "kol") {
+      updatedData.kol_koc = updatedData.kol_koc.filter((_, i) => i !== indexInOriginal);
+    } else if (tab === "btl") {
+      updatedData.btl_trade = updatedData.btl_trade.filter((_, i) => i !== indexInOriginal);
+    } else if (tab === "ooh") {
+      updatedData.monthly_ooh_pr = updatedData.monthly_ooh_pr.filter((_, i) => i !== indexInOriginal);
+    }
+
+    try {
+      const response = await fetch("/api/save-raw-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: updatedData })
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        const safeData = normalizeMarketingData(result.data);
+        setMarketingData(safeData);
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        triggerNotification("success", "Đã xóa dòng dữ liệu và lưu vào CSDL hệ thống thành công!");
+      } else {
+        triggerNotification("error", result.error || "Lỗi lưu dữ liệu sau khi xóa.");
+      }
+    } catch (err) {
+      console.error("Failed to save raw data after delete:", err);
+      triggerNotification("error", "Không thể lưu thay đổi sau khi xóa.");
+    }
+  };
+
+  const handleDbEditStart = (tab: "digital" | "kol" | "btl" | "ooh", indexInOriginal: number) => {
+    let rowToEdit: any = null;
+    if (tab === "digital") {
+      rowToEdit = marketingData.digital_marketing[indexInOriginal];
+    } else if (tab === "kol") {
+      rowToEdit = marketingData.kol_koc[indexInOriginal];
+    } else if (tab === "btl") {
+      rowToEdit = marketingData.btl_trade[indexInOriginal];
+    } else if (tab === "ooh") {
+      rowToEdit = marketingData.monthly_ooh_pr[indexInOriginal];
+    }
+
+    if (rowToEdit) {
+      setDbEditingRowIndex(indexInOriginal);
+      setDbEditingRowData({ ...rowToEdit });
+    }
+  };
+
+  const handleDbEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (dbEditingRowIndex === null || !dbEditingRowData) return;
+
+    const updatedData = { ...marketingData };
+    if (dbActiveTab === "digital") {
+      updatedData.digital_marketing = updatedData.digital_marketing.map((row, i) => 
+        i === dbEditingRowIndex ? dbEditingRowData : row
+      );
+    } else if (dbActiveTab === "kol") {
+      updatedData.kol_koc = updatedData.kol_koc.map((row, i) => 
+        i === dbEditingRowIndex ? dbEditingRowData : row
+      );
+    } else if (dbActiveTab === "btl") {
+      updatedData.btl_trade = updatedData.btl_trade.map((row, i) => 
+        i === dbEditingRowIndex ? dbEditingRowData : row
+      );
+    } else if (dbActiveTab === "ooh") {
+      updatedData.monthly_ooh_pr = updatedData.monthly_ooh_pr.map((row, i) => 
+        i === dbEditingRowIndex ? dbEditingRowData : row
+      );
+    }
+
+    try {
+      const response = await fetch("/api/save-raw-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: updatedData })
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        const safeData = normalizeMarketingData(result.data);
+        setMarketingData(safeData);
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        setDbEditingRowIndex(null);
+        setDbEditingRowData(null);
+        triggerNotification("success", "Đã cập nhật dòng dữ liệu và đồng bộ vào hệ thống thành công!");
+      } else {
+        triggerNotification("error", result.error || "Lỗi lưu thay đổi.");
+      }
+    } catch (err) {
+      console.error("Failed to save raw data after edit:", err);
+      triggerNotification("error", "Không thể đồng bộ thay đổi.");
+    }
+  };
+
+  const getHeaderMinWidth = (header: string) => {
+    if (header.startsWith("Thực hiện T")) return "min-w-[130px]";
+    if (header.startsWith("Kế hoạch T")) return "min-w-[130px]";
+    if (header.startsWith("Tích lũy T")) return "min-w-[130px]";
+    switch (header) {
+      case "Tuần":
+      case "Tháng":
+        return "min-w-[100px]";
+      case "Thương hiệu":
+        return "min-w-[110px]";
+      case "Hạng mục":
+      case "Hạng mục lớn":
+      case "Metric":
+      case "Chỉ số metric":
+        return "min-w-[150px]";
+      case "Kênh":
+        return "min-w-[100px]";
+      case "KPI tuần":
+      case "Thực tế tuần":
+      case "Tích lũy tháng":
+      case "KPI":
+      case "Thực tế":
+      case "KPI chiến dịch":
+      case "Thực tế tuần":
+        return "min-w-[110px]";
+      case "Chi tiết":
+        return "min-w-[180px]";
+      case "Thực hiện tháng trước":
+      case "Kế hoạch tháng này":
+      case "Tích lũy tháng này":
+        return "min-w-[145px]";
+      case "Thao tác":
+        return "min-w-[100px] text-right";
+      default:
+        return "min-w-[100px]";
+    }
+  };
+
+  const getHeadersForTab = () => {
+    if (dbActiveTab === "digital") {
+      return ["Tuần", "Thương hiệu", "Hạng mục", "Chỉ số metric", "KPI tuần", "Thực tế tuần", "Tích lũy tháng", "Thao tác"];
+    } else if (dbActiveTab === "kol") {
+      return ["Tuần", "Thương hiệu", "Hạng mục", "Kênh", "KPI chiến dịch", "Thực tế tuần", "Thao tác"];
+    } else if (dbActiveTab === "btl") {
+      const monthInfo = getBtlReportMonth(selectedTimeline.id);
+      const thisM = monthInfo.month;
+      const lastM = thisM === 1 ? 12 : thisM - 1;
+      return [
+        "Tuần",
+        "Thương hiệu",
+        "Hạng mục lớn",
+        "Chi tiết",
+        `Thực hiện T${lastM}`,
+        `Kế hoạch T${thisM}`,
+        `Tích lũy T${thisM}`,
+        "Thao tác"
+      ];
+    } else { // ooh
+      return ["Tháng", "Thương hiệu", "Hạng mục", "Metric", "KPI", "Thực tế", "Thao tác"];
+    }
+  };
+
   // Google Drive connection and Server DB sync
   const handleDriveImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -625,6 +925,36 @@ export default function App() {
       } catch (err: any) {
         triggerNotification("error", `Lỗi khôi phục: ${err.message}`);
       }
+    }
+  };
+
+  // Save mail configuration to Server DB
+  const handleSaveMailConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsMailLoading(true);
+    try {
+      const response = await fetch("/api/save-mail-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          smtp_host: mailHost,
+          smtp_port: mailPort,
+          smtp_user: mailUser,
+          smtp_pass: mailPass,
+          notification_email: mailRecipient,
+          enabled: mailEnabled
+        }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success) {
+        triggerNotification("success", "Cấu hình gửi mail tự động đã được lưu và mã hóa bảo mật!");
+      } else {
+        throw new Error(result.error || "Lỗi lưu cấu hình mail");
+      }
+    } catch (err: any) {
+      triggerNotification("error", `Không thể lưu cấu hình mail: ${err.message}`);
+    } finally {
+      setIsMailLoading(false);
     }
   };
 
@@ -760,7 +1090,11 @@ export default function App() {
   // 2. Share of Voice calculation (Always show industry snapshot for selected timeline)
   // In our JSON, Livotec & Karofi share of voice are under brand "Karofi" with kênh_channel as brand name
   const sovRows = digitalMarketingList.filter(
-    (row) => row.hạng_mục === "Social Listening" && isInSelectedTimeline(row.week)
+    (row) => row.hạng_mục === "Social Listening" && 
+             isInSelectedTimeline(row.week) && 
+             row.thực_tế_actual !== null && 
+             row.thực_tế_actual !== undefined && 
+             row.thực_tế_actual !== 0
   );
   
   const sovData = sovRows.map((row) => ({
@@ -775,7 +1109,12 @@ export default function App() {
   const sovPercentage = activeBrandSov ? (activeBrandSov.thực_tế_actual || 0) * 100 : 0;
 
   // 3. Content (số ấn phẩm) Weekly
-  const contentRows = brandDigital.filter((row) => row.nhóm_báo_cáo === "Content");
+  const contentRows = brandDigital.filter(
+    (row) => row.nhóm_báo_cáo === "Content" && 
+             row.thực_tế_actual !== null && 
+             row.thực_tế_actual !== undefined && 
+             row.thực_tế_actual !== 0
+  );
   const weeklyContentSum = contentRows.reduce((sum, row) => sum + (row.thực_tế_actual || 0), 0);
 
   // Group contentRows by "hạng_mục" for the "Content & Sáng tạo" category chart
@@ -799,7 +1138,11 @@ export default function App() {
 
   // 3.1 TVC (GRPS) - Filter TVC with metric GRPS
   const tvcGrpsRows = brandDigital.filter(
-    (row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "tvc" && row.chỉ_số_metric && row.chỉ_số_metric.toLowerCase() === "grps"
+    (row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "tvc" && 
+             row.chỉ_số_metric && row.chỉ_số_metric.toLowerCase() === "grps" &&
+             row.thực_tế_actual !== null && 
+             row.thực_tế_actual !== undefined && 
+             row.thực_tế_actual !== 0
   );
   const tvcGrpsChartData = tvcGrpsRows.map(row => ({
     name: row.kênh_channel || "Khác",
@@ -809,8 +1152,8 @@ export default function App() {
   }));
 
   // PR charts data - split into quantity and views
-  const prQuantityRows = brandOohPr.filter(r => r.hạng_mục && (r.hạng_mục.toLowerCase() === "pr - báo chí" || r.hạng_mục.toLowerCase() === "pr") && r.chỉ_số_metric && r.chỉ_số_metric.toLowerCase() === "quantity");
-  const prViewsRows = brandOohPr.filter(r => r.hạng_mục && (r.hạng_mục.toLowerCase() === "pr - báo chí" || r.hạng_mục.toLowerCase() === "pr") && r.chỉ_số_metric && r.chỉ_số_metric.toLowerCase() === "views");
+  const prQuantityRows = brandOohPr.filter(r => r.hạng_mục && (r.hạng_mục.toLowerCase() === "pr - báo chí" || r.hạng_mục.toLowerCase() === "pr") && r.chỉ_số_metric && r.chỉ_số_metric.toLowerCase() === "quantity" && r.thực_tế_actual !== null && r.thực_tế_actual !== undefined && r.thực_tế_actual !== 0);
+  const prViewsRows = brandOohPr.filter(r => r.hạng_mục && (r.hạng_mục.toLowerCase() === "pr - báo chí" || r.hạng_mục.toLowerCase() === "pr") && r.chỉ_số_metric && r.chỉ_số_metric.toLowerCase() === "views" && r.thực_tế_actual !== null && r.thực_tế_actual !== undefined && r.thực_tế_actual !== 0);
 
   const prQuantityChartData = prQuantityRows.map(row => ({
     name: row.ngành_hàng || "Ngành hàng",
@@ -827,7 +1170,7 @@ export default function App() {
   }));
 
   // OOH sub-categories charts data - LCD Building, LED Cities, LED Airport, Pano
-  const oohRows = brandOohPr.filter(row => row.hạng_mục && row.hạng_mục.toLowerCase() === "ooh");
+  const oohRows = brandOohPr.filter(row => row.hạng_mục && row.hạng_mục.toLowerCase() === "ooh" && row.thực_tế_actual !== null && row.thực_tế_actual !== undefined && row.thực_tế_actual !== 0);
 
   const lcdBuildingRows = oohRows.filter(r => r.kênh_channel && r.kênh_channel.toLowerCase() === "lcd building");
   const ledCitiesRows = oohRows.filter(r => r.kênh_channel && r.kênh_channel.toLowerCase() === "led cities");
@@ -879,7 +1222,11 @@ export default function App() {
     const isBrandMatch = ("brand" in row && (row as any).brand)
       ? (row as any).brand.toLowerCase() === selectedBrand.toLowerCase()
       : selectedBrand.toLowerCase() === "livotec";
-    return isBrandMatch && isInSelectedTimeline(row.week);
+    return isBrandMatch && 
+           isInSelectedTimeline(row.week) && 
+           row.thực_tế_trong_tuần !== null && 
+           row.thực_tế_trong_tuần !== undefined && 
+           row.thực_tế_trong_tuần !== 0;
   });
 
   const totalKolKocKpi = brandKolKoc.reduce((sum, r) => sum + (r.kpi_toàn_chiến_dịch || 0), 0);
@@ -1058,8 +1405,9 @@ export default function App() {
 
   // Card: Retail POSM & Vật dụng - VỊ TRÍ SAU CARD PR!
   const retailRows = brandBtl.filter((row) => row.hạng_mục_lớn === "POSM");
-  const totalRetailTichLuy = retailRows.reduce((sum, row) => sum + (row.tích_lũy_tháng || 0), 0);
-  const totalRetailKeHoach = retailRows.reduce((sum, row) => sum + (row.kế_hoạch_tháng_6 || 0), 0);
+  const retailValues = retailRows.map((row) => getBtlRowDataValues(row));
+  const totalRetailTichLuy = retailValues.reduce((sum, item) => sum + (item.accVal || 0), 0);
+  const totalRetailKeHoach = retailValues.reduce((sum, item) => sum + (item.planVal || 0), 0);
   const retailCompletionRate = totalRetailKeHoach > 0 ? Math.round((totalRetailTichLuy / totalRetailKeHoach) * 100) : 0;
 
   if (totalRetailTichLuy > 0 || totalRetailKeHoach > 0) {
@@ -1443,6 +1791,16 @@ export default function App() {
             >
               <LogOut className="h-3.5 w-3.5 text-slate-400" />
               <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
+
+            {/* Export PDF Button */}
+            <button
+              onClick={() => window.print()}
+              className="no-print flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition cursor-pointer"
+              title="Xuất báo cáo thành tệp PDF"
+            >
+              <Printer className="h-3.5 w-3.5 text-indigo-500" />
+              <span>Xuất PDF</span>
             </button>
 
             {/* Timeline selector */}
@@ -2306,7 +2664,12 @@ export default function App() {
                       CATEGORY VIEW: 4. PAID ADS
                      ------------------------------------------------------------ */}
                   {activeCategoryTab === "ads" && (() => {
-                    const adsRows = brandDigital.filter((row) => row.hạng_mục === "Paid Ads");
+                    const adsRows = brandDigital.filter(
+                      (row) => row.hạng_mục === "Paid Ads" &&
+                               row.thực_tế_actual !== null && 
+                               row.thực_tế_actual !== undefined && 
+                               row.thực_tế_actual !== 0
+                    );
                     const uniqueAdsIndustries = Array.from(new Set(adsRows.map((row) => row.ngành_hàng).filter(Boolean)));
                     
                     const filteredAdsRows = adsRows.filter((row) => {
@@ -2414,7 +2777,7 @@ export default function App() {
                                   <th className="px-4 py-3">Chỉ số đo lường</th>
                                   <th className="px-4 py-3 text-right">KPI Mục tiêu</th>
                                   <th className="px-4 py-3 text-right">Kết quả Đạt được</th>
-                                  {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
+                                  {hasPreviousWeek && categoryTimeViews.paidAds === "week" && <th className="px-4 py-3 text-right">WoW</th>}
                                   <th className="px-4 py-3 text-right">Tỷ lệ Đạt</th>
                                 </tr>
                               </thead>
@@ -2463,7 +2826,7 @@ export default function App() {
                                       <td className="px-4 py-3 font-sans text-slate-500">{row.chỉ_số_metric}</td>
                                       <td className="px-4 py-3 text-right font-medium">{formattedTarget}</td>
                                       <td className="px-4 py-3 text-right font-semibold text-blue-600">{formattedActual}</td>
-                                      {hasPreviousWeek && (
+                                      {hasPreviousWeek && categoryTimeViews.paidAds === "week" && (
                                         <td className="px-4 py-3 text-right font-sans font-bold">
                                           {wow ? (
                                             <span className={wow.percent >= 0 ? "text-emerald-600" : "text-rose-600"}>
@@ -2548,13 +2911,16 @@ export default function App() {
                                   <th className="px-4 py-3">Chỉ số</th>
                                   <th className="px-4 py-3 text-right">KPI Mục tiêu</th>
                                   <th className="px-4 py-3 text-right">Thực tế đạt</th>
-                                  {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
+                                  {hasPreviousWeek && categoryTimeViews.seo === "week" && <th className="px-4 py-3 text-right">WoW</th>}
                                   <th className="px-4 py-3 text-right">Tỷ lệ</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-slate-700 font-mono">
                                 {brandDigital
-                                  .filter((row) => row.hạng_mục === "SEO Website")
+                                  .filter((row) => row.hạng_mục === "SEO Website" && 
+                                                   row.thực_tế_actual !== null && 
+                                                   row.thực_tế_actual !== undefined && 
+                                                   row.thực_tế_actual !== 0)
                                   .map((row, idx) => {
                                     const isWeek = categoryTimeViews.seo === "week";
                                     const target = isWeek ? row.mục_tiêu_target : row.target_tháng;
@@ -2566,7 +2932,7 @@ export default function App() {
                                         <td className="px-4 py-3 font-sans font-semibold text-slate-900">{row.chỉ_số_metric}</td>
                                         <td className="px-4 py-3 text-right font-medium">{target !== null && target !== undefined ? target.toLocaleString() : "—"}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-emerald-600">{actual !== null && actual !== undefined ? actual.toLocaleString() : "—"}</td>
-                                        {hasPreviousWeek && (
+                                        {hasPreviousWeek && categoryTimeViews.seo === "week" && (
                                           <td className="px-4 py-3 text-right font-sans font-bold">
                                             {wow ? (
                                               <span className={wow.percent >= 0 ? "text-emerald-600" : "text-rose-600"}>
@@ -2596,13 +2962,16 @@ export default function App() {
                                   <th className="px-4 py-3">Ngành hàng</th>
                                   <th className="px-4 py-3 text-right">Mục tiêu tuần</th>
                                   <th className="px-4 py-3 text-right">Đã xuất bản</th>
-                                  {hasPreviousWeek && <th className="px-4 py-3 text-right">WoW</th>}
+                                  {hasPreviousWeek && categoryTimeViews.seo === "week" && <th className="px-4 py-3 text-right">WoW</th>}
                                   <th className="px-4 py-3 text-right">Tích lũy tháng</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-slate-700 font-mono">
                                 {brandDigital
-                                  .filter((row) => row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page")
+                                  .filter((row) => (row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page") && 
+                                                   row.thực_tế_actual !== null && 
+                                                   row.thực_tế_actual !== undefined && 
+                                                   row.thực_tế_actual !== 0)
                                   .map((row, idx) => {
                                     const wow = hasPreviousWeek ? getWowComparison("seo", row.chỉ_số_metric, undefined, row.ngành_hàng, row.hạng_mục) : null;
                                     return (
@@ -2612,7 +2981,7 @@ export default function App() {
                                         </td>
                                         <td className="px-4 py-3 text-right font-medium">{row.mục_tiêu_target || "—"}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-emerald-600">{row.thực_tế_actual !== null ? row.thực_tế_actual : "—"}</td>
-                                        {hasPreviousWeek && (
+                                        {hasPreviousWeek && categoryTimeViews.seo === "week" && (
                                           <td className="px-4 py-3 text-right font-sans font-bold">
                                             {wow ? (
                                               <span className={wow.percent >= 0 ? "text-emerald-600" : "text-rose-600"}>
@@ -2636,119 +3005,140 @@ export default function App() {
                   {/* ------------------------------------------------------------
                       CATEGORY VIEW: 6. BTL & TRADE MARKETING
                      ------------------------------------------------------------ */}
-                  {activeCategoryTab === "btl" && (
-                    <div className="space-y-8">
-                      {/* Grid with 2 Charts as requested */}
-                      <div className="grid gap-6 md:grid-cols-2">
-                        {/* Chart 1: Kế hoạch tháng 6 vs Tích lũy tháng 6 */}
-                        <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-                          <span className="text-xs font-bold text-slate-400 block pb-2 uppercase tracking-wide">
-                            Biểu Đồ 1: Kế Hoạch Tháng 6 vs Tích Lũy Đạt Được (Cái/Điểm bán)
-                          </span>
-                          <ResponsiveContainer width="100%" height="85%">
-                            <BarChart
-                              data={brandBtl
-                                .filter((row) => row.kế_hoạch_tháng_6 !== null || row.tích_lũy_tháng !== null)
-                                .map((row) => ({
-                                  name: `${row.chi_tiết_hạng_mục} ${row.phân_loại ? `(${row.phân_loại})` : ""}`,
-                                  plan: row.kế_hoạch_tháng_6 || 0,
-                                  accumulated: row.tích_lũy_tháng || 0,
-                                }))
-                                .slice(0, 5) // Display major 5 for clarity
-                              }
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                              <YAxis />
-                              <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-                              <Legend />
-                              <Bar dataKey="plan" name="Kế hoạch Tháng 6" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-                              <Bar dataKey="accumulated" name="Tích lũy đạt được" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
+                  {activeCategoryTab === "btl" && (() => {
+                    const weekInfo = getBtlReportMonth(selectedTimeline.id);
+                    const thisMonthNum = weekInfo.month;
+                    const lastMonthNum = thisMonthNum === 1 ? 12 : thisMonthNum - 1;
+
+                    const btlMappedRows = brandBtl.map((row) => {
+                      const vals = getBtlRowDataValues(row);
+                      return {
+                        ...row,
+                        lastMonthVal: vals.lastMonthVal,
+                        planVal: vals.planVal,
+                        accVal: vals.accVal,
+                      };
+                    }).filter((row) => {
+                      const hasLastMonth = row.lastMonthVal !== null && row.lastMonthVal !== undefined && row.lastMonthVal !== 0;
+                      const hasPlan = row.planVal !== null && row.planVal !== undefined && row.planVal !== 0;
+                      const hasAcc = row.accVal !== null && row.accVal !== undefined && row.accVal !== 0;
+                      return hasLastMonth || hasPlan || hasAcc;
+                    });
+
+                    return (
+                      <div className="space-y-8">
+                        {/* Grid with 2 Charts as requested */}
+                        <div className="grid gap-6 md:grid-cols-2">
+                          {/* Chart 1: Kế hoạch tháng vs Tích lũy tháng */}
+                          <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col justify-between">
+                            <span className="text-xs font-bold text-slate-400 block pb-2 uppercase tracking-wide">
+                              Biểu Đồ 1: Kế Hoạch Tháng {thisMonthNum} vs Tích Lũy Đạt Được (Cái/Điểm bán)
+                            </span>
+                            <ResponsiveContainer width="100%" height="85%">
+                              <BarChart
+                                data={btlMappedRows
+                                  .filter((row) => row.planVal !== null || row.accVal !== null)
+                                  .map((row) => ({
+                                    name: `${row.chi_tiết_hạng_mục} ${row.phân_loại ? `(${row.phân_loại})` : ""}`,
+                                    plan: row.planVal || 0,
+                                    accumulated: row.accVal || 0,
+                                  }))
+                                  .slice(0, 5) // Display major 5 for clarity
+                                }
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                                <YAxis />
+                                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                                <Legend />
+                                <Bar dataKey="plan" name={`Kế hoạch Tháng ${thisMonthNum}`} fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="accumulated" name="Tích lũy đạt được" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+
+                          {/* Chart 2: Tích lũy tháng vs Thực hiện tháng trước (So sánh tăng trưởng) */}
+                          <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col justify-between">
+                            <span className="text-xs font-bold text-slate-400 block pb-2 uppercase tracking-wide">
+                              Biểu Đồ 2: So Sánh Tăng Trưởng Tích Lũy Tháng {thisMonthNum} vs Thực Hiện Tháng {lastMonthNum}
+                            </span>
+                            <ResponsiveContainer width="100%" height="85%">
+                              <BarChart
+                                data={btlMappedRows
+                                  .filter((row) => row.lastMonthVal !== null || row.accVal !== null)
+                                  .map((row) => ({
+                                    name: `${row.chi_tiết_hạng_mục} ${row.phân_loại ? `(${row.phân_loại})` : ""}`,
+                                    lastMonthActual: row.lastMonthVal || 0,
+                                    thisMonthAccumulated: row.accVal || 0,
+                                  }))
+                                  .slice(0, 5) // Display same major 5 for parity
+                                }
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                                <YAxis />
+                                <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                                <Legend />
+                                <Bar dataKey="lastMonthActual" name={`Thực hiện Tháng ${lastMonthNum}`} fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="thisMonthAccumulated" name={`Tích lũy Tháng ${thisMonthNum}`} fill="#10b981" radius={[4, 4, 0, 0]} />
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
                         </div>
 
-                        {/* Chart 2: Tích lũy tháng 6 vs Thực hiện tháng 5 (So sánh tăng trưởng) */}
-                        <div className="h-80 bg-white border border-slate-100 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-                          <span className="text-xs font-bold text-slate-400 block pb-2 uppercase tracking-wide">
-                            Biểu Đồ 2: So Sánh Tăng Trưởng Tích Lũy Tháng 6 vs Thực Hiện Tháng 5
+                        {/* Full Data table */}
+                        <div className="space-y-2">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                            Bảng Dữ Liệu BTL, POSM & Trade Marketing Chi Tiết
                           </span>
-                          <ResponsiveContainer width="100%" height="85%">
-                            <BarChart
-                              data={brandBtl
-                                .filter((row) => row.thực_hiện_tháng_5 !== null || row.tích_lũy_tháng !== null)
-                                .map((row) => ({
-                                  name: `${row.chi_tiết_hạng_mục} ${row.phân_loại ? `(${row.phân_loại})` : ""}`,
-                                  mayActual: row.thực_hiện_tháng_5 || 0,
-                                  juneAccumulated: row.tích_lũy_tháng || 0,
-                                }))
-                                .slice(0, 5) // Display same major 5 for parity
-                              }
-                            >
-                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                              <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                              <YAxis />
-                              <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-                              <Legend />
-                              <Bar dataKey="mayActual" name="Thực hiện Tháng 5" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                              <Bar dataKey="juneAccumulated" name="Tích lũy Tháng 6" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
+                          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
+                                <tr>
+                                  <th className="px-4 py-3">Hạng mục lớn</th>
+                                  <th className="px-4 py-3">Chi tiết & Phân loại</th>
+                                  <th className="px-4 py-3">Tần suất / Đơn vị</th>
+                                  <th className="px-4 py-3 text-right">{`Thực hiện tháng ${lastMonthNum}`}</th>
+                                  <th className="px-4 py-3 text-right">{`Kế hoạch tháng ${thisMonthNum}`}</th>
+                                  <th className="px-4 py-3 text-right">{`Tích lũy tháng ${thisMonthNum}`}</th>
+                                  <th className="px-4 py-3 text-right">Đạt kế hoạch</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-slate-700">
+                                {btlMappedRows.map((row, idx) => {
+                                  const rate = row.planVal && row.accVal
+                                    ? Math.round((row.accVal / row.planVal) * 100)
+                                    : null;
+                                  return (
+                                    <tr key={idx} className="hover:bg-slate-50/50">
+                                      <td className="px-4 py-3 font-semibold text-slate-900">{row.hạng_mục_lớn}</td>
+                                      <td className="px-4 py-3 font-sans">
+                                        <div className="font-medium text-slate-800">{row.chi_tiết_hạng_mục}</div>
+                                        {row.phân_loại && <div className="text-slate-400 text-[10px] font-mono">{row.phân_loại}</div>}
+                                      </td>
+                                      <td className="px-4 py-3 font-sans text-slate-500">
+                                        {row.tần_suất} / <span className="font-mono text-[10px]">{row.đơn_vị_tính}</span>
+                                      </td>
+                                      <td className="px-4 py-3 text-right font-mono font-medium">{row.lastMonthVal !== null && row.lastMonthVal !== undefined ? row.lastMonthVal.toLocaleString() : "—"}</td>
+                                      <td className="px-4 py-3 text-right font-mono font-medium">{row.planVal !== null && row.planVal !== undefined ? row.planVal.toLocaleString() : "—"}</td>
+                                      <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600">{row.accVal !== null && row.accVal !== undefined ? row.accVal.toLocaleString() : "—"}</td>
+                                      <td className="px-4 py-3 text-right font-mono font-bold">
+                                        {rate !== null ? (
+                                          <span className={rate >= 100 ? "text-emerald-600" : rate >= 70 ? "text-amber-500" : "text-rose-500"}>
+                                            {rate}%
+                                          </span>
+                                        ) : "—"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
-
-                      {/* Full Data table */}
-                      <div className="space-y-2">
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                          Bảng Dữ Liệu BTL, POSM & Trade Marketing Chi Tiết
-                        </span>
-                        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                          <table className="w-full text-left text-xs">
-                            <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
-                              <tr>
-                                <th className="px-4 py-3">Hạng mục lớn</th>
-                                <th className="px-4 py-3">Chi tiết & Phân loại</th>
-                                <th className="px-4 py-3">Tần suất / Đơn vị</th>
-                                <th className="px-4 py-3 text-right">Thực hiện tháng 5</th>
-                                <th className="px-4 py-3 text-right">Kế hoạch tháng 6</th>
-                                <th className="px-4 py-3 text-right">Tích lũy tháng 6</th>
-                                <th className="px-4 py-3 text-right">Đạt kế hoạch</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 text-slate-700">
-                              {brandBtl.map((row, idx) => {
-                                const rate = row.kế_hoạch_tháng_6 && row.tích_lũy_tháng
-                                  ? Math.round((row.tích_lũy_tháng / row.kế_hoạch_tháng_6) * 100)
-                                  : null;
-                                return (
-                                  <tr key={idx} className="hover:bg-slate-50/50">
-                                    <td className="px-4 py-3 font-semibold text-slate-900">{row.hạng_mục_lớn}</td>
-                                    <td className="px-4 py-3 font-sans">
-                                      <div className="font-medium text-slate-800">{row.chi_tiết_hạng_mục}</div>
-                                      {row.phân_loại && <div className="text-slate-400 text-[10px] font-mono">{row.phân_loại}</div>}
-                                    </td>
-                                    <td className="px-4 py-3 font-sans text-slate-500">
-                                      {row.tần_suất} / <span className="font-mono text-[10px]">{row.đơn_vị_tính}</span>
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-mono font-medium">{row.thực_hiện_tháng_5 !== null && row.thực_hiện_tháng_5 !== undefined ? row.thực_hiện_tháng_5.toLocaleString() : "—"}</td>
-                                    <td className="px-4 py-3 text-right font-mono font-medium">{row.kế_hoạch_tháng_6 !== null && row.kế_hoạch_tháng_6 !== undefined ? row.kế_hoạch_tháng_6.toLocaleString() : "—"}</td>
-                                    <td className="px-4 py-3 text-right font-mono font-semibold text-emerald-600">{row.tích_lũy_tháng !== null && row.tích_lũy_tháng !== undefined ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
-                                    <td className="px-4 py-3 text-right font-mono font-bold">
-                                      {rate !== null ? (
-                                        <span className={rate >= 100 ? "text-emerald-600" : rate >= 70 ? "text-amber-500" : "text-rose-500"}>
-                                          {rate}%
-                                        </span>
-                                      ) : "—"}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                 </div>
               </div>
@@ -2770,14 +3160,35 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Reset to defaults button */}
-              <button
-                onClick={handleResetData}
-                className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-sm self-start sm:self-auto"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Khôi phục mặc định
-              </button>
+              {/* Action buttons: Export & Reset */}
+              <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+                <button
+                  onClick={() => exportToExcel(marketingData)}
+                  className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
+                  title="Xuất cơ sở dữ liệu hiện tại thành định dạng Excel đa phân hệ (Multi-worksheet)"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+                  Xuất Excel (.xls)
+                </button>
+
+                <button
+                  onClick={() => exportToJSON(marketingData)}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-sm"
+                  title="Xuất toàn bộ cấu trúc dữ liệu JSON để dự phòng hoặc phục hồi"
+                >
+                  <FileJson className="h-3.5 w-3.5 text-slate-600" />
+                  Xuất JSON
+                </button>
+
+                <button
+                  onClick={handleResetData}
+                  className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-sm"
+                  title="Xoá toàn bộ chỉnh sửa và khôi phục dữ liệu gốc mặc định"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 text-rose-600" />
+                  Khôi phục mặc định
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-12 items-start">
@@ -3047,142 +3458,546 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Section 4: Brand KPI Targets Database (Only Admin) */}
+                {/* Section: Automatic Email Configuration (Only Admin) */}
                 {currentUser && currentUser.role === "Admin" && (
                   <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in">
                     <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                        <Award className="h-4 w-4" />
+                        <Mail className="h-4 w-4" />
                       </div>
                       <div>
                         <h3 className="font-bold text-slate-900 text-sm">
-                          Bảng mục tiêu KPI thương hiệu
+                          Cấu hình gửi Mail tự động
                         </h3>
-                        <p className="text-[11px] text-slate-500">Thiết lập mục tiêu so sánh hiển thị trên Scorecards</p>
+                        <p className="text-[11px] text-slate-500">
+                          Tự động gửi email thông báo nhận định tổng quan khi lưu và xuất bản báo cáo
+                        </p>
                       </div>
                     </div>
 
-                    {/* Inline Edit Form */}
-                    <form onSubmit={handleUpdateBrandKpi} className="space-y-3 bg-indigo-50/40 p-3 rounded-xl border border-indigo-100">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider block">
-                          ✏️ Hiệu chỉnh KPI: {kpiBrandId.toUpperCase()}
-                        </span>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleSelectKpiBrand("livotec")}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${kpiBrandId === "livotec" ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
-                          >
-                            Livotec
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectKpiBrand("karofi")}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${kpiBrandId === "karofi" ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"}`}
-                          >
-                            Karofi
-                          </button>
+                    <form onSubmit={handleSaveMailConfig} className="space-y-4">
+                      {/* Toggle Enabled */}
+                      <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                        <div className="space-y-0.5">
+                          <label className="text-xs font-bold text-slate-700 block">Kích hoạt gửi Email tự động</label>
+                          <span className="text-[10px] text-slate-400 block">Bật/tắt tự động gửi thông báo qua email</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={mailEnabled}
+                            onChange={(e) => setMailEnabled(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Máy chủ SMTP (Host) <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
+                          <input
+                            type="text"
+                            required={false}
+                            disabled={!mailEnabled}
+                            value={mailHost}
+                            onChange={(e) => setMailHost(e.target.value)}
+                            placeholder="smtp.gmail.com"
+                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Cổng (Port) <span className="text-[9px] text-slate-400 lowercase">(mặc định: 587)</span></label>
+                          <input
+                            type="text"
+                            required={false}
+                            disabled={!mailEnabled}
+                            value={mailPort}
+                            onChange={(e) => setMailPort(e.target.value)}
+                            placeholder="587"
+                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[9px] font-bold text-slate-500 uppercase block">SOV Target Rank</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tài khoản SMTP (User) <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
                           <input
                             type="text"
-                            required
-                            value={kpiSovTargetRank}
-                            onChange={(e) => setKpiSovTargetRank(e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                            required={false}
+                            disabled={!mailEnabled}
+                            value={mailUser}
+                            onChange={(e) => setMailUser(e.target.value)}
+                            placeholder="marketing.karofi.livotec@gmail.com"
+                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           />
                         </div>
+
                         <div>
-                          <label className="text-[9px] font-bold text-slate-500 uppercase block">Content Target</label>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Mật khẩu (App Password - Secret) <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
                           <input
-                            type="number"
-                            required
-                            min={1}
-                            value={kpiContentTarget}
-                            onChange={(e) => setKpiContentTarget(Number(e.target.value))}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[9px] font-bold text-slate-500 uppercase block">PR Target</label>
-                          <input
-                            type="number"
-                            required
-                            min={0}
-                            value={kpiPrTarget}
-                            onChange={(e) => setKpiPrTarget(Number(e.target.value))}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                            type="password"
+                            required={false}
+                            disabled={!mailEnabled}
+                            value={mailPass}
+                            onChange={(e) => setMailPass(e.target.value)}
+                            placeholder="Nhập mật khẩu SMTP hoặc App Password..."
+                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="text-[9px] font-bold text-slate-500 uppercase block">Ghi chú / Comment</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Email nhận thông báo <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
                         <input
-                          type="text"
-                          value={kpiComment}
-                          onChange={(e) => setKpiComment(e.target.value)}
-                          placeholder="Nhập ghi chú mục tiêu..."
-                          className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                          type="email"
+                          required={false}
+                          disabled={!mailEnabled}
+                          value={mailRecipient}
+                          onChange={(e) => setMailRecipient(e.target.value)}
+                          placeholder="ntkdung1206@gmail.com"
+                          className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                         />
                       </div>
 
                       <button
                         type="submit"
-                        className="w-full rounded bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
+                        disabled={isMailLoading}
+                        className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition cursor-pointer"
                       >
-                        Lưu cấu hình KPI
+                        {isMailLoading ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        )}
+                        Lưu cấu hình & Mã hóa bảo mật
                       </button>
                     </form>
+                  </div>
+                )}
 
-                    {/* Brand KPIs list table */}
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Danh sách mục tiêu trong Cơ sở dữ liệu ({brandKpis.length})
-                      </span>
-                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                {/* Section 4: Advanced Database Row Manager (Only Admin) */}
+                {currentUser && currentUser.role === "Admin" && (
+                  <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                          <Layers className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-sm">
+                            Trình Quản Trị Cơ Sở Dữ Liệu
+                          </h3>
+                          <p className="text-[11px] text-slate-500">
+                            Chỉnh sửa, xóa dữ liệu các bảng đang có trong hệ thống CSDL
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Collection Selector Tabs */}
+                      <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDbActiveTab("digital");
+                            setDbPage(1);
+                            setDbEditingRowIndex(null);
+                          }}
+                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                            dbActiveTab === "digital" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          Digital Marketing
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDbActiveTab("kol");
+                            setDbPage(1);
+                            setDbEditingRowIndex(null);
+                          }}
+                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                            dbActiveTab === "kol" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          KOL/KOC
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDbActiveTab("btl");
+                            setDbPage(1);
+                            setDbEditingRowIndex(null);
+                          }}
+                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                            dbActiveTab === "btl" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          BTL & POSM
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDbActiveTab("ooh");
+                            setDbPage(1);
+                            setDbEditingRowIndex(null);
+                          }}
+                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                            dbActiveTab === "ooh" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          OOH & PR
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Filter & Search Bar */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex-1 min-w-[200px]">
+                        <input
+                          type="text"
+                          value={dbSearchQuery}
+                          onChange={(e) => {
+                            setDbSearchQuery(e.target.value);
+                            setDbPage(1);
+                          }}
+                          placeholder="Tìm kiếm dòng dữ liệu trong bảng này..."
+                          className="w-full rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        <select
+                          value={dbBrandFilter}
+                          onChange={(e) => {
+                            setDbBrandFilter(e.target.value as any);
+                            setDbPage(1);
+                          }}
+                          className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                        >
+                          <option value="Tất cả">Tất cả nhãn hàng</option>
+                          <option value="Livotec">Livotec</option>
+                          <option value="Karofi">Karofi</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Interactive Edit Panel */}
+                    {dbEditingRowIndex !== null && dbEditingRowData && (
+                      <form
+                        onSubmit={handleDbEditSave}
+                        className="space-y-4 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100 animate-fade-in"
+                      >
+                        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                          <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider block">
+                            ✏️ Hiệu Chỉnh Dòng Dữ Liệu (Bản ghi gốc #{dbEditingRowIndex})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDbEditingRowIndex(null);
+                              setDbEditingRowData(null);
+                            }}
+                            className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold"
+                          >
+                            Hủy bỏ
+                          </button>
+                        </div>
+
+                        {/* Fields list mapping */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {(() => {
+                            const fields =
+                              dbActiveTab === "digital"
+                                ? [
+                                    { key: "week", label: "Tuần báo cáo (week)", type: "text" },
+                                    { key: "phân_loại_thời_gian", label: "Phân loại TG", type: "text" },
+                                    { key: "brand", label: "Nhãn hàng (brand)", type: "select", options: ["Livotec", "Karofi"] },
+                                    { key: "nhóm_báo_cáo", label: "Nhóm báo cáo", type: "text" },
+                                    { key: "hạng_mục", label: "Hạng mục", type: "text" },
+                                    { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
+                                    { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
+                                    { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
+                                    { key: "mục_tiêu_target", label: "KPI tuần (target)", type: "number" },
+                                    { key: "thực_tế_actual", label: "Thực tế tuần (actual)", type: "number" },
+                                    { key: "target_tháng", label: "Target tháng", type: "number" },
+                                    { key: "tích_lũy_tháng", label: "Lũy kế tháng", type: "number" },
+                                  ]
+                                : dbActiveTab === "kol"
+                                ? [
+                                    { key: "week", label: "Tuần báo cáo", type: "text" },
+                                    { key: "brand", label: "Nhãn hàng (brand)", type: "select", options: ["Livotec", "Karofi"] },
+                                    { key: "hạng_mục", label: "Hạng mục", type: "text" },
+                                    { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
+                                    { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
+                                    { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
+                                    { key: "kpi_toàn_chiến_dịch", label: "KPI Chiến dịch", type: "number" },
+                                    { key: "thực_tế_trong_tuần", label: "Thực tế tuần", type: "number" },
+                                    { key: "tích_lũy_chiến_dịch", label: "Tích lũy chiến dịch", type: "number" },
+                                  ]
+                                : dbActiveTab === "btl"
+                                ? (() => {
+                                    const btlInfo = getBtlRowDataValues(dbEditingRowData);
+                                    return [
+                                      { key: "week", label: "Tuần báo cáo", type: "text" },
+                                      { key: "brand", label: "Nhãn hàng", type: "select", options: ["Livotec", "Karofi"] },
+                                      { key: "hạng_mục_lớn", label: "Hạng mục lớn", type: "text" },
+                                      { key: "chi_tiết_hạng_mục", label: "Chi tiết hạng mục", type: "text" },
+                                      { key: "phân_loại", label: "Phân loại", type: "text" },
+                                      { key: "tần_suất", label: "Tần suất", type: "text" },
+                                      { key: "đơn_vị_tính", label: "Đơn vị tính", type: "text" },
+                                      { key: btlInfo.lastMonthKey, label: `Thực hiện T${btlInfo.lastMonth}`, type: "number" },
+                                      { key: btlInfo.thisMonthPlanKey, label: `Kế hoạch T${btlInfo.thisMonth}`, type: "number" },
+                                      { key: btlInfo.thisMonthAccumulatedKey, label: `Tích lũy T${btlInfo.thisMonth}`, type: "number" },
+                                    ];
+                                  })()
+                                : [
+                                    { key: "week", label: "Tuần báo cáo", type: "text" },
+                                    { key: "tháng_báo_cáo", label: "Tháng báo cáo", type: "text" },
+                                    { key: "brand", label: "Nhãn hàng", type: "select", options: ["Livotec", "Karofi"] },
+                                    { key: "hạng_mục", label: "Hạng mục", type: "text" },
+                                    { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
+                                    { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
+                                    { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
+                                    { key: "mục_tiêu_target", label: "Target", type: "number" },
+                                    { key: "thực_tế_actual", label: "Thực tế", type: "number" },
+                                  ];
+
+                            return fields.map((f) => (
+                              <div key={f.key}>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                                  {f.label}
+                                </label>
+                                {f.type === "select" ? (
+                                  <select
+                                    value={dbEditingRowData[f.key] || ""}
+                                    onChange={(e) =>
+                                      setDbEditingRowData({ ...dbEditingRowData, [f.key]: e.target.value })
+                                    }
+                                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                                  >
+                                    {(f.options || []).map((opt) => (
+                                      <option key={opt} value={opt}>
+                                        {opt}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type={f.type}
+                                    value={dbEditingRowData[f.key] !== null ? dbEditingRowData[f.key] : ""}
+                                    onChange={(e) => {
+                                      const val = f.type === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value;
+                                      setDbEditingRowData({ ...dbEditingRowData, [f.key]: val });
+                                    }}
+                                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                                  />
+                                )}
+                              </div>
+                            ));
+                          })()}
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="submit"
+                            className="flex-1 rounded bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
+                          >
+                            Đồng bộ thay đổi vào CSDL
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDbEditingRowIndex(null);
+                              setDbEditingRowData(null);
+                            }}
+                            className="px-4 rounded bg-slate-200 text-slate-800 hover:bg-slate-300 text-xs font-bold transition cursor-pointer"
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {/* Data List Table */}
+                    <div className="space-y-2">
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
                         <table className="w-full text-left text-xs">
                           <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
                             <tr>
-                              <th className="px-3 py-2 text-[10px]">Thương hiệu</th>
-                              <th className="px-3 py-2 text-[10px] text-center">SOV Rank</th>
-                              <th className="px-3 py-2 text-[10px] text-center">Content</th>
-                              <th className="px-3 py-2 text-[10px] text-center">PR</th>
-                              <th className="px-3 py-2 text-right text-[10px]">Thao tác</th>
+                              {getHeadersForTab().map((h, i) => (
+                                <th key={i} className={`px-3 py-2 text-[10px] ${getHeaderMinWidth(h)}`}>
+                                  {h}
+                                </th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
-                            {brandKpis.map((k) => (
-                              <tr key={k.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-3 py-2">
-                                  <span className="font-semibold text-slate-900 block leading-tight">{k.brandName}</span>
-                                  <span className="text-[10px] text-slate-400 block truncate max-w-[120px]" title={k.comment}>{k.comment || "Không có ghi chú"}</span>
-                                </td>
-                                <td className="px-3 py-2 text-center font-mono font-medium text-slate-600">
-                                  {k.sovTargetRank}
-                                </td>
-                                <td className="px-3 py-2 text-center font-mono font-medium text-slate-600">
-                                  {k.contentTarget} bài
-                                </td>
-                                <td className="px-3 py-2 text-center font-mono font-medium text-slate-600">
-                                  {k.prTarget} bài
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSelectKpiBrand(k.id as any)}
-                                    className="text-indigo-600 hover:text-indigo-900 text-[11px] font-semibold cursor-pointer"
-                                  >
-                                    Chọn sửa
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
+                            {(() => {
+                              // Build filtered rows
+                              let activeDbRows: any[] = [];
+                              if (dbActiveTab === "digital") {
+                                activeDbRows = marketingData.digital_marketing || [];
+                              } else if (dbActiveTab === "kol") {
+                                activeDbRows = marketingData.kol_koc || [];
+                              } else if (dbActiveTab === "btl") {
+                                activeDbRows = marketingData.btl_trade || [];
+                              } else if (dbActiveTab === "ooh") {
+                                activeDbRows = marketingData.monthly_ooh_pr || [];
+                              }
+
+                              const mappedDbRows = activeDbRows.map((row, originalIndex) => ({
+                                row,
+                                originalIndex,
+                              }));
+
+                              const filteredMappedRows = mappedDbRows.filter(({ row }) => {
+                                if (dbBrandFilter !== "Tất cả") {
+                                  if (!row.brand || row.brand.toLowerCase() !== dbBrandFilter.toLowerCase()) {
+                                    return false;
+                                  }
+                                }
+                                if (dbSearchQuery.trim()) {
+                                  const query = dbSearchQuery.toLowerCase();
+                                  const matchVal = Object.values(row)
+                                    .map((val) => (val !== null && val !== undefined ? val.toString().toLowerCase() : ""))
+                                    .join(" ");
+                                  return matchVal.includes(query);
+                                }
+                                return true;
+                              });
+
+                              const totalDbRows = filteredMappedRows.length;
+                              const totalDbPages = Math.ceil(totalDbRows / dbLimit) || 1;
+                              const safeDbPage = Math.min(dbPage, totalDbPages);
+                              const startIndex = (safeDbPage - 1) * dbLimit;
+                              const paginatedDbRows = filteredMappedRows.slice(startIndex, startIndex + dbLimit);
+
+                              if (paginatedDbRows.length === 0) {
+                                return (
+                                  <tr>
+                                    <td colSpan={10} className="px-3 py-6 text-center text-slate-400 italic font-sans">
+                                      Không tìm thấy dòng dữ liệu nào khớp với bộ lọc tìm kiếm.
+                                    </td>
+                                  </tr>
+                                );
+                              }
+
+                              return (
+                                <>
+                                  {paginatedDbRows.map(({ row, originalIndex }) => (
+                                    <tr key={originalIndex} className="hover:bg-slate-50/75 transition-colors">
+                                      {dbActiveTab === "digital" && (
+                                        <>
+                                          <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
+                                          <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[110px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
+                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Chỉ số metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
+                                          <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI tuần")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
+                                          <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                          <td className={`px-3 py-2 font-mono text-indigo-600 ${getHeaderMinWidth("Tích lũy tháng")}`}>{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
+                                        </>
+                                      )}
+
+                                      {dbActiveTab === "kol" && (
+                                        <>
+                                          <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
+                                          <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                          <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Hạng mục")}`}>{row.hạng_mục}</td>
+                                          <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Kênh")}`}>{row.kênh_channel}</td>
+                                          <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI chiến dịch")}`}>{row.kpi_toàn_chiến_dịch !== null ? row.kpi_toàn_chiến_dịch.toLocaleString() : "—"}</td>
+                                          <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_trong_tuần !== null ? row.thực_tế_trong_tuần.toLocaleString() : "—"}</td>
+                                        </>
+                                      )}
+
+                                      {dbActiveTab === "btl" && (() => {
+                                        const btlInfo = getBtlRowDataValues(row);
+                                        return (
+                                          <>
+                                            <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
+                                            <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                            <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Hạng mục lớn")}`} title={row.hạng_mục_lớn}>{row.hạng_mục_lớn}</td>
+                                            <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Chi tiết")}`}>
+                                              <div className="font-medium text-slate-800 leading-tight">{row.chi_tiết_hạng_mục}</div>
+                                              {row.phân_loại && <div className="text-[9px] text-slate-400 font-mono leading-none">{row.phân_loại}</div>}
+                                            </td>
+                                            <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Thực hiện T${btlInfo.lastMonth}`)}`}>{btlInfo.lastMonthVal !== null && btlInfo.lastMonthVal !== undefined ? btlInfo.lastMonthVal.toLocaleString() : "—"}</td>
+                                            <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Kế hoạch T${btlInfo.thisMonth}`)}`}>{btlInfo.planVal !== null && btlInfo.planVal !== undefined ? btlInfo.planVal.toLocaleString() : "—"}</td>
+                                            <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth(`Tích lũy T${btlInfo.thisMonth}`)}`}>{btlInfo.accVal !== null && btlInfo.accVal !== undefined ? btlInfo.accVal.toLocaleString() : "—"}</td>
+                                          </>
+                                        );
+                                      })()}
+
+                                      {dbActiveTab === "ooh" && (
+                                        <>
+                                          <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tháng")}`}>{row.tháng_báo_cáo}</td>
+                                          <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
+                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
+                                          <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
+                                          <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                        </>
+                                      )}
+
+                                      <td className={`px-3 py-2 text-right ${getHeaderMinWidth("Thao tác")}`}>
+                                        <div className="flex items-center justify-end gap-2.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDbEditStart(dbActiveTab, originalIndex)}
+                                            className="text-indigo-600 hover:text-indigo-900 font-semibold cursor-pointer"
+                                          >
+                                            Sửa
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDbDelete(dbActiveTab, originalIndex)}
+                                            className="text-rose-600 hover:text-rose-900 font-semibold cursor-pointer"
+                                          >
+                                            Xóa
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+
+                                  {/* Pagination controls inside table rendering context to avoid nested state dependency errors */}
+                                  {totalDbPages > 1 && (
+                                    <tr>
+                                      <td colSpan={10} className="px-3 py-3 bg-slate-50">
+                                        <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+                                          <span>
+                                            Hiển thị {startIndex + 1} - {Math.min(startIndex + dbLimit, totalDbRows)} trong số{" "}
+                                            <strong>{totalDbRows}</strong> dòng dữ liệu
+                                          </span>
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              disabled={safeDbPage === 1}
+                                              onClick={() => setDbPage((p) => Math.max(1, p - 1))}
+                                              className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
+                                            >
+                                              Trang trước
+                                            </button>
+                                            <span className="px-2 font-sans font-semibold">
+                                              Trang {safeDbPage} / {totalDbPages}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              disabled={safeDbPage >= totalDbPages}
+                                              onClick={() => setDbPage((p) => Math.min(totalDbPages, p + 1))}
+                                              className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
+                                            >
+                                              Trang sau
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </tbody>
                         </table>
                       </div>

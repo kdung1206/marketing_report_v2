@@ -4,11 +4,139 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import nodemailer from "nodemailer";
+import crypto from "crypto";
 import { normalizeMarketingData } from "./src/data";
 
 dotenv.config();
 
 const app = express();
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "marketing_dashboard_key_32bytes_!"; // Must be 32 bytes
+const IV_LENGTH = 16;
+
+function encrypt(text: string): string {
+  if (!text) return "";
+  try {
+    const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+    let encrypted = cipher.update(text);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString("hex") + ":" + encrypted.toString("hex");
+  } catch (err) {
+    console.error("Encryption error:", err);
+    return text;
+  }
+}
+
+function decrypt(text: string): string {
+  if (!text) return "";
+  if (!text.includes(":")) return text;
+  try {
+    const parts = text.split(":");
+    const iv = Buffer.from(parts.shift() || "", "hex");
+    const encryptedText = Buffer.from(parts.join(":"), "hex");
+    const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
+    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+    let decrypted = decipher.update(encryptedText);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted.toString();
+  } catch (err) {
+    console.error("Decryption error:", err);
+    return text;
+  }
+}
+
+// Lazy-initialize SMTP transport if environment variables or database config exist
+function getMailTransporter() {
+  const store = getDatabaseData();
+  const config = store.mail_config || {};
+
+  const host = config.smtp_host || process.env.SMTP_HOST;
+  const port = Number(config.smtp_port || process.env.SMTP_PORT || 587);
+  const user = config.smtp_user || process.env.SMTP_USER;
+  const encryptedPass = config.smtp_pass;
+  const pass = encryptedPass ? decrypt(encryptedPass) : process.env.SMTP_PASS;
+
+  if (host && user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: {
+        user,
+        pass
+      }
+    });
+  }
+  return null;
+}
+
+// Helper to send email notifications when report is published
+async function sendPublishNotification(weekId: string, comments: any) {
+  const store = getDatabaseData();
+  const config = store.mail_config || {};
+
+  // Check if automatic email is disabled (defaults to true)
+  if (config.enabled === false) {
+    console.log("[Email] Automatic email notification is disabled by admin config.");
+    return { success: false, reason: "disabled" };
+  }
+
+  const recipient = config.notification_email || process.env.NOTIFICATION_EMAIL || "ntkdung1206@gmail.com";
+  const senderUser = config.smtp_user || process.env.SMTP_USER || "marketing.karofi.livotec@gmail.com";
+  const transporter = getMailTransporter();
+  
+  const weekLabel = weekId.toUpperCase();
+  const subject = `[Báo cáo Marketing] Đã xuất bản báo cáo mới cho tuần ${weekLabel}`;
+  
+  let commentsHtml = "<h3>Báo cáo mới đã được xuất bản trực tuyến!</h3>";
+  commentsHtml += `<p>Thương hiệu và tuần báo cáo: <strong>Tuần ${weekLabel}</strong></p>`;
+  
+  if (comments) {
+    for (const [brand, data] of Object.entries(comments)) {
+      const bData = data as any;
+      if (bData && bData.executiveSummary) {
+        commentsHtml += `
+          <div style="margin-top: 15px; padding: 15px; border-left: 4px solid #4f46e5; background-color: #f9fafb; border-radius: 8px; font-family: sans-serif;">
+            <h4 style="margin: 0 0 5px 0; color: #4f46e5; font-size: 16px;">Thương hiệu: ${brand}</h4>
+            <p style="margin: 8px 0;"><strong>Nhận định tổng quan:</strong> ${bData.executiveSummary.evaluation || "Không có nhận định."}</p>
+            <p style="margin: 8px 0;"><strong>Đề xuất tuần tới:</strong> ${bData.executiveSummary.proposals || "Không có đề xuất."}</p>
+          </div>
+        `;
+      }
+    }
+  }
+  
+  commentsHtml += `
+    <p style="margin-top: 25px; font-size: 12px; color: #6b7280; font-family: sans-serif;">
+      Đây là email thông báo tự động từ hệ thống Marketing Campaign Performance Dashboard.
+    </p>
+  `;
+
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: `"Marketing Performance Dashboard" <${senderUser}>`,
+        to: recipient,
+        subject,
+        html: commentsHtml
+      });
+      console.log(`[Email] Notification sent successfully to ${recipient}`);
+      return { success: true, method: "smtp" };
+    } catch (err) {
+      console.error("[Email] Failed to send email via SMTP, falling back to logging:", err);
+    }
+  }
+
+  console.log("==================================================");
+  console.log(`[EMAIL SIMULATION] Sent to: ${recipient}`);
+  console.log(`Subject: ${subject}`);
+  console.log(`Body:\n${commentsHtml.replace(/<[^>]*>/g, " ").trim()}`);
+  console.log("==================================================");
+  return { success: true, method: "simulation" };
+}
 const PORT = 3000;
 
 app.use(express.json({ limit: "20mb" }));
@@ -210,6 +338,52 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
   }
 });
 
+// GET /api/get-mail-config
+app.get("/api/get-mail-config", (req, res) => {
+  try {
+    const store = getDatabaseData();
+    const config = store.mail_config || {};
+    const decryptedPass = config.smtp_pass ? decrypt(config.smtp_pass) : "";
+    res.json({
+      success: true,
+      config: {
+        smtp_host: config.smtp_host || "",
+        smtp_port: config.smtp_port || "587",
+        smtp_user: config.smtp_user || "",
+        smtp_pass: decryptedPass,
+        notification_email: config.notification_email || "ntkdung1206@gmail.com",
+        enabled: config.enabled !== undefined ? config.enabled : true
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/save-mail-config
+app.post("/api/save-mail-config", (req, res) => {
+  try {
+    const { smtp_host, smtp_port, smtp_user, smtp_pass, notification_email, enabled } = req.body;
+    const store = getDatabaseData();
+    
+    const encryptedPass = smtp_pass ? encrypt(smtp_pass) : "";
+    
+    store.mail_config = {
+      smtp_host: smtp_host || "",
+      smtp_port: smtp_port || "587",
+      smtp_user: smtp_user || "",
+      smtp_pass: encryptedPass,
+      notification_email: notification_email || "",
+      enabled: enabled === true
+    };
+    
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(store, null, 2), "utf8");
+    res.json({ success: true, message: "Cấu hình gửi mail tự động đã được lưu và mã hóa bảo mật!" });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/get-data
 app.get("/api/get-data", (req, res) => {
   try {
@@ -227,7 +401,7 @@ app.get("/api/get-data", (req, res) => {
 });
 
 // POST /api/save-comments
-app.post("/api/save-comments", (req, res) => {
+app.post("/api/save-comments", async (req, res) => {
   try {
     const { week, comments } = req.body;
     if (!week || !comments) {
@@ -242,10 +416,42 @@ app.post("/api/save-comments", (req, res) => {
     rawDbData.comments[week] = comments;
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(rawDbData, null, 2), "utf8");
 
+    // Send email notification (async non-blocking or simple await)
+    try {
+      await sendPublishNotification(week, comments);
+    } catch (mailErr) {
+      console.error("Failed to process publish notification mail:", mailErr);
+    }
+
     return res.json({ success: true });
   } catch (err: any) {
     console.error("POST /api/save-comments error:", err);
     return res.status(500).json({ error: `Lỗi lưu nhận định vào cơ sở dữ liệu: ${err.message}` });
+  }
+});
+
+// POST /api/save-raw-data (Direct edit/delete row management for Admin)
+app.post("/api/save-raw-data", (req, res) => {
+  try {
+    const { data } = req.body;
+    if (!data) {
+      return res.status(400).json({ error: "Thiếu dữ liệu để lưu." });
+    }
+
+    const rawDbData = getDatabaseData();
+    // Overwrite the specific core array lists while keeping existing comments
+    rawDbData.digital_marketing = data.digital_marketing || [];
+    rawDbData.kol_koc = data.kol_koc || [];
+    rawDbData.btl_trade = data.btl_trade || [];
+    rawDbData.monthly_ooh_pr = data.monthly_ooh_pr || [];
+
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(rawDbData, null, 2), "utf8");
+    const normalized = normalizeMarketingData(rawDbData);
+
+    return res.json({ success: true, data: normalized });
+  } catch (err: any) {
+    console.error("POST /api/save-raw-data error:", err);
+    return res.status(500).json({ error: `Lỗi cập nhật cơ sở dữ liệu: ${err.message}` });
   }
 });
 
