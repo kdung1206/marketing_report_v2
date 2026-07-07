@@ -52,6 +52,14 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "20mb" }));
 
+// Rewrite requests to respect Vite's base path '/marketing_report_v2' when handling API routes
+app.use((req, res, next) => {
+  if (req.url.startsWith("/marketing_report_v2/api")) {
+    req.url = req.url.replace("/marketing_report_v2/api", "/api");
+  }
+  next();
+});
+
 // Persistent JSON Database Configuration
 const DB_FILE_PATH = path.join(process.cwd(), "src", "db_store.json");
 const INITIAL_DATA_PATH = path.join(process.cwd(), "src", "initial_data.json");

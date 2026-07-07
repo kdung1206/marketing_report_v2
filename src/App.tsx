@@ -64,7 +64,12 @@ import {
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
 async function safeFetchJson(url: string, options?: RequestInit) {
-  const response = await fetch(url, options);
+  const metaEnv = (import.meta as any).env;
+  const baseUrl = metaEnv && metaEnv.BASE_URL && metaEnv.BASE_URL !== "/"
+    ? metaEnv.BASE_URL.replace(/\/$/, "")
+    : "";
+  const targetUrl = baseUrl && url.startsWith("/api") ? `${baseUrl}${url}` : url;
+  const response = await fetch(targetUrl, options);
   const text = await response.text();
   const trimmed = text.trim();
   if (trimmed.startsWith("<") || !response.ok) {
@@ -1225,11 +1230,7 @@ export default function App() {
     const isBrandMatch = ("brand" in row && (row as any).brand)
       ? (row as any).brand.toLowerCase() === selectedBrand.toLowerCase()
       : selectedBrand.toLowerCase() === "livotec";
-    return isBrandMatch && 
-           isInSelectedTimeline(row.week) && 
-           row.thực_tế_trong_tuần !== null && 
-           row.thực_tế_trong_tuần !== undefined && 
-           row.thực_tế_trong_tuần !== 0;
+    return isBrandMatch && isInSelectedTimeline(row.week);
   });
 
   const totalKolKocKpi = brandKolKoc.reduce((sum, r) => sum + (r.kpi_toàn_chiến_dịch || 0), 0);
@@ -1381,10 +1382,10 @@ export default function App() {
   if (totalKolKocKpi > 0 || totalKolKocTichLuy > 0 || totalKolKocTrongTuan > 0) {
     scorecards.push({
       id: "kol_koc",
-      title: "KOL/KOC Đã Đạt",
-      value: totalKolKocKpi > 0 ? `${totalKolKocTichLuy}/${totalKolKocKpi} KOC/KOL` : "0 KOC/KOL",
-      targetLabel: "Thực hiện trong tuần",
-      targetVal: `+${totalKolKocTrongTuan}`,
+      title: "KOC/KOL Air Bài Tuần",
+      value: `${totalKolKocTrongTuan} KOC/KOL`,
+      targetLabel: "Lũy kế chiến dịch",
+      targetVal: totalKolKocKpi > 0 ? `${totalKolKocTichLuy}/${totalKolKocKpi}` : "0 KOC/KOL",
       percent: totalKolKocKpi > 0 ? Math.round((totalKolKocTichLuy / totalKolKocKpi) * 100) : 0,
       icon: Users,
       color: "text-blue-600 border-blue-100",
@@ -2277,8 +2278,8 @@ export default function App() {
                                 <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
                                 <Legend />
                                 <Bar dataKey="kpi_toàn_chiến_dịch" name="KPI Toàn chiến dịch" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="tích_lũy_chiến_dịch" name="Lũy kế thực hiện" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                 <Bar dataKey="thực_tế_trong_tuần" name="Thực hiện tuần" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="tích_lũy_chiến_dịch" name="Lũy kế thực hiện" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                               </BarChart>
                             </ResponsiveContainer>
                           </div>
@@ -2295,8 +2296,8 @@ export default function App() {
                                     <th className="px-4 py-3">Hạng mục & Kênh</th>
                                     <th className="px-4 py-3">Ngành hàng</th>
                                     <th className="px-4 py-3 text-right">KPI toàn chiến dịch</th>
-                                    <th className="px-4 py-3 text-right">Lũy kế thực hiện</th>
                                     <th className="px-4 py-3 text-right">Thực hiện tuần</th>
+                                    <th className="px-4 py-3 text-right">Lũy kế thực hiện</th>
                                     <th className="px-4 py-3 text-right">Tỷ lệ hoàn thành</th>
                                   </tr>
                                 </thead>
@@ -2310,8 +2311,8 @@ export default function App() {
                                         <td className="px-4 py-3 font-semibold text-slate-900">{row.hạng_mục} ({row.kênh_channel})</td>
                                         <td className="px-4 py-3">{row.ngành_hàng}</td>
                                         <td className="px-4 py-3 text-right font-mono font-medium">{row.kpi_toàn_chiến_dịch}</td>
-                                        <td className="px-4 py-3 text-right font-mono font-medium text-blue-600">{row.tích_lũy_chiến_dịch}</td>
                                         <td className="px-4 py-3 text-right font-mono font-medium text-emerald-600">{row.thực_tế_trong_tuần}</td>
+                                        <td className="px-4 py-3 text-right font-mono font-medium text-blue-600">{row.tích_lũy_chiến_dịch}</td>
                                         <td className="px-4 py-3 text-right font-mono font-semibold text-slate-900">{rate}%</td>
                                       </tr>
                                     );
