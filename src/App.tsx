@@ -785,7 +785,6 @@ export default function App() {
       case "Kênh":
         return "min-w-[100px]";
       case "KPI tuần":
-      case "Thực tế tuần":
       case "Tích lũy tháng":
       case "KPI":
       case "Thực tế":
@@ -1703,27 +1702,7 @@ export default function App() {
             </div>
           </form>
 
-          {/* Reference list of accounts */}
-          <div className="rounded-xl bg-slate-50 p-4 border border-slate-100 text-[11px] text-slate-500 space-y-2">
-            <span className="font-bold text-slate-700 block">🔐 Tài khoản truy cập demo (Vui lòng tự gõ thông tin):</span>
-            <div className="grid grid-cols-1 gap-1.5 font-mono">
-              <div>
-                <span className="font-semibold text-indigo-700">Admin (Toàn quyền):</span>
-                <span className="block text-slate-600 pl-2">• Username: ntkdung1206@gmail.com</span>
-                <span className="block text-slate-600 pl-2">• Password: 123</span>
-              </div>
-              <div className="border-t border-slate-200/60 pt-1.5">
-                <span className="font-semibold text-emerald-700">Editor (Biên tập dữ liệu):</span>
-                <span className="block text-slate-600 pl-2">• Username: editor1</span>
-                <span className="block text-slate-600 pl-2">• Password: 123</span>
-              </div>
-              <div className="border-t border-slate-200/60 pt-1.5">
-                <span className="font-semibold text-amber-700">Viewer (Chỉ xem báo cáo):</span>
-                <span className="block text-slate-600 pl-2">• Username: viewer1</span>
-                <span className="block text-slate-600 pl-2">• Password: 123</span>
-              </div>
-            </div>
-          </div>
+
         </div>
 
         {/* Global Notifications inside login */}
@@ -3458,125 +3437,7 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Section: Automatic Email Configuration (Only Admin) */}
-                {currentUser && currentUser.role === "Admin" && (
-                  <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                        <Mail className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">
-                          Cấu hình gửi Mail tự động
-                        </h3>
-                        <p className="text-[11px] text-slate-500">
-                          Tự động gửi email thông báo nhận định tổng quan khi lưu và xuất bản báo cáo
-                        </p>
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleSaveMailConfig} className="space-y-4">
-                      {/* Toggle Enabled */}
-                      <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
-                        <div className="space-y-0.5">
-                          <label className="text-xs font-bold text-slate-700 block">Kích hoạt gửi Email tự động</label>
-                          <span className="text-[10px] text-slate-400 block">Bật/tắt tự động gửi thông báo qua email</span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={mailEnabled}
-                            onChange={(e) => setMailEnabled(e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                        </label>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Máy chủ SMTP (Host) <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
-                          <input
-                            type="text"
-                            required={false}
-                            disabled={!mailEnabled}
-                            value={mailHost}
-                            onChange={(e) => setMailHost(e.target.value)}
-                            placeholder="smtp.gmail.com"
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Cổng (Port) <span className="text-[9px] text-slate-400 lowercase">(mặc định: 587)</span></label>
-                          <input
-                            type="text"
-                            required={false}
-                            disabled={!mailEnabled}
-                            value={mailPort}
-                            onChange={(e) => setMailPort(e.target.value)}
-                            placeholder="587"
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Tài khoản SMTP (User) <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
-                          <input
-                            type="text"
-                            required={false}
-                            disabled={!mailEnabled}
-                            value={mailUser}
-                            onChange={(e) => setMailUser(e.target.value)}
-                            placeholder="marketing.karofi.livotec@gmail.com"
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Mật khẩu (App Password - Secret) <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
-                          <input
-                            type="password"
-                            required={false}
-                            disabled={!mailEnabled}
-                            value={mailPass}
-                            onChange={(e) => setMailPass(e.target.value)}
-                            placeholder="Nhập mật khẩu SMTP hoặc App Password..."
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Email nhận thông báo <span className="text-[9px] text-slate-400 lowercase">(tùy chọn nếu cấu hình .env)</span></label>
-                        <input
-                          type="email"
-                          required={false}
-                          disabled={!mailEnabled}
-                          value={mailRecipient}
-                          onChange={(e) => setMailRecipient(e.target.value)}
-                          placeholder="ntkdung1206@gmail.com"
-                          className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-50 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={isMailLoading}
-                        className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition cursor-pointer"
-                      >
-                        {isMailLoading ? (
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        )}
-                        Lưu cấu hình & Mã hóa bảo mật
-                      </button>
-                    </form>
-                  </div>
-                )}
+                {/* Automatic Email Configuration has been removed per user request */}
 
                 {/* Section 4: Advanced Database Row Manager (Only Admin) */}
                 {currentUser && currentUser.role === "Admin" && (

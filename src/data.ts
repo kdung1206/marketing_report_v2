@@ -41,6 +41,18 @@ export interface BtlTradeRow {
   [key: string]: any;
 }
 
+export interface BtlTradeMonthlyRow {
+  month: number;
+  year: number;
+  brand: string;
+  hạng_mục_lớn: string;
+  chi_tiết_hạng_mục: string;
+  phân_loại: string | null;
+  tần_suất: string;
+  đơn_vị_tính: string;
+  thực_hiện_tháng: number | null;
+}
+
 export interface MonthlyOohPrRow {
   tháng_báo_cáo: string;
   hạng_mục: string;
@@ -58,6 +70,7 @@ export interface MarketingReportData {
   kol_koc: KolKocRow[];
   btl_trade: BtlTradeRow[];
   monthly_ooh_pr: MonthlyOohPrRow[];
+  btl_trade_monthly: BtlTradeMonthlyRow[];
 }
 
 export interface CategoryComments {
@@ -76,6 +89,50 @@ export interface BrandComments {
   evaluation: string;
   proposals: string;
   categories: CategoryComments;
+}
+
+function getEndOfWeekDate(str: string): { day: number; month: number; year: number } {
+  const TIMELINE_LABELS_MAP: { [key: string]: string } = {
+    "week4": "19/06 - 25/06/2026",
+    "week3": "12/06 - 18/06/2026",
+    "week2": "05/06 - 11/06/2026",
+    "week1": "01/06 - 04/06/2026",
+  };
+  if (TIMELINE_LABELS_MAP[str]) {
+    str = TIMELINE_LABELS_MAP[str];
+  }
+  
+  const parts = str.split(/-|\s+-\s+/);
+  if (parts.length >= 2) {
+    const endDateStr = parts[parts.length - 1].trim();
+    const cleaned = endDateStr.replace(/[^0-9/]/g, "");
+    const dateParts = cleaned.split("/");
+    if (dateParts.length === 3) {
+      const day = parseInt(dateParts[0], 10);
+      const month = parseInt(dateParts[1], 10);
+      const year = parseInt(dateParts[2], 10);
+      return { day, month, year };
+    }
+  } else {
+    const cleanStr = str.replace(/[^0-9/\-]/g, "");
+    const p = cleanStr.split("-");
+    if (p.length >= 2) {
+      const endDateStr = p[p.length - 1];
+      const dateParts = endDateStr.split("/");
+      if (dateParts.length === 3) {
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10);
+        const year = parseInt(dateParts[2], 10);
+        return { day, month, year };
+      }
+    }
+  }
+  return { day: 25, month: 6, year: 2026 };
+}
+
+export function getBtlReportMonth(weekStr: string): { month: number; year: number } {
+  const endInfo = getEndOfWeekDate(weekStr);
+  return { month: endInfo.month, year: endInfo.year };
 }
 
 export function normalizeMarketingData(parsed: any): MarketingReportData {
@@ -183,6 +240,31 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
       })
     : [];
 
+  const btl_trade_monthly: BtlTradeMonthlyRow[] = Array.isArray(parsed?.btl_trade_monthly)
+    ? parsed.btl_trade_monthly.map((row: any) => {
+        const rawBrand = getVal(row, ["brand"]) || "";
+        const normalizedBrand = rawBrand.toString().trim().toLowerCase() === "livotec" ? "Livotec" :
+                             rawBrand.toString().trim().toLowerCase() === "karofi" ? "Karofi" : rawBrand.toString().trim();
+                             
+        const rawHangMucLon = getVal(row, ["hạng_mục_lớn", "hạng mục lớn"]) || "";
+        const rawHangMucLonUpper = rawHangMucLon.toString().trim().toUpperCase();
+        let normalizedHangMucLon = rawHangMucLon.toString().trim();
+        if (rawHangMucLonUpper === "POSM") normalizedHangMucLon = "POSM";
+
+        return {
+          month: getNumVal(row, ["month", "tháng"]) || 5,
+          year: getNumVal(row, ["year", "năm"]) || 2026,
+          brand: normalizedBrand,
+          hạng_mục_lớn: normalizedHangMucLon,
+          chi_tiết_hạng_mục: (getVal(row, ["chi_tiết_hạng_mục", "chi tiết hạng mục"]) || "").toString().trim(),
+          phân_loại: getVal(row, ["phân_loại", "phân loại"]) || null,
+          tần_suất: (getVal(row, ["tần_suất", "tần suất"]) || "").toString().trim(),
+          đơn_vị_tính: (getVal(row, ["đơn_vị_tính", "đơn vị tính"]) || "").toString().trim(),
+          thực_hiện_tháng: getNumVal(row, ["thực_hiện_tháng", "thực hiện tháng", "giá_trị", "giá trị"])
+        };
+      })
+    : [];
+
   const btl_trade: BtlTradeRow[] = Array.isArray(parsed?.btl_trade)
     ? parsed.btl_trade.map((row: any) => {
         const rawBrand = getVal(row, ["brand"]) || "";
@@ -213,15 +295,41 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
           return null;
         };
 
+        const weekStr = (getVal(row, ["week"]) || "").toString().trim();
+        const info = getBtlReportMonth(weekStr);
+        const thisMonth = info.month;
+        const lastMonth = thisMonth === 1 ? 12 : thisMonth - 1;
+        const lastYear = thisMonth === 1 ? info.year - 1 : info.year;
+
+        const chiTiet = (getVal(row, ["chi_tiết_hạng_mục", "chi tiết hạng mục"]) || "").toString().trim();
+        const phanLoai = getVal(row, ["phân_loại", "phân loại"]) || null;
+        const tanSuat = (getVal(row, ["tần_suất", "tần suất"]) || "").toString().trim();
+        const donViTinh = (getVal(row, ["đơn_vị_tính", "đơn vị tính"]) || "").toString().trim();
+
+        const linkedMonthlyRow = btl_trade_monthly.find((mRow) => {
+          return mRow.month === lastMonth &&
+                 mRow.year === lastYear &&
+                 mRow.brand.toLowerCase() === normalizedBrand.toLowerCase() &&
+                 mRow.hạng_mục_lớn.toLowerCase() === normalizedHangMucLon.toLowerCase() &&
+                 mRow.chi_tiết_hạng_mục.toLowerCase() === chiTiet.toLowerCase() &&
+                 (mRow.phân_loại || "").toString().toLowerCase() === (phanLoai || "").toString().toLowerCase() &&
+                 mRow.tần_suất.toLowerCase() === tanSuat.toLowerCase() &&
+                 mRow.đơn_vị_tính.toLowerCase() === donViTinh.toLowerCase();
+        });
+
+        const btl_thuc_hien_thang = linkedMonthlyRow !== undefined 
+          ? linkedMonthlyRow.thực_hiện_tháng 
+          : getBtlField(["thực_hiện_tháng", "thực hiện tháng", "thực_hiện_tháng_5", "thực hiện tháng 5"]);
+
         const resultRow: BtlTradeRow = {
-          week: (getVal(row, ["week"]) || "").toString().trim(),
+          week: weekStr,
           brand: normalizedBrand,
           hạng_mục_lớn: normalizedHangMucLon,
-          chi_tiết_hạng_mục: (getVal(row, ["chi_tiết_hạng_mục", "chi tiết hạng mục"]) || "").toString().trim(),
-          phân_loại: getVal(row, ["phân_loại", "phân loại"]) || null,
-          tần_suất: (getVal(row, ["tần_suất", "tần suất"]) || "").toString().trim(),
-          đơn_vị_tính: (getVal(row, ["đơn_vị_tính", "đơn vị tính"]) || "").toString().trim(),
-          thực_hiện_tháng: getBtlField(["thực_hiện_tháng", "thực hiện tháng", "thực_hiện_tháng_5", "thực hiện tháng 5"]),
+          chi_tiết_hạng_mục: chiTiet,
+          phân_loại: phanLoai,
+          tần_suất: tanSuat,
+          đơn_vị_tính: donViTinh,
+          thực_hiện_tháng: btl_thuc_hien_thang,
           kế_hoạch_tháng: getBtlField(["kế_hoạch_tháng", "kế hoạch tháng", "kế_hoạch_tháng_6", "kế hoạch tháng 6"]),
           tích_lũy_tháng: getBtlField(["tích_lũy_tháng", "tích lũy tháng"])
         };
@@ -265,6 +373,7 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
     kol_koc,
     btl_trade,
     monthly_ooh_pr,
+    btl_trade_monthly,
   };
 }
 

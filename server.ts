@@ -4,9 +4,8 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import nodemailer from "nodemailer";
 import crypto from "crypto";
-import { normalizeMarketingData } from "./src/data";
+import { normalizeMarketingData, getBtlReportMonth } from "./src/data";
 
 dotenv.config();
 
@@ -48,95 +47,7 @@ function decrypt(text: string): string {
   }
 }
 
-// Lazy-initialize SMTP transport if environment variables or database config exist
-function getMailTransporter() {
-  const store = getDatabaseData();
-  const config = store.mail_config || {};
-
-  const host = config.smtp_host || process.env.SMTP_HOST;
-  const port = Number(config.smtp_port || process.env.SMTP_PORT || 587);
-  const user = config.smtp_user || process.env.SMTP_USER;
-  const encryptedPass = config.smtp_pass;
-  const pass = encryptedPass ? decrypt(encryptedPass) : process.env.SMTP_PASS;
-
-  if (host && user && pass) {
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: {
-        user,
-        pass
-      }
-    });
-  }
-  return null;
-}
-
-// Helper to send email notifications when report is published
-async function sendPublishNotification(weekId: string, comments: any) {
-  const store = getDatabaseData();
-  const config = store.mail_config || {};
-
-  // Check if automatic email is disabled (defaults to true)
-  if (config.enabled === false) {
-    console.log("[Email] Automatic email notification is disabled by admin config.");
-    return { success: false, reason: "disabled" };
-  }
-
-  const recipient = config.notification_email || process.env.NOTIFICATION_EMAIL || "ntkdung1206@gmail.com";
-  const senderUser = config.smtp_user || process.env.SMTP_USER || "marketing.karofi.livotec@gmail.com";
-  const transporter = getMailTransporter();
-  
-  const weekLabel = weekId.toUpperCase();
-  const subject = `[Báo cáo Marketing] Đã xuất bản báo cáo mới cho tuần ${weekLabel}`;
-  
-  let commentsHtml = "<h3>Báo cáo mới đã được xuất bản trực tuyến!</h3>";
-  commentsHtml += `<p>Thương hiệu và tuần báo cáo: <strong>Tuần ${weekLabel}</strong></p>`;
-  
-  if (comments) {
-    for (const [brand, data] of Object.entries(comments)) {
-      const bData = data as any;
-      if (bData && bData.executiveSummary) {
-        commentsHtml += `
-          <div style="margin-top: 15px; padding: 15px; border-left: 4px solid #4f46e5; background-color: #f9fafb; border-radius: 8px; font-family: sans-serif;">
-            <h4 style="margin: 0 0 5px 0; color: #4f46e5; font-size: 16px;">Thương hiệu: ${brand}</h4>
-            <p style="margin: 8px 0;"><strong>Nhận định tổng quan:</strong> ${bData.executiveSummary.evaluation || "Không có nhận định."}</p>
-            <p style="margin: 8px 0;"><strong>Đề xuất tuần tới:</strong> ${bData.executiveSummary.proposals || "Không có đề xuất."}</p>
-          </div>
-        `;
-      }
-    }
-  }
-  
-  commentsHtml += `
-    <p style="margin-top: 25px; font-size: 12px; color: #6b7280; font-family: sans-serif;">
-      Đây là email thông báo tự động từ hệ thống Marketing Campaign Performance Dashboard.
-    </p>
-  `;
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: `"Marketing Performance Dashboard" <${senderUser}>`,
-        to: recipient,
-        subject,
-        html: commentsHtml
-      });
-      console.log(`[Email] Notification sent successfully to ${recipient}`);
-      return { success: true, method: "smtp" };
-    } catch (err) {
-      console.error("[Email] Failed to send email via SMTP, falling back to logging:", err);
-    }
-  }
-
-  console.log("==================================================");
-  console.log(`[EMAIL SIMULATION] Sent to: ${recipient}`);
-  console.log(`Subject: ${subject}`);
-  console.log(`Body:\n${commentsHtml.replace(/<[^>]*>/g, " ").trim()}`);
-  console.log("==================================================");
-  return { success: true, method: "simulation" };
-}
+// Automatic email features have been disabled per user request
 const PORT = 3000;
 
 app.use(express.json({ limit: "20mb" }));
@@ -416,12 +327,7 @@ app.post("/api/save-comments", async (req, res) => {
     rawDbData.comments[week] = comments;
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(rawDbData, null, 2), "utf8");
 
-    // Send email notification (async non-blocking or simple await)
-    try {
-      await sendPublishNotification(week, comments);
-    } catch (mailErr) {
-      console.error("Failed to process publish notification mail:", mailErr);
-    }
+    // Automatic email notifications have been disabled per user request
 
     return res.json({ success: true });
   } catch (err: any) {
@@ -444,6 +350,53 @@ app.post("/api/save-raw-data", (req, res) => {
     rawDbData.kol_koc = data.kol_koc || [];
     rawDbData.btl_trade = data.btl_trade || [];
     rawDbData.monthly_ooh_pr = data.monthly_ooh_pr || [];
+
+    // Sync weekly btl_trade thực_hiện_tháng back to btl_trade_monthly
+    if (!rawDbData.btl_trade_monthly) {
+      rawDbData.btl_trade_monthly = [];
+    }
+
+    rawDbData.btl_trade.forEach((row: any) => {
+      const weekStr = row.week || "";
+      const info = getBtlReportMonth(weekStr);
+      const lastMonth = info.month === 1 ? 12 : info.month - 1;
+      const lastYear = info.month === 1 ? info.year - 1 : info.year;
+      
+      const val = row.thực_hiện_tháng;
+      if (val !== undefined && val !== null) {
+        // Find if there is a matching row in btl_trade_monthly
+        const match = rawDbData.btl_trade_monthly.find((m: any) => {
+          return m.month === lastMonth &&
+                 m.year === lastYear &&
+                 (m.brand || "").toLowerCase() === (row.brand || "").toLowerCase() &&
+                 (m.hạng_mục_lớn || "").toLowerCase() === (row.hạng_mục_lớn || "").toLowerCase() &&
+                 (m.chi_tiết_hạng_mục || "").toLowerCase() === (row.chi_tiết_hạng_mục || "").toLowerCase() &&
+                 (m.phân_loại || "").toString().toLowerCase() === (row.phân_loại || "").toString().toLowerCase() &&
+                 (m.tần_suất || "").toLowerCase() === (row.tần_suất || "").toLowerCase() &&
+                 (m.đơn_vị_tính || "").toLowerCase() === (row.đơn_vị_tính || "").toLowerCase();
+        });
+        
+        if (match) {
+          match.thực_hiện_tháng = Number(val);
+        } else {
+          rawDbData.btl_trade_monthly.push({
+            month: lastMonth,
+            year: lastYear,
+            brand: row.brand,
+            hạng_mục_lớn: row.hạng_mục_lớn,
+            chi_tiết_hạng_mục: row.chi_tiết_hạng_mục,
+            phân_loại: row.phân_loại,
+            tần_suất: row.tần_suất,
+            đơn_vị_tính: row.đơn_vị_tính,
+            thực_hiện_tháng: Number(val)
+          });
+        }
+      }
+    });
+
+    if (data.btl_trade_monthly) {
+      rawDbData.btl_trade_monthly = data.btl_trade_monthly;
+    }
 
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(rawDbData, null, 2), "utf8");
     const normalized = normalizeMarketingData(rawDbData);
@@ -527,11 +480,24 @@ app.post("/api/sync-data", (req, res) => {
       return `${week}|${tbc}|${hm}|${brand}|${nganh}|${channel}|${metric}`;
     };
 
+    const getBtlMonthlyKey = (row: any): string => {
+      const month = (row.month || 5).toString();
+      const year = (row.year || 2026).toString();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const hml = (row.hạng_mục_lớn || "").toString().trim().toLowerCase();
+      const cthm = (row.chi_tiết_hạng_mục || "").toString().trim().toLowerCase();
+      const pl = (row.phân_loại || "").toString().trim().toLowerCase();
+      const ts = (row.tần_suất || "").toString().trim().toLowerCase();
+      const dvt = (row.đơn_vị_tính || "").toString().trim().toLowerCase();
+      return `${month}|${year}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
+    };
+
     const mergedData = {
       digital_marketing: mergeRowsByKey(currentDb.digital_marketing, normalizedNew.digital_marketing, getDigitalKey),
       kol_koc: mergeRowsByKey(currentDb.kol_koc, normalizedNew.kol_koc, getKolKey),
       btl_trade: mergeRowsByKey(currentDb.btl_trade, normalizedNew.btl_trade, getBtlKey),
       monthly_ooh_pr: mergeRowsByKey(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr, getOohPrKey),
+      btl_trade_monthly: mergeRowsByKey(currentFullDb.btl_trade_monthly || [], normalizedNew.btl_trade_monthly || [], getBtlMonthlyKey),
       comments: currentFullDb.comments || {} // Preserve existing comments!
     };
 

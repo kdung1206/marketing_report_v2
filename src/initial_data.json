@@ -3190,5 +3190,260 @@
       "mục_tiêu_target": 31,
       "thực_tế_actual": 31
     }
+  ],
+  "btl_trade_monthly": [
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "biển bảng",
+      "phân_loại": "gt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 3
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "quầy kệ",
+      "phân_loại": "gt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 7
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "posm mặt tiền",
+      "phân_loại": "rối hơi",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 138
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "posm mặt tiền",
+      "phân_loại": "ô/dù",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 0
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "mock up",
+      "phân_loại": "điều hòa mt",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 239
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "mock up",
+      "phân_loại": "điều hòa gt",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 320
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "tài liệu bán hàng (catalog, brochure...)",
+      "phân_loại": null,
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "bộ",
+      "thực_hiện_tháng": 0
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "event",
+      "chi_tiết_hạng_mục": "activation",
+      "phân_loại": null,
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số sự kiện",
+      "thực_hiện_tháng": 0
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "kiểm soát ha điểm bán",
+      "chi_tiết_hạng_mục": "chấm điểm hình ảnh",
+      "phân_loại": "mt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "điểm bán",
+      "thực_hiện_tháng": 4
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "nghiên cứu thị trường",
+      "chi_tiết_hạng_mục": "dự án nghiên cứu",
+      "phân_loại": null,
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số dự án",
+      "thực_hiện_tháng": null
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "biển bảng",
+      "phân_loại": "gt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 40
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "quầy kệ",
+      "phân_loại": "gt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 45
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "posm mặt tiền",
+      "phân_loại": "rối hơi",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "cái",
+      "thực_hiện_tháng": 146
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "event",
+      "chi_tiết_hạng_mục": "activation",
+      "phân_loại": "mt/gt",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số sự kiện",
+      "thực_hiện_tháng": null
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "event",
+      "chi_tiết_hạng_mục": "workshop",
+      "phân_loại": "lọc tổng",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số sự kiện",
+      "thực_hiện_tháng": null
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "kiểm soát ha điểm bán",
+      "chi_tiết_hạng_mục": "kiểm tra thực tế",
+      "phân_loại": "mt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "điểm bán",
+      "thực_hiện_tháng": 98
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "kiểm soát ha điểm bán",
+      "chi_tiết_hạng_mục": "kiểm tra thực tế",
+      "phân_loại": "gt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "điểm bán",
+      "thực_hiện_tháng": 40
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "kiểm soát ha điểm bán",
+      "chi_tiết_hạng_mục": "chấm điểm hình ảnh",
+      "phân_loại": "mt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "điểm bán",
+      "thực_hiện_tháng": 357
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "kiểm soát ha điểm bán",
+      "chi_tiết_hạng_mục": "chấm điểm hình ảnh",
+      "phân_loại": "gt",
+      "tần_suất": "tháng",
+      "đơn_vị_tính": "điểm bán",
+      "thực_hiện_tháng": 2028
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "karofi",
+      "hạng_mục_lớn": "nghiên cứu thị trường",
+      "chi_tiết_hạng_mục": "dự án nghiên cứu",
+      "phân_loại": "theo yêu cầu",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số dự án",
+      "thực_hiện_tháng": null
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "posm",
+      "chi_tiết_hạng_mục": "tài liệu bán hàng (catalog, brochure...)",
+      "phân_loại": "mt/gt",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "bộ",
+      "thực_hiện_tháng": 0
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "event",
+      "chi_tiết_hạng_mục": "activation",
+      "phân_loại": "mt/gt",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số sự kiện",
+      "thực_hiện_tháng": 0
+    },
+    {
+      "month": 5,
+      "year": 2026,
+      "brand": "livotec",
+      "hạng_mục_lớn": "nghiên cứu thị trường",
+      "chi_tiết_hạng_mục": "dự án nghiên cứu",
+      "phân_loại": "theo yêu cầu",
+      "tần_suất": "theo dự án",
+      "đơn_vị_tính": "số dự án",
+      "thực_hiện_tháng": null
+    }
   ]
 }
