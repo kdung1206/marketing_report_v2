@@ -63,6 +63,16 @@ import {
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
+async function safeFetchJson(url: string, options?: RequestInit) {
+  const response = await fetch(url, options);
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<") || !response.ok) {
+    throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
+  }
+  return JSON.parse(text);
+}
+
 export function getTimelines(marketingData: MarketingReportData) {
   const weeksSet = new Set<string>();
   
@@ -430,9 +440,8 @@ export default function App() {
   useEffect(() => {
     const fetchMailConfig = async () => {
       try {
-        const response = await fetch("/api/get-mail-config");
-        const result = await response.json();
-        if (response.ok && result.success && result.config) {
+        const result = await safeFetchJson("/api/get-mail-config");
+        if (result.success && result.config) {
           setMailHost(result.config.smtp_host || "");
           setMailPort(result.config.smtp_port || "587");
           setMailUser(result.config.smtp_user || "");
@@ -458,9 +467,8 @@ export default function App() {
   useEffect(() => {
     const fetchServerData = async () => {
       try {
-        const response = await fetch("/api/get-data");
-        const result = await response.json();
-        if (response.ok && result.success) {
+        const result = await safeFetchJson("/api/get-data");
+        if (result.success) {
           const safeData = normalizeMarketingData(result.data);
           setMarketingData(safeData);
           setPastedJson(JSON.stringify(safeData, null, 2));
@@ -683,13 +691,12 @@ export default function App() {
     }
 
     try {
-      const response = await fetch("/api/save-raw-data", {
+      const result = await safeFetchJson("/api/save-raw-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: updatedData })
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
+      if (result.success) {
         const safeData = normalizeMarketingData(result.data);
         setMarketingData(safeData);
         localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
@@ -699,7 +706,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to save raw data after delete:", err);
-      triggerNotification("error", "Không thể lưu thay đổi sau khi xóa.");
+      triggerNotification("error", "Không thể lưu thay đổi sau khi xóa (có thể đang chạy ngoại tuyến).");
     }
   };
 
@@ -745,13 +752,12 @@ export default function App() {
     }
 
     try {
-      const response = await fetch("/api/save-raw-data", {
+      const result = await safeFetchJson("/api/save-raw-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: updatedData })
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
+      if (result.success) {
         const safeData = normalizeMarketingData(result.data);
         setMarketingData(safeData);
         localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
@@ -763,7 +769,7 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to save raw data after edit:", err);
-      triggerNotification("error", "Không thể đồng bộ thay đổi.");
+      triggerNotification("error", "Không thể đồng bộ thay đổi (có thể đang chạy ngoại tuyến).");
     }
   };
 
@@ -836,24 +842,22 @@ export default function App() {
     setIsDriveLoading(true);
     try {
       // 1. Fetch file content
-      const response = await fetch("/api/fetch-drive", {
+      const result = await safeFetchJson("/api/fetch-drive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: driveUrl }),
       });
-      const result = await response.json();
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.error || "Không thể tải dữ liệu từ Google Drive.");
       }
 
       // 2. Send retrieved data to /api/sync-data to merge with Server DB
-      const syncResponse = await fetch("/api/sync-data", {
+      const syncResult = await safeFetchJson("/api/sync-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newData: result.data }),
       });
-      const syncResult = await syncResponse.json();
-      if (syncResponse.ok && syncResult.success) {
+      if (syncResult.success) {
         const safeData = normalizeMarketingData(syncResult.data);
         setMarketingData(safeData);
         setPastedJson(JSON.stringify(safeData, null, 2));
@@ -875,13 +879,12 @@ export default function App() {
     try {
       const parsed = JSON.parse(pastedJson);
       
-      const syncResponse = await fetch("/api/sync-data", {
+      const syncResult = await safeFetchJson("/api/sync-data", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newData: parsed }),
       });
-      const syncResult = await syncResponse.json();
-      if (syncResponse.ok && syncResult.success) {
+      if (syncResult.success) {
         const safeData = normalizeMarketingData(syncResult.data);
         setMarketingData(safeData);
         setPastedJson(JSON.stringify(safeData, null, 2));
@@ -899,9 +902,8 @@ export default function App() {
   const handleResetData = async () => {
     if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ dữ liệu báo cáo và nhận định về mặc định ban đầu không?")) {
       try {
-        const response = await fetch("/api/reset-data", { method: "POST" });
-        const result = await response.json();
-        if (response.ok && result.success) {
+        const result = await safeFetchJson("/api/reset-data", { method: "POST" });
+        if (result.success) {
           const safeData = normalizeMarketingData(result.data);
           setMarketingData(safeData);
           setPastedJson(JSON.stringify(safeData, null, 2));
@@ -932,7 +934,7 @@ export default function App() {
     e.preventDefault();
     setIsMailLoading(true);
     try {
-      const response = await fetch("/api/save-mail-config", {
+      const result = await safeFetchJson("/api/save-mail-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -944,8 +946,7 @@ export default function App() {
           enabled: mailEnabled
         }),
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
+      if (result.success) {
         triggerNotification("success", "Cấu hình gửi mail tự động đã được lưu và mã hóa bảo mật!");
       } else {
         throw new Error(result.error || "Lỗi lưu cấu hình mail");
@@ -961,13 +962,12 @@ export default function App() {
   const handleAiSuggestions = async () => {
     setIsAiLoading(true);
     try {
-      const response = await fetch("/api/analyze", {
+      const result = await safeFetchJson("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: marketingData, brand: selectedBrand }),
       });
-      const result = await response.json();
-      if (response.ok && result.success) {
+      if (result.success) {
         const aiAnalysis = result.analysis;
         
         // Update draft with all categories
@@ -1037,7 +1037,7 @@ export default function App() {
     };
 
     try {
-      const response = await fetch("/api/save-comments", {
+      const result = await safeFetchJson("/api/save-comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1045,7 +1045,7 @@ export default function App() {
           comments: updatedWeekComments,
         }),
       });
-      if (response.ok) {
+      if (result.success) {
         setPublishedComments(newPublishedComments);
         localStorage.setItem("marketing_published_comments", JSON.stringify(newPublishedComments));
         setHasUnpublishedChanges(false);
@@ -1055,7 +1055,11 @@ export default function App() {
       }
     } catch (err) {
       console.error("Failed to save comments:", err);
-      triggerNotification("error", "Không thể kết nối đến máy chủ để lưu nhận định.");
+      // Fallback for static/offline: Allow publishing to local state even if server is offline
+      setPublishedComments(newPublishedComments);
+      localStorage.setItem("marketing_published_comments", JSON.stringify(newPublishedComments));
+      setHasUnpublishedChanges(false);
+      triggerNotification("success", `Đã lưu nhận định thành công tại thiết bị này (đang chạy ngoại tuyến) cho tuần ${selectedTimeline.label}!`);
     }
   };
 
