@@ -707,11 +707,14 @@ export default function App() {
         localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
         triggerNotification("success", "Đã xóa dòng dữ liệu và lưu vào CSDL hệ thống thành công!");
       } else {
-        triggerNotification("error", result.error || "Lỗi lưu dữ liệu sau khi xóa.");
+        throw new Error(result.error || "Lỗi lưu dữ liệu sau khi xóa.");
       }
     } catch (err) {
-      console.error("Failed to save raw data after delete:", err);
-      triggerNotification("error", "Không thể lưu thay đổi sau khi xóa (có thể đang chạy ngoại tuyến).");
+      console.warn("Failed to save to server after delete, saving locally:", err);
+      const safeData = normalizeMarketingData(updatedData);
+      setMarketingData(safeData);
+      localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+      triggerNotification("success", "Đã xóa dòng dữ liệu thành công trên thiết bị này (Chạy Offline/GitHub Pages)!");
     }
   };
 
@@ -770,11 +773,16 @@ export default function App() {
         setDbEditingRowData(null);
         triggerNotification("success", "Đã cập nhật dòng dữ liệu và đồng bộ vào hệ thống thành công!");
       } else {
-        triggerNotification("error", result.error || "Lỗi lưu thay đổi.");
+        throw new Error(result.error || "Lỗi lưu thay đổi.");
       }
     } catch (err) {
-      console.error("Failed to save raw data after edit:", err);
-      triggerNotification("error", "Không thể đồng bộ thay đổi (có thể đang chạy ngoại tuyến).");
+      console.warn("Failed to save to server after edit, saving locally:", err);
+      const safeData = normalizeMarketingData(updatedData);
+      setMarketingData(safeData);
+      localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+      setDbEditingRowIndex(null);
+      setDbEditingRowData(null);
+      triggerNotification("success", "Đã cập nhật dòng dữ liệu thành công trên thiết bị này (Chạy Offline/GitHub Pages)!");
     }
   };
 
@@ -839,6 +847,125 @@ export default function App() {
     }
   };
 
+  // Client-side fallback merge helper matching the server-side sync logic
+  const clientSideMergeData = (currentData: MarketingReportData, newDataToSync: any): MarketingReportData => {
+    const normalizedNew = normalizeMarketingData(newDataToSync);
+    const currentDb = normalizeMarketingData(currentData);
+
+    function mergeRowsByKeyLocal<T>(currentList: T[], newList: T[], keyFn: (row: T) => string): T[] {
+      if (!newList || newList.length === 0) return currentList;
+      const map = new Map<string, T>();
+      currentList.forEach((row) => {
+        map.set(keyFn(row), row);
+      });
+      newList.forEach((row) => {
+        map.set(keyFn(row), row);
+      });
+      return Array.from(map.values());
+    }
+
+    const getDigitalKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const nhom = (row.nhóm_báo_cáo || "").toString().trim().toLowerCase();
+      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
+      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
+      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
+      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
+      return `${week}|${brand}|${nhom}|${hm}|${nganh}|${channel}|${metric}`;
+    };
+
+    const getKolKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
+      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
+      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
+      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
+      return `${week}|${brand}|${hm}|${nganh}|${channel}|${metric}`;
+    };
+
+    const getBtlKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const hml = (row.hạng_mục_lớn || "").toString().trim().toLowerCase();
+      const cthm = (row.chi_tiết_hạng_mục || "").toString().trim().toLowerCase();
+      const pl = (row.phân_loại || "").toString().trim().toLowerCase();
+      const ts = (row.tần_suất || "").toString().trim().toLowerCase();
+      const dvt = (row.đơn_vị_tính || "").toString().trim().toLowerCase();
+      return `${week}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
+    };
+
+    const getOohPrKey = (row: any): string => {
+      const week = (row.week || "").toString().trim().toLowerCase();
+      const tbc = (row.tháng_báo_cáo || "").toString().trim().toLowerCase();
+      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
+      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
+      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
+      return `${week}|${tbc}|${hm}|${brand}|${nganh}|${channel}|${metric}`;
+    };
+
+    const getBtlMonthlyKey = (row: any): string => {
+      const month = (row.month || 5).toString();
+      const year = (row.year || 2026).toString();
+      const brand = (row.brand || "").toString().trim().toLowerCase();
+      const hml = (row.hạng_mục_lớn || "").toString().trim().toLowerCase();
+      const cthm = (row.chi_tiết_hạng_mục || "").toString().trim().toLowerCase();
+      const pl = (row.phân_loại || "").toString().trim().toLowerCase();
+      const ts = (row.tần_suất || "").toString().trim().toLowerCase();
+      const dvt = (row.đơn_vị_tính || "").toString().trim().toLowerCase();
+      return `${month}|${year}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
+    };
+
+    const btl_trade_monthly = [...(currentDb.btl_trade_monthly || [])];
+    normalizedNew.btl_trade.forEach((row: any) => {
+      const weekStr = row.week || "";
+      const info = getBtlReportMonth(weekStr);
+      const lastMonth = info.month === 1 ? 12 : info.month - 1;
+      const lastYear = info.month === 1 ? info.year - 1 : info.year;
+      
+      const val = row.thực_hiện_tháng;
+      if (val !== undefined && val !== null) {
+        const match = btl_trade_monthly.find((m: any) => {
+          return m.month === lastMonth &&
+                 m.year === lastYear &&
+                 (m.brand || "").toLowerCase() === (row.brand || "").toLowerCase() &&
+                 (m.hạng_mục_lớn || "").toLowerCase() === (row.hạng_mục_lớn || "").toLowerCase() &&
+                 (m.chi_tiết_hạng_mục || "").toLowerCase() === (row.chi_tiết_hạng_mục || "").toLowerCase() &&
+                 (m.phân_loại || "").toString().toLowerCase() === (row.phân_loại || "").toString().toLowerCase() &&
+                 (m.tần_suất || "").toLowerCase() === (row.tần_suất || "").toLowerCase() &&
+                 (m.đơn_vị_tính || "").toLowerCase() === (row.đơn_vị_tính || "").toLowerCase();
+        });
+        
+        if (match) {
+          match.thực_hiện_tháng = Number(val);
+        } else {
+          btl_trade_monthly.push({
+            month: lastMonth,
+            year: lastYear,
+            brand: row.brand,
+            hạng_mục_lớn: row.hạng_mục_lớn,
+            chi_tiết_hạng_mục: row.chi_tiết_hạng_mục,
+            phân_loại: row.phân_loại,
+            tần_suất: row.tần_suất,
+            đơn_vị_tính: row.đơn_vị_tính,
+            thực_hiện_tháng: Number(val)
+          });
+        }
+      }
+    });
+
+    return {
+      digital_marketing: mergeRowsByKeyLocal(currentDb.digital_marketing, normalizedNew.digital_marketing, getDigitalKey),
+      kol_koc: mergeRowsByKeyLocal(currentDb.kol_koc, normalizedNew.kol_koc, getKolKey),
+      btl_trade: mergeRowsByKeyLocal(currentDb.btl_trade, normalizedNew.btl_trade, getBtlKey),
+      monthly_ooh_pr: mergeRowsByKeyLocal(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr, getOohPrKey),
+      btl_trade_monthly: mergeRowsByKeyLocal(btl_trade_monthly, normalizedNew.btl_trade_monthly || [], getBtlMonthlyKey)
+    };
+  };
+
   // Google Drive connection and Server DB sync
   const handleDriveImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -857,21 +984,56 @@ export default function App() {
       }
 
       // 2. Send retrieved data to /api/sync-data to merge with Server DB
-      const syncResult = await safeFetchJson("/api/sync-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newData: result.data }),
-      });
-      if (syncResult.success) {
-        const safeData = normalizeMarketingData(syncResult.data);
-        setMarketingData(safeData);
-        setPastedJson(JSON.stringify(safeData, null, 2));
-        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
-        triggerNotification("success", "Đã kết nối và đồng bộ, sáp nhập dữ liệu tuần mới từ Google Drive thành công!");
-      } else {
-        throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
+      try {
+        const syncResult = await safeFetchJson("/api/sync-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newData: result.data }),
+        });
+        if (syncResult.success) {
+          const safeData = normalizeMarketingData(syncResult.data);
+          setMarketingData(safeData);
+          setPastedJson(JSON.stringify(safeData, null, 2));
+          localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+          triggerNotification("success", "Đã kết nối và đồng bộ, sáp nhập dữ liệu tuần mới từ Google Drive thành công!");
+        } else {
+          throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
+        }
+      } catch (syncErr) {
+        console.warn("Server sync failed, falling back to client-side merge:", syncErr);
+        const mergedData = clientSideMergeData(marketingData, result.data);
+        setMarketingData(mergedData);
+        setPastedJson(JSON.stringify(mergedData, null, 2));
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+        triggerNotification("success", "Đã đồng bộ và sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến/GitHub Pages)!");
       }
     } catch (err: any) {
+      console.warn("Drive connection error, trying browser-direct fetch as last resort:", err);
+      try {
+        let directUrl = driveUrl;
+        if (driveUrl.includes("drive.google.com") && driveUrl.includes("/file/d/")) {
+          const idMatch = driveUrl.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+          if (idMatch && idMatch[1]) {
+            directUrl = `https://docs.google.com/uc?export=download&id=${idMatch[1]}`;
+          }
+        }
+        const resp = await fetch(directUrl);
+        if (resp.ok) {
+          const jsonText = await resp.text();
+          if (!jsonText.includes("<!DOCTYPE html>") && !jsonText.includes("<html")) {
+            const parsed = JSON.parse(jsonText);
+            const mergedData = clientSideMergeData(marketingData, parsed);
+            setMarketingData(mergedData);
+            setPastedJson(JSON.stringify(mergedData, null, 2));
+            localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+            triggerNotification("success", "Đã tải trực tiếp và đồng bộ dữ liệu thành công trên trình duyệt!");
+            setIsDriveLoading(false);
+            return;
+          }
+        }
+      } catch (browserErr) {
+        console.error("Direct browser fetch also failed:", browserErr);
+      }
       triggerNotification("error", err.message || "Lỗi kết nối tệp trực tuyến.");
     } finally {
       setIsDriveLoading(false);
@@ -884,19 +1046,28 @@ export default function App() {
     try {
       const parsed = JSON.parse(pastedJson);
       
-      const syncResult = await safeFetchJson("/api/sync-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newData: parsed }),
-      });
-      if (syncResult.success) {
-        const safeData = normalizeMarketingData(syncResult.data);
-        setMarketingData(safeData);
-        setPastedJson(JSON.stringify(safeData, null, 2));
-        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
-        triggerNotification("success", "Đã sáp nhập và cập nhật dữ liệu tuần mới vào cơ sở dữ liệu thành công!");
-      } else {
-        throw new Error(syncResult.error || "Lỗi sáp nhập dữ liệu vào cơ sở dữ liệu.");
+      try {
+        const syncResult = await safeFetchJson("/api/sync-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newData: parsed }),
+        });
+        if (syncResult.success) {
+          const safeData = normalizeMarketingData(syncResult.data);
+          setMarketingData(safeData);
+          setPastedJson(JSON.stringify(safeData, null, 2));
+          localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+          triggerNotification("success", "Đã sáp nhập và cập nhật dữ liệu tuần mới vào cơ sở dữ liệu thành công!");
+        } else {
+          throw new Error(syncResult.error || "Lỗi sáp nhập dữ liệu vào cơ sở dữ liệu.");
+        }
+      } catch (syncErr) {
+        console.warn("Server sync failed, falling back to client-side merge:", syncErr);
+        const mergedData = clientSideMergeData(marketingData, parsed);
+        setMarketingData(mergedData);
+        setPastedJson(JSON.stringify(mergedData, null, 2));
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+        triggerNotification("success", "Đã sáp nhập và cập nhật dữ liệu thành công trên trình duyệt (Chạy Ngoại Tuyến/GitHub Pages)!");
       }
     } catch (err: any) {
       triggerNotification("error", `Lỗi định dạng JSON hoặc Lỗi đồng bộ: ${err.message}`);
@@ -929,7 +1100,23 @@ export default function App() {
           throw new Error(result.error || "Lỗi khôi phục cơ sở dữ liệu máy chủ.");
         }
       } catch (err: any) {
-        triggerNotification("error", `Lỗi khôi phục: ${err.message}`);
+        console.warn("Server reset failed, resetting locally inside browser:", err);
+        const safeData = normalizeMarketingData(INITIAL_MARKETING_DATA);
+        setMarketingData(safeData);
+        setPastedJson(JSON.stringify(safeData, null, 2));
+        
+        const defaultPublished = {
+          Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
+          Karofi: { ...DEFAULT_COMMENTS_KAROFI },
+        };
+        setPublishedComments(defaultPublished);
+        setDraftComments(JSON.parse(JSON.stringify(defaultPublished)));
+        
+        localStorage.removeItem("marketing_report_raw_data");
+        localStorage.removeItem("marketing_published_comments");
+        
+        setHasUnpublishedChanges(false);
+        triggerNotification("success", "Đã khôi phục dữ liệu trình duyệt về trạng thái mặc định ban đầu.");
       }
     }
   };
@@ -3437,437 +3624,8 @@ export default function App() {
                       </h3>
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">
-                      Bạn đang đăng nhập với quyền <strong className="text-emerald-600">{currentUser.role}</strong>. Chỉ có tài khoản Quản trị viên (Admin) mới có thể xem danh sách và phân quyền quản trị tài khoản người dùng khác.
+                      Bạn đang đăng nhập with quyền <strong className="text-emerald-600">{currentUser.role}</strong>. Chỉ có tài khoản Quản trị viên (Admin) mới có thể xem danh sách và phân quyền quản trị tài khoản người dùng khác.
                     </p>
-                  </div>
-                )}
-
-                {/* Automatic Email Configuration has been removed per user request */}
-
-                {/* Section 4: Advanced Database Row Manager (Only Admin) */}
-                {currentUser && currentUser.role === "Admin" && (
-                  <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                          <Layers className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-sm">
-                            Trình Quản Trị Cơ Sở Dữ Liệu
-                          </h3>
-                          <p className="text-[11px] text-slate-500">
-                            Chỉnh sửa, xóa dữ liệu các bảng đang có trong hệ thống CSDL
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Collection Selector Tabs */}
-                      <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 border border-slate-200">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDbActiveTab("digital");
-                            setDbPage(1);
-                            setDbEditingRowIndex(null);
-                          }}
-                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-                            dbActiveTab === "digital" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                          }`}
-                        >
-                          Digital Marketing
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDbActiveTab("kol");
-                            setDbPage(1);
-                            setDbEditingRowIndex(null);
-                          }}
-                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-                            dbActiveTab === "kol" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                          }`}
-                        >
-                          KOL/KOC
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDbActiveTab("btl");
-                            setDbPage(1);
-                            setDbEditingRowIndex(null);
-                          }}
-                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-                            dbActiveTab === "btl" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                          }`}
-                        >
-                          BTL & POSM
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDbActiveTab("ooh");
-                            setDbPage(1);
-                            setDbEditingRowIndex(null);
-                          }}
-                          className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-                            dbActiveTab === "ooh" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                          }`}
-                        >
-                          OOH & PR
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Filter & Search Bar */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex-1 min-w-[200px]">
-                        <input
-                          type="text"
-                          value={dbSearchQuery}
-                          onChange={(e) => {
-                            setDbSearchQuery(e.target.value);
-                            setDbPage(1);
-                          }}
-                          placeholder="Tìm kiếm dòng dữ liệu trong bảng này..."
-                          className="w-full rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                        />
-                      </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        <select
-                          value={dbBrandFilter}
-                          onChange={(e) => {
-                            setDbBrandFilter(e.target.value as any);
-                            setDbPage(1);
-                          }}
-                          className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                        >
-                          <option value="Tất cả">Tất cả nhãn hàng</option>
-                          <option value="Livotec">Livotec</option>
-                          <option value="Karofi">Karofi</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Interactive Edit Panel */}
-                    {dbEditingRowIndex !== null && dbEditingRowData && (
-                      <form
-                        onSubmit={handleDbEditSave}
-                        className="space-y-4 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100 animate-fade-in"
-                      >
-                        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-                          <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider block">
-                            ✏️ Hiệu Chỉnh Dòng Dữ Liệu (Bản ghi gốc #{dbEditingRowIndex})
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDbEditingRowIndex(null);
-                              setDbEditingRowData(null);
-                            }}
-                            className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold"
-                          >
-                            Hủy bỏ
-                          </button>
-                        </div>
-
-                        {/* Fields list mapping */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          {(() => {
-                            const fields =
-                              dbActiveTab === "digital"
-                                ? [
-                                    { key: "week", label: "Tuần báo cáo (week)", type: "text" },
-                                    { key: "phân_loại_thời_gian", label: "Phân loại TG", type: "text" },
-                                    { key: "brand", label: "Nhãn hàng (brand)", type: "select", options: ["Livotec", "Karofi"] },
-                                    { key: "nhóm_báo_cáo", label: "Nhóm báo cáo", type: "text" },
-                                    { key: "hạng_mục", label: "Hạng mục", type: "text" },
-                                    { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
-                                    { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
-                                    { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
-                                    { key: "mục_tiêu_target", label: "KPI tuần (target)", type: "number" },
-                                    { key: "thực_tế_actual", label: "Thực tế tuần (actual)", type: "number" },
-                                    { key: "target_tháng", label: "Target tháng", type: "number" },
-                                    { key: "tích_lũy_tháng", label: "Lũy kế tháng", type: "number" },
-                                  ]
-                                : dbActiveTab === "kol"
-                                ? [
-                                    { key: "week", label: "Tuần báo cáo", type: "text" },
-                                    { key: "brand", label: "Nhãn hàng (brand)", type: "select", options: ["Livotec", "Karofi"] },
-                                    { key: "hạng_mục", label: "Hạng mục", type: "text" },
-                                    { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
-                                    { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
-                                    { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
-                                    { key: "kpi_toàn_chiến_dịch", label: "KPI Chiến dịch", type: "number" },
-                                    { key: "thực_tế_trong_tuần", label: "Thực tế tuần", type: "number" },
-                                    { key: "tích_lũy_chiến_dịch", label: "Tích lũy chiến dịch", type: "number" },
-                                  ]
-                                : dbActiveTab === "btl"
-                                ? (() => {
-                                    const btlInfo = getBtlRowDataValues(dbEditingRowData);
-                                    return [
-                                      { key: "week", label: "Tuần báo cáo", type: "text" },
-                                      { key: "brand", label: "Nhãn hàng", type: "select", options: ["Livotec", "Karofi"] },
-                                      { key: "hạng_mục_lớn", label: "Hạng mục lớn", type: "text" },
-                                      { key: "chi_tiết_hạng_mục", label: "Chi tiết hạng mục", type: "text" },
-                                      { key: "phân_loại", label: "Phân loại", type: "text" },
-                                      { key: "tần_suất", label: "Tần suất", type: "text" },
-                                      { key: "đơn_vị_tính", label: "Đơn vị tính", type: "text" },
-                                      { key: btlInfo.lastMonthKey, label: `Thực hiện T${btlInfo.lastMonth}`, type: "number" },
-                                      { key: btlInfo.thisMonthPlanKey, label: `Kế hoạch T${btlInfo.thisMonth}`, type: "number" },
-                                      { key: btlInfo.thisMonthAccumulatedKey, label: `Tích lũy T${btlInfo.thisMonth}`, type: "number" },
-                                    ];
-                                  })()
-                                : [
-                                    { key: "week", label: "Tuần báo cáo", type: "text" },
-                                    { key: "tháng_báo_cáo", label: "Tháng báo cáo", type: "text" },
-                                    { key: "brand", label: "Nhãn hàng", type: "select", options: ["Livotec", "Karofi"] },
-                                    { key: "hạng_mục", label: "Hạng mục", type: "text" },
-                                    { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
-                                    { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
-                                    { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
-                                    { key: "mục_tiêu_target", label: "Target", type: "number" },
-                                    { key: "thực_tế_actual", label: "Thực tế", type: "number" },
-                                  ];
-
-                            return fields.map((f) => (
-                              <div key={f.key}>
-                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                                  {f.label}
-                                </label>
-                                {f.type === "select" ? (
-                                  <select
-                                    value={dbEditingRowData[f.key] || ""}
-                                    onChange={(e) =>
-                                      setDbEditingRowData({ ...dbEditingRowData, [f.key]: e.target.value })
-                                    }
-                                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                                  >
-                                    {(f.options || []).map((opt) => (
-                                      <option key={opt} value={opt}>
-                                        {opt}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <input
-                                    type={f.type}
-                                    value={dbEditingRowData[f.key] !== null ? dbEditingRowData[f.key] : ""}
-                                    onChange={(e) => {
-                                      const val = f.type === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value;
-                                      setDbEditingRowData({ ...dbEditingRowData, [f.key]: val });
-                                    }}
-                                    className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                                  />
-                                )}
-                              </div>
-                            ));
-                          })()}
-                        </div>
-
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            type="submit"
-                            className="flex-1 rounded bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
-                          >
-                            Đồng bộ thay đổi vào CSDL
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDbEditingRowIndex(null);
-                              setDbEditingRowData(null);
-                            }}
-                            className="px-4 rounded bg-slate-200 text-slate-800 hover:bg-slate-300 text-xs font-bold transition cursor-pointer"
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      </form>
-                    )}
-
-                    {/* Data List Table */}
-                    <div className="space-y-2">
-                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider">
-                            <tr>
-                              {getHeadersForTab().map((h, i) => (
-                                <th key={i} className={`px-3 py-2 text-[10px] ${getHeaderMinWidth(h)}`}>
-                                  {h}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
-                            {(() => {
-                              // Build filtered rows
-                              let activeDbRows: any[] = [];
-                              if (dbActiveTab === "digital") {
-                                activeDbRows = marketingData.digital_marketing || [];
-                              } else if (dbActiveTab === "kol") {
-                                activeDbRows = marketingData.kol_koc || [];
-                              } else if (dbActiveTab === "btl") {
-                                activeDbRows = marketingData.btl_trade || [];
-                              } else if (dbActiveTab === "ooh") {
-                                activeDbRows = marketingData.monthly_ooh_pr || [];
-                              }
-
-                              const mappedDbRows = activeDbRows.map((row, originalIndex) => ({
-                                row,
-                                originalIndex,
-                              }));
-
-                              const filteredMappedRows = mappedDbRows.filter(({ row }) => {
-                                if (dbBrandFilter !== "Tất cả") {
-                                  if (!row.brand || row.brand.toLowerCase() !== dbBrandFilter.toLowerCase()) {
-                                    return false;
-                                  }
-                                }
-                                if (dbSearchQuery.trim()) {
-                                  const query = dbSearchQuery.toLowerCase();
-                                  const matchVal = Object.values(row)
-                                    .map((val) => (val !== null && val !== undefined ? val.toString().toLowerCase() : ""))
-                                    .join(" ");
-                                  return matchVal.includes(query);
-                                }
-                                return true;
-                              });
-
-                              const totalDbRows = filteredMappedRows.length;
-                              const totalDbPages = Math.ceil(totalDbRows / dbLimit) || 1;
-                              const safeDbPage = Math.min(dbPage, totalDbPages);
-                              const startIndex = (safeDbPage - 1) * dbLimit;
-                              const paginatedDbRows = filteredMappedRows.slice(startIndex, startIndex + dbLimit);
-
-                              if (paginatedDbRows.length === 0) {
-                                return (
-                                  <tr>
-                                    <td colSpan={10} className="px-3 py-6 text-center text-slate-400 italic font-sans">
-                                      Không tìm thấy dòng dữ liệu nào khớp với bộ lọc tìm kiếm.
-                                    </td>
-                                  </tr>
-                                );
-                              }
-
-                              return (
-                                <>
-                                  {paginatedDbRows.map(({ row, originalIndex }) => (
-                                    <tr key={originalIndex} className="hover:bg-slate-50/75 transition-colors">
-                                      {dbActiveTab === "digital" && (
-                                        <>
-                                          <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
-                                          <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
-                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[110px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
-                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Chỉ số metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
-                                          <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI tuần")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
-                                          <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
-                                          <td className={`px-3 py-2 font-mono text-indigo-600 ${getHeaderMinWidth("Tích lũy tháng")}`}>{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
-                                        </>
-                                      )}
-
-                                      {dbActiveTab === "kol" && (
-                                        <>
-                                          <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
-                                          <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
-                                          <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Hạng mục")}`}>{row.hạng_mục}</td>
-                                          <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Kênh")}`}>{row.kênh_channel}</td>
-                                          <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI chiến dịch")}`}>{row.kpi_toàn_chiến_dịch !== null ? row.kpi_toàn_chiến_dịch.toLocaleString() : "—"}</td>
-                                          <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_trong_tuần !== null ? row.thực_tế_trong_tuần.toLocaleString() : "—"}</td>
-                                        </>
-                                      )}
-
-                                      {dbActiveTab === "btl" && (() => {
-                                        const btlInfo = getBtlRowDataValues(row);
-                                        return (
-                                          <>
-                                            <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
-                                            <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
-                                            <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Hạng mục lớn")}`} title={row.hạng_mục_lớn}>{row.hạng_mục_lớn}</td>
-                                            <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Chi tiết")}`}>
-                                              <div className="font-medium text-slate-800 leading-tight">{row.chi_tiết_hạng_mục}</div>
-                                              {row.phân_loại && <div className="text-[9px] text-slate-400 font-mono leading-none">{row.phân_loại}</div>}
-                                            </td>
-                                            <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Thực hiện T${btlInfo.lastMonth}`)}`}>{btlInfo.lastMonthVal !== null && btlInfo.lastMonthVal !== undefined ? btlInfo.lastMonthVal.toLocaleString() : "—"}</td>
-                                            <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Kế hoạch T${btlInfo.thisMonth}`)}`}>{btlInfo.planVal !== null && btlInfo.planVal !== undefined ? btlInfo.planVal.toLocaleString() : "—"}</td>
-                                            <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth(`Tích lũy T${btlInfo.thisMonth}`)}`}>{btlInfo.accVal !== null && btlInfo.accVal !== undefined ? btlInfo.accVal.toLocaleString() : "—"}</td>
-                                          </>
-                                        );
-                                      })()}
-
-                                      {dbActiveTab === "ooh" && (
-                                        <>
-                                          <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tháng")}`}>{row.tháng_báo_cáo}</td>
-                                          <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
-                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
-                                          <td className={`px-3 py-2 text-slate-600 truncate max-w-[120px] ${getHeaderMinWidth("Metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
-                                          <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
-                                          <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
-                                        </>
-                                      )}
-
-                                      <td className={`px-3 py-2 text-right ${getHeaderMinWidth("Thao tác")}`}>
-                                        <div className="flex items-center justify-end gap-2.5">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDbEditStart(dbActiveTab, originalIndex)}
-                                            className="text-indigo-600 hover:text-indigo-900 font-semibold cursor-pointer"
-                                          >
-                                            Sửa
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDbDelete(dbActiveTab, originalIndex)}
-                                            className="text-rose-600 hover:text-rose-900 font-semibold cursor-pointer"
-                                          >
-                                            Xóa
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-
-                                  {/* Pagination controls inside table rendering context to avoid nested state dependency errors */}
-                                  {totalDbPages > 1 && (
-                                    <tr>
-                                      <td colSpan={10} className="px-3 py-3 bg-slate-50">
-                                        <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-                                          <span>
-                                            Hiển thị {startIndex + 1} - {Math.min(startIndex + dbLimit, totalDbRows)} trong số{" "}
-                                            <strong>{totalDbRows}</strong> dòng dữ liệu
-                                          </span>
-                                          <div className="flex items-center gap-1">
-                                            <button
-                                              type="button"
-                                              disabled={safeDbPage === 1}
-                                              onClick={() => setDbPage((p) => Math.max(1, p - 1))}
-                                              className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
-                                            >
-                                              Trang trước
-                                            </button>
-                                            <span className="px-2 font-sans font-semibold">
-                                              Trang {safeDbPage} / {totalDbPages}
-                                            </span>
-                                            <button
-                                              type="button"
-                                              disabled={safeDbPage >= totalDbPages}
-                                              onClick={() => setDbPage((p) => Math.min(totalDbPages, p + 1))}
-                                              className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
-                                            >
-                                              Trang sau
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
                   </div>
                 )}
 
@@ -4119,6 +3877,433 @@ export default function App() {
               </div>
 
             </div>
+
+            {/* Section 4: Advanced Database Row Manager (Only Admin) - Responsive Full-Width Layout */}
+            {currentUser && currentUser.role === "Admin" && (
+              <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                      <Layers className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        Trình Quản Trị Cơ Sở Dữ Liệu
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Chỉnh sửa, xóa dữ liệu các bảng đang có trong hệ thống CSDL (Bản mở rộng tối ưu mọi màn hình)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Collection Selector Tabs */}
+                  <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbActiveTab("digital");
+                        setDbPage(1);
+                        setDbEditingRowIndex(null);
+                      }}
+                      className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                        dbActiveTab === "digital" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      Digital Marketing
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbActiveTab("kol");
+                        setDbPage(1);
+                        setDbEditingRowIndex(null);
+                      }}
+                      className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                        dbActiveTab === "kol" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      KOL/KOC
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbActiveTab("btl");
+                        setDbPage(1);
+                        setDbEditingRowIndex(null);
+                      }}
+                      className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                        dbActiveTab === "btl" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      BTL & POSM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDbActiveTab("ooh");
+                        setDbPage(1);
+                        setDbEditingRowIndex(null);
+                      }}
+                      className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                        dbActiveTab === "ooh" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      OOH & PR
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter & Search Bar */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex-1 min-w-[200px]">
+                    <input
+                      type="text"
+                      value={dbSearchQuery}
+                      onChange={(e) => {
+                        setDbSearchQuery(e.target.value);
+                        setDbPage(1);
+                      }}
+                      placeholder="Tìm kiếm dòng dữ liệu trong bảng này..."
+                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex gap-1.5 shrink-0">
+                    <select
+                      value={dbBrandFilter}
+                      onChange={(e) => {
+                        setDbBrandFilter(e.target.value as any);
+                        setDbPage(1);
+                      }}
+                      className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                    >
+                      <option value="Tất cả">Tất cả nhãn hàng</option>
+                      <option value="Livotec">Livotec</option>
+                      <option value="Karofi">Karofi</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Interactive Edit Panel */}
+                {dbEditingRowIndex !== null && dbEditingRowData && (
+                  <form
+                    onSubmit={handleDbEditSave}
+                    className="space-y-4 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100 animate-fade-in"
+                  >
+                    <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                      <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider block">
+                        ✏️ Hiệu Chỉnh Dòng Dữ Liệu (Bản ghi gốc #{dbEditingRowIndex})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDbEditingRowIndex(null);
+                          setDbEditingRowData(null);
+                        }}
+                        className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold"
+                      >
+                        Hủy bỏ
+                      </button>
+                    </div>
+
+                    {/* Fields list mapping */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {(() => {
+                        const fields =
+                          dbActiveTab === "digital"
+                            ? [
+                                { key: "week", label: "Tuần báo cáo (week)", type: "text" },
+                                { key: "phân_loại_thời_gian", label: "Phân loại TG", type: "text" },
+                                { key: "brand", label: "Nhãn hàng (brand)", type: "select", options: ["Livotec", "Karofi"] },
+                                { key: "nhóm_báo_cáo", label: "Nhóm báo cáo", type: "text" },
+                                { key: "hạng_mục", label: "Hạng mục", type: "text" },
+                                { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
+                                { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
+                                { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
+                                { key: "mục_tiêu_target", label: "KPI tuần (target)", type: "number" },
+                                { key: "thực_tế_actual", label: "Thực tế tuần (actual)", type: "number" },
+                                { key: "target_tháng", label: "Target tháng", type: "number" },
+                                { key: "tích_lũy_tháng", label: "Lũy kế tháng", type: "number" },
+                              ]
+                            : dbActiveTab === "kol"
+                            ? [
+                                { key: "week", label: "Tuần báo cáo", type: "text" },
+                                { key: "brand", label: "Nhãn hàng (brand)", type: "select", options: ["Livotec", "Karofi"] },
+                                { key: "hạng_mục", label: "Hạng mục", type: "text" },
+                                { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
+                                { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
+                                { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
+                                { key: "kpi_toàn_chiến_dịch", label: "KPI Chiến dịch", type: "number" },
+                                { key: "thực_tế_trong_tuần", label: "Thực tế tuần", type: "number" },
+                                { key: "tích_lũy_chiến_dịch", label: "Tích lũy chiến dịch", type: "number" },
+                              ]
+                            : dbActiveTab === "btl"
+                            ? (() => {
+                                const btlInfo = getBtlRowDataValues(dbEditingRowData);
+                                return [
+                                  { key: "week", label: "Tuần báo cáo", type: "text" },
+                                  { key: "brand", label: "Nhãn hàng", type: "select", options: ["Livotec", "Karofi"] },
+                                  { key: "hạng_mục_lớn", label: "Hạng mục lớn", type: "text" },
+                                  { key: "chi_tiết_hạng_mục", label: "Chi tiết hạng mục", type: "text" },
+                                  { key: "phân_loại", label: "Phân loại", type: "text" },
+                                  { key: "tần_suất", label: "Tần suất", type: "text" },
+                                  { key: "đơn_vị_tính", label: "Đơn vị tính", type: "text" },
+                                  { key: btlInfo.lastMonthKey, label: `Thực hiện T${btlInfo.lastMonth}`, type: "number" },
+                                  { key: btlInfo.thisMonthPlanKey, label: `Kế hoạch T${btlInfo.thisMonth}`, type: "number" },
+                                  { key: btlInfo.thisMonthAccumulatedKey, label: `Tích lũy T${btlInfo.thisMonth}`, type: "number" },
+                                ];
+                              })()
+                            : [
+                                { key: "week", label: "Tuần báo cáo", type: "text" },
+                                { key: "tháng_báo_cáo", label: "Tháng báo cáo", type: "text" },
+                                { key: "brand", label: "Nhãn hàng", type: "select", options: ["Livotec", "Karofi"] },
+                                { key: "hạng_mục", label: "Hạng mục", type: "text" },
+                                { key: "ngành_hàng", label: "Ngành hàng", type: "text" },
+                                { key: "kênh_channel", label: "Kênh (channel)", type: "text" },
+                                { key: "chỉ_số_metric", label: "Chỉ số metric", type: "text" },
+                                { key: "mục_tiêu_target", label: "Target", type: "number" },
+                                { key: "thực_tế_actual", label: "Thực tế", type: "number" },
+                              ];
+
+                        return fields.map((f) => (
+                          <div key={f.key}>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                              {f.label}
+                            </label>
+                            {f.type === "select" ? (
+                              <select
+                                value={dbEditingRowData[f.key] || ""}
+                                onChange={(e) =>
+                                  setDbEditingRowData({ ...dbEditingRowData, [f.key]: e.target.value })
+                                }
+                                className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                              >
+                                {(f.options || []).map((opt) => (
+                                  <option key={opt} value={opt}>
+                                    {opt}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <input
+                                type={f.type}
+                                value={dbEditingRowData[f.key] !== null ? dbEditingRowData[f.key] : ""}
+                                onChange={(e) => {
+                                  const val = f.type === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value;
+                                  setDbEditingRowData({ ...dbEditingRowData, [f.key]: val });
+                                }}
+                                className="w-full rounded border border-slate-300 px-2 py-1 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                              />
+                            )}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="submit"
+                        className="flex-1 rounded bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
+                      >
+                        Đồng bộ thay đổi vào CSDL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDbEditingRowIndex(null);
+                          setDbEditingRowData(null);
+                        }}
+                        className="px-4 rounded bg-slate-200 text-slate-800 hover:bg-slate-300 text-xs font-bold transition cursor-pointer"
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Data List Table */}
+                <div className="space-y-2">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider sticky top-0">
+                        <tr>
+                          {getHeadersForTab().map((h, i) => (
+                            <th key={i} className={`px-3 py-2 text-[10px] ${getHeaderMinWidth(h)}`}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
+                        {(() => {
+                          // Build filtered rows
+                          let activeDbRows: any[] = [];
+                          if (dbActiveTab === "digital") {
+                            activeDbRows = marketingData.digital_marketing || [];
+                          } else if (dbActiveTab === "kol") {
+                            activeDbRows = marketingData.kol_koc || [];
+                          } else if (dbActiveTab === "btl") {
+                            activeDbRows = marketingData.btl_trade || [];
+                          } else if (dbActiveTab === "ooh") {
+                            activeDbRows = marketingData.monthly_ooh_pr || [];
+                          }
+
+                          const mappedDbRows = activeDbRows.map((row, originalIndex) => ({
+                            row,
+                            originalIndex,
+                          }));
+
+                          const filteredMappedRows = mappedDbRows.filter(({ row }) => {
+                            if (dbBrandFilter !== "Tất cả") {
+                              if (!row.brand || row.brand.toLowerCase() !== dbBrandFilter.toLowerCase()) {
+                                return false;
+                              }
+                            }
+                            if (dbSearchQuery.trim()) {
+                              const query = dbSearchQuery.toLowerCase();
+                              const matchVal = Object.values(row)
+                                .map((val) => (val !== null && val !== undefined ? val.toString().toLowerCase() : ""))
+                                .join(" ");
+                              return matchVal.includes(query);
+                            }
+                            return true;
+                          });
+
+                          const totalDbRows = filteredMappedRows.length;
+                          const totalDbPages = Math.ceil(totalDbRows / dbLimit) || 1;
+                          const safeDbPage = Math.min(dbPage, totalDbPages);
+                          const startIndex = (safeDbPage - 1) * dbLimit;
+                          const paginatedDbRows = filteredMappedRows.slice(startIndex, startIndex + dbLimit);
+
+                          if (paginatedDbRows.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={10} className="px-3 py-6 text-center text-slate-400 italic font-sans">
+                                  Không tìm thấy dòng dữ liệu nào khớp với bộ lọc tìm kiếm.
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <>
+                              {paginatedDbRows.map(({ row, originalIndex }) => (
+                                <tr key={originalIndex} className="hover:bg-slate-50/75 transition-colors">
+                                  {dbActiveTab === "digital" && (
+                                    <>
+                                      <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
+                                      <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                      <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
+                                      <td className={`px-3 py-2 text-slate-600 truncate max-w-[160px] ${getHeaderMinWidth("Chỉ số metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
+                                      <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI tuần")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-indigo-600 ${getHeaderMinWidth("Tích lũy tháng")}`}>{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
+                                    </>
+                                  )}
+
+                                  {dbActiveTab === "kol" && (
+                                    <>
+                                      <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
+                                      <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                      <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Hạng mục")}`}>{row.hạng_mục}</td>
+                                      <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Kênh")}`}>{row.kênh_channel}</td>
+                                      <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI chiến dịch")}`}>{row.kpi_toàn_chiến_dịch !== null ? row.kpi_toàn_chiến_dịch.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_trong_tuần !== null ? row.thực_tế_trong_tuần.toLocaleString() : "—"}</td>
+                                    </>
+                                  )}
+
+                                  {dbActiveTab === "btl" && (() => {
+                                    const btlInfo = getBtlRowDataValues(row);
+                                    return (
+                                      <>
+                                        <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
+                                        <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                        <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Hạng mục lớn")}`} title={row.hạng_mục_lớn}>{row.hạng_mục_lớn}</td>
+                                        <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Chi tiết")}`}>
+                                          <div className="font-medium text-slate-800 leading-tight">{row.chi_tiết_hạng_mục}</div>
+                                          {row.phân_loại && <div className="text-[9px] text-slate-400 font-mono leading-none">{row.phân_loại}</div>}
+                                        </td>
+                                        <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Thực hiện T${btlInfo.lastMonth}`)}`}>{btlInfo.lastMonthVal !== null && btlInfo.lastMonthVal !== undefined ? btlInfo.lastMonthVal.toLocaleString() : "—"}</td>
+                                        <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Kế hoạch T${btlInfo.thisMonth}`)}`}>{btlInfo.planVal !== null && btlInfo.planVal !== undefined ? btlInfo.planVal.toLocaleString() : "—"}</td>
+                                        <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth(`Tích lũy T${btlInfo.thisMonth}`)}`}>{btlInfo.accVal !== null && btlInfo.accVal !== undefined ? btlInfo.accVal.toLocaleString() : "—"}</td>
+                                      </>
+                                    );
+                                  })()}
+
+                                  {dbActiveTab === "ooh" && (
+                                    <>
+                                      <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tháng")}`}>{row.tháng_báo_cáo}</td>
+                                      <td className={`px-3 py-2 font-semibold text-slate-800 ${getHeaderMinWidth("Thương hiệu")}`}>{row.brand}</td>
+                                      <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
+                                      <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
+                                      <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                    </>
+                                  )}
+
+                                  <td className={`px-3 py-2 text-right ${getHeaderMinWidth("Thao tác")}`}>
+                                    <div className="flex items-center justify-end gap-2.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDbEditStart(dbActiveTab, originalIndex)}
+                                        className="text-indigo-600 hover:text-indigo-900 font-semibold cursor-pointer"
+                                      >
+                                        Sửa
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDbDelete(dbActiveTab, originalIndex)}
+                                        className="text-rose-600 hover:text-rose-900 font-semibold cursor-pointer"
+                                      >
+                                        Xóa
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+
+                              {/* Pagination controls inside table rendering context to avoid nested state dependency errors */}
+                              {totalDbPages > 1 && (
+                                <tr>
+                                  <td colSpan={10} className="px-3 py-3 bg-slate-50">
+                                    <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+                                      <span>
+                                        Hiển thị {startIndex + 1} - {Math.min(startIndex + dbLimit, totalDbRows)} trong số{" "}
+                                        <strong>{totalDbRows}</strong> dòng dữ liệu
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          disabled={safeDbPage === 1}
+                                          onClick={() => setDbPage((p) => Math.max(1, p - 1))}
+                                          className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
+                                        >
+                                          Trang trước
+                                        </button>
+                                        <span className="px-2 font-sans font-semibold">
+                                          Trang {safeDbPage} / {totalDbPages}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          disabled={safeDbPage >= totalDbPages}
+                                          onClick={() => setDbPage((p) => Math.min(totalDbPages, p + 1))}
+                                          className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
+                                        >
+                                          Trang sau
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
