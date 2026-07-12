@@ -425,9 +425,9 @@ export default function App() {
   }, [selectedBrand, marketingData, activeCategoryTab]);
 
   // Control Panel Import states
-  const [driveUrl, setDriveUrl] = useState("");
+  const [isFileUploading, setIsFileUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
   const [pastedJson, setPastedJson] = useState(JSON.stringify(INITIAL_MARKETING_DATA, null, 2));
-  const [isDriveLoading, setIsDriveLoading] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
@@ -966,77 +966,81 @@ export default function App() {
     };
   };
 
-  // Google Drive connection and Server DB sync
-  const handleDriveImport = async (e: React.FormEvent) => {
+  // JSON Offline File Sync handlers
+  const handleJsonFileParseAndSync = async (file: File) => {
+    if (!file) return;
+    if (file.type !== "application/json" && !file.name.endsWith(".json")) {
+      triggerNotification("error", "Định dạng tệp không hợp lệ. Vui lòng chọn tệp tin JSON (.json)");
+      return;
+    }
+
+    setIsFileUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const parsed = JSON.parse(text);
+
+        // Send to server to sync/merge
+        try {
+          const syncResult = await safeFetchJson("/api/sync-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ newData: parsed }),
+          });
+          if (syncResult.success) {
+            const safeData = normalizeMarketingData(syncResult.data);
+            setMarketingData(safeData);
+            setPastedJson(JSON.stringify(safeData, null, 2));
+            localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+            triggerNotification("success", "Tải lên và đồng bộ, sáp nhập dữ liệu thành công từ tệp JSON ngoại tuyến!");
+          } else {
+            throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
+          }
+        } catch (syncErr: any) {
+          console.warn("Server sync failed, falling back to client-side merge:", syncErr);
+          const mergedData = clientSideMergeData(marketingData, parsed);
+          setMarketingData(mergedData);
+          setPastedJson(JSON.stringify(mergedData, null, 2));
+          localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+          triggerNotification("success", "Đã sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến)!");
+        }
+      } catch (err: any) {
+        console.error(err);
+        triggerNotification("error", "Lỗi đọc hoặc phân tích cú pháp tệp JSON: " + err.message);
+      } finally {
+        setIsFileUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      triggerNotification("error", "Lỗi đọc tệp tin.");
+      setIsFileUploading(false);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!driveUrl.trim()) return;
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
 
-    setIsDriveLoading(true);
-    try {
-      // 1. Fetch file content
-      const result = await safeFetchJson("/api/fetch-drive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: driveUrl }),
-      });
-      if (!result.success) {
-        throw new Error(result.error || "Không thể tải dữ liệu từ Google Drive.");
-      }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleJsonFileParseAndSync(e.dataTransfer.files[0]);
+    }
+  };
 
-      // 2. Send retrieved data to /api/sync-data to merge with Server DB
-      try {
-        const syncResult = await safeFetchJson("/api/sync-data", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ newData: result.data }),
-        });
-        if (syncResult.success) {
-          const safeData = normalizeMarketingData(syncResult.data);
-          setMarketingData(safeData);
-          setPastedJson(JSON.stringify(safeData, null, 2));
-          localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
-          triggerNotification("success", "Đã kết nối và đồng bộ, sáp nhập dữ liệu tuần mới từ Google Drive thành công!");
-        } else {
-          throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
-        }
-      } catch (syncErr) {
-        console.warn("Server sync failed, falling back to client-side merge:", syncErr);
-        const mergedData = clientSideMergeData(marketingData, result.data);
-        setMarketingData(mergedData);
-        setPastedJson(JSON.stringify(mergedData, null, 2));
-        localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
-        triggerNotification("success", "Đã đồng bộ và sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến/GitHub Pages)!");
-      }
-    } catch (err: any) {
-      console.warn("Drive connection error, trying browser-direct fetch as last resort:", err);
-      try {
-        let directUrl = driveUrl;
-        if (driveUrl.includes("drive.google.com") && driveUrl.includes("/file/d/")) {
-          const idMatch = driveUrl.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
-          if (idMatch && idMatch[1]) {
-            directUrl = `https://docs.google.com/uc?export=download&id=${idMatch[1]}`;
-          }
-        }
-        const resp = await fetch(directUrl);
-        if (resp.ok) {
-          const jsonText = await resp.text();
-          if (!jsonText.includes("<!DOCTYPE html>") && !jsonText.includes("<html")) {
-            const parsed = JSON.parse(jsonText);
-            const mergedData = clientSideMergeData(marketingData, parsed);
-            setMarketingData(mergedData);
-            setPastedJson(JSON.stringify(mergedData, null, 2));
-            localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
-            triggerNotification("success", "Đã tải trực tiếp và đồng bộ dữ liệu thành công trên trình duyệt!");
-            setIsDriveLoading(false);
-            return;
-          }
-        }
-      } catch (browserErr) {
-        console.error("Direct browser fetch also failed:", browserErr);
-      }
-      triggerNotification("error", err.message || "Lỗi kết nối tệp trực tuyến.");
-    } finally {
-      setIsDriveLoading(false);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleJsonFileParseAndSync(e.target.files[0]);
     }
   };
 
@@ -3367,52 +3371,70 @@ export default function App() {
               {/* LEFT COLUMN: JSON DATA SOURCE MANAGEMENT (5 Cols) */}
               <div className="lg:col-span-5 space-y-6">
                 
-                {/* Option 1: Google Drive Import */}
+                {/* Option 1: Offline JSON File Upload */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                      <Globe className="h-4 w-4" />
+                      <Upload className="h-4 w-4" />
                     </div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      1. Kết nối Google Drive trực tuyến
+                      1. Tải lên tệp JSON ngoại tuyến
                     </h3>
                   </div>
 
-                  <form onSubmit={handleDriveImport} className="space-y-3">
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Lưu trữ file JSON của bạn trên Google Drive, thiết lập chế độ chia sẻ <strong>&quot;Bất kỳ ai có liên kết đều xem được&quot; (Anyone with link)</strong>, sau đó dán link vào đây:
-                    </p>
-                    <div className="flex gap-2">
-                      <input
-                        id="drive_url_input"
-                        type="text"
-                        value={driveUrl}
-                        onChange={(e) => setDriveUrl(e.target.value)}
-                        placeholder="Dán link chia sẻ hoặc ID tệp Google Drive..."
-                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 shadow-inner focus:border-indigo-500 focus:outline-none"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isDriveLoading || !driveUrl.trim()}
-                        className="flex items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition shrink-0"
-                      >
-                        {isDriveLoading ? (
-                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Upload className="h-3.5 w-3.5" />
-                        )}
-                        Đồng bộ
-                      </button>
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    className={`relative rounded-xl border-2 border-dashed p-6 text-center transition ${
+                      dragActive
+                        ? "border-indigo-500 bg-indigo-50/50"
+                        : "border-slate-300 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50"
+                    } ${isFileUploading ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    <input
+                      id="json_file_uploader"
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isFileUploading}
+                    />
+                    <div className="flex flex-col items-center justify-center gap-2.5">
+                      {isFileUploading ? (
+                        <>
+                          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
+                          <p className="text-xs font-semibold text-slate-600">
+                            Đang xử lý và đồng bộ dữ liệu...
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <FileJson className="h-8 w-8 text-indigo-500" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-700">
+                              Kéo thả tệp tin JSON vào đây
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              hoặc nhấp chuột để chọn tệp từ máy tính của bạn
+                            </p>
+                          </div>
+                          <span className="inline-block rounded bg-indigo-100/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 uppercase tracking-wider">
+                            Hỗ trợ sáp nhập tự động
+                          </span>
+                        </>
+                      )}
                     </div>
-                  </form>
-                  
-                  {/* Public Sample Links */}
+                  </div>
+
+                  {/* Guide info */}
                   <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1.5">
-                    <span className="font-semibold text-slate-800 block">💡 Cách chuẩn bị Link tệp nhanh:</span>
-                    <ul className="list-disc pl-4 space-y-1">
-                      <li>Bấm nút <span className="font-medium text-slate-800">Chia sẻ (Share)</span> trên file JSON ở Drive của bạn.</li>
-                      <li>Chọn <span className="font-medium text-slate-800">Bất kỳ ai có đường liên kết (Anyone with link)</span>.</li>
-                      <li>Copy liên kết đó dán vào khung trên và bấm <span className="font-medium text-indigo-600">Đồng bộ</span>.</li>
+                    <span className="font-semibold text-slate-800 block">💡 Thông tin đồng bộ ngoại tuyến:</span>
+                    <ul className="list-disc pl-4 space-y-1 leading-relaxed">
+                      <li>Tải tệp JSON báo cáo tuần mới của bạn lên từ máy tính.</li>
+                      <li>Hệ thống sẽ tự động đối chiếu, <strong>sáp nhập (merge) thông minh</strong> các bản ghi trùng lặp và bổ sung các dòng dữ liệu mới vào CSDL nội bộ.</li>
+                      <li>Quy trình này hoàn toàn an toàn và không phụ thuộc vào kết nối mạng bên ngoài.</li>
                     </ul>
                   </div>
                 </div>
