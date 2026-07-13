@@ -33,6 +33,11 @@ jobs:
         run: npm install
         
       - name: Build Project
+        env:
+          VITE_GITHUB_OWNER: kdung1206
+          VITE_GITHUB_REPO: marketing_report_v2
+          VITE_GITHUB_BRANCH: main
+          VITE_GITHUB_TOKEN: ${{ secrets.VITE_GITHUB_TOKEN }}
         run: |
           export CI=false
           npm run build
