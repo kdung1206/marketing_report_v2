@@ -415,6 +415,7 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
 }
 
 export const INITIAL_MARKETING_DATA: MarketingReportData = normalizeMarketingData(RAW_INITIAL_DATA);
+export { RAW_INITIAL_DATA };
 
 export const DEFAULT_COMMENTS_LIVOTEC: BrandComments = {
   evaluation: "Chiến dịch tuần này của Livotec ghi nhận kết quả khả quan ở mảng SEO Website (đạt 3.246 traffic organic, tiệm cận mục tiêu) và Social Media (vượt KPI số lượng bài viết với 5 bài viết thực tế). Các kênh Paid Ads hoạt động ổn định, trong đó TikTok KOC/KOL mang lại tỷ lệ reach cao vượt trội (3.251.131 Reach thực tế so với KPI là 2.114.285). Tuy nhiên, chỉ số Share of Voice (SOV) của Livotec trên thị trường thảo luận chung còn khá khiêm tốn (chỉ đạt 2,8%), bị lấn át lớn bởi Karofi và Kangaroo.",
