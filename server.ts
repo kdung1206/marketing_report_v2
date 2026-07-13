@@ -52,10 +52,13 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "20mb" }));
 
-// Rewrite requests to respect Vite's base path '/marketing_report_v2' when handling API routes
+// Rewrite requests to respect Vite's base path '/marketing_report_v2' for all routes (API and assets)
 app.use((req, res, next) => {
-  if (req.url.startsWith("/marketing_report_v2/api")) {
-    req.url = req.url.replace("/marketing_report_v2/api", "/api");
+  if (req.url.startsWith("/marketing_report_v2")) {
+    req.url = req.url.replace("/marketing_report_v2", "");
+    if (req.url === "") {
+      req.url = "/";
+    }
   }
   next();
 });
@@ -500,13 +503,28 @@ app.post("/api/sync-data", (req, res) => {
       return `${month}|${year}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
     };
 
+    // Merge comments if present in newData
+    const mergedComments = { ...(currentFullDb.comments || {}) };
+    if (newData && newData.comments) {
+      Object.keys(newData.comments).forEach((weekKey) => {
+        if (!mergedComments[weekKey]) {
+          mergedComments[weekKey] = newData.comments[weekKey];
+        } else {
+          mergedComments[weekKey] = {
+            ...mergedComments[weekKey],
+            ...newData.comments[weekKey],
+          };
+        }
+      });
+    }
+
     const mergedData = {
       digital_marketing: mergeRowsByKey(currentDb.digital_marketing, normalizedNew.digital_marketing, getDigitalKey),
       kol_koc: mergeRowsByKey(currentDb.kol_koc, normalizedNew.kol_koc, getKolKey),
       btl_trade: mergeRowsByKey(currentDb.btl_trade, normalizedNew.btl_trade, getBtlKey),
       monthly_ooh_pr: mergeRowsByKey(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr, getOohPrKey),
       btl_trade_monthly: mergeRowsByKey(currentFullDb.btl_trade_monthly || [], normalizedNew.btl_trade_monthly || [], getBtlMonthlyKey),
-      comments: currentFullDb.comments || {} // Preserve existing comments!
+      comments: mergedComments
     };
 
     // 4. Save the fully merged and normalized dataset back to the database file

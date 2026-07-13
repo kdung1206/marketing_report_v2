@@ -64,11 +64,11 @@ import {
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
 async function safeFetchJson(url: string, options?: RequestInit) {
-  const metaEnv = (import.meta as any).env;
-  const baseUrl = metaEnv && metaEnv.BASE_URL && metaEnv.BASE_URL !== "/"
-    ? metaEnv.BASE_URL.replace(/\/$/, "")
-    : "";
-  const targetUrl = baseUrl && url.startsWith("/api") ? `${baseUrl}${url}` : url;
+  // Dynamically detect base path from window.location.pathname instead of relying solely on hardcoded build-time BASE_URL
+  const hasBasePrefix = window.location.pathname.includes("/marketing_report_v2");
+  const prefix = hasBasePrefix ? "/marketing_report_v2" : "";
+  const targetUrl = url.startsWith("/api") ? `${prefix}${url}` : url;
+  
   const response = await fetch(targetUrl, options);
   const text = await response.text();
   const trimmed = text.trim();
@@ -107,8 +107,14 @@ export function getTimelines(marketingData: MarketingReportData) {
     ["week4", "week3", "week2"].forEach((w) => weeksSet.add(w));
   }
 
-  // Sort weeks in descending order (latest first)
-  const sortedWeeks = Array.from(weeksSet).sort((a, b) => b.localeCompare(a));
+  // Sort weeks in descending order (latest first) based on end of week date
+  const sortedWeeks = Array.from(weeksSet).sort((a, b) => {
+    const dateA = getEndOfWeekDate(a);
+    const dateB = getEndOfWeekDate(b);
+    const timeA = new Date(dateA.year, dateA.month - 1, dateA.day).getTime();
+    const timeB = new Date(dateB.year, dateB.month - 1, dateB.day).getTime();
+    return timeB - timeA;
+  });
 
   const TIMELINE_LABELS_MAP: { [key: string]: string } = {
     "week4": "Tuần 4 (19/06 - 25/06/2026)",
@@ -336,10 +342,26 @@ export default function App() {
 
   // Helper to get active comments for a given week and brand
   const getActiveComments = (weekId: string, brand: "Livotec" | "Karofi"): BrandComments => {
-    if (publishedComments[weekId] && publishedComments[weekId][brand]) {
-      return publishedComments[weekId][brand];
+    const defaultComments = brand === "Livotec" ? DEFAULT_COMMENTS_LIVOTEC : DEFAULT_COMMENTS_KAROFI;
+    const published = publishedComments[weekId] && publishedComments[weekId][brand];
+    if (published) {
+      return {
+        evaluation: published.evaluation !== undefined ? published.evaluation : defaultComments.evaluation,
+        proposals: published.proposals !== undefined ? published.proposals : defaultComments.proposals,
+        categories: {
+          sov: published.categories?.sov !== undefined ? published.categories.sov : defaultComments.categories.sov,
+          kol_koc: published.categories?.kol_koc !== undefined ? published.categories.kol_koc : defaultComments.categories.kol_koc,
+          content: published.categories?.content !== undefined ? published.categories.content : defaultComments.categories.content,
+          tvc: published.categories?.tvc !== undefined ? published.categories.tvc : defaultComments.categories.tvc,
+          pr: published.categories?.pr !== undefined ? published.categories.pr : defaultComments.categories.pr,
+          ooh: published.categories?.ooh !== undefined ? published.categories.ooh : defaultComments.categories.ooh,
+          paid_ads: published.categories?.paid_ads !== undefined ? published.categories.paid_ads : defaultComments.categories.paid_ads,
+          seo: published.categories?.seo !== undefined ? published.categories.seo : defaultComments.categories.seo,
+          btl_trade: published.categories?.btl_trade !== undefined ? published.categories.btl_trade : defaultComments.categories.btl_trade,
+        }
+      };
     }
-    return brand === "Livotec" ? DEFAULT_COMMENTS_LIVOTEC : DEFAULT_COMMENTS_KAROFI;
+    return defaultComments;
   };
 
   // Control Panel Draft Comments States (allows editing before publishing)
@@ -993,6 +1015,10 @@ export default function App() {
             setMarketingData(safeData);
             setPastedJson(JSON.stringify(safeData, null, 2));
             localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+            if (syncResult.data && syncResult.data.comments) {
+              setPublishedComments(syncResult.data.comments);
+              localStorage.setItem("marketing_published_comments", JSON.stringify(syncResult.data.comments));
+            }
             triggerNotification("success", "Tải lên và đồng bộ, sáp nhập dữ liệu thành công từ tệp JSON ngoại tuyến!");
           } else {
             throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
@@ -1003,6 +1029,11 @@ export default function App() {
           setMarketingData(mergedData);
           setPastedJson(JSON.stringify(mergedData, null, 2));
           localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+          if (parsed && parsed.comments) {
+            const newComments = { ...publishedComments, ...parsed.comments };
+            setPublishedComments(newComments);
+            localStorage.setItem("marketing_published_comments", JSON.stringify(newComments));
+          }
           triggerNotification("success", "Đã sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến)!");
         }
       } catch (err: any) {
@@ -1061,6 +1092,10 @@ export default function App() {
           setMarketingData(safeData);
           setPastedJson(JSON.stringify(safeData, null, 2));
           localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+          if (syncResult.data && syncResult.data.comments) {
+            setPublishedComments(syncResult.data.comments);
+            localStorage.setItem("marketing_published_comments", JSON.stringify(syncResult.data.comments));
+          }
           triggerNotification("success", "Đã sáp nhập và cập nhật dữ liệu tuần mới vào cơ sở dữ liệu thành công!");
         } else {
           throw new Error(syncResult.error || "Lỗi sáp nhập dữ liệu vào cơ sở dữ liệu.");
@@ -1071,6 +1106,11 @@ export default function App() {
         setMarketingData(mergedData);
         setPastedJson(JSON.stringify(mergedData, null, 2));
         localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+        if (parsed && parsed.comments) {
+          const newComments = { ...publishedComments, ...parsed.comments };
+          setPublishedComments(newComments);
+          localStorage.setItem("marketing_published_comments", JSON.stringify(newComments));
+        }
         triggerNotification("success", "Đã sáp nhập và cập nhật dữ liệu thành công trên trình duyệt (Chạy Ngoại Tuyến/GitHub Pages)!");
       }
     } catch (err: any) {
@@ -1497,7 +1537,7 @@ export default function App() {
   };
 
   const hasPreviousWeek = (() => {
-    const sorted = timelines.map(t => t.id).sort((a, b) => b.localeCompare(a));
+    const sorted = timelines.map(t => t.id);
     const idx = sorted.indexOf(selectedTimeline.id);
     return idx !== -1 && idx + 1 < sorted.length;
   })();
@@ -1688,7 +1728,7 @@ export default function App() {
     rowHangMuc?: string
   ) => {
     // 1. Find previous week ID
-    const sorted = timelines.map(t => t.id).sort((a, b) => b.localeCompare(a));
+    const sorted = timelines.map(t => t.id);
     const idx = sorted.indexOf(selectedTimeline.id);
     if (idx === -1 || idx + 1 >= sorted.length) return null; // No previous week
     const prevWeekId = sorted[idx + 1];
@@ -1803,7 +1843,8 @@ export default function App() {
   const activeComments = getActiveComments(selectedTimeline.id, selectedBrand);
 
   // Helper to render formatting of Proposals in Box 2
-  const renderFormattedText = (text: string) => {
+  const renderFormattedText = (text?: string | null) => {
+    if (!text) return null;
     return text.split("\n").map((line, idx) => {
       // Check if it starts with bold (e.g., 1. **Title**: Content or **Title**)
       const boldMatch = line.match(/^\d*\.?\s*\*\*(.*?)\*\*(.*)$/);
@@ -2118,9 +2159,9 @@ export default function App() {
                   <TrendingUp className="h-3.5 w-3.5" />
                   Box 1: Scorecards Chỉ Số Chủ Chốt
                 </h2>
-                {selectedTimeline.isPRWeek && (
+                {selectedTimeline?.isPRWeek && (
                   <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-[10px] font-bold text-purple-700 border border-purple-200">
-                    {selectedTimeline.label.split(" ")[0]} {selectedTimeline.label.split(" ")[1]}: Có PR báo chí (+1 Card)
+                    {(selectedTimeline?.label || "").split(" ")[0] || ""} {(selectedTimeline?.label || "").split(" ")[1] || ""}: Có PR báo chí (+1 Card)
                   </span>
                 )}
               </div>
@@ -2343,7 +2384,7 @@ export default function App() {
                     <div className="grid gap-6 md:grid-cols-12 items-center">
                       <div className="md:col-span-7 h-80 flex flex-col justify-center bg-white border border-slate-100 rounded-xl p-2 shadow-sm">
                         <span className="text-xs font-bold text-slate-400 block px-4 py-2 uppercase tracking-wide">
-                          Thị Phần Thảo Luận Thương Hiệu Tuần {selectedTimeline.label.split(" ")[1]}
+                          Thị Phần Thảo Luận Thương Hiệu Tuần {(selectedTimeline?.label || "").split(" ")[1] || ""}
                         </span>
                         <ResponsiveContainer width="100%" height="85%">
                           <PieChart>
@@ -2908,8 +2949,8 @@ export default function App() {
                                   }
 
                                   return {
-                                    name: `${row.kênh_channel} (${row.ngành_hàng}) - ${row.chỉ_số_metric}`,
-                                    metric: row.chỉ_số_metric.split(" ")[0],
+                                    name: `${row.kênh_channel} (${row.ngành_hàng}) - ${row.chỉ_số_metric || ""}`,
+                                    metric: (row.chỉ_số_metric || "").split(" ")[0] || "",
                                     target: target,
                                     actual: actual,
                                   };
