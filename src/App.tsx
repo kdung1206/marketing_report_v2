@@ -311,7 +311,8 @@ const DEFAULT_USERS: UserAccount[] = [
   { username: "ntkdung1206@gmail.com", password: "123", name: "Dũng Nguyễn", role: "Admin" },
   { username: "admin", password: "123", name: "Quản trị hệ thống", role: "Admin" },
   { username: "editor1", password: "123", name: "Nguyễn Biên Tập", role: "Editor" },
-  { username: "viewer1", password: "123", name: "Lê Người Xem", role: "Viewer" }
+  { username: "viewer1", password: "123", name: "Lê Người Xem", role: "Viewer" },
+  { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }
 ];
 
 export interface BrandKpiTarget {
@@ -337,7 +338,17 @@ export default function App() {
   
   const [users, setUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem("marketing_users_list");
-    return saved ? JSON.parse(saved) : DEFAULT_USERS;
+    if (saved) {
+      const parsed: UserAccount[] = JSON.parse(saved);
+      const hasViewer2 = parsed.some(u => u.username === "viewer2");
+      if (!hasViewer2) {
+        const updated = [...parsed, { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }];
+        localStorage.setItem("marketing_users_list", JSON.stringify(updated));
+        return updated;
+      }
+      return parsed;
+    }
+    return DEFAULT_USERS;
   });
 
   // Brand KPI Targets States
@@ -374,7 +385,10 @@ export default function App() {
 
   // Navigation & Brand States
   const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel">("dashboard");
-  const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">("Livotec");
+  const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">(() => {
+    const saved = localStorage.getItem("marketing_selected_brand");
+    return (saved === "Livotec" || saved === "Karofi") ? saved : "Livotec";
+  });
 
   // Core Data States
   const [marketingData, setMarketingData] = useState<MarketingReportData>(() => {
@@ -407,6 +421,11 @@ export default function App() {
       }
     }
     const list = getTimelines(currentData);
+    const savedTimelineId = localStorage.getItem("marketing_selected_timeline_id");
+    if (savedTimelineId) {
+      const found = list.find(t => t.id === savedTimelineId);
+      if (found) return found;
+    }
     return list[0];
   });
 
@@ -468,7 +487,11 @@ export default function App() {
   });
   
   // Category tab state in Box 3
-  const [activeCategoryTab, setActiveCategoryTab] = useState<"sov" | "kol" | "content" | "tvc" | "pr" | "ooh" | "ads" | "seo" | "btl">("sov");
+  const [activeCategoryTab, setActiveCategoryTab] = useState<"sov" | "kol" | "content" | "tvc" | "pr" | "ooh" | "ads" | "seo" | "btl">(() => {
+    const saved = localStorage.getItem("marketing_active_category_tab");
+    const allowed = ["sov", "kol", "content", "tvc", "pr", "ooh", "ads", "seo", "btl"];
+    return (saved && allowed.includes(saved)) ? (saved as any) : "sov";
+  });
 
   // State for filtering Paid Ads by industry
   const [selectedAdsIndustry, setSelectedAdsIndustry] = useState<string>("Tất cả");
@@ -582,6 +605,95 @@ export default function App() {
     setHasUnpublishedChanges(false);
   }, [selectedTimeline.id, selectedBrand, publishedComments]);
 
+  // Push live presentation active display state to server
+  const pushActiveStateToServer = async (
+    brand: "Livotec" | "Karofi",
+    timelineId: string,
+    categoryTab: string
+  ) => {
+    if (currentUser && (currentUser.role === "Admin" || currentUser.role === "Editor")) {
+      try {
+        await safeFetchJson("/api/save-active-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            selectedBrand: brand,
+            selectedTimelineId: timelineId,
+            activeCategoryTab: categoryTab
+          })
+        });
+      } catch (err) {
+        console.warn("Failed to push live presentation state to server (Normal if running offline):", err);
+      }
+    }
+  };
+
+  // Sync current brand/timeline/tab selections to localStorage
+  useEffect(() => {
+    localStorage.setItem("marketing_selected_brand", selectedBrand);
+  }, [selectedBrand]);
+
+  useEffect(() => {
+    if (selectedTimeline?.id) {
+      localStorage.setItem("marketing_selected_timeline_id", selectedTimeline.id);
+    }
+  }, [selectedTimeline?.id]);
+
+  useEffect(() => {
+    localStorage.setItem("marketing_active_category_tab", activeCategoryTab);
+  }, [activeCategoryTab]);
+
+  // Sync Admin's view state to server so viewers follow automatically (debounced)
+  useEffect(() => {
+    if (currentUser && (currentUser.role === "Admin" || currentUser.role === "Editor") && selectedTimeline?.id) {
+      const delayDebounceFn = setTimeout(() => {
+        pushActiveStateToServer(selectedBrand, selectedTimeline.id, activeCategoryTab);
+      }, 800);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [selectedBrand, selectedTimeline?.id, activeCategoryTab, currentUser]);
+
+  // Listen to Storage events for instant local tab sync (useful for offline / GitHub Pages / iframe)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.newValue) return;
+      try {
+        if (e.key === "marketing_report_raw_data") {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed) setMarketingData(normalizeMarketingData(parsed));
+        } else if (e.key === "marketing_published_comments") {
+          setPublishedComments(JSON.parse(e.newValue));
+        } else if (e.key === "marketing_brand_kpis") {
+          setBrandKpis(JSON.parse(e.newValue));
+        } else if (e.key === "marketing_users_list") {
+          setUsers(JSON.parse(e.newValue));
+        } else if (e.key === "marketing_selected_brand") {
+          const isViewer = !currentUser || currentUser.role === "Viewer";
+          if (isViewer && (e.newValue === "Livotec" || e.newValue === "Karofi")) {
+            setSelectedBrand(e.newValue);
+          }
+        } else if (e.key === "marketing_selected_timeline_id") {
+          const isViewer = !currentUser || currentUser.role === "Viewer";
+          if (isViewer) {
+            const list = getTimelines(marketingData);
+            const found = list.find((t) => t.id === e.newValue);
+            if (found) setSelectedTimeline(found);
+          }
+        } else if (e.key === "marketing_active_category_tab") {
+          const isViewer = !currentUser || currentUser.role === "Viewer";
+          if (isViewer) {
+            setActiveCategoryTab(e.newValue as any);
+          }
+        }
+      } catch (err) {
+        console.error("Error handling storage sync:", err);
+      }
+    };
+    
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [currentUser, marketingData]);
+
   // Fetch latest database data and comments from server
   const fetchServerData = async (isManual = false) => {
     try {
@@ -597,7 +709,27 @@ export default function App() {
         localStorage.setItem("marketing_published_comments", JSON.stringify(serverComments));
 
         const list = getTimelines(safeData);
-        if (list.length > 0) {
+        
+        // Sync active display state if available and current user is Viewer (or not logged in)
+        const isViewer = !currentUser || currentUser.role === "Viewer";
+        if (isViewer && result.activeState) {
+          const { selectedBrand: activeBrand, selectedTimelineId, activeCategoryTab: activeCat } = result.activeState;
+          
+          if (activeBrand && (activeBrand === "Livotec" || activeBrand === "Karofi") && activeBrand !== selectedBrand) {
+            setSelectedBrand(activeBrand);
+          }
+          
+          if (selectedTimelineId) {
+            const foundTimeline = list.find((t) => t.id === selectedTimelineId);
+            if (foundTimeline && foundTimeline.id !== selectedTimeline?.id) {
+              setSelectedTimeline(foundTimeline);
+            }
+          }
+          
+          if (activeCat && activeCat !== activeCategoryTab) {
+            setActiveCategoryTab(activeCat);
+          }
+        } else if (list.length > 0) {
           setSelectedTimeline((prev) => {
             if (prev && prev.id) {
               // Compare previous timelines to see if they were looking at the latest available week
@@ -647,7 +779,14 @@ export default function App() {
         }
       }
       if (isManual) {
-        triggerNotification("error", "Không thể kết nối máy chủ để đồng bộ dữ liệu mới nhất.");
+        const isStaticOrOffline = window.location.hostname.includes("github.io") || 
+                                  window.location.hostname.includes("github.com") ||
+                                  (err && err instanceof Error && err.message.includes("JSON/HTML response"));
+        if (isStaticOrOffline) {
+          triggerNotification("success", "Đã đồng bộ cục bộ! Bạn đang xem báo cáo trực tiếp trên GitHub Pages (Dữ liệu ngoại tuyến được lưu trữ an toàn trong trình duyệt).");
+        } else {
+          triggerNotification("error", "Không thể kết nối máy chủ để đồng bộ dữ liệu mới nhất.");
+        }
       }
     }
   };
@@ -657,15 +796,18 @@ export default function App() {
     fetchServerData();
   }, []);
 
-  // Auto-sync data every 30 seconds to keep Viewer and Admin aligned
+  // Auto-sync data to keep Viewer and Admin aligned (faster polling for Viewers to follow Admin live)
   useEffect(() => {
+    const isViewer = !currentUser || currentUser.role === "Viewer";
+    const delay = isViewer ? 4000 : 30000; // 4 seconds for Viewer to react rapidly to Admin presentation, 30 seconds for Admin
+    
     const interval = setInterval(() => {
       if (!hasUnpublishedChanges) {
         fetchServerData();
       }
-    }, 30000);
+    }, delay);
     return () => clearInterval(interval);
-  }, [hasUnpublishedChanges]);
+  }, [hasUnpublishedChanges, currentUser, selectedBrand, selectedTimeline?.id, activeCategoryTab]);
 
   const triggerNotification = (type: "success" | "error", message: string) => {
     setNotification({ type, message });

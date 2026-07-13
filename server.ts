@@ -314,11 +314,33 @@ app.get("/api/get-data", (req, res) => {
     return res.json({
       success: true,
       data: normalized,
-      comments: rawDbData.comments || {}
+      comments: rawDbData.comments || {},
+      activeState: rawDbData.active_state || null
     });
   } catch (err: any) {
     console.error("GET /api/get-data error:", err);
     return res.status(500).json({ error: `Lỗi đọc cơ sở dữ liệu: ${err.message}` });
+  }
+});
+
+// POST /api/save-active-state
+app.post("/api/save-active-state", (req, res) => {
+  try {
+    const { selectedBrand, selectedTimelineId, activeCategoryTab } = req.body;
+    const rawDbData = getDatabaseData();
+    
+    rawDbData.active_state = {
+      selectedBrand,
+      selectedTimelineId,
+      activeCategoryTab,
+      updatedAt: new Date().toISOString()
+    };
+    
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(rawDbData, null, 2), "utf8");
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST /api/save-active-state error:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
