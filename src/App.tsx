@@ -318,13 +318,36 @@ export default function App() {
   const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">("Livotec");
 
   // Core Data States
-  const [marketingData, setMarketingData] = useState<MarketingReportData>(INITIAL_MARKETING_DATA);
+  const [marketingData, setMarketingData] = useState<MarketingReportData>(() => {
+    const saved = localStorage.getItem("marketing_report_raw_data");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) return normalizeMarketingData(parsed);
+      } catch (e) {
+        console.error("Error parsing local storage raw data", e);
+      }
+    }
+    return INITIAL_MARKETING_DATA;
+  });
 
   // Compute dynamic timelines list from current marketingData
   const timelines = getTimelines(marketingData);
 
   const [selectedTimeline, setSelectedTimeline] = useState(() => {
-    const list = getTimelines(INITIAL_MARKETING_DATA);
+    const saved = localStorage.getItem("marketing_report_raw_data");
+    let currentData = INITIAL_MARKETING_DATA;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed) {
+          currentData = normalizeMarketingData(parsed);
+        }
+      } catch (e) {
+        console.error("Error parsing local storage raw data for timeline", e);
+      }
+    }
+    const list = getTimelines(currentData);
     return list[0];
   });
 
@@ -338,7 +361,17 @@ export default function App() {
 
   const [publishedComments, setPublishedComments] = useState<{
     [weekId: string]: { Livotec: BrandComments; Karofi: BrandComments };
-  }>({});
+  }>(() => {
+    const saved = localStorage.getItem("marketing_published_comments");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error parsing local storage comments", e);
+      }
+    }
+    return {};
+  });
 
   // Helper to get active comments for a given week and brand
   const getActiveComments = (weekId: string, brand: "Livotec" | "Karofi"): BrandComments => {
@@ -417,14 +450,14 @@ export default function App() {
     );
 
     const hasSov = activeBrandSov ? (activeBrandSov.thực_tế_actual || 0) > 0 : false;
-    const hasKol = kol.length > 0;
+    const hasKol = true; // Keep KOL tab always active to avoid confusion
     const hasContent = digital.some((row) => row.nhóm_báo_cáo && row.nhóm_báo_cáo.toLowerCase() === "content");
     const hasTvc = digital.some((row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "tvc" && row.chỉ_số_metric && row.chỉ_số_metric.toLowerCase() === "grps");
     const hasPr = brandOohPr.some((row) => row.hạng_mục && (row.hạng_mục.toLowerCase() === "pr" || row.hạng_mục.toLowerCase() === "pr - báo chí"));
     const hasOoh = brandOohPr.some((row) => row.hạng_mục && row.hạng_mục.toLowerCase() === "ooh");
     const hasAds = digital.some((row) => row.hạng_mục === "Paid Ads");
     const hasSeo = digital.some((row) => row.hạng_mục === "SEO Website" || row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page");
-    const hasBtl = btl.length > 0;
+    const hasBtl = true; // Keep BTL tab always active to avoid confusion
 
     const tabsStatus = {
       sov: hasSov,
@@ -507,8 +540,19 @@ export default function App() {
         const list = getTimelines(safeData);
         if (list.length > 0) {
           setSelectedTimeline((prev) => {
-            if (prev && prev.id && list.some((t) => t.id === prev.id)) {
-              return prev;
+            if (prev && prev.id) {
+              // Compare previous timelines to see if they were looking at the latest available week
+              const prevTimelines = getTimelines(marketingData);
+              const wasLookingAtLatest = prevTimelines.length > 0 && prev.id === prevTimelines[0].id;
+              
+              if (wasLookingAtLatest) {
+                // Automatically move to the brand new latest week!
+                return list[0];
+              }
+              // Otherwise keep the user's manual selection if it still exists
+              if (list.some((t) => t.id === prev.id)) {
+                return prev;
+              }
             }
             return list[0];
           });
@@ -1545,18 +1589,18 @@ export default function App() {
   const hasSeoData = brandDigital.some(
     (row) => row.hạng_mục === "SEO Website" || row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page"
   );
-  const hasBtlData = brandBtl.length > 0;
+  const hasBtlData = true; // Keep BTL tab always active to avoid confusion
 
   const tabsStatus: { [key: string]: boolean } = {
     sov: hasSovData,
-    kol: hasKolData,
+    kol: true, // Keep KOL tab always active to avoid confusion
     content: hasContentData,
     tvc: hasTvcData,
     pr: hasPrData,
     ooh: hasOohData,
     ads: hasAdsData,
     seo: hasSeoData,
-    btl: hasBtlData,
+    btl: true, // Keep BTL tab always active to avoid confusion
   };
 
   const hasPreviousWeek = (() => {
@@ -3273,6 +3317,18 @@ export default function App() {
                       const hasAcc = row.accVal !== null && row.accVal !== undefined && row.accVal !== 0;
                       return hasLastMonth || hasPlan || hasAcc;
                     });
+
+                    if (btlMappedRows.length === 0) {
+                      return (
+                        <div id="btl_empty_state" className="flex flex-col items-center justify-center py-12 px-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+                          <Store className="h-12 w-12 text-slate-300 mb-3 animate-pulse" />
+                          <h4 className="font-bold text-slate-800 text-sm">Không có dữ liệu BTL & Trade Marketing</h4>
+                          <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                            Thương hiệu <strong>{selectedBrand}</strong> không ghi nhận hoạt động BTL nào trong kỳ báo cáo này.
+                          </p>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div className="space-y-8">
