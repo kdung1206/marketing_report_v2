@@ -10,6 +10,15 @@ import {
 } from "./data";
 import { exportToExcel, exportToJSON } from "./lib/export";
 import {
+  isGithubSyncConfigured,
+  githubGetData,
+  githubSaveActiveState,
+  githubSaveComments,
+  githubSaveRawData,
+  githubSyncData,
+  githubResetData,
+} from "./lib/githubSync";
+import {
   TrendingUp,
   Award,
   Users,
@@ -63,19 +72,52 @@ import {
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
+// When the Express backend isn't reachable (most notably on the static
+// GitHub Pages deployment, which cannot run a server at all), fall back to
+// reading/writing the shared database file directly on GitHub instead of
+// silently going local-only. See src/lib/githubSync.ts for details.
+async function githubFallback(url: string, options?: RequestInit) {
+  const body = options?.body ? JSON.parse(options.body as string) : {};
+  switch (url) {
+    case "/api/get-data":
+      return githubGetData();
+    case "/api/save-active-state":
+      return githubSaveActiveState(body.selectedBrand, body.selectedTimelineId, body.activeCategoryTab);
+    case "/api/save-comments":
+      return githubSaveComments(body.week, body.comments);
+    case "/api/save-raw-data":
+      return githubSaveRawData(body.data);
+    case "/api/sync-data":
+      return githubSyncData(body.newData);
+    case "/api/reset-data":
+      return githubResetData();
+    default:
+      // Endpoints that need a real server-side secret (Gemini analysis,
+      // mail config, Google Drive fetch) have no GitHub equivalent.
+      throw new Error(`Máy chủ không khả dụng và endpoint "${url}" không hỗ trợ đồng bộ qua GitHub.`);
+  }
+}
+
 async function safeFetchJson(url: string, options?: RequestInit) {
   // Dynamically detect base path from window.location.pathname instead of relying solely on hardcoded build-time BASE_URL
   const hasBasePrefix = window.location.pathname.includes("/marketing_report_v2");
   const prefix = hasBasePrefix ? "/marketing_report_v2" : "";
   const targetUrl = url.startsWith("/api") ? `${prefix}${url}` : url;
-  
-  const response = await fetch(targetUrl, options);
-  const text = await response.text();
-  const trimmed = text.trim();
-  if (trimmed.startsWith("<") || !response.ok) {
-    throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
+
+  try {
+    const response = await fetch(targetUrl, options);
+    const text = await response.text();
+    const trimmed = text.trim();
+    if (trimmed.startsWith("<") || !response.ok) {
+      throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
+    }
+    return JSON.parse(text);
+  } catch (err) {
+    if (url.startsWith("/api") && isGithubSyncConfigured()) {
+      return await githubFallback(url, options);
+    }
+    throw err;
   }
-  return JSON.parse(text);
 }
 
 export function getTimelines(marketingData: MarketingReportData) {
@@ -332,7 +374,16 @@ const DEFAULT_BRAND_KPIS: BrandKpiTarget[] = [
 export default function App() {
   // Authentication & Users State
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    return { username: "admin", password: "123", name: "Quản trị viên", role: "Admin" };
+    const saved = localStorage.getItem("marketing_current_user");
+    if (saved) {
+      try {
+        return JSON.parse(saved) as UserAccount;
+      } catch (e) {
+        console.error("Error parsing saved current user", e);
+        return null;
+      }
+    }
+    return null;
   });
   
   const [users, setUsers] = useState<UserAccount[]>(() => {
@@ -596,6 +647,13 @@ export default function App() {
     };
     fetchMailConfig();
   }, [currentUser]);
+
+  // Safety guard: Viewer accounts must never remain on the Control Panel tab
+  useEffect(() => {
+    if ((!currentUser || currentUser.role === "Viewer") && activeTab === "control-panel") {
+      setActiveTab("dashboard");
+    }
+  }, [currentUser, activeTab]);
 
   // Synchronize draftComments with published comments for current brand & week
   useEffect(() => {
@@ -2257,7 +2315,21 @@ export default function App() {
             <div className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-1.5 font-sans text-xs text-indigo-700">
               <Shield className="h-3.5 w-3.5 text-indigo-500" />
               <span className="font-semibold text-indigo-950">{currentUser.name}</span>
+              <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-600">
+                {currentUser.role}
+              </span>
             </div>
+
+            {/* Logout Button */}
+            <button
+              id="logout_btn"
+              onClick={handleLogout}
+              className="no-print flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-rose-700 shadow-sm transition cursor-pointer"
+              title="Đăng xuất khỏi hệ thống"
+            >
+              <LogOut className="h-3.5 w-3.5 text-slate-400" />
+              <span>Đăng xuất</span>
+            </button>
 
             {/* Sync Button */}
             <button
