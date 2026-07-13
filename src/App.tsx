@@ -332,8 +332,7 @@ const DEFAULT_BRAND_KPIS: BrandKpiTarget[] = [
 export default function App() {
   // Authentication & Users State
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    const saved = localStorage.getItem("marketing_current_user");
-    return saved ? JSON.parse(saved) : null;
+    return { username: "admin", password: "123", name: "Quản trị viên", role: "Admin" };
   });
   
   const [users, setUsers] = useState<UserAccount[]>(() => {
@@ -2255,27 +2254,10 @@ export default function App() {
 
           {/* User metadata & timeline info */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-xs text-slate-600">
-              <UserCheck className="h-3.5 w-3.5 text-slate-500" />
-              <span className="font-semibold text-slate-950">{currentUser.name}</span>
-              <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                currentUser.role === "Admin" ? "bg-indigo-100 text-indigo-700" :
-                currentUser.role === "Editor" ? "bg-emerald-100 text-emerald-700" :
-                "bg-amber-100 text-amber-700"
-              }`}>
-                {currentUser.role}
-              </span>
+            <div className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-1.5 font-sans text-xs text-indigo-700">
+              <Shield className="h-3.5 w-3.5 text-indigo-500" />
+              <span className="font-semibold text-indigo-950">{currentUser.name}</span>
             </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 shadow-sm transition cursor-pointer"
-              title="Đăng xuất khỏi tài khoản"
-            >
-              <LogOut className="h-3.5 w-3.5 text-slate-400" />
-              <span className="hidden sm:inline">Đăng xuất</span>
-            </button>
 
             {/* Sync Button */}
             <button
@@ -3806,181 +3788,6 @@ export default function App() {
                     </button>
                   </form>
                 </div>
-
-                {/* Section 3: Quản Lý Người Dùng & Phân Quyền (Only Admin) */}
-                {currentUser.role === "Admin" ? (
-                  <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4">
-                    <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                        <UserPlus className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-sm">
-                          Quản lý tài khoản & Phân quyền
-                        </h3>
-                        <p className="text-[11px] text-slate-500">Thêm, sửa, xóa người dùng hệ thống</p>
-                      </div>
-                    </div>
-
-                    {/* Add / Edit Form */}
-                    <form onSubmit={handleAddOrEditUser} className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200/60">
-                      <span className="text-xs font-bold text-indigo-900 block uppercase tracking-wider">
-                        {editingUsername ? "⚡ Cập nhật người dùng" : "➕ Thêm tài khoản mới"}
-                      </span>
-                      
-                      <div className="space-y-2">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block">Tên hiển thị</label>
-                          <input
-                            id="manager_name_input"
-                            type="text"
-                            required
-                            value={managerName}
-                            onChange={(e) => setManagerName(e.target.value)}
-                            placeholder="Ví dụ: Nguyễn Văn A"
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block">Tên đăng nhập (Email)</label>
-                          <input
-                            id="manager_username_input"
-                            type="text"
-                            required
-                            disabled={!!editingUsername}
-                            value={managerUsername}
-                            onChange={(e) => setManagerUsername(e.target.value)}
-                            placeholder="Ví dụ: name@gmail.com"
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 disabled:bg-slate-100 disabled:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block">Mật khẩu</label>
-                          <input
-                            id="manager_password_input"
-                            type="password"
-                            required={!editingUsername}
-                            value={managerPassword}
-                            onChange={(e) => setManagerPassword(e.target.value)}
-                            placeholder={editingUsername ? "Để trống nếu giữ nguyên..." : "Nhập mật khẩu..."}
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-500 uppercase block">Vai trò phân quyền</label>
-                          <select
-                            id="manager_role_select"
-                            value={managerRole}
-                            onChange={(e) => setManagerRole(e.target.value as any)}
-                            className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none cursor-pointer"
-                          >
-                            <option value="Viewer">Viewer (Chỉ xem báo cáo)</option>
-                            <option value="Editor">Editor (Biên tập dữ liệu)</option>
-                            <option value="Admin">Admin (Toàn quyền hệ thống)</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="submit"
-                          id="btn_submit_manager"
-                          className="flex-1 rounded bg-indigo-600 py-1.5 text-xs font-bold text-white hover:bg-indigo-700 transition cursor-pointer"
-                        >
-                          {editingUsername ? "Lưu thay đổi" : "Tạo tài khoản"}
-                        </button>
-                        {editingUsername && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditingUsername(null);
-                              setManagerUsername("");
-                              setManagerPassword("");
-                              setManagerName("");
-                              setManagerRole("Viewer");
-                            }}
-                            className="rounded bg-slate-300 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-400 transition cursor-pointer"
-                          >
-                            Hủy
-                          </button>
-                        )}
-                      </div>
-                    </form>
-
-                    {/* Users list table */}
-                    <div className="space-y-1.5 pt-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Danh sách tài khoản ({users.length})
-                      </span>
-                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white max-h-56 overflow-y-auto">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider sticky top-0">
-                            <tr>
-                              <th className="px-3 py-2 text-[10px]">Tài khoản</th>
-                              <th className="px-3 py-2 text-[10px]">Vai trò</th>
-                              <th className="px-3 py-2 text-right text-[10px]">Thao tác</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
-                            {users.map((u) => (
-                              <tr key={u.username} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-3 py-2">
-                                  <span className="font-semibold text-slate-900 block leading-tight">{u.name}</span>
-                                  <span className="text-[10px] text-slate-400 font-mono block leading-tight">{u.username}</span>
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-extrabold ${
-                                    u.role === "Admin" ? "bg-indigo-100 text-indigo-700" :
-                                    u.role === "Editor" ? "bg-emerald-100 text-emerald-700" :
-                                    "bg-amber-100 text-amber-700"
-                                  }`}>
-                                    {u.role}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-right space-x-1.5">
-                                  <button
-                                    onClick={() => handleStartEditUser(u)}
-                                    className="text-indigo-600 hover:text-indigo-900 text-[11px] font-semibold cursor-pointer"
-                                    title="Sửa phân quyền"
-                                  >
-                                    Sửa
-                                  </button>
-                                  {/* Cannot delete oneself */}
-                                  {u.username !== currentUser.username ? (
-                                    <button
-                                      onClick={() => handleDeleteUser(u.username)}
-                                      className="text-rose-600 hover:text-rose-900 text-[11px] font-semibold cursor-pointer"
-                                      title="Xóa người dùng"
-                                    >
-                                      Xóa
-                                    </button>
-                                  ) : (
-                                    <span className="text-slate-300 text-[11px] select-none">Bản thân</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-slate-400" />
-                      <h3 className="font-bold text-slate-700 text-sm">
-                        Phân quyền & Tài khoản
-                      </h3>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed">
-                      Bạn đang đăng nhập with quyền <strong className="text-emerald-600">{currentUser.role}</strong>. Chỉ có tài khoản Quản trị viên (Admin) mới có thể xem danh sách và phân quyền quản trị tài khoản người dùng khác.
-                    </p>
-                  </div>
-                )}
 
               </div>
 
