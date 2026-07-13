@@ -213,20 +213,79 @@ export function getBtlRowDataValues(row: any) {
 
   let lastMonthVal = row.thực_hiện_tháng;
   if (lastMonthVal === undefined || lastMonthVal === null) {
-    const fallbackKey = `thực_hiện_tháng_${lastMonth}`;
-    lastMonthVal = row[fallbackKey] !== undefined && row[fallbackKey] !== null ? row[fallbackKey] : row.thực_hiện_tháng_5;
+    const keys = [
+      `thực_hiện_tháng_${lastMonth}`,
+      `thực hiện tháng ${lastMonth}`,
+      `thực_hiện_tháng_${thisMonth}`,
+      `thực hiện tháng ${thisMonth}`,
+      "thực_hiện_tháng",
+      "thực hiện tháng",
+      "thực_hiện_tháng_5",
+      "thực hiện tháng 5",
+      "thực_hiện_tháng_6",
+      "thực hiện tháng 6",
+      "thực_hiện_tháng_7",
+      "thực hiện tháng 7"
+    ];
+    for (const key of keys) {
+      if (row[key] !== undefined && row[key] !== null) {
+        lastMonthVal = row[key];
+        break;
+      }
+    }
+    if (lastMonthVal === undefined || lastMonthVal === null) {
+      lastMonthVal = row.thực_hiện_tháng_5;
+    }
   }
 
   let planVal = row.kế_hoạch_tháng;
   if (planVal === undefined || planVal === null) {
-    const fallbackKey = `kế_hoạch_tháng_${thisMonth}`;
-    planVal = row[fallbackKey] !== undefined && row[fallbackKey] !== null ? row[fallbackKey] : row.kế_hoạch_tháng_6;
+    const keys = [
+      `kế_hoạch_tháng_${thisMonth}`,
+      `kế hoạch tháng ${thisMonth}`,
+      `kế_hoạch_tháng_${lastMonth}`,
+      `kế hoạch tháng ${lastMonth}`,
+      "kế_hoạch_tháng",
+      "kế hoạch tháng",
+      "kế_hoạch_tháng_6",
+      "kế hoạch tháng 6",
+      "kế_hoạch_tháng_7",
+      "kế hoạch tháng 7"
+    ];
+    for (const key of keys) {
+      if (row[key] !== undefined && row[key] !== null) {
+        planVal = row[key];
+        break;
+      }
+    }
+    if (planVal === undefined || planVal === null) {
+      planVal = row.kế_hoạch_tháng_6;
+    }
   }
 
   let accVal = row.tích_lũy_tháng;
   if (accVal === undefined || accVal === null) {
-    const fallbackKey = `tích_lũy_tháng_${thisMonth}`;
-    accVal = row[fallbackKey] !== undefined && row[fallbackKey] !== null ? row[fallbackKey] : row.tích_lũy_tháng;
+    const keys = [
+      `tích_lũy_tháng_${thisMonth}`,
+      `tích lũy tháng ${thisMonth}`,
+      `tích_lũy_tháng_${lastMonth}`,
+      `tích lũy tháng ${lastMonth}`,
+      "tích_lũy_tháng",
+      "tích lũy tháng",
+      "tích_lũy_tháng_6",
+      "tích lũy tháng 6",
+      "tích_lũy_tháng_7",
+      "tích lũy tháng 7"
+    ];
+    for (const key of keys) {
+      if (row[key] !== undefined && row[key] !== null) {
+        accVal = row[key];
+        break;
+      }
+    }
+    if (accVal === undefined || accVal === null) {
+      accVal = row.tích_lũy_tháng;
+    }
   }
 
   return {

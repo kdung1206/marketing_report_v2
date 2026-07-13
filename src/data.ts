@@ -319,7 +319,20 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
 
         const btl_thuc_hien_thang = linkedMonthlyRow !== undefined 
           ? linkedMonthlyRow.thực_hiện_tháng 
-          : getBtlField(["thực_hiện_tháng", "thực hiện tháng", "thực_hiện_tháng_5", "thực hiện tháng 5"]);
+          : getBtlField([
+              "thực_hiện_tháng",
+              "thực hiện tháng",
+              `thực_hiện_tháng_${lastMonth}`,
+              `thực hiện tháng ${lastMonth}`,
+              "thực_hiện_tháng_5",
+              "thực hiện tháng 5",
+              "thực_hiện_tháng_6",
+              "thực hiện tháng 6",
+              "thực_hiện_tháng_7",
+              "thực hiện tháng 7",
+              "thực_hiện_tháng_8",
+              "thực hiện tháng 8"
+            ]);
 
         const resultRow: BtlTradeRow = {
           week: weekStr,
@@ -330,8 +343,31 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
           tần_suất: tanSuat,
           đơn_vị_tính: donViTinh,
           thực_hiện_tháng: btl_thuc_hien_thang,
-          kế_hoạch_tháng: getBtlField(["kế_hoạch_tháng", "kế hoạch tháng", "kế_hoạch_tháng_6", "kế hoạch tháng 6"]),
-          tích_lũy_tháng: getBtlField(["tích_lũy_tháng", "tích lũy tháng"])
+          kế_hoạch_tháng: getBtlField([
+            "kế_hoạch_tháng",
+            "kế hoạch tháng",
+            `kế_hoạch_tháng_${thisMonth}`,
+            `kế hoạch tháng ${thisMonth}`,
+            "kế_hoạch_tháng_6",
+            "kế hoạch tháng 6",
+            "kế_hoạch_tháng_7",
+            "kế hiện tháng 7",
+            "kế hoạch tháng 7",
+            "kế_hoạch_tháng_8",
+            "kế hoạch tháng 8"
+          ]),
+          tích_lũy_tháng: getBtlField([
+            "tích_lũy_tháng",
+            "tích lũy tháng",
+            `tích_lũy_tháng_${thisMonth}`,
+            `tích lũy tháng ${thisMonth}`,
+            "tích_lũy_tháng_6",
+            "tích lũy tháng 6",
+            "tích_lũy_tháng_7",
+            "tích lũy tháng 7",
+            "tích_lũy_tháng_8",
+            "tích lũy tháng 8"
+          ])
         };
 
         return resultRow;
