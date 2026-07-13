@@ -490,57 +490,79 @@ export default function App() {
     setHasUnpublishedChanges(false);
   }, [selectedTimeline.id, selectedBrand, publishedComments]);
 
-  // Load marketing data and comments from database on load
-  useEffect(() => {
-    const fetchServerData = async () => {
-      try {
-        const result = await safeFetchJson("/api/get-data");
-        if (result.success) {
-          const safeData = normalizeMarketingData(result.data);
-          setMarketingData(safeData);
-          setPastedJson(JSON.stringify(safeData, null, 2));
-          localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+  // Fetch latest database data and comments from server
+  const fetchServerData = async (isManual = false) => {
+    try {
+      const result = await safeFetchJson("/api/get-data");
+      if (result.success) {
+        const safeData = normalizeMarketingData(result.data);
+        setMarketingData(safeData);
+        setPastedJson(JSON.stringify(safeData, null, 2));
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
 
-          const serverComments = result.comments || {};
-          setPublishedComments(serverComments);
-          localStorage.setItem("marketing_published_comments", JSON.stringify(serverComments));
+        const serverComments = result.comments || {};
+        setPublishedComments(serverComments);
+        localStorage.setItem("marketing_published_comments", JSON.stringify(serverComments));
 
-          const list = getTimelines(safeData);
-          if (list.length > 0) {
-            setSelectedTimeline(list[0]);
-          }
-        } else {
-          throw new Error(result.error || "Cannot retrieve data from server");
-        }
-      } catch (err) {
-        console.error("Failed to fetch database data from server, falling back to local storage:", err);
-        const savedData = localStorage.getItem("marketing_report_raw_data");
-        if (savedData) {
-          try {
-            const parsed = JSON.parse(savedData);
-            if (parsed) {
-              const safeData = normalizeMarketingData(parsed);
-              setMarketingData(safeData);
-              setPastedJson(JSON.stringify(safeData, null, 2));
+        const list = getTimelines(safeData);
+        if (list.length > 0) {
+          setSelectedTimeline((prev) => {
+            if (prev && prev.id && list.some((t) => t.id === prev.id)) {
+              return prev;
             }
-          } catch (e) {
-            console.error("Error reading saved data fallback", e);
-          }
+            return list[0];
+          });
         }
-
-        const savedPublished = localStorage.getItem("marketing_published_comments");
-        if (savedPublished) {
-          try {
-            setPublishedComments(JSON.parse(savedPublished));
-          } catch (e) {
-            console.error("Error reading saved comments fallback", e);
+        if (isManual) {
+          triggerNotification("success", "Đã đồng bộ dữ liệu mới nhất từ máy chủ thành công!");
+        }
+      } else {
+        throw new Error(result.error || "Không thể lấy dữ liệu từ máy chủ");
+      }
+    } catch (err) {
+      console.error("Failed to fetch database data from server, falling back to local storage:", err);
+      const savedData = localStorage.getItem("marketing_report_raw_data");
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          if (parsed) {
+            const safeData = normalizeMarketingData(parsed);
+            setMarketingData(safeData);
+            setPastedJson(JSON.stringify(safeData, null, 2));
           }
+        } catch (e) {
+          console.error("Error reading saved data fallback", e);
         }
       }
-    };
 
+      const savedPublished = localStorage.getItem("marketing_published_comments");
+      if (savedPublished) {
+        try {
+          setPublishedComments(JSON.parse(savedPublished));
+        } catch (e) {
+          console.error("Error reading saved comments fallback", e);
+        }
+      }
+      if (isManual) {
+        triggerNotification("error", "Không thể kết nối máy chủ để đồng bộ dữ liệu mới nhất.");
+      }
+    }
+  };
+
+  // Load marketing data and comments from database on load
+  useEffect(() => {
     fetchServerData();
   }, []);
+
+  // Auto-sync data every 30 seconds to keep Viewer and Admin aligned
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!hasUnpublishedChanges) {
+        fetchServerData();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [hasUnpublishedChanges]);
 
   const triggerNotification = (type: "success" | "error", message: string) => {
     setNotification({ type, message });
@@ -580,6 +602,7 @@ export default function App() {
       if (foundUser.role === "Viewer") {
         setActiveTab("dashboard");
       }
+      fetchServerData();
     } else {
       setLoginError("Tên đăng nhập hoặc mật khẩu không chính xác.");
     }
@@ -2007,6 +2030,16 @@ export default function App() {
             >
               <LogOut className="h-3.5 w-3.5 text-slate-400" />
               <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
+
+            {/* Sync Button */}
+            <button
+              onClick={() => fetchServerData(true)}
+              className="no-print flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 shadow-sm transition cursor-pointer"
+              title="Đồng bộ dữ liệu mới nhất từ máy chủ"
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-slate-400" />
+              <span>Đồng bộ</span>
             </button>
 
             {/* Export PDF Button */}
