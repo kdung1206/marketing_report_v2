@@ -338,8 +338,9 @@ export function normalizeMarketingData(parsed: any): MarketingReportData {
       })
     : [];
 
-  const monthly_ooh_pr: MonthlyOohPrRow[] = Array.isArray(parsed?.monthly_ooh_pr)
-    ? parsed.monthly_ooh_pr.map((row: any) => {
+  const oohPrRaw = parsed?.monthly_ooh_pr || parsed?.["pr & ooh"] || parsed?.["pr_ooh"];
+  const monthly_ooh_pr: MonthlyOohPrRow[] = Array.isArray(oohPrRaw)
+    ? oohPrRaw.map((row: any) => {
         const rawBrand = getVal(row, ["brand"]) || "";
         const normalizedBrand = rawBrand.toString().trim().toLowerCase() === "livotec" ? "Livotec" :
                              rawBrand.toString().trim().toLowerCase() === "karofi" ? "Karofi" : rawBrand.toString().trim();
