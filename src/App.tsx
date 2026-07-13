@@ -350,9 +350,11 @@ export interface UserAccount {
 }
 
 const DEFAULT_USERS: UserAccount[] = [
-  { username: "ntkdung1206@gmail.com", password: "123", name: "Dung Nguyễn", role: "Admin" },
-  { username: "admin", password: "123krf@#digital", name: "Quản trị hệ thống", role: "Admin" },
-  { username: "viewer01", password: "krf@#digital", name: "Người Xem", role: "Viewer" },
+  { username: "ntkdung1206@gmail.com", password: "123", name: "Dũng Nguyễn", role: "Admin" },
+  { username: "admin", password: "123", name: "Quản trị hệ thống", role: "Admin" },
+  { username: "editor1", password: "123", name: "Nguyễn Biên Tập", role: "Editor" },
+  { username: "viewer1", password: "krf@#digital", name: "Người xem", role: "Viewer" },
+  { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }
 ];
 
 export interface BrandKpiTarget {
@@ -387,12 +389,28 @@ export default function App() {
   const [users, setUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem("marketing_users_list");
     if (saved) {
-      const parsed: UserAccount[] = JSON.parse(saved);
+      let parsed: UserAccount[] = JSON.parse(saved);
+      let changed = false;
+
       const hasViewer2 = parsed.some(u => u.username === "viewer2");
       if (!hasViewer2) {
-        const updated = [...parsed, { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }];
-        localStorage.setItem("marketing_users_list", JSON.stringify(updated));
-        return updated;
+        parsed = [...parsed, { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }];
+        changed = true;
+      }
+
+      // One-time credential rotation for viewer1: only touch it if it still
+      // has the original default password (i.e. no one has customized it
+      // since), so this never overwrites an intentional change.
+      parsed = parsed.map((u) => {
+        if (u.username === "viewer1" && u.password === "123") {
+          changed = true;
+          return { ...u, password: "krf@#digital", name: "Người xem" };
+        }
+        return u;
+      });
+
+      if (changed) {
+        localStorage.setItem("marketing_users_list", JSON.stringify(parsed));
       }
       return parsed;
     }
