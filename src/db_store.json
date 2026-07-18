@@ -4379,7 +4379,7 @@
       "chỉ_số_metric": "amount spent (vnđ)",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": 0,
+      "target_tháng": 0,
       "tích_lũy_tháng": 0
     },
     {
@@ -4393,7 +4393,7 @@
       "chỉ_số_metric": "impressions",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": 0,
+      "target_tháng": 0,
       "tích_lũy_tháng": 0
     },
     {
@@ -4407,7 +4407,7 @@
       "chỉ_số_metric": "reach",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": 0,
+      "target_tháng": 0,
       "tích_lũy_tháng": 0
     },
     {
@@ -4421,7 +4421,7 @@
       "chỉ_số_metric": "cpm",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": 0,
+      "target_tháng": 0,
       "tích_lũy_tháng": 0
     },
     {
@@ -4435,7 +4435,7 @@
       "chỉ_số_metric": "frequency",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": 0,
+      "target_tháng": 0,
       "tích_lũy_tháng": 0
     },
     {
@@ -4449,7 +4449,7 @@
       "chỉ_số_metric": "traffic organic",
       "mục_tiêu_target": 3100,
       "thực_tế_actual": 2489,
-      "target tháng": 16000,
+      "target_tháng": 16000,
       "tích_lũy_tháng": 5169
     },
     {
@@ -4463,7 +4463,7 @@
       "chỉ_số_metric": "impressions organic",
       "mục_tiêu_target": 126000,
       "thực_tế_actual": 104123,
-      "target tháng": 560000,
+      "target_tháng": 560000,
       "tích_lũy_tháng": 232272
     },
     {
@@ -4477,7 +4477,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4491,7 +4491,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4505,7 +4505,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4519,7 +4519,7 @@
       "chỉ_số_metric": "số lượng bài viết (single post, album post, motion, video, reels...)",
       "mục_tiêu_target": 1,
       "thực_tế_actual": 4,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4533,7 +4533,7 @@
       "chỉ_số_metric": "số lượng bài viết",
       "mục_tiêu_target": 4,
       "thực_tế_actual": 4,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4547,7 +4547,7 @@
       "chỉ_số_metric": "số lượng bài viết",
       "mục_tiêu_target": 2,
       "thực_tế_actual": 2,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4561,7 +4561,7 @@
       "chỉ_số_metric": "số lượng bài viết",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4575,7 +4575,7 @@
       "chỉ_số_metric": "số lượng bài viết",
       "mục_tiêu_target": 2,
       "thực_tế_actual": 2,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4589,7 +4589,7 @@
       "chỉ_số_metric": "số lượng trang sản phẩm",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4603,7 +4603,7 @@
       "chỉ_số_metric": "số lượng trang sản phẩm",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4617,7 +4617,7 @@
       "chỉ_số_metric": "số lượng trang sản phẩm",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4631,7 +4631,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 5,
       "thực_tế_actual": 5,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4645,7 +4645,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4659,7 +4659,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4673,7 +4673,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 1,
       "thực_tế_actual": 1,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4687,7 +4687,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4701,7 +4701,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 0,
       "thực_tế_actual": 0,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4715,7 +4715,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 20,
       "thực_tế_actual": 23,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4729,7 +4729,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 21,
       "thực_tế_actual": 21.4,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4743,7 +4743,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 45,
       "thực_tế_actual": 48.6,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4757,7 +4757,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 25,
       "thực_tế_actual": 25.7,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4771,7 +4771,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 46,
       "thực_tế_actual": 46.4,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4785,7 +4785,7 @@
       "chỉ_số_metric": "sov (thị phần thảo luận theo brand)",
       "mục_tiêu_target": null,
       "thực_tế_actual": 0.341,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4799,7 +4799,7 @@
       "chỉ_số_metric": "sov (thị phần thảo luận theo brand)",
       "mục_tiêu_target": null,
       "thực_tế_actual": 0.429,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4813,7 +4813,7 @@
       "chỉ_số_metric": "sov (thị phần thảo luận theo brand)",
       "mục_tiêu_target": null,
       "thực_tế_actual": 0.052,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4827,7 +4827,7 @@
       "chỉ_số_metric": "sov (thị phần thảo luận theo brand)",
       "mục_tiêu_target": null,
       "thực_tế_actual": 0.105,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4841,7 +4841,7 @@
       "chỉ_số_metric": "sov (thị phần thảo luận theo brand)",
       "mục_tiêu_target": null,
       "thực_tế_actual": 0.033,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4855,7 +4855,7 @@
       "chỉ_số_metric": "sov (thị phần thảo luận theo brand)",
       "mục_tiêu_target": null,
       "thực_tế_actual": 0.039999999999999925,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4869,7 +4869,7 @@
       "chỉ_số_metric": "amount spent (vnđ)",
       "mục_tiêu_target": 90000000,
       "thực_tế_actual": 2257898,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4883,7 +4883,7 @@
       "chỉ_số_metric": "impressions",
       "mục_tiêu_target": 8571429,
       "thực_tế_actual": 130532,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4897,7 +4897,7 @@
       "chỉ_số_metric": "reach",
       "mục_tiêu_target": 3726708,
       "thực_tế_actual": 111733,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4911,7 +4911,7 @@
       "chỉ_số_metric": "cpm",
       "mục_tiêu_target": 10.5,
       "thực_tế_actual": 17.3,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4925,7 +4925,7 @@
       "chỉ_số_metric": "frequency",
       "mục_tiêu_target": 2.3,
       "thực_tế_actual": 1.2,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4939,7 +4939,7 @@
       "chỉ_số_metric": "traffic organic",
       "mục_tiêu_target": 18000,
       "thực_tế_actual": 17956,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4953,7 +4953,7 @@
       "chỉ_số_metric": "impressions organic",
       "mục_tiêu_target": 500000,
       "thực_tế_actual": 535496,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4967,7 +4967,7 @@
       "chỉ_số_metric": "số lượng bài viết (single post, album post, motion, video, reels...)",
       "mục_tiêu_target": 6,
       "thực_tế_actual": 6,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4981,7 +4981,7 @@
       "chỉ_số_metric": "số lượng bài viết",
       "mục_tiêu_target": 6,
       "thực_tế_actual": 6,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -4995,7 +4995,7 @@
       "chỉ_số_metric": "số lượng bài viết",
       "mục_tiêu_target": null,
       "thực_tế_actual": null,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5009,7 +5009,7 @@
       "chỉ_số_metric": "số lượng trang sản phẩm",
       "mục_tiêu_target": null,
       "thực_tế_actual": null,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5023,7 +5023,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 3,
       "thực_tế_actual": 3,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5037,7 +5037,7 @@
       "chỉ_số_metric": "số lượng video",
       "mục_tiêu_target": 1,
       "thực_tế_actual": 1,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5051,7 +5051,7 @@
       "chỉ_số_metric": "số lượng video/ảnh",
       "mục_tiêu_target": 3,
       "thực_tế_actual": 3,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5065,7 +5065,7 @@
       "chỉ_số_metric": "số lượng bài edited",
       "mục_tiêu_target": null,
       "thực_tế_actual": null,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5079,7 +5079,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 80,
       "thực_tế_actual": 83.9,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5093,7 +5093,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 163,
       "thực_tế_actual": 163.7,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     },
     {
@@ -5107,7 +5107,7 @@
       "chỉ_số_metric": "grps",
       "mục_tiêu_target": 116.4,
       "thực_tế_actual": 111.8,
-      "target tháng": null,
+      "target_tháng": null,
       "tích_lũy_tháng": null
     }
   ],
@@ -8795,7 +8795,7 @@
           "pr": "",
           "ooh": "",
           "paid_ads": "Đạt hoặc suýt soát đạt mục tiêu chi tiêu tuần. Lượng Reach thu về trên tất cả các kênh Facebook, TikTok, Youtube của các ngành_hàng đều vượt kế hoạch tuần nhờ tối ưu tần_suất (Frequency)",
-          "seo": "Lượng Organic Traffic MTD lũy kế đạt 3,019 lượt (gần bám sát target 3,260 lượt). Lượng Organic Impressions tuần đạt 116,246 lượt (đạt 89.4% so với target tuần 130,000 lượt). Lũy kế hiển thị tháng đạt 545,828 lượt (vượt target tháng 525,000).",
+          "seo": "Lượng Organic Traffic MTD lũy kế đạt 3,019 lượt (gần bám sát target 3,260 lượt). Lượng Organic Impressions tuần đạt 116,246 lượt (đạt 89.4% so với target tuần 130,000 lượt). Lũy kế hiển thị tháng đạt 545,828 lượt (vượt target_tháng 525,000).",
           "btl_trade": "Tổng lực nghiệm thu POSM cuối tháng 6 với số lượng ấn tượng: 36 biển bảng GT, 43 quầy kệ GT, 279 ô dù mặt tiền, 492 mock up điều hòa MT và 997 mock up điều hòa GT. Hoàn thành 4 dự án nghiên cứu thị trường đúng hạn"
         }
       },
