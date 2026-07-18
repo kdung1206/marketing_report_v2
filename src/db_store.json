@@ -7832,7 +7832,6 @@
       "kế_hoạch_tháng": 3,
       "tích_lũy_tháng": 3
     }
-	}
   ],
   "monthly_ooh_pr": [
     {
@@ -8197,7 +8196,7 @@
       "chỉ_số_metric": "location",
       "mục_tiêu_target": 28,
       "thực_tế_actual": 28
-    },
+    }
   ],
   "btl_trade_monthly": [
     {
