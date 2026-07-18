@@ -353,7 +353,7 @@ const DEFAULT_USERS: UserAccount[] = [
   { username: "ntkdung1206@gmail.com", password: "123", name: "Dũng Nguyễn", role: "Admin" },
   { username: "admin", password: "123", name: "Quản trị hệ thống", role: "Admin" },
   { username: "editor1", password: "123", name: "Nguyễn Biên Tập", role: "Editor" },
-  { username: "viewer1", password: "krfdigital123", name: "Người xem", role: "Viewer" },
+  { username: "viewer1", password: "krf@#digital", name: "Người xem", role: "Viewer" },
   { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }
 ];
 
@@ -386,35 +386,31 @@ export default function App() {
     return null;
   });
   
+
+  // Bump this number any time DEFAULT_USERS credentials/roles change in code.
+  // On load, every browser reconciles its cached user list against the
+  // current DEFAULT_USERS whenever it sees a newer version — this guarantees
+  // credential fixes always take effect everywhere, even in browsers that
+  // previously cached a stale or manually-mistyped user list. Any extra
+  // accounts that aren't part of DEFAULT_USERS (e.g. added later through a
+  // user-management UI) are preserved as-is.
+  const USERS_CONFIG_VERSION = 2;
+
   const [users, setUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem("marketing_users_list");
-    if (saved) {
-      let parsed: UserAccount[] = JSON.parse(saved);
-      let changed = false;
+    const savedVersion = Number(localStorage.getItem("marketing_users_version") || "0");
+    const savedList: UserAccount[] = saved ? JSON.parse(saved) : [];
 
-      const hasViewer2 = parsed.some(u => u.username === "viewer2");
-      if (!hasViewer2) {
-        parsed = [...parsed, { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }];
-        changed = true;
-      }
-
-      // One-time credential rotation for viewer1: only touch it if it still
-      // has the original default password (i.e. no one has customized it
-      // since), so this never overwrites an intentional change.
-      parsed = parsed.map((u) => {
-        if (u.username === "viewer1" && u.password === "123") {
-          changed = true;
-          return { ...u, password: "krf@#digital", name: "Người xem" };
-        }
-        return u;
-      });
-
-      if (changed) {
-        localStorage.setItem("marketing_users_list", JSON.stringify(parsed));
-      }
-      return parsed;
+    if (!saved || savedVersion < USERS_CONFIG_VERSION) {
+      const defaultUsernames = new Set(DEFAULT_USERS.map((u) => u.username.toLowerCase()));
+      const customExtras = savedList.filter((u) => !defaultUsernames.has(u.username.toLowerCase()));
+      const reconciled = [...DEFAULT_USERS, ...customExtras];
+      localStorage.setItem("marketing_users_list", JSON.stringify(reconciled));
+      localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
+      return reconciled;
     }
-    return DEFAULT_USERS;
+
+    return savedList;
   });
 
   // Brand KPI Targets States
