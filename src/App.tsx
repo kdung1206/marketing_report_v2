@@ -18,6 +18,7 @@ import {
   githubSyncData,
   githubResetData,
 } from "./lib/githubSync";
+import { hashPassword, generateSalt, verifyPassword } from "./lib/passwordHash";
 import {
   TrendingUp,
   Award,
@@ -344,17 +345,23 @@ export function getBtlRowDataValues(row: any) {
 
 export interface UserAccount {
   username: string;
-  password: string;
+  // Passwords are never stored in plaintext (see src/lib/passwordHash.ts).
+  // `passwordHash` = SHA-256(`${salt}:${plainPassword}`), hex-encoded.
+  passwordHash: string;
+  salt: string;
   name: string;
   role: "Admin" | "Editor" | "Viewer";
 }
 
+// Precomputed with src/lib/passwordHash.ts (SHA-256 + per-user salt).
+// Plaintext passwords are intentionally NOT written anywhere in this repo
+// (it's public) — save them in your own password manager instead.
 const DEFAULT_USERS: UserAccount[] = [
-  { username: "ntkdung1206@gmail.com", password: "123", name: "Dũng Nguyễn", role: "Admin" },
-  { username: "admin", password: "123", name: "Quản trị hệ thống", role: "Admin" },
-  { username: "editor1", password: "123", name: "Nguyễn Biên Tập", role: "Editor" },
-  { username: "viewer1", password: "krf@#digital", name: "Người xem", role: "Viewer" },
-  { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }
+  { username: "ntkdung1206@gmail.com", salt: "3e83a6d1a854840d5e1af6028d17224d", passwordHash: "77bb43ffd629f0621d85cd86a0b2e55551a8c0d7eadb7c3e9c65fddb35842511", name: "Dũng Nguyễn", role: "Admin" },
+  { username: "admin", salt: "8f89341202e6b122fd50319143c90700", passwordHash: "15725c760fe8dfef6c39c3ebc343183d7a7ceb6a8a964d1d60b07b4ac2c26020", name: "Quản trị hệ thống", role: "Admin" },
+  { username: "editor1", salt: "8a7a42e05d4a245bb937ff9e038ddae5", passwordHash: "70b94d7025353a71dbdcf0250875d6a54e640be672693aa3cea56d80a12bfd7a", name: "Nguyễn Biên Tập", role: "Editor" },
+  { username: "viewer1", salt: "9891b5004f979ed95778a77d487a15fc", passwordHash: "7fdc2efb593acbeb57e98d555a3fdce244f547a5a73fa13df66ad61678e2c7b9", name: "Người xem", role: "Viewer" },
+  { username: "viewer2", salt: "1bc2d4bf855a868da0e6b85fe199bdc6", passwordHash: "a1d752a1b080a097507451db46a0d1fb1581ac9a7d3317c05af4b326123de5be", name: "Viewer 2", role: "Viewer" }
 ];
 
 export interface BrandKpiTarget {
@@ -394,7 +401,7 @@ export default function App() {
   // previously cached a stale or manually-mistyped user list. Any extra
   // accounts that aren't part of DEFAULT_USERS (e.g. added later through a
   // user-management UI) are preserved as-is.
-  const USERS_CONFIG_VERSION = 2;
+  const USERS_CONFIG_VERSION = 3; // v3: switched from plaintext `password` to salted `passwordHash`
 
   const [users, setUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem("marketing_users_list");
@@ -403,7 +410,9 @@ export default function App() {
 
     if (!saved || savedVersion < USERS_CONFIG_VERSION) {
       const defaultUsernames = new Set(DEFAULT_USERS.map((u) => u.username.toLowerCase()));
-      const customExtras = savedList.filter((u) => !defaultUsernames.has(u.username.toLowerCase()));
+      const customExtras = savedList.filter(
+        (u: any) => !defaultUsernames.has((u.username || "").toLowerCase()) && typeof u.passwordHash === "string" && typeof u.salt === "string"
+      );
       const reconciled = [...DEFAULT_USERS, ...customExtras];
       localStorage.setItem("marketing_users_list", JSON.stringify(reconciled));
       localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
@@ -896,7 +905,7 @@ export default function App() {
   }, [brandKpis]);
 
   // Login handler
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
 
@@ -905,9 +914,9 @@ export default function App() {
       return;
     }
 
-    const foundUser = users.find(
-      (u) => u.username.toLowerCase() === loginUsername.trim().toLowerCase() && u.password === loginPassword
-    );
+    const candidate = users.find((u) => u.username.toLowerCase() === loginUsername.trim().toLowerCase());
+    const passwordMatches = candidate ? await verifyPassword(loginPassword, candidate.salt, candidate.passwordHash) : false;
+    const foundUser = passwordMatches ? candidate : undefined;
 
     if (foundUser) {
       setCurrentUser(foundUser);
@@ -932,25 +941,33 @@ export default function App() {
   };
 
   // User management handlers
-  const handleAddOrEditUser = (e: React.FormEvent) => {
+  const handleAddOrEditUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!managerUsername.trim() || !managerName.trim() || !managerPassword) {
+    if (!managerUsername.trim() || !managerName.trim() || (!editingUsername && !managerPassword)) {
       triggerNotification("error", "Vui lòng điền đầy đủ các thông tin người dùng.");
       return;
     }
 
     if (editingUsername) {
-      // Editing mode
+      // Editing mode. Leave managerPassword blank to keep the current
+      // password unchanged; type a new one to rotate it.
+      let salt: string | null = null;
+      let passwordHash: string | null = null;
+      if (managerPassword) {
+        salt = generateSalt();
+        passwordHash = await hashPassword(managerPassword, salt);
+      }
+
       setUsers(
         users.map((u) =>
           u.username.toLowerCase() === editingUsername.toLowerCase()
-            ? { ...u, name: managerName.trim(), password: managerPassword, role: managerRole }
+            ? { ...u, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) }
             : u
         )
       );
 
       if (currentUser && currentUser.username.toLowerCase() === editingUsername.toLowerCase()) {
-        const updatedSelf = { ...currentUser, name: managerName.trim(), password: managerPassword, role: managerRole };
+        const updatedSelf = { ...currentUser, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) };
         setCurrentUser(updatedSelf);
         localStorage.setItem("marketing_current_user", JSON.stringify(updatedSelf));
       }
@@ -965,9 +982,12 @@ export default function App() {
         return;
       }
 
+      const salt = generateSalt();
+      const passwordHash = await hashPassword(managerPassword, salt);
       const newUser: UserAccount = {
         username: managerUsername.trim().toLowerCase(),
-        password: managerPassword,
+        passwordHash,
+        salt,
         name: managerName.trim(),
         role: managerRole,
       };
@@ -985,7 +1005,7 @@ export default function App() {
   const handleStartEditUser = (u: UserAccount) => {
     setEditingUsername(u.username);
     setManagerUsername(u.username);
-    setManagerPassword(u.password);
+    setManagerPassword(""); // never pre-fill; a hash can't be reversed into a password
     setManagerName(u.name);
     setManagerRole(u.role);
   };
