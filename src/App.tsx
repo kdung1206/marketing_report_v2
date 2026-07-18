@@ -353,7 +353,7 @@ const DEFAULT_USERS: UserAccount[] = [
   { username: "ntkdung1206@gmail.com", password: "123", name: "Dũng Nguyễn", role: "Admin" },
   { username: "admin", password: "123", name: "Quản trị hệ thống", role: "Admin" },
   { username: "editor1", password: "123", name: "Nguyễn Biên Tập", role: "Editor" },
-  { username: "viewer1", password: "krf@#digital", name: "Người xem", role: "Viewer" },
+  { username: "viewer1", password: "krf#digital", name: "Người xem", role: "Viewer" },
   { username: "viewer2", password: "123", name: "Viewer 2", role: "Viewer" }
 ];
 
