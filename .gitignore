@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Live report data now lives in Supabase, not in the repo (see
+# scripts/migrate-to-supabase.ts for the one-time import of this file's data).
+src/db_store.json

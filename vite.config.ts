@@ -6,7 +6,8 @@ import {defineConfig} from 'vite';
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
-    base: '/marketing_report_v2/',
+    // Vercel serves the app from the domain root (no GitHub Pages subpath anymore).
+    base: '/',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

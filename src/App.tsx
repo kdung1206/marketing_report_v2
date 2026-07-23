@@ -9,15 +9,6 @@ import {
   normalizeMarketingData,
 } from "./data";
 import { exportToExcel, exportToJSON } from "./lib/export";
-import {
-  isGithubSyncConfigured,
-  githubGetData,
-  githubSaveActiveState,
-  githubSaveComments,
-  githubSaveRawData,
-  githubSyncData,
-  githubResetData,
-} from "./lib/githubSync";
 import { hashPassword, generateSalt, verifyPassword } from "./lib/passwordHash";
 import {
   TrendingUp,
@@ -73,52 +64,14 @@ import {
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
-// When the Express backend isn't reachable (most notably on the static
-// GitHub Pages deployment, which cannot run a server at all), fall back to
-// reading/writing the shared database file directly on GitHub instead of
-// silently going local-only. See src/lib/githubSync.ts for details.
-async function githubFallback(url: string, options?: RequestInit) {
-  const body = options?.body ? JSON.parse(options.body as string) : {};
-  switch (url) {
-    case "/api/get-data":
-      return githubGetData();
-    case "/api/save-active-state":
-      return githubSaveActiveState(body.selectedBrand, body.selectedTimelineId, body.activeCategoryTab);
-    case "/api/save-comments":
-      return githubSaveComments(body.week, body.comments);
-    case "/api/save-raw-data":
-      return githubSaveRawData(body.data);
-    case "/api/sync-data":
-      return githubSyncData(body.newData);
-    case "/api/reset-data":
-      return githubResetData();
-    default:
-      // Endpoints that need a real server-side secret (Gemini analysis,
-      // mail config, Google Drive fetch) have no GitHub equivalent.
-      throw new Error(`Máy chủ không khả dụng và endpoint "${url}" không hỗ trợ đồng bộ qua GitHub.`);
-  }
-}
-
 async function safeFetchJson(url: string, options?: RequestInit) {
-  // Dynamically detect base path from window.location.pathname instead of relying solely on hardcoded build-time BASE_URL
-  const hasBasePrefix = window.location.pathname.includes("/marketing_report_v2");
-  const prefix = hasBasePrefix ? "/marketing_report_v2" : "";
-  const targetUrl = url.startsWith("/api") ? `${prefix}${url}` : url;
-
-  try {
-    const response = await fetch(targetUrl, options);
-    const text = await response.text();
-    const trimmed = text.trim();
-    if (trimmed.startsWith("<") || !response.ok) {
-      throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
-    }
-    return JSON.parse(text);
-  } catch (err) {
-    if (url.startsWith("/api") && isGithubSyncConfigured()) {
-      return await githubFallback(url, options);
-    }
-    throw err;
+  const response = await fetch(url, options);
+  const text = await response.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<") || !response.ok) {
+    throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
   }
+  return JSON.parse(text);
 }
 
 export function getTimelines(marketingData: MarketingReportData) {
@@ -364,6 +317,24 @@ const DEFAULT_USERS: UserAccount[] = [
   { username: "viewer2", salt: "1bc2d4bf855a868da0e6b85fe199bdc6", passwordHash: "a1d752a1b080a097507451db46a0d1fb1581ac9a7d3317c05af4b326123de5be", name: "Viewer 2", role: "Viewer" }
 ];
 
+// Bump this number any time DEFAULT_USERS credentials/roles change in code.
+// Every browser reconciles the shared user list against the current
+// DEFAULT_USERS whenever it sees a newer version — this guarantees credential
+// fixes always take effect everywhere. Any extra accounts that aren't part of
+// DEFAULT_USERS (added later through the user-management UI) are preserved as-is.
+const USERS_CONFIG_VERSION = 3; // v3: switched from plaintext `password` to salted `passwordHash`
+
+function reconcileUsers(savedList: UserAccount[], savedVersion: number): UserAccount[] {
+  if (savedVersion >= USERS_CONFIG_VERSION) {
+    return savedList;
+  }
+  const defaultUsernames = new Set(DEFAULT_USERS.map((u) => u.username.toLowerCase()));
+  const customExtras = savedList.filter(
+    (u: any) => !defaultUsernames.has((u.username || "").toLowerCase()) && typeof u.passwordHash === "string" && typeof u.salt === "string"
+  );
+  return [...DEFAULT_USERS, ...customExtras];
+}
+
 export interface BrandKpiTarget {
   id: string;
   brandName: string;
@@ -394,32 +365,19 @@ export default function App() {
   });
   
 
-  // Bump this number any time DEFAULT_USERS credentials/roles change in code.
-  // On load, every browser reconciles its cached user list against the
-  // current DEFAULT_USERS whenever it sees a newer version — this guarantees
-  // credential fixes always take effect everywhere, even in browsers that
-  // previously cached a stale or manually-mistyped user list. Any extra
-  // accounts that aren't part of DEFAULT_USERS (e.g. added later through a
-  // user-management UI) are preserved as-is.
-  const USERS_CONFIG_VERSION = 3; // v3: switched from plaintext `password` to salted `passwordHash`
-
+  // Local cache for instant paint; the real source of truth is the server
+  // (/api/get-users), fetched right after mount and re-polled alongside the
+  // marketing data below — see fetchServerUsers.
   const [users, setUsers] = useState<UserAccount[]>(() => {
     const saved = localStorage.getItem("marketing_users_list");
     const savedVersion = Number(localStorage.getItem("marketing_users_version") || "0");
     const savedList: UserAccount[] = saved ? JSON.parse(saved) : [];
-
-    if (!saved || savedVersion < USERS_CONFIG_VERSION) {
-      const defaultUsernames = new Set(DEFAULT_USERS.map((u) => u.username.toLowerCase()));
-      const customExtras = savedList.filter(
-        (u: any) => !defaultUsernames.has((u.username || "").toLowerCase()) && typeof u.passwordHash === "string" && typeof u.salt === "string"
-      );
-      const reconciled = [...DEFAULT_USERS, ...customExtras];
+    const reconciled = reconcileUsers(savedList, saved ? savedVersion : -1);
+    if (!saved || reconciled !== savedList) {
       localStorage.setItem("marketing_users_list", JSON.stringify(reconciled));
       localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
-      return reconciled;
     }
-
-    return savedList;
+    return reconciled;
   });
 
   // Brand KPI Targets States
@@ -744,7 +702,7 @@ export default function App() {
         } else if (e.key === "marketing_brand_kpis") {
           setBrandKpis(JSON.parse(e.newValue));
         } else if (e.key === "marketing_users_list") {
-          setUsers(JSON.parse(e.newValue));
+          setUsers(reconcileUsers(JSON.parse(e.newValue), -1));
         } else if (e.key === "marketing_selected_brand") {
           const isViewer = !currentUser || currentUser.role === "Viewer";
           if (isViewer && (e.newValue === "Livotec" || e.newValue === "Karofi")) {
@@ -857,32 +815,66 @@ export default function App() {
         }
       }
       if (isManual) {
-        const isStaticOrOffline = window.location.hostname.includes("github.io") || 
-                                  window.location.hostname.includes("github.com") ||
-                                  (err && err instanceof Error && err.message.includes("JSON/HTML response"));
-        if (isStaticOrOffline) {
-          triggerNotification("success", "Đã đồng bộ cục bộ! Bạn đang xem báo cáo trực tiếp trên GitHub Pages (Dữ liệu ngoại tuyến được lưu trữ an toàn trong trình duyệt).");
-        } else {
-          triggerNotification("error", "Không thể kết nối máy chủ để đồng bộ dữ liệu mới nhất.");
-        }
+        triggerNotification("error", "Không thể kết nối máy chủ để đồng bộ dữ liệu mới nhất. Dữ liệu ngoại tuyến được lưu trữ an toàn trong trình duyệt.");
       }
     }
   };
 
-  // Load marketing data and comments from database on load
+  // Persist a user list change to the server so every browser (not just the
+  // one that made the change) sees new/edited/deleted accounts. Also updates
+  // the local cache immediately for a fast, offline-tolerant UI.
+  const persistUsersToServer = async (list: UserAccount[]) => {
+    localStorage.setItem("marketing_users_list", JSON.stringify(list));
+    localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
+    try {
+      await safeFetchJson("/api/save-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ users: list }),
+      });
+    } catch (err) {
+      console.error("Failed to persist users to server, kept in local cache only:", err);
+    }
+  };
+
+  // Fetch the shared account list from the server. This is what makes an
+  // account Admin adds/edits/removes visible to every other browser, instead
+  // of only living in that Admin's own localStorage.
+  const fetchServerUsers = async () => {
+    try {
+      const result = await safeFetchJson("/api/get-users");
+      if (!result.success) return;
+      const serverUsers: UserAccount[] = Array.isArray(result.users) ? result.users : [];
+      const reconciled = reconcileUsers(serverUsers, -1);
+      setUsers(reconciled);
+      localStorage.setItem("marketing_users_list", JSON.stringify(reconciled));
+      localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
+      // First run (server had no users yet) or DEFAULT_USERS changed since the
+      // last push: write the reconciled list back so the server catches up.
+      if (JSON.stringify(reconciled) !== JSON.stringify(serverUsers)) {
+        await persistUsersToServer(reconciled);
+      }
+    } catch (err) {
+      console.error("Failed to fetch users from server, using local cache:", err);
+    }
+  };
+
+  // Load marketing data, comments and the shared account list on mount
   useEffect(() => {
     fetchServerData();
+    fetchServerUsers();
   }, []);
 
   // Auto-sync data to keep Viewer and Admin aligned (faster polling for Viewers to follow Admin live)
   useEffect(() => {
     const isViewer = !currentUser || currentUser.role === "Viewer";
     const delay = isViewer ? 4000 : 30000; // 4 seconds for Viewer to react rapidly to Admin presentation, 30 seconds for Admin
-    
+
     const interval = setInterval(() => {
       if (!hasUnpublishedChanges) {
         fetchServerData();
       }
+      fetchServerUsers();
     }, delay);
     return () => clearInterval(interval);
   }, [hasUnpublishedChanges, currentUser, selectedBrand, selectedTimeline?.id, activeCategoryTab]);
@@ -893,11 +885,6 @@ export default function App() {
       setNotification(null);
     }, 5000);
   };
-
-  // Persist users to localStorage
-  useEffect(() => {
-    localStorage.setItem("marketing_users_list", JSON.stringify(users));
-  }, [users]);
 
   // Persist brandKpis to localStorage
   useEffect(() => {
@@ -958,13 +945,13 @@ export default function App() {
         passwordHash = await hashPassword(managerPassword, salt);
       }
 
-      setUsers(
-        users.map((u) =>
-          u.username.toLowerCase() === editingUsername.toLowerCase()
-            ? { ...u, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) }
-            : u
-        )
+      const updatedUsers = users.map((u) =>
+        u.username.toLowerCase() === editingUsername.toLowerCase()
+          ? { ...u, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) }
+          : u
       );
+      setUsers(updatedUsers);
+      await persistUsersToServer(updatedUsers);
 
       if (currentUser && currentUser.username.toLowerCase() === editingUsername.toLowerCase()) {
         const updatedSelf = { ...currentUser, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) };
@@ -992,7 +979,9 @@ export default function App() {
         role: managerRole,
       };
 
-      setUsers([...users, newUser]);
+      const updatedUsers = [...users, newUser];
+      setUsers(updatedUsers);
+      await persistUsersToServer(updatedUsers);
       triggerNotification("success", `Đã thêm thành viên mới: ${managerName} (${managerRole})!`);
     }
 
@@ -1010,14 +999,16 @@ export default function App() {
     setManagerRole(u.role);
   };
 
-  const handleDeleteUser = (usernameToDelete: string) => {
+  const handleDeleteUser = async (usernameToDelete: string) => {
     if (currentUser && currentUser.username.toLowerCase() === usernameToDelete.toLowerCase()) {
       triggerNotification("error", "Bạn không thể tự xóa chính mình khi đang đăng nhập.");
       return;
     }
 
     if (window.confirm(`Bạn có chắc chắn muốn xóa tài khoản ${usernameToDelete} khỏi hệ thống?`)) {
-      setUsers(users.filter((u) => u.username.toLowerCase() !== usernameToDelete.toLowerCase()));
+      const updatedUsers = users.filter((u) => u.username.toLowerCase() !== usernameToDelete.toLowerCase());
+      setUsers(updatedUsers);
+      await persistUsersToServer(updatedUsers);
       triggerNotification("success", `Đã xóa tài khoản ${usernameToDelete} thành công.`);
 
       if (editingUsername && editingUsername.toLowerCase() === usernameToDelete.toLowerCase()) {
@@ -4562,6 +4553,165 @@ export default function App() {
                             </>
                           );
                         })()}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Section 5: User & Account Management (Only Admin) */}
+            {currentUser && currentUser.role === "Admin" && (
+              <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      Quản Lý Người Dùng & Phân Quyền
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Thêm, sửa hoặc xóa tài khoản Admin/Editor/Viewer. Thay đổi được đồng bộ ngay cho mọi trình duyệt.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-12 items-start">
+                  {/* Add / Edit form */}
+                  <form onSubmit={handleAddOrEditUser} className="lg:col-span-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      {editingUsername ? `Sửa tài khoản: ${editingUsername}` : "Thêm tài khoản mới"}
+                    </h4>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600">Tên đăng nhập</label>
+                      <input
+                        type="text"
+                        value={managerUsername}
+                        onChange={(e) => setManagerUsername(e.target.value)}
+                        disabled={!!editingUsername}
+                        placeholder="vd: viewer3 hoặc email"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-inner focus:border-indigo-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600">Họ và tên hiển thị</label>
+                      <input
+                        type="text"
+                        value={managerName}
+                        onChange={(e) => setManagerName(e.target.value)}
+                        placeholder="vd: Nguyễn Văn A"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-inner focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600">
+                        Mật khẩu {editingUsername && <span className="font-normal text-slate-400">(để trống nếu không đổi)</span>}
+                      </label>
+                      <input
+                        type="password"
+                        value={managerPassword}
+                        onChange={(e) => setManagerPassword(e.target.value)}
+                        placeholder={editingUsername ? "••••••••" : "Nhập mật khẩu"}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-inner focus:border-indigo-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600">Vai trò</label>
+                      <select
+                        value={managerRole}
+                        onChange={(e) => setManagerRole(e.target.value as "Admin" | "Editor" | "Viewer")}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs shadow-inner focus:border-indigo-500 focus:outline-none bg-white"
+                      >
+                        <option value="Admin">Admin (Toàn quyền)</option>
+                        <option value="Editor">Editor (Biên tập)</option>
+                        <option value="Viewer">Viewer (Chỉ xem)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="submit"
+                        className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 shadow-sm transition"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        {editingUsername ? "Lưu thay đổi" : "Thêm tài khoản"}
+                      </button>
+                      {editingUsername && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingUsername(null);
+                            setManagerUsername("");
+                            setManagerPassword("");
+                            setManagerName("");
+                            setManagerRole("Viewer");
+                          }}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                        >
+                          Hủy
+                        </button>
+                      )}
+                    </div>
+                  </form>
+
+                  {/* User list */}
+                  <div className="lg:col-span-8 rounded-xl border border-slate-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-bold uppercase tracking-wider">Tên đăng nhập</th>
+                          <th className="px-3 py-2 text-left font-bold uppercase tracking-wider">Họ và tên</th>
+                          <th className="px-3 py-2 text-left font-bold uppercase tracking-wider">Vai trò</th>
+                          <th className="px-3 py-2 text-right font-bold uppercase tracking-wider">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {users.map((u) => (
+                          <tr key={u.username} className="hover:bg-slate-50/70">
+                            <td className="px-3 py-2 font-mono text-slate-700">{u.username}</td>
+                            <td className="px-3 py-2 text-slate-700">{u.name}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                  u.role === "Admin"
+                                    ? "bg-rose-50 text-rose-600 border border-rose-200"
+                                    : u.role === "Editor"
+                                    ? "bg-indigo-50 text-indigo-600 border border-indigo-200"
+                                    : "bg-slate-100 text-slate-500 border border-slate-200"
+                                }`}
+                              >
+                                {u.role === "Admin" ? <Shield className="h-3 w-3" /> : u.role === "Editor" ? <UserCheck className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                {u.role}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditUser(u)}
+                                  title="Sửa tài khoản"
+                                  className="flex items-center justify-center h-7 w-7 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition"
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(u.username)}
+                                  disabled={currentUser?.username.toLowerCase() === u.username.toLowerCase()}
+                                  title="Xóa tài khoản"
+                                  className="flex items-center justify-center h-7 w-7 rounded-lg border border-rose-200 bg-white text-rose-500 hover:bg-rose-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                       </tbody>
                     </table>
                   </div>

@@ -19,41 +19,62 @@ View your app in AI Studio: https://ai.studio/apps/343fafab-6b69-41e6-8e2a-c767c
 3. Run the app:
    `npm run dev`
 
-## Đồng bộ dữ liệu qua GitHub (cho bản deploy trên GitHub Pages)
+## Deploy: Vercel + Supabase
 
-GitHub Pages chỉ phục vụ file tĩnh — nó **không chạy được `server.ts`**. Vì vậy khi
-xem bản deploy trên GitHub Pages, mọi lời gọi tới server (`/api/get-data`,
-`/api/save-raw-data`...) sẽ thất bại, và app sẽ tự động chuyển sang đọc/ghi
-trực tiếp file `src/db_store.json` **trong chính repo GitHub này** thông qua
-GitHub Contents API. Nhờ vậy Admin/Editor sửa dữ liệu ở đâu, Viewer ở nơi
-khác cũng sẽ nhận được sau vài giây (nhờ cơ chế polling có sẵn của app).
+Bản deploy trước dùng GitHub Pages (thuần static) nên không chạy được
+`server.ts`, và phải "chữa cháy" bằng cách ghi thẳng `src/db_store.json` lên
+chính repo GitHub qua Contents API (token lộ trong bundle JS, dữ liệu công
+khai cho bất kỳ ai có link repo). Cách deploy hiện tại thay thế hoàn toàn cơ
+chế đó bằng:
 
-Để bật tính năng này:
+- **Vercel**: chạy `src/server/app.ts` (chứa toàn bộ route `/api/*`) dưới
+  dạng Serverless Function (`api/index.ts`), nên `/api/get-data`,
+  `/api/save-raw-data`... luôn hoạt động thật — không còn fallback nào cần
+  thiết nữa.
+- **Supabase (Postgres)**: là nơi lưu dữ liệu thật (bảng `app_state`), vì
+  filesystem của Vercel Serverless Function không giữ được dữ liệu qua các
+  lần gọi/deploy khác nhau. Đây là bước bắt buộc đi kèm — deploy lên Vercel
+  mà không đổi chỗ lưu trữ thì dữ liệu ghi vào sẽ mất ngay lập tức.
 
-1. Tạo một **Fine-grained Personal Access Token** tại
-   https://github.com/settings/personal-access-tokens/new
-   - **Repository access**: chỉ chọn repo `marketing_report_v2` này (không chọn "All repositories")
-   - **Permissions**: chỉ cấp `Contents: Read and write` — không cấp thêm quyền nào khác
-2. Thêm vào `.env.local` (không commit file này lên Git):
-   ```
-   VITE_GITHUB_OWNER=kdung1206
-   VITE_GITHUB_REPO=marketing_report_v2
-   VITE_GITHUB_BRANCH=main
-   VITE_GITHUB_TOKEN=<token vừa tạo>
-   ```
-3. Khi build & deploy qua GitHub Actions (`.github/workflows/static.yml`),
-   thêm các biến trên vào **Settings → Secrets and variables → Actions**
-   của repo, rồi khai báo chúng trong bước build của workflow (dạng
-   `env:` với `${{ secrets.VITE_GITHUB_TOKEN }}` v.v.) để giá trị được
-   nhúng vào bản build tĩnh.
+### 1. Tạo bảng trong Supabase
 
-⚠️ **Lưu ý bảo mật quan trọng**: vì GitHub Pages không có server để giữ bí
-mật, token này **sẽ nằm trong file JS công khai** sau khi build (ai mở dev
-tools cũng xem được). Giới hạn token đúng như hướng dẫn ở bước 1 (chỉ 1 repo,
-chỉ quyền Contents) để nếu bị lộ, thiệt hại chỉ giới hạn ở việc ai đó có thể
-commit vào đúng repo báo cáo này — không ảnh hưởng tài khoản GitHub hay các
-repo khác của bạn. Nên đổi token định kỳ.
+Vào **Supabase Dashboard → SQL Editor → New query**, dán và chạy nội dung
+file [supabase/schema.sql](supabase/schema.sql).
 
-Mỗi lần lưu dữ liệu qua đường này sẽ tạo một commit mới (kèm `[skip ci]`
-trong nội dung commit để không kích hoạt lại quy trình build/deploy mỗi lần
-lưu dữ liệu).
+### 2. Cấu hình biến môi trường
+
+Lấy `Project URL` và `service_role` key tại **Project Settings → API**, rồi
+thêm vào `.env.local` (không commit file này):
+
+```
+SUPABASE_URL=<project url>
+SUPABASE_SERVICE_ROLE_KEY=<service role key>
+```
+
+⚠️ Đây là 2 biến **phía server** (không có tiền tố `VITE_`), nên không bao
+giờ bị nhúng vào file JS công khai. Tuyệt đối không đặt `service_role` key
+vào biến `VITE_*` — làm vậy sẽ lộ toàn quyền đọc/ghi database ra trình
+duyệt.
+
+### 3. Di chuyển dữ liệu hiện có (chạy một lần)
+
+```
+npm run migrate:supabase
+```
+
+Lệnh này đọc `src/db_store.json` (dữ liệu báo cáo hiện tại) và ghi vào bảng
+`app_state` trên Supabase. Sau bước này, `src/db_store.json` không còn được
+dùng nữa (đã được thêm vào `.gitignore`).
+
+### 4. Deploy lên Vercel
+
+1. Import repo này vào Vercel (New Project → chọn repo).
+2. Ở phần **Environment Variables**, khai báo: `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `ENCRYPTION_KEY`, và các
+   biến SMTP nếu dùng — tất cả đều là biến server, không cần tiền tố `VITE_`.
+3. Vercel tự nhận diện `vercel.json` (build bằng `vite build`, route
+   `/api/*` vào serverless function `api/index.ts`) — không cần chỉnh gì
+   thêm.
+4. Deploy. Từ giờ Admin sửa dữ liệu ở đâu, Viewer ở máy khác cũng thấy sau
+   vài giây (nhờ cơ chế polling có sẵn của app), vì cả hai đều đọc/ghi cùng
+   một Supabase, không phụ thuộc trình duyệt hay repo GitHub nữa.
