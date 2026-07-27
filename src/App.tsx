@@ -389,6 +389,9 @@ export default function App() {
   const [dbActiveTab, setDbActiveTab] = useState<"digital" | "kol" | "btl" | "ooh">("digital");
   const [dbSearchQuery, setDbSearchQuery] = useState("");
   const [dbBrandFilter, setDbBrandFilter] = useState<"Tất cả" | "Livotec" | "Karofi">("Tất cả");
+  // "Tất cả" = no filter. Otherwise a raw value from the tab's own week/month
+  // field (row.week for digital/kol/btl, row.tháng_báo_cáo for ooh).
+  const [dbWeekFilter, setDbWeekFilter] = useState<string>("Tất cả");
   const [dbEditingRowIndex, setDbEditingRowIndex] = useState<number | null>(null);
   const [dbEditingRowData, setDbEditingRowData] = useState<any | null>(null);
   const [dbPage, setDbPage] = useState(1);
@@ -1294,6 +1297,11 @@ export default function App() {
     }
   };
 
+  // "ooh" rows carry a report month (row.tháng_báo_cáo, ISO "YYYY-MM-DD")
+  // instead of a week — every other tab uses row.week.
+  const getDbPeriodField = (): "week" | "tháng_báo_cáo" => (dbActiveTab === "ooh" ? "tháng_báo_cáo" : "week");
+  const getDbPeriodLabel = () => (dbActiveTab === "ooh" ? "Tháng" : "Tuần");
+
   // Filtering/pagination for the database manager table, shared by the
   // header (select-all checkbox needs to know which rows are on this page)
   // and the body — previously this was computed inline only inside the body.
@@ -1309,6 +1317,21 @@ export default function App() {
       activeDbRows = marketingData.monthly_ooh_pr || [];
     }
 
+    const periodField = getDbPeriodField();
+    // Options always come from every row in the tab (not the already-filtered
+    // list) so picking a week/month never removes other options from the
+    // dropdown itself — only narrows the table rows.
+    const periodOptions = Array.from(
+      new Set(activeDbRows.map((r) => r[periodField]).filter((v): v is string => !!v))
+    ).sort((a, b) => {
+      if (periodField === "week") {
+        const da = getEndOfWeekDate(a);
+        const db = getEndOfWeekDate(b);
+        return new Date(db.year, db.month - 1, db.day).getTime() - new Date(da.year, da.month - 1, da.day).getTime();
+      }
+      return b.localeCompare(a); // ISO "YYYY-MM-DD" sorts correctly as a string; descending = latest first
+    });
+
     const mappedDbRows = activeDbRows.map((row, originalIndex) => ({ row, originalIndex }));
 
     const filteredMappedRows = mappedDbRows.filter(({ row }) => {
@@ -1316,6 +1339,9 @@ export default function App() {
         if (!row.brand || row.brand.toLowerCase() !== dbBrandFilter.toLowerCase()) {
           return false;
         }
+      }
+      if (dbWeekFilter !== "Tất cả" && row[periodField] !== dbWeekFilter) {
+        return false;
       }
       if (dbSearchQuery.trim()) {
         const query = dbSearchQuery.toLowerCase();
@@ -1333,7 +1359,7 @@ export default function App() {
     const startIndex = (safeDbPage - 1) * dbLimit;
     const paginatedDbRows = filteredMappedRows.slice(startIndex, startIndex + dbLimit);
 
-    return { totalDbRows, totalDbPages, safeDbPage, startIndex, paginatedDbRows };
+    return { totalDbRows, totalDbPages, safeDbPage, startIndex, paginatedDbRows, periodOptions };
   };
 
   // Client-side fallback merge helper matching the server-side sync logic
@@ -4291,6 +4317,7 @@ export default function App() {
                         setDbPage(1);
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
+                        setDbWeekFilter("Tất cả");
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "digital" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4305,6 +4332,7 @@ export default function App() {
                         setDbPage(1);
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
+                        setDbWeekFilter("Tất cả");
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "kol" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4319,6 +4347,7 @@ export default function App() {
                         setDbPage(1);
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
+                        setDbWeekFilter("Tất cả");
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "btl" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4333,6 +4362,7 @@ export default function App() {
                         setDbPage(1);
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
+                        setDbWeekFilter("Tất cả");
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "ooh" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4344,34 +4374,85 @@ export default function App() {
                 </div>
 
                 {/* Filter & Search Bar */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex-1 min-w-[200px]">
-                    <input
-                      type="text"
-                      value={dbSearchQuery}
-                      onChange={(e) => {
-                        setDbSearchQuery(e.target.value);
-                        setDbPage(1);
-                      }}
-                      placeholder="Tìm kiếm dòng dữ liệu trong bảng này..."
-                      className="w-full rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <select
-                      value={dbBrandFilter}
-                      onChange={(e) => {
-                        setDbBrandFilter(e.target.value as any);
-                        setDbPage(1);
-                      }}
-                      className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
-                    >
-                      <option value="Tất cả">Tất cả nhãn hàng</option>
-                      <option value="Livotec">Livotec</option>
-                      <option value="Karofi">Karofi</option>
-                    </select>
-                  </div>
-                </div>
+                {(() => {
+                  const { periodOptions, totalDbRows } = getDbTableView();
+                  const periodLabel = getDbPeriodLabel();
+                  const hasActiveFilter = dbSearchQuery.trim() !== "" || dbBrandFilter !== "Tất cả" || dbWeekFilter !== "Tất cả";
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex-1 min-w-[200px]">
+                          <input
+                            type="text"
+                            value={dbSearchQuery}
+                            onChange={(e) => {
+                              setDbSearchQuery(e.target.value);
+                              setDbPage(1);
+                            }}
+                            placeholder="Tìm kiếm dòng dữ liệu trong bảng này..."
+                            className="w-full rounded border border-slate-300 px-3 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          <select
+                            value={dbWeekFilter}
+                            onChange={(e) => {
+                              setDbWeekFilter(e.target.value);
+                              setDbPage(1);
+                            }}
+                            className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none max-w-[220px]"
+                          >
+                            <option value="Tất cả">Tất cả các {periodLabel === "Tháng" ? "tháng" : "tuần"}</option>
+                            {periodOptions.map((opt) => {
+                              // "tháng_báo_cáo" is an ISO date ("YYYY-MM-DD") — show it as "Tháng M/YYYY"
+                              // instead of the raw string. Week values are already human-readable.
+                              const display =
+                                periodLabel === "Tháng" && /^\d{4}-\d{2}-\d{2}$/.test(opt)
+                                  ? `Tháng ${Number(opt.slice(5, 7))}/${opt.slice(0, 4)}`
+                                  : `${periodLabel} ${opt}`;
+                              return (
+                                <option key={opt} value={opt}>
+                                  {display}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <select
+                            value={dbBrandFilter}
+                            onChange={(e) => {
+                              setDbBrandFilter(e.target.value as any);
+                              setDbPage(1);
+                            }}
+                            className="rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800 bg-white focus:border-indigo-500 focus:outline-none"
+                          >
+                            <option value="Tất cả">Tất cả nhãn hàng</option>
+                            <option value="Livotec">Livotec</option>
+                            <option value="Karofi">Karofi</option>
+                          </select>
+                          {hasActiveFilter && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDbSearchQuery("");
+                                setDbBrandFilter("Tất cả");
+                                setDbWeekFilter("Tất cả");
+                                setDbPage(1);
+                              }}
+                              className="rounded border border-slate-300 px-2.5 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-100 cursor-pointer whitespace-nowrap"
+                            >
+                              Xóa bộ lọc
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {hasActiveFilter && (
+                        <p className="text-[11px] text-slate-400">
+                          Đang lọc: {totalDbRows} dòng khớp
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Interactive Edit Panel */}
                 {dbEditingRowIndex !== null && dbEditingRowData && (
