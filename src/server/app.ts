@@ -663,7 +663,13 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
     // 4. Save the fully merged and normalized dataset back to Supabase
     await saveDatabaseData(mergedData);
 
-    return res.json({ success: true, data: mergedData });
+    // The response only needs the report fields the client actually reads
+    // (digital_marketing/kol_koc/.../comments) — `users` (password hashes +
+    // salts) and `mail_config` (decrypted SMTP password) must never be echoed
+    // back here, unlike the full `mergedData` that gets persisted above.
+    const { users: _omitUsers, mail_config: _omitMailConfig, ...responseData } = mergedData;
+
+    return res.json({ success: true, data: responseData });
   } catch (err: any) {
     console.error("POST /api/sync-data error:", err);
     return res.status(500).json({ error: `Lỗi đồng bộ hóa dữ liệu vào DB: ${err.message}` });

@@ -92,7 +92,13 @@ async function safeFetchJson(url: string, options?: RequestInit) {
     window.dispatchEvent(new Event("auth:expired"));
   }
   if (trimmed.startsWith("<") || !response.ok) {
-    throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
+    // Attach the HTTP status so callers can tell "not logged in / no
+    // permission" (401/403) apart from a genuine network/offline failure —
+    // those need very different user-facing messages (see
+    // handleJsonFileParseAndSync's catch block for why this matters).
+    const err: any = new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
+    err.status = response.status;
+    throw err;
   }
   return JSON.parse(text);
 }
@@ -387,6 +393,9 @@ export default function App() {
   const [dbEditingRowData, setDbEditingRowData] = useState<any | null>(null);
   const [dbPage, setDbPage] = useState(1);
   const dbLimit = 15; // Number of rows per page in database manager
+  // Original-array indices (not filtered/paginated positions) of rows
+  // checked for bulk delete in the database manager table.
+  const [dbSelectedRows, setDbSelectedRows] = useState<Set<number>>(new Set());
 
   // Login form inputs
   const [loginUsername, setLoginUsername] = useState("");
@@ -1108,6 +1117,54 @@ export default function App() {
     }
   };
 
+  // Delete every row whose original-array index is in `indices` in a single
+  // save, instead of one confirm+request per row.
+  const handleDbBulkDelete = async (tab: "digital" | "kol" | "btl" | "ooh", indices: Set<number>) => {
+    if (indices.size === 0) return;
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa ${indices.size} dòng dữ liệu đã chọn không? Hành động này sẽ được lưu ngay vào CSDL.`)) return;
+
+    const updatedData = { ...marketingData };
+    if (tab === "digital") {
+      updatedData.digital_marketing = updatedData.digital_marketing.filter((_, i) => !indices.has(i));
+    } else if (tab === "kol") {
+      updatedData.kol_koc = updatedData.kol_koc.filter((_, i) => !indices.has(i));
+    } else if (tab === "btl") {
+      updatedData.btl_trade = updatedData.btl_trade.filter((_, i) => !indices.has(i));
+    } else if (tab === "ooh") {
+      updatedData.monthly_ooh_pr = updatedData.monthly_ooh_pr.filter((_, i) => !indices.has(i));
+    }
+
+    try {
+      const result = await safeFetchJson("/api/save-raw-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: updatedData })
+      });
+      if (result.success) {
+        const safeData = normalizeMarketingData(result.data);
+        setMarketingData(safeData);
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        setDbSelectedRows(new Set());
+        triggerNotification("success", `Đã xóa ${indices.size} dòng dữ liệu và lưu vào CSDL hệ thống thành công!`);
+      } else {
+        throw new Error(result.error || "Lỗi lưu dữ liệu sau khi xóa.");
+      }
+    } catch (err: any) {
+      console.warn("Failed to save to server after bulk delete, saving locally:", err);
+      const safeData = normalizeMarketingData(updatedData);
+      setMarketingData(safeData);
+      localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+      setDbSelectedRows(new Set());
+      if (err?.status === 401) {
+        triggerNotification("error", `Phiên đăng nhập đã hết hạn — đã xóa ${indices.size} dòng CHỈ trên trình duyệt này, CHƯA lưu lên máy chủ. Vui lòng đăng nhập lại rồi thử lại.`);
+      } else if (err?.status === 403) {
+        triggerNotification("error", `Tài khoản của bạn không có quyền lưu lên máy chủ — đã xóa ${indices.size} dòng CHỈ trên trình duyệt này, CHƯA đồng bộ cho người khác.`);
+      } else {
+        triggerNotification("success", `Đã xóa ${indices.size} dòng dữ liệu thành công trên thiết bị này (Chạy Offline/GitHub Pages)!`);
+      }
+    }
+  };
+
   const handleDbEditStart = (tab: "digital" | "kol" | "btl" | "ooh", indexInOriginal: number) => {
     let rowToEdit: any = null;
     if (tab === "digital") {
@@ -1235,6 +1292,48 @@ export default function App() {
     } else { // ooh
       return ["Tháng", "Thương hiệu", "Hạng mục", "Metric", "KPI", "Thực tế", "Thao tác"];
     }
+  };
+
+  // Filtering/pagination for the database manager table, shared by the
+  // header (select-all checkbox needs to know which rows are on this page)
+  // and the body — previously this was computed inline only inside the body.
+  const getDbTableView = () => {
+    let activeDbRows: any[] = [];
+    if (dbActiveTab === "digital") {
+      activeDbRows = marketingData.digital_marketing || [];
+    } else if (dbActiveTab === "kol") {
+      activeDbRows = marketingData.kol_koc || [];
+    } else if (dbActiveTab === "btl") {
+      activeDbRows = marketingData.btl_trade || [];
+    } else if (dbActiveTab === "ooh") {
+      activeDbRows = marketingData.monthly_ooh_pr || [];
+    }
+
+    const mappedDbRows = activeDbRows.map((row, originalIndex) => ({ row, originalIndex }));
+
+    const filteredMappedRows = mappedDbRows.filter(({ row }) => {
+      if (dbBrandFilter !== "Tất cả") {
+        if (!row.brand || row.brand.toLowerCase() !== dbBrandFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      if (dbSearchQuery.trim()) {
+        const query = dbSearchQuery.toLowerCase();
+        const matchVal = Object.values(row)
+          .map((val) => (val !== null && val !== undefined ? val.toString().toLowerCase() : ""))
+          .join(" ");
+        return matchVal.includes(query);
+      }
+      return true;
+    });
+
+    const totalDbRows = filteredMappedRows.length;
+    const totalDbPages = Math.ceil(totalDbRows / dbLimit) || 1;
+    const safeDbPage = Math.min(dbPage, totalDbPages);
+    const startIndex = (safeDbPage - 1) * dbLimit;
+    const paginatedDbRows = filteredMappedRows.slice(startIndex, startIndex + dbLimit);
+
+    return { totalDbRows, totalDbPages, safeDbPage, startIndex, paginatedDbRows };
   };
 
   // Client-side fallback merge helper matching the server-side sync logic
@@ -1402,7 +1501,19 @@ export default function App() {
             setPublishedComments(newComments);
             localStorage.setItem("marketing_published_comments", JSON.stringify(newComments));
           }
-          triggerNotification("success", "Đã sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến)!");
+          // A 401/403 here means the merge above only ever touched this
+          // browser's local state — it was never persisted to Supabase, so
+          // no other viewer will see it. That must never be reported as a
+          // success; only a genuine network/offline failure (no status, the
+          // fetch itself never got a response) is the "offline mode" this
+          // fallback was originally built for.
+          if (syncErr?.status === 401) {
+            triggerNotification("error", "Phiên đăng nhập đã hết hạn — dữ liệu CHƯA được lưu lên máy chủ (chỉ tạm trên trình duyệt này). Vui lòng đăng nhập lại rồi tải tệp lên lần nữa.");
+          } else if (syncErr?.status === 403) {
+            triggerNotification("error", "Tài khoản của bạn không có quyền lưu dữ liệu lên máy chủ — dữ liệu CHƯA được đồng bộ cho người khác, chỉ tạm trên trình duyệt này.");
+          } else {
+            triggerNotification("success", "Đã sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến)!");
+          }
         }
       } catch (err: any) {
         console.error(err);
@@ -4179,6 +4290,7 @@ export default function App() {
                         setDbActiveTab("digital");
                         setDbPage(1);
                         setDbEditingRowIndex(null);
+                        setDbSelectedRows(new Set());
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "digital" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4192,6 +4304,7 @@ export default function App() {
                         setDbActiveTab("kol");
                         setDbPage(1);
                         setDbEditingRowIndex(null);
+                        setDbSelectedRows(new Set());
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "kol" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4205,6 +4318,7 @@ export default function App() {
                         setDbActiveTab("btl");
                         setDbPage(1);
                         setDbEditingRowIndex(null);
+                        setDbSelectedRows(new Set());
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "btl" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4218,6 +4332,7 @@ export default function App() {
                         setDbActiveTab("ooh");
                         setDbPage(1);
                         setDbEditingRowIndex(null);
+                        setDbSelectedRows(new Set());
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "ooh" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4397,10 +4512,68 @@ export default function App() {
 
                 {/* Data List Table */}
                 <div className="space-y-2">
+                  {dbSelectedRows.size > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+                      <span className="text-xs font-semibold text-rose-700">
+                        Đã chọn {dbSelectedRows.size} dòng
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDbSelectedRows(new Set())}
+                          className="rounded px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-200 cursor-pointer"
+                        >
+                          Bỏ chọn
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDbBulkDelete(dbActiveTab, dbSelectedRows)}
+                          className="rounded bg-rose-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-rose-700 cursor-pointer"
+                        >
+                          Xóa {dbSelectedRows.size} dòng đã chọn
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    {(() => {
+                      const { totalDbRows, totalDbPages, safeDbPage, startIndex, paginatedDbRows } = getDbTableView();
+                      const allOnPageSelected =
+                        paginatedDbRows.length > 0 && paginatedDbRows.every(({ originalIndex }) => dbSelectedRows.has(originalIndex));
+
+                      const toggleSelectAllOnPage = (checked: boolean) => {
+                        setDbSelectedRows((prev) => {
+                          const next = new Set(prev);
+                          paginatedDbRows.forEach(({ originalIndex }) => {
+                            if (checked) next.add(originalIndex);
+                            else next.delete(originalIndex);
+                          });
+                          return next;
+                        });
+                      };
+
+                      const toggleSelectRow = (originalIndex: number, checked: boolean) => {
+                        setDbSelectedRows((prev) => {
+                          const next = new Set(prev);
+                          if (checked) next.add(originalIndex);
+                          else next.delete(originalIndex);
+                          return next;
+                        });
+                      };
+
+                      return (
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider sticky top-0">
                         <tr>
+                          <th className="px-3 py-2 w-8">
+                            <input
+                              type="checkbox"
+                              checked={allOnPageSelected}
+                              onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                              aria-label="Chọn tất cả dòng trong trang này"
+                              className="cursor-pointer"
+                            />
+                          </th>
                           {getHeadersForTab().map((h, i) => (
                             <th key={i} className={`px-3 py-2 text-[10px] ${getHeaderMinWidth(h)}`}>
                               {h}
@@ -4410,49 +4583,10 @@ export default function App() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700 font-sans">
                         {(() => {
-                          // Build filtered rows
-                          let activeDbRows: any[] = [];
-                          if (dbActiveTab === "digital") {
-                            activeDbRows = marketingData.digital_marketing || [];
-                          } else if (dbActiveTab === "kol") {
-                            activeDbRows = marketingData.kol_koc || [];
-                          } else if (dbActiveTab === "btl") {
-                            activeDbRows = marketingData.btl_trade || [];
-                          } else if (dbActiveTab === "ooh") {
-                            activeDbRows = marketingData.monthly_ooh_pr || [];
-                          }
-
-                          const mappedDbRows = activeDbRows.map((row, originalIndex) => ({
-                            row,
-                            originalIndex,
-                          }));
-
-                          const filteredMappedRows = mappedDbRows.filter(({ row }) => {
-                            if (dbBrandFilter !== "Tất cả") {
-                              if (!row.brand || row.brand.toLowerCase() !== dbBrandFilter.toLowerCase()) {
-                                return false;
-                              }
-                            }
-                            if (dbSearchQuery.trim()) {
-                              const query = dbSearchQuery.toLowerCase();
-                              const matchVal = Object.values(row)
-                                .map((val) => (val !== null && val !== undefined ? val.toString().toLowerCase() : ""))
-                                .join(" ");
-                              return matchVal.includes(query);
-                            }
-                            return true;
-                          });
-
-                          const totalDbRows = filteredMappedRows.length;
-                          const totalDbPages = Math.ceil(totalDbRows / dbLimit) || 1;
-                          const safeDbPage = Math.min(dbPage, totalDbPages);
-                          const startIndex = (safeDbPage - 1) * dbLimit;
-                          const paginatedDbRows = filteredMappedRows.slice(startIndex, startIndex + dbLimit);
-
                           if (paginatedDbRows.length === 0) {
                             return (
                               <tr>
-                                <td colSpan={10} className="px-3 py-6 text-center text-slate-400 italic font-sans">
+                                <td colSpan={11} className="px-3 py-6 text-center text-slate-400 italic font-sans">
                                   Không tìm thấy dòng dữ liệu nào khớp với bộ lọc tìm kiếm.
                                 </td>
                               </tr>
@@ -4463,6 +4597,15 @@ export default function App() {
                             <>
                               {paginatedDbRows.map(({ row, originalIndex }) => (
                                 <tr key={originalIndex} className="hover:bg-slate-50/75 transition-colors">
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={dbSelectedRows.has(originalIndex)}
+                                      onChange={(e) => toggleSelectRow(originalIndex, e.target.checked)}
+                                      aria-label={`Chọn dòng ${originalIndex}`}
+                                      className="cursor-pointer"
+                                    />
+                                  </td>
                                   {dbActiveTab === "digital" && (
                                     <>
                                       <td className={`px-3 py-2 font-mono font-bold text-slate-500 ${getHeaderMinWidth("Tuần")}`}>{row.week}</td>
@@ -4539,7 +4682,7 @@ export default function App() {
                               {/* Pagination controls inside table rendering context to avoid nested state dependency errors */}
                               {totalDbPages > 1 && (
                                 <tr>
-                                  <td colSpan={10} className="px-3 py-3 bg-slate-50">
+                                  <td colSpan={11} className="px-3 py-3 bg-slate-50">
                                     <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
                                       <span>
                                         Hiển thị {startIndex + 1} - {Math.min(startIndex + dbLimit, totalDbRows)} trong số{" "}
@@ -4575,6 +4718,8 @@ export default function App() {
                         })()}
                       </tbody>
                     </table>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
