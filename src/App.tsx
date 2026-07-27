@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   INITIAL_MARKETING_DATA,
   DEFAULT_COMMENTS_LIVOTEC,
@@ -395,10 +395,17 @@ export default function App() {
   const [dbEditingRowIndex, setDbEditingRowIndex] = useState<number | null>(null);
   const [dbEditingRowData, setDbEditingRowData] = useState<any | null>(null);
   const [dbPage, setDbPage] = useState(1);
-  const dbLimit = 15; // Number of rows per page in database manager
+  const [dbLimit, setDbLimit] = useState(15); // Rows per page in database manager
   // Original-array indices (not filtered/paginated positions) of rows
   // checked for bulk delete in the database manager table.
   const [dbSelectedRows, setDbSelectedRows] = useState<Set<number>>(new Set());
+  // Which single cell (row + field) is currently showing an inline <input>
+  // instead of static text, for the quick-edit-in-place columns.
+  const [quickEditCell, setQuickEditCell] = useState<{ originalIndex: number; field: string } | null>(null);
+  const [quickEditValue, setQuickEditValue] = useState("");
+  // Escape sets this before clearing quickEditCell, so the blur event that
+  // follows (removing the <input> fires a native blur) doesn't also commit.
+  const quickEditCancelledRef = useRef(false);
 
   // Login form inputs
   const [loginUsername, setLoginUsername] = useState("");
@@ -1166,6 +1173,118 @@ export default function App() {
         triggerNotification("success", `Đã xóa ${indices.size} dòng dữ liệu thành công trên thiết bị này (Chạy Offline/GitHub Pages)!`);
       }
     }
+  };
+
+  const getDbListKey = (tab: "digital" | "kol" | "btl" | "ooh") =>
+    tab === "digital" ? "digital_marketing" : tab === "kol" ? "kol_koc" : tab === "btl" ? "btl_trade" : "monthly_ooh_pr";
+
+  const isQuickEditingCell = (originalIndex: number, field: string) =>
+    quickEditCell?.originalIndex === originalIndex && quickEditCell?.field === field;
+
+  const startQuickEdit = (originalIndex: number, field: string, currentValue: any) => {
+    setQuickEditCell({ originalIndex, field });
+    setQuickEditValue(currentValue !== null && currentValue !== undefined ? String(currentValue) : "");
+  };
+
+  const cancelQuickEdit = () => {
+    quickEditCancelledRef.current = true;
+    setQuickEditCell(null);
+    setQuickEditValue("");
+  };
+
+  // Saves a single field of a single row via the same /api/save-raw-data
+  // route the full edit form and delete actions use — for "btl", writing
+  // thực_hiện_tháng also feeds the server's own btl_trade_monthly rollup
+  // (see app.ts), same as editing it through the full form would.
+  const commitQuickEdit = async () => {
+    if (!quickEditCell) return;
+    const { originalIndex, field } = quickEditCell;
+    const raw = quickEditValue.trim();
+    const val = raw === "" ? null : Number(raw);
+    if (raw !== "" && Number.isNaN(val)) {
+      triggerNotification("error", "Giá trị không hợp lệ, vui lòng nhập số.");
+      return; // leave the input open so the user can fix the value
+    }
+
+    const listKey = getDbListKey(dbActiveTab);
+    const updatedData = { ...marketingData };
+    (updatedData as any)[listKey] = (updatedData as any)[listKey].map((r: any, i: number) =>
+      i === originalIndex ? { ...r, [field]: val } : r
+    );
+
+    setQuickEditCell(null);
+    setQuickEditValue("");
+
+    try {
+      const result = await safeFetchJson("/api/save-raw-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: updatedData }),
+      });
+      if (result.success) {
+        const safeData = normalizeMarketingData(result.data);
+        setMarketingData(safeData);
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        triggerNotification("success", "Đã lưu thay đổi vào CSDL hệ thống.");
+      } else {
+        throw new Error(result.error || "Lỗi lưu dữ liệu.");
+      }
+    } catch (err: any) {
+      console.warn("Failed to save quick edit to server, saving locally:", err);
+      const safeData = normalizeMarketingData(updatedData);
+      setMarketingData(safeData);
+      localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+      if (err?.status === 401) {
+        triggerNotification("error", "Phiên đăng nhập đã hết hạn — thay đổi CHỈ lưu trên trình duyệt này, CHƯA lên máy chủ. Vui lòng đăng nhập lại rồi sửa lại.");
+      } else if (err?.status === 403) {
+        triggerNotification("error", "Tài khoản của bạn không có quyền lưu lên máy chủ — thay đổi CHỈ lưu trên trình duyệt này.");
+      } else {
+        triggerNotification("success", "Đã lưu thay đổi trên thiết bị này (Chạy Offline/GitHub Pages)!");
+      }
+    }
+  };
+
+  // Renders either the static formatted value, or (while this exact cell is
+  // being quick-edited) a focused <input> — click the value to start editing.
+  const renderQuickEditableCell = (originalIndex: number, field: string, value: any, className: string) => {
+    if (isQuickEditingCell(originalIndex, field)) {
+      return (
+        <input
+          type="number"
+          autoFocus
+          value={quickEditValue}
+          onChange={(e) => setQuickEditValue(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onBlur={() => {
+            if (quickEditCancelledRef.current) {
+              quickEditCancelledRef.current = false;
+              return;
+            }
+            commitQuickEdit();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitQuickEdit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              cancelQuickEdit();
+            }
+          }}
+          className="w-full min-w-[70px] rounded border border-indigo-400 px-1.5 py-0.5 text-xs font-mono focus:outline-none"
+        />
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={() => startQuickEdit(originalIndex, field, value)}
+        title="Nhấp để sửa nhanh"
+        className={`-mx-1 w-full rounded px-1 text-left hover:bg-indigo-50 cursor-text ${className}`}
+      >
+        {value !== null && value !== undefined ? value.toLocaleString() : "—"}
+      </button>
+    );
   };
 
   const handleDbEditStart = (tab: "digital" | "kol" | "btl" | "ooh", indexInOriginal: number) => {
@@ -4318,6 +4437,7 @@ export default function App() {
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
                         setDbWeekFilter("Tất cả");
+                        setQuickEditCell(null);
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "digital" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4333,6 +4453,7 @@ export default function App() {
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
                         setDbWeekFilter("Tất cả");
+                        setQuickEditCell(null);
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "kol" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4348,6 +4469,7 @@ export default function App() {
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
                         setDbWeekFilter("Tất cả");
+                        setQuickEditCell(null);
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "btl" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4363,6 +4485,7 @@ export default function App() {
                         setDbEditingRowIndex(null);
                         setDbSelectedRows(new Set());
                         setDbWeekFilter("Tất cả");
+                        setQuickEditCell(null);
                       }}
                       className={`rounded px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
                         dbActiveTab === "ooh" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-800"
@@ -4616,7 +4739,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                     {(() => {
                       const { totalDbRows, totalDbPages, safeDbPage, startIndex, paginatedDbRows } = getDbTableView();
                       const allOnPageSelected =
@@ -4643,8 +4766,14 @@ export default function App() {
                       };
 
                       return (
+                    <>
+                    {/* max-h + overflow-auto here (not just overflow-x-auto) is what
+                        actually makes `sticky top-0` on <thead> stick — sticky only
+                        engages relative to a scrolling ancestor, and previously this
+                        div had no vertical size limit so it never scrolled. */}
+                    <div className="overflow-auto max-h-[65vh]">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider sticky top-0">
+                      <thead className="bg-slate-50 font-bold text-slate-500 uppercase tracking-wider sticky top-0 z-10">
                         <tr>
                           <th className="px-3 py-2 w-8">
                             <input
@@ -4694,7 +4823,9 @@ export default function App() {
                                       <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
                                       <td className={`px-3 py-2 text-slate-600 truncate max-w-[160px] ${getHeaderMinWidth("Chỉ số metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
                                       <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI tuần")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
-                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>
+                                        {renderQuickEditableCell(originalIndex, "thực_tế_actual", row.thực_tế_actual, "")}
+                                      </td>
                                       <td className={`px-3 py-2 font-mono text-indigo-600 ${getHeaderMinWidth("Tích lũy tháng")}`}>{row.tích_lũy_tháng !== null ? row.tích_lũy_tháng.toLocaleString() : "—"}</td>
                                     </>
                                   )}
@@ -4706,7 +4837,9 @@ export default function App() {
                                       <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Hạng mục")}`}>{row.hạng_mục}</td>
                                       <td className={`px-3 py-2 text-slate-600 ${getHeaderMinWidth("Kênh")}`}>{row.kênh_channel}</td>
                                       <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI chiến dịch")}`}>{row.kpi_toàn_chiến_dịch !== null ? row.kpi_toàn_chiến_dịch.toLocaleString() : "—"}</td>
-                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>{row.thực_tế_trong_tuần !== null ? row.thực_tế_trong_tuần.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế tuần")}`}>
+                                        {renderQuickEditableCell(originalIndex, "thực_tế_trong_tuần", row.thực_tế_trong_tuần, "")}
+                                      </td>
                                     </>
                                   )}
 
@@ -4721,9 +4854,15 @@ export default function App() {
                                           <div className="font-medium text-slate-800 leading-tight">{row.chi_tiết_hạng_mục}</div>
                                           {row.phân_loại && <div className="text-[9px] text-slate-400 font-mono leading-none">{row.phân_loại}</div>}
                                         </td>
-                                        <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Thực hiện T${btlInfo.lastMonth}`)}`}>{btlInfo.lastMonthVal !== null && btlInfo.lastMonthVal !== undefined ? btlInfo.lastMonthVal.toLocaleString() : "—"}</td>
-                                        <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Kế hoạch T${btlInfo.thisMonth}`)}`}>{btlInfo.planVal !== null && btlInfo.planVal !== undefined ? btlInfo.planVal.toLocaleString() : "—"}</td>
-                                        <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth(`Tích lũy T${btlInfo.thisMonth}`)}`}>{btlInfo.accVal !== null && btlInfo.accVal !== undefined ? btlInfo.accVal.toLocaleString() : "—"}</td>
+                                        <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Thực hiện T${btlInfo.lastMonth}`)}`}>
+                                          {renderQuickEditableCell(originalIndex, "thực_hiện_tháng", btlInfo.lastMonthVal, "")}
+                                        </td>
+                                        <td className={`px-3 py-2 font-mono ${getHeaderMinWidth(`Kế hoạch T${btlInfo.thisMonth}`)}`}>
+                                          {renderQuickEditableCell(originalIndex, "kế_hoạch_tháng", btlInfo.planVal, "")}
+                                        </td>
+                                        <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth(`Tích lũy T${btlInfo.thisMonth}`)}`}>
+                                          {renderQuickEditableCell(originalIndex, "tích_lũy_tháng", btlInfo.accVal, "")}
+                                        </td>
                                       </>
                                     );
                                   })()}
@@ -4735,7 +4874,9 @@ export default function App() {
                                       <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Hạng mục")}`} title={row.hạng_mục}>{row.hạng_mục}</td>
                                       <td className={`px-3 py-2 text-slate-600 truncate max-w-[150px] ${getHeaderMinWidth("Metric")}`} title={row.chỉ_số_metric}>{row.chỉ_số_metric}</td>
                                       <td className={`px-3 py-2 font-mono ${getHeaderMinWidth("KPI")}`}>{row.mục_tiêu_target !== null ? row.mục_tiêu_target.toLocaleString() : "—"}</td>
-                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế")}`}>{row.thực_tế_actual !== null ? row.thực_tế_actual.toLocaleString() : "—"}</td>
+                                      <td className={`px-3 py-2 font-mono text-emerald-600 font-semibold ${getHeaderMinWidth("Thực tế")}`}>
+                                        {renderQuickEditableCell(originalIndex, "thực_tế_actual", row.thực_tế_actual, "")}
+                                      </td>
                                     </>
                                   )}
 
@@ -4759,46 +4900,62 @@ export default function App() {
                                   </td>
                                 </tr>
                               ))}
-
-                              {/* Pagination controls inside table rendering context to avoid nested state dependency errors */}
-                              {totalDbPages > 1 && (
-                                <tr>
-                                  <td colSpan={11} className="px-3 py-3 bg-slate-50">
-                                    <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-                                      <span>
-                                        Hiển thị {startIndex + 1} - {Math.min(startIndex + dbLimit, totalDbRows)} trong số{" "}
-                                        <strong>{totalDbRows}</strong> dòng dữ liệu
-                                      </span>
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          disabled={safeDbPage === 1}
-                                          onClick={() => setDbPage((p) => Math.max(1, p - 1))}
-                                          className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
-                                        >
-                                          Trang trước
-                                        </button>
-                                        <span className="px-2 font-sans font-semibold">
-                                          Trang {safeDbPage} / {totalDbPages}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          disabled={safeDbPage >= totalDbPages}
-                                          onClick={() => setDbPage((p) => Math.min(totalDbPages, p + 1))}
-                                          className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
-                                        >
-                                          Trang sau
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
                             </>
                           );
                         })()}
                       </tbody>
                     </table>
+                    </div>
+                    {/* Row count + page size live outside the scrollable area so
+                        they (and pagination) stay visible without scrolling down. */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                      <span>
+                        Hiển thị {startIndex + 1} - {Math.min(startIndex + dbLimit, totalDbRows)} trong số{" "}
+                        <strong>{totalDbRows}</strong> dòng dữ liệu
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5">
+                          Số dòng/trang:
+                          <select
+                            value={dbLimit}
+                            onChange={(e) => {
+                              setDbLimit(Number(e.target.value));
+                              setDbPage(1);
+                            }}
+                            className="rounded border border-slate-300 bg-white px-1.5 py-1 text-[11px] font-bold text-slate-700 focus:border-indigo-500 focus:outline-none"
+                          >
+                            <option value={15}>15</option>
+                            <option value={100}>100</option>
+                            <option value={200}>200</option>
+                            <option value={500}>500</option>
+                          </select>
+                        </label>
+                        {totalDbPages > 1 && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              disabled={safeDbPage === 1}
+                              onClick={() => setDbPage((p) => Math.max(1, p - 1))}
+                              className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
+                            >
+                              Trang trước
+                            </button>
+                            <span className="px-2 font-sans font-semibold">
+                              Trang {safeDbPage} / {totalDbPages}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={safeDbPage >= totalDbPages}
+                              onClick={() => setDbPage((p) => Math.min(totalDbPages, p + 1))}
+                              className="px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed text-[11px] font-bold"
+                            >
+                              Trang sau
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    </>
                       );
                     })()}
                   </div>
