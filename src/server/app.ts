@@ -6,6 +6,9 @@ import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { normalizeMarketingData, getBtlReportMonth } from "../data";
 import { supabase, APP_STATE_ROW_ID } from "./supabaseClient";
+import { DEFAULT_USERS, reconcileUsers, UserAccount } from "../lib/defaultUsers";
+import { verifyPassword } from "../lib/passwordHash";
+import { requireAuth, signSessionToken } from "./auth";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -52,6 +55,45 @@ function decrypt(text: string): string {
 }
 
 app.use(express.json({ limit: "20mb" }));
+
+// POST /api/login — the only public data endpoint. Verifies credentials
+// server-side and issues a signed session token; the client never sees any
+// passwordHash/salt in the response, and never sees other accounts' hashes
+// either (contrast with the old client-side login, which fetched the full
+// account list including every hash+salt before checking anything).
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu." });
+    }
+
+    const store = await getDatabaseData();
+    const storedUsers: UserAccount[] = Array.isArray(store.users) ? store.users : [];
+    // Same reconciliation the client applies to /api/get-users results: merge
+    // DEFAULT_USERS with any custom accounts added via the user-management UI.
+    const allUsers = reconcileUsers(storedUsers, -1);
+
+    const candidate = allUsers.find((u) => u.username.toLowerCase() === String(username).trim().toLowerCase());
+    const ok = candidate?.passwordHash && candidate?.salt
+      ? await verifyPassword(String(password), candidate.salt, candidate.passwordHash)
+      : false;
+
+    if (!candidate || !ok) {
+      return res.status(401).json({ error: "Tên đăng nhập hoặc mật khẩu không chính xác." });
+    }
+
+    const token = signSessionToken(candidate);
+    return res.json({
+      success: true,
+      token,
+      user: { username: candidate.username, name: candidate.name, role: candidate.role },
+    });
+  } catch (err: any) {
+    console.error("POST /api/login error:", err);
+    return res.status(500).json({ error: `Lỗi đăng nhập: ${err.message}` });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Persistent database, backed by Supabase (Postgres) instead of a local JSON
@@ -131,7 +173,7 @@ try {
 }
 
 // API: Fetch file from Google Drive via direct link
-app.post("/api/fetch-drive", async (req, res) => {
+app.post("/api/fetch-drive", requireAuth("Editor"), async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) {
@@ -199,7 +241,7 @@ app.post("/api/fetch-drive", async (req, res) => {
 });
 
 // API: Call Gemini to analyze marketing report
-app.post("/api/analyze", async (req, res) => {
+app.post("/api/analyze", requireAuth("Editor"), async (req, res) => {
   try {
     const { data, brand } = req.body;
     if (!data) {
@@ -278,7 +320,7 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
 });
 
 // GET /api/get-mail-config
-app.get("/api/get-mail-config", async (req, res) => {
+app.get("/api/get-mail-config", requireAuth("Admin"), async (req, res) => {
   try {
     const store = await getDatabaseData();
     const config = store.mail_config || {};
@@ -300,7 +342,7 @@ app.get("/api/get-mail-config", async (req, res) => {
 });
 
 // POST /api/save-mail-config
-app.post("/api/save-mail-config", async (req, res) => {
+app.post("/api/save-mail-config", requireAuth("Admin"), async (req, res) => {
   try {
     const { smtp_host, smtp_port, smtp_user, smtp_pass, notification_email, enabled } = req.body;
     const store = await getDatabaseData();
@@ -324,7 +366,7 @@ app.post("/api/save-mail-config", async (req, res) => {
 });
 
 // GET /api/get-data
-app.get("/api/get-data", async (req, res) => {
+app.get("/api/get-data", requireAuth(), async (req, res) => {
   try {
     const rawDbData = await getDatabaseData();
     const normalized = normalizeMarketingData(rawDbData);
@@ -342,26 +384,49 @@ app.get("/api/get-data", async (req, res) => {
 
 // GET /api/get-users — shared user/account list (Admin/Editor/Viewer), so
 // accounts added or edited by one Admin are visible to every browser instead
-// of only living in that Admin's localStorage.
-app.get("/api/get-users", async (req, res) => {
+// of only living in that Admin's localStorage. Admin-only, and never returns
+// passwordHash/salt — the client only needs username/name/role to render the
+// account list; login itself is verified entirely server-side (POST /api/login).
+app.get("/api/get-users", requireAuth("Admin"), async (req, res) => {
   try {
     const store = await getDatabaseData();
-    return res.json({ success: true, users: Array.isArray(store.users) ? store.users : null });
+    const users: UserAccount[] = Array.isArray(store.users) ? store.users : [];
+    const publicUsers = users.map(({ username, name, role }) => ({ username, name, role }));
+    return res.json({ success: true, users: publicUsers });
   } catch (err: any) {
     console.error("GET /api/get-users error:", err);
     return res.status(500).json({ error: `Lỗi đọc danh sách người dùng: ${err.message}` });
   }
 });
 
-// POST /api/save-users
-app.post("/api/save-users", async (req, res) => {
+// POST /api/save-users — Admin-only. The client no longer holds
+// passwordHash/salt for accounts it isn't actively editing (see
+// GET /api/get-users above), so incoming entries missing those fields are
+// merged against the existing stored record by username instead of being
+// overwritten with nothing — otherwise every save would wipe out every other
+// account's password.
+app.post("/api/save-users", requireAuth("Admin"), async (req, res) => {
   try {
     const { users } = req.body;
     if (!Array.isArray(users)) {
       return res.status(400).json({ error: "Dữ liệu người dùng phải là một mảng." });
     }
     const store = await getDatabaseData();
-    store.users = users;
+    const existingByUsername = new Map<string, UserAccount>(
+      (Array.isArray(store.users) ? store.users : []).map((u: UserAccount) => [u.username.toLowerCase(), u])
+    );
+
+    const merged: UserAccount[] = users.map((incoming: UserAccount) => {
+      if (incoming.passwordHash && incoming.salt) return incoming;
+      const existing = existingByUsername.get((incoming.username || "").toLowerCase());
+      return {
+        ...incoming,
+        passwordHash: existing?.passwordHash,
+        salt: existing?.salt,
+      };
+    });
+
+    store.users = merged;
     await saveDatabaseData(store);
     return res.json({ success: true });
   } catch (err: any) {
@@ -371,7 +436,7 @@ app.post("/api/save-users", async (req, res) => {
 });
 
 // POST /api/save-active-state
-app.post("/api/save-active-state", async (req, res) => {
+app.post("/api/save-active-state", requireAuth("Editor"), async (req, res) => {
   try {
     const { selectedBrand, selectedTimelineId, activeCategoryTab } = req.body;
     const rawDbData = await getDatabaseData();
@@ -392,7 +457,7 @@ app.post("/api/save-active-state", async (req, res) => {
 });
 
 // POST /api/save-comments
-app.post("/api/save-comments", async (req, res) => {
+app.post("/api/save-comments", requireAuth("Editor"), async (req, res) => {
   try {
     const { week, comments } = req.body;
     if (!week || !comments) {
@@ -415,7 +480,7 @@ app.post("/api/save-comments", async (req, res) => {
 });
 
 // POST /api/save-raw-data (Direct edit/delete row management for Admin)
-app.post("/api/save-raw-data", async (req, res) => {
+app.post("/api/save-raw-data", requireAuth("Editor"), async (req, res) => {
   try {
     const { data } = req.body;
     if (!data) {
@@ -487,7 +552,7 @@ app.post("/api/save-raw-data", async (req, res) => {
 });
 
 // POST /api/sync-data
-app.post("/api/sync-data", async (req, res) => {
+app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
   try {
     const { newData } = req.body;
     if (!newData) {
@@ -608,7 +673,7 @@ app.post("/api/sync-data", async (req, res) => {
 // POST /api/reset-data — resets marketing report data to defaults, but keeps
 // account list (users) and mail config intact: resetting the dashboard's
 // weekly numbers should never silently delete everyone's login accounts.
-app.post("/api/reset-data", async (req, res) => {
+app.post("/api/reset-data", requireAuth("Admin"), async (req, res) => {
   try {
     const current = await getDatabaseData();
     const seed = readInitialSeed();

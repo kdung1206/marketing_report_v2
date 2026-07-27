@@ -10,3 +10,7 @@ coverage/
 # Live report data now lives in Supabase, not in the repo (see
 # scripts/migrate-to-supabase.ts for the one-time import of this file's data).
 src/db_store.json
+
+# One-off local exports from scripts/export-db.ts — a snapshot of live data,
+# not something that belongs in version control.
+db_export.json

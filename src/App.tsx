@@ -9,7 +9,8 @@ import {
   normalizeMarketingData,
 } from "./data";
 import { exportToExcel, exportToJSON } from "./lib/export";
-import { hashPassword, generateSalt, verifyPassword } from "./lib/passwordHash";
+import { hashPassword, generateSalt } from "./lib/passwordHash";
+import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
 import {
   TrendingUp,
   Award,
@@ -64,10 +65,32 @@ import {
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
+// Session token issued by POST /api/login (see src/server/auth.ts). Kept as a
+// module-level variable (mirrored to localStorage) rather than React state so
+// safeFetchJson — used everywhere, including outside any component — can
+// always read the current value without prop-drilling it through every call.
+let authToken: string | null = typeof localStorage !== "undefined" ? localStorage.getItem("marketing_auth_token") : null;
+
+function setAuthToken(token: string | null) {
+  authToken = token;
+  if (token) {
+    localStorage.setItem("marketing_auth_token", token);
+  } else {
+    localStorage.removeItem("marketing_auth_token");
+  }
+}
+
 async function safeFetchJson(url: string, options?: RequestInit) {
-  const response = await fetch(url, options);
+  const headers = { ...(options?.headers || {}), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
+  const response = await fetch(url, { ...options, headers });
   const text = await response.text();
   const trimmed = text.trim();
+  if (response.status === 401) {
+    // Session expired or was never established (e.g. a stale tab from before
+    // login). Let the component handling the login screen know so it can log
+    // the user out client-side too, instead of silently failing forever.
+    window.dispatchEvent(new Event("auth:expired"));
+  }
   if (trimmed.startsWith("<") || !response.ok) {
     throw new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
   }
@@ -296,44 +319,9 @@ export function getBtlRowDataValues(row: any) {
   };
 }
 
-export interface UserAccount {
-  username: string;
-  // Passwords are never stored in plaintext (see src/lib/passwordHash.ts).
-  // `passwordHash` = SHA-256(`${salt}:${plainPassword}`), hex-encoded.
-  passwordHash: string;
-  salt: string;
-  name: string;
-  role: "Admin" | "Editor" | "Viewer";
-}
-
-// Precomputed with src/lib/passwordHash.ts (SHA-256 + per-user salt).
-// Plaintext passwords are intentionally NOT written anywhere in this repo
-// (it's public) — save them in your own password manager instead.
-const DEFAULT_USERS: UserAccount[] = [
-  { username: "ntkdung1206@gmail.com", salt: "3e83a6d1a854840d5e1af6028d17224d", passwordHash: "77bb43ffd629f0621d85cd86a0b2e55551a8c0d7eadb7c3e9c65fddb35842511", name: "Dũng Nguyễn", role: "Admin" },
-  { username: "admin", salt: "8f89341202e6b122fd50319143c90700", passwordHash: "15725c760fe8dfef6c39c3ebc343183d7a7ceb6a8a964d1d60b07b4ac2c26020", name: "Quản trị hệ thống", role: "Admin" },
-  { username: "editor1", salt: "8a7a42e05d4a245bb937ff9e038ddae5", passwordHash: "70b94d7025353a71dbdcf0250875d6a54e640be672693aa3cea56d80a12bfd7a", name: "Nguyễn Biên Tập", role: "Editor" },
-  { username: "viewer1", salt: "9891b5004f979ed95778a77d487a15fc", passwordHash: "7fdc2efb593acbeb57e98d555a3fdce244f547a5a73fa13df66ad61678e2c7b9", name: "Người xem", role: "Viewer" },
-  { username: "viewer2", salt: "1bc2d4bf855a868da0e6b85fe199bdc6", passwordHash: "a1d752a1b080a097507451db46a0d1fb1581ac9a7d3317c05af4b326123de5be", name: "Viewer 2", role: "Viewer" }
-];
-
-// Bump this number any time DEFAULT_USERS credentials/roles change in code.
-// Every browser reconciles the shared user list against the current
-// DEFAULT_USERS whenever it sees a newer version — this guarantees credential
-// fixes always take effect everywhere. Any extra accounts that aren't part of
-// DEFAULT_USERS (added later through the user-management UI) are preserved as-is.
-const USERS_CONFIG_VERSION = 3; // v3: switched from plaintext `password` to salted `passwordHash`
-
-function reconcileUsers(savedList: UserAccount[], savedVersion: number): UserAccount[] {
-  if (savedVersion >= USERS_CONFIG_VERSION) {
-    return savedList;
-  }
-  const defaultUsernames = new Set(DEFAULT_USERS.map((u) => u.username.toLowerCase()));
-  const customExtras = savedList.filter(
-    (u: any) => !defaultUsernames.has((u.username || "").toLowerCase()) && typeof u.passwordHash === "string" && typeof u.salt === "string"
-  );
-  return [...DEFAULT_USERS, ...customExtras];
-}
+// UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers now live in
+// ./lib/defaultUsers so the server (src/server/app.ts, auth.ts) can share the
+// exact same default accounts and reconciliation rules for login.
 
 export interface BrandKpiTarget {
   id: string;
@@ -607,8 +595,11 @@ export default function App() {
   const [mailEnabled, setMailEnabled] = useState(true);
   const [isMailLoading, setIsMailLoading] = useState(false);
 
-  // Load mail configuration from server on load
+  // Load mail configuration from server on load. GET /api/get-mail-config is
+  // Admin-only server-side (it returns the decrypted SMTP password), so only
+  // fetch it for Admins — Editor/Viewer have no use for it anyway.
   useEffect(() => {
+    if (!currentUser || currentUser.role !== "Admin") return;
     const fetchMailConfig = async () => {
       try {
         const result = await safeFetchJson("/api/get-mail-config");
@@ -859,22 +850,26 @@ export default function App() {
     }
   };
 
-  // Load marketing data, comments and the shared account list on mount
+  // Load marketing data, comments and (for Admins only — GET /api/get-users
+  // is now Admin-only) the shared account list on mount. Every /api/* route
+  // now requires a valid session, so there is nothing to fetch before login.
   useEffect(() => {
+    if (!currentUser) return;
     fetchServerData();
-    fetchServerUsers();
-  }, []);
+    if (currentUser.role === "Admin") fetchServerUsers();
+  }, [currentUser]);
 
   // Auto-sync data to keep Viewer and Admin aligned (faster polling for Viewers to follow Admin live)
   useEffect(() => {
-    const isViewer = !currentUser || currentUser.role === "Viewer";
+    if (!currentUser) return;
+    const isViewer = currentUser.role === "Viewer";
     const delay = isViewer ? 4000 : 30000; // 4 seconds for Viewer to react rapidly to Admin presentation, 30 seconds for Admin
 
     const interval = setInterval(() => {
       if (!hasUnpublishedChanges) {
         fetchServerData();
       }
-      fetchServerUsers();
+      if (currentUser.role === "Admin") fetchServerUsers();
     }, delay);
     return () => clearInterval(interval);
   }, [hasUnpublishedChanges, currentUser, selectedBrand, selectedTimeline?.id, activeCategoryTab]);
@@ -891,7 +886,8 @@ export default function App() {
     localStorage.setItem("marketing_brand_kpis", JSON.stringify(brandKpis));
   }, [brandKpis]);
 
-  // Login handler
+  // Login handler — credentials are now verified server-side (POST /api/login);
+  // the browser never sees any account's passwordHash/salt, including its own.
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
@@ -901,31 +897,55 @@ export default function App() {
       return;
     }
 
-    const candidate = users.find((u) => u.username.toLowerCase() === loginUsername.trim().toLowerCase());
-    const passwordMatches = candidate ? await verifyPassword(loginPassword, candidate.salt, candidate.passwordHash) : false;
-    const foundUser = passwordMatches ? candidate : undefined;
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginUsername.trim(), password: loginPassword }),
+      });
+      const result = await response.json();
 
-    if (foundUser) {
-      setCurrentUser(foundUser);
-      localStorage.setItem("marketing_current_user", JSON.stringify(foundUser));
-      triggerNotification("success", `Chào mừng ${foundUser.name} (${foundUser.role}) quay lại hệ thống!`);
-      if (foundUser.role === "Viewer") {
+      if (!response.ok || !result.success) {
+        setLoginError(result.error || "Tên đăng nhập hoặc mật khẩu không chính xác.");
+        return;
+      }
+
+      setAuthToken(result.token);
+      setCurrentUser(result.user);
+      localStorage.setItem("marketing_current_user", JSON.stringify(result.user));
+      triggerNotification("success", `Chào mừng ${result.user.name} (${result.user.role}) quay lại hệ thống!`);
+      if (result.user.role === "Viewer") {
         setActiveTab("dashboard");
       }
       fetchServerData();
-    } else {
-      setLoginError("Tên đăng nhập hoặc mật khẩu không chính xác.");
+    } catch (err) {
+      console.error("Login request failed:", err);
+      setLoginError("Không thể kết nối máy chủ để đăng nhập. Vui lòng thử lại.");
     }
   };
 
   // Logout handler
   const handleLogout = () => {
     setCurrentUser(null);
+    setAuthToken(null);
     localStorage.removeItem("marketing_current_user");
     setLoginUsername("");
     setLoginPassword("");
     triggerNotification("success", "Đã đăng xuất khỏi hệ thống.");
   };
+
+  // If any API call comes back 401 (session expired, or a stale tab left
+  // open from before this login flow existed), drop back to the login screen
+  // instead of silently failing every subsequent request forever.
+  useEffect(() => {
+    const onAuthExpired = () => {
+      setCurrentUser((prev) => (prev ? null : prev));
+      setAuthToken(null);
+      localStorage.removeItem("marketing_current_user");
+    };
+    window.addEventListener("auth:expired", onAuthExpired);
+    return () => window.removeEventListener("auth:expired", onAuthExpired);
+  }, []);
 
   // User management handlers
   const handleAddOrEditUser = async (e: React.FormEvent) => {
