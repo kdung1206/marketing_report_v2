@@ -10,7 +10,6 @@ import {
 } from "./data";
 import { exportToExcel, exportToJSON, parseSpreadsheetFile, exportFullDatabaseToExcel } from "./lib/export";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
-import SocialReportPage from "./components/SocialReport/SocialReportPage";
 import {
   TrendingUp,
   Award,
@@ -459,7 +458,7 @@ export default function App() {
 
   const REPORT_CATEGORIES: { id: "mkt_weekly" | "social" | "digital"; label: string; icon: typeof FileSpreadsheet; comingSoon: boolean }[] = [
     { id: "mkt_weekly", label: "MKT Weekly", icon: FileSpreadsheet, comingSoon: false },
-    { id: "social", label: "Social Report", icon: Share2, comingSoon: false },
+    { id: "social", label: "Social Report", icon: Share2, comingSoon: true },
     { id: "digital", label: "Digital Report", icon: Globe, comingSoon: true },
   ];
 
@@ -743,15 +742,6 @@ export default function App() {
       setActiveTab("dashboard");
     }
   }, [currentUser, activeTab]);
-
-  // Safety guard: Social Report is temporarily Admin-only — Editor/Viewer
-  // accounts must never remain on it (also covers a stale
-  // "marketing_report_category" localStorage value from before this change).
-  useEffect(() => {
-    if ((!currentUser || currentUser.role !== "Admin") && reportCategory === "social") {
-      setReportCategory("mkt_weekly");
-    }
-  }, [currentUser, reportCategory]);
 
   // Synchronize draftComments with published comments for current brand & week
   useEffect(() => {
@@ -3026,9 +3016,7 @@ export default function App() {
               </div>
             </div>
 
-            {reportCategory === "social" && currentUser.role === "Admin" ? (
-              <SocialReportPage role={currentUser.role} />
-            ) : reportCategory !== "mkt_weekly" ? (
+            {reportCategory !== "mkt_weekly" ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-24 text-center shadow-sm">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
                   <Construction className="h-7 w-7" />

@@ -10,7 +10,6 @@ import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny
 import { requireAuth, signSessionToken } from "./auth";
 import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
-import { registerSocialReportRoutes } from "./socialReport/routes";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -1021,12 +1020,5 @@ app.get("/api/action-logs", requireAuth(), async (req, res) => {
     return res.status(500).json({ error: `Lỗi đọc nhật ký thao tác: ${err.message}` });
   }
 });
-
-// Social Report (YouTube Analytics + Google Ads automation) — see
-// src/server/socialReport/routes.ts. Registered last, sharing this file's
-// getDatabaseData/saveDatabaseData so it reads/writes the exact same
-// app_state blob (Supabase in production, src/db_store.json locally) rather
-// than a second, separately-configured store.
-registerSocialReportRoutes(app, { getDatabaseData, saveDatabaseData });
 
 export default app;

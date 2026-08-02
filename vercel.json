@@ -6,7 +6,6 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/cron/weekly-backup", "schedule": "0 10 * * 5" },
-    { "path": "/api/cron/social-report-sync", "schedule": "0 3 * * 1" }
+    { "path": "/api/cron/weekly-backup", "schedule": "0 10 * * 5" }
   ]
 }
