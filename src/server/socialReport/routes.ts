@@ -128,7 +128,17 @@ export function registerSocialReportRoutes(app: Express, deps: Deps): void {
       );
       return res.redirect("/?social_oauth=success");
     } catch (err: any) {
-      return res.redirect(`/?social_oauth=error&message=${encodeURIComponent(err.message || "Lỗi kết nối Google.")}`);
+      // Log the real error server-side only — never put a raw error message
+      // (from Google's OAuth client / gaxios) into this redirect's query
+      // string. This repo is public and this URL can end up in browser
+      // history/proxy logs, so it must never carry anything that could
+      // echo request details back (e.g. a library formatting an error
+      // around the token request body).
+      console.error("Google OAuth callback error:", err);
+      const safeMessage = err instanceof Error && err.message.startsWith("Google không trả về refresh_token")
+        ? err.message // this one specific message is authored by us, not Google's client library — safe to show
+        : "Lỗi kết nối Google. Vui lòng thử lại hoặc liên hệ Admin.";
+      return res.redirect(`/?social_oauth=error&message=${encodeURIComponent(safeMessage)}`);
     }
   });
 
