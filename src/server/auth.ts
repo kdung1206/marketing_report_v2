@@ -10,13 +10,17 @@ import crypto from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import type { UserAccount } from "../lib/defaultUsers";
 
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "marketing_dashboard_session_secret_dev_only_change_me";
+// No fallback value on purpose: a hardcoded default committed to this public
+// repo would let anyone forge a valid session token (this file's whole job
+// is to make that impossible). Fail loudly at startup instead of silently
+// running with a secret every reader of the source already knows.
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
-if (!process.env.SESSION_SECRET) {
-  console.warn(
-    "SESSION_SECRET chưa được cấu hình trong .env.local — đang dùng giá trị mặc định KHÔNG an toàn cho production. " +
-    "Hãy đặt SESSION_SECRET (một chuỗi ngẫu nhiên dài) trong .env.local và trong Vercel Environment Variables."
+if (!SESSION_SECRET) {
+  throw new Error(
+    "SESSION_SECRET chưa được cấu hình. Đặt SESSION_SECRET (một chuỗi ngẫu nhiên dài) trong .env.local " +
+    "(dev) hoặc Vercel Environment Variables (production) — tạo bằng: " +
+    'node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
   );
 }
 
@@ -27,22 +31,27 @@ export interface SessionPayload {
   name: string;
   role: UserAccount["role"];
   exp: number;
+  // Unique per issued token — logged alongside login/action audit entries
+  // (see login_logs/action_logs in supabase/schema.sql) so entries can be
+  // tied back to one specific session rather than just a username.
+  sid: string;
 }
 
 function base64url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64url");
 }
 
-export function signSessionToken(user: Pick<UserAccount, "username" | "name" | "role">): string {
+export function signSessionToken(user: Pick<UserAccount, "username" | "name" | "role">): { token: string; sid: string } {
   const payload: SessionPayload = {
     username: user.username,
     name: user.name,
     role: user.role,
     exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
+    sid: crypto.randomBytes(12).toString("hex"),
   };
   const data = base64url(JSON.stringify(payload));
   const signature = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
-  return `${data}.${signature}`;
+  return { token: `${data}.${signature}`, sid: payload.sid };
 }
 
 export function verifySessionToken(token: string | undefined | null): SessionPayload | null {

@@ -6,27 +6,31 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && npm run build:api && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "build:api": "esbuild src/server/app.ts --bundle --platform=node --format=cjs --target=node20 --outfile=api/index.js",
+    "build:api": "esbuild src/server/app.ts --bundle --platform=node --format=cjs --target=node20 --packages=external --outfile=api/index.js",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit",
+    "lint": "node --max-old-space-size=8192 node_modules/typescript/bin/tsc --noEmit",
     "migrate:supabase": "tsx scripts/migrate-to-supabase.ts",
     "export:db": "tsx scripts/export-db.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
+    "@googleapis/youtube": "^33.0.0",
+    "@googleapis/youtubeanalytics": "^6.0.1",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "google-ads-api": "^24.1.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "nodemailer": "^9.0.3",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.9.1",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

@@ -8,9 +8,9 @@ import {
   CategoryComments,
   normalizeMarketingData,
 } from "./data";
-import { exportToExcel, exportToJSON } from "./lib/export";
-import { hashPassword, generateSalt } from "./lib/passwordHash";
+import { exportToExcel, exportToJSON, parseSpreadsheetFile, exportFullDatabaseToExcel } from "./lib/export";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
+import SocialReportPage from "./components/SocialReport/SocialReportPage";
 import {
   TrendingUp,
   Award,
@@ -47,6 +47,8 @@ import {
   UserMinus,
   Printer,
   Mail,
+  Share2,
+  Construction,
 } from "lucide-react";
 import {
   PieChart,
@@ -95,7 +97,7 @@ async function safeFetchJson(url: string, options?: RequestInit) {
     // Attach the HTTP status so callers can tell "not logged in / no
     // permission" (401/403) apart from a genuine network/offline failure —
     // those need very different user-facing messages (see
-    // handleJsonFileParseAndSync's catch block for why this matters).
+    // syncOfflineDataToServer's catch block for why this matters).
     const err: any = new Error(`API returned invalid JSON/HTML response (status: ${response.status})`);
     err.status = response.status;
     throw err;
@@ -343,6 +345,29 @@ const DEFAULT_BRAND_KPIS: BrandKpiTarget[] = [
   { id: "karofi", brandName: "Karofi", sovTargetRank: "Rank #2", contentTarget: 24, prTarget: 1, comment: "Mục tiêu mặc định cho Karofi" }
 ];
 
+// Audit log timestamp display: the server stores one canonical UTC instant
+// (created_at, timestamptz) — these two helpers render it two ways rather
+// than storing a separate "local time" column server-side, which wouldn't
+// even be the viewing admin's own local time (see supabase/schema.sql).
+function formatLogUtc(iso: string): string {
+  return iso ? new Date(iso).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC") : "—";
+}
+function formatLogLocal(iso: string): string {
+  return iso ? new Date(iso).toLocaleString("vi-VN", { hour12: false }) : "—";
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  "fetch-drive": "Tải tệp Google Drive",
+  "analyze": "Phân tích AI",
+  "save-mail-config": "Sửa cấu hình mail",
+  "save-users": "Sửa tài khoản",
+  "save-comments": "Sửa nhận định",
+  "save-raw-data": "Sửa dữ liệu báo cáo",
+  "sync-data": "Đồng bộ tệp ngoại tuyến",
+  "reset-data": "Khôi phục mặc định",
+  "send-backup-now": "Gửi thử email backup",
+};
+
 export default function App() {
   // Authentication & Users State
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
@@ -421,6 +446,55 @@ export default function App() {
 
   // Navigation & Brand States
   const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel">("dashboard");
+  // Left sidebar on the report view: which top-level report family is showing.
+  // "social" and "digital" are placeholders until those report types are built.
+  const [reportCategory, setReportCategory] = useState<"mkt_weekly" | "social" | "digital">(() => {
+    const saved = localStorage.getItem("marketing_report_category");
+    return saved === "social" || saved === "digital" ? saved : "mkt_weekly";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("marketing_report_category", reportCategory);
+  }, [reportCategory]);
+
+  const REPORT_CATEGORIES: { id: "mkt_weekly" | "social" | "digital"; label: string; icon: typeof FileSpreadsheet; comingSoon: boolean }[] = [
+    { id: "mkt_weekly", label: "MKT Weekly", icon: FileSpreadsheet, comingSoon: false },
+    { id: "social", label: "Social Report", icon: Share2, comingSoon: false },
+    { id: "digital", label: "Digital Report", icon: Globe, comingSoon: true },
+  ];
+
+  // Left sidebar on the Control Panel view: which work-group section is
+  // showing. Entirely separate from `reportCategory` above (report sidebar
+  // vs control-panel sidebar never show at the same time — see the shared
+  // <aside> render, which switches its whole menu on `activeTab`).
+  type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "logs";
+  const [controlPanelSection, setControlPanelSection] = useState<ControlPanelSection>(() => {
+    const saved = localStorage.getItem("marketing_control_panel_section");
+    return (["data-entry", "comments", "db-admin", "users", "backup", "logs"] as const).includes(saved as any)
+      ? (saved as ControlPanelSection)
+      : "data-entry";
+  });
+  useEffect(() => {
+    localStorage.setItem("marketing_control_panel_section", controlPanelSection);
+  }, [controlPanelSection]);
+
+  // "Log hệ thống" has two sub-views; Editor accounts only ever see "action"
+  // (Login Logs is Admin-only), so default accordingly per role below.
+  const [logsSubTab, setLogsSubTab] = useState<"login" | "action">("login");
+  useEffect(() => {
+    if (currentUser && currentUser.role !== "Admin" && logsSubTab === "login") {
+      setLogsSubTab("action");
+    }
+  }, [currentUser, logsSubTab]);
+
+  const CONTROL_PANEL_SECTIONS: { id: ControlPanelSection; label: string; icon: typeof FileSpreadsheet; adminOnly: boolean }[] = [
+    { id: "data-entry", label: "Nhập liệu", icon: Upload, adminOnly: false },
+    { id: "comments", label: "Biên tập nhận xét", icon: Edit3, adminOnly: false },
+    { id: "db-admin", label: "Quản trị cơ sở dữ liệu", icon: Layers, adminOnly: true },
+    { id: "users", label: "Quản trị người dùng", icon: Shield, adminOnly: true },
+    { id: "backup", label: "Sao Lưu Tự Động", icon: Mail, adminOnly: true },
+    { id: "logs", label: "Log hệ thống", icon: Lock, adminOnly: false },
+  ];
   const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">(() => {
     const saved = localStorage.getItem("marketing_selected_brand");
     return (saved === "Livotec" || saved === "Karofi") ? saved : "Livotec";
@@ -605,6 +679,32 @@ export default function App() {
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
 
+  // Audit trail state: GET /api/login-logs (Admin only) and GET
+  // /api/action-logs (Admin sees every account, Editor sees only its own —
+  // scoping happens server-side based on the session, see src/server/app.ts).
+  interface LoginLogEntry {
+    id: number;
+    username: string;
+    status: "success" | "failure";
+    ip: string | null;
+    user_agent: string | null;
+    session_id: string | null;
+    created_at: string;
+  }
+  interface ActionLogEntry {
+    id: number;
+    username: string;
+    role: string | null;
+    action: string;
+    details: string | null;
+    ip: string | null;
+    created_at: string;
+  }
+  const [loginLogs, setLoginLogs] = useState<LoginLogEntry[]>([]);
+  const [isLoginLogsLoading, setIsLoginLogsLoading] = useState(false);
+  const [actionLogs, setActionLogs] = useState<ActionLogEntry[]>([]);
+  const [isActionLogsLoading, setIsActionLogsLoading] = useState(false);
+
   // Mail configuration states
   const [mailHost, setMailHost] = useState("");
   const [mailPort, setMailPort] = useState("587");
@@ -643,6 +743,15 @@ export default function App() {
       setActiveTab("dashboard");
     }
   }, [currentUser, activeTab]);
+
+  // Safety guard: Social Report is temporarily Admin-only — Editor/Viewer
+  // accounts must never remain on it (also covers a stale
+  // "marketing_report_category" localStorage value from before this change).
+  useEffect(() => {
+    if ((!currentUser || currentUser.role !== "Admin") && reportCategory === "social") {
+      setReportCategory("mkt_weekly");
+    }
+  }, [currentUser, reportCategory]);
 
   // Synchronize draftComments with published comments for current brand & week
   useEffect(() => {
@@ -834,7 +943,11 @@ export default function App() {
   // one that made the change) sees new/edited/deleted accounts. Also updates
   // the local cache immediately for a fast, offline-tolerant UI.
   const persistUsersToServer = async (list: UserAccount[]) => {
-    localStorage.setItem("marketing_users_list", JSON.stringify(list));
+    // `newPassword` (plaintext, only set when actually rotating a password —
+    // see handleAddOrEditUser) must reach the server so it can be hashed, but
+    // must never sit in localStorage: strip it from the cached copy.
+    const cacheSafeList = list.map(({ newPassword, ...rest }) => rest);
+    localStorage.setItem("marketing_users_list", JSON.stringify(cacheSafeList));
     localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
     try {
       await safeFetchJson("/api/save-users", {
@@ -861,11 +974,48 @@ export default function App() {
       localStorage.setItem("marketing_users_version", String(USERS_CONFIG_VERSION));
       // First run (server had no users yet) or DEFAULT_USERS changed since the
       // last push: write the reconciled list back so the server catches up.
-      if (JSON.stringify(reconciled) !== JSON.stringify(serverUsers)) {
+      // Compare only the public fields GET /api/get-users actually returns
+      // (username/name/role) — `reconciled` also carries passwordHash/salt
+      // from DEFAULT_USERS, so a full-object comparison against `serverUsers`
+      // would always "mismatch" and needlessly re-save on every single poll,
+      // flooding action_logs with a "save-users" entry every ~30s for no
+      // real change.
+      const reconciledPublic = reconciled.map(({ username, name, role }) => ({ username, name, role }));
+      if (JSON.stringify(reconciledPublic) !== JSON.stringify(serverUsers)) {
         await persistUsersToServer(reconciled);
       }
     } catch (err) {
       console.error("Failed to fetch users from server, using local cache:", err);
+    }
+  };
+
+  // GET /api/login-logs — Admin only (task: login audit trail). Server also
+  // enforces this with requireAuth("Admin"); the role check here just avoids
+  // a pointless 403 round-trip for non-Admins.
+  const fetchLoginLogs = async () => {
+    setIsLoginLogsLoading(true);
+    try {
+      const result = await safeFetchJson("/api/login-logs?limit=300");
+      if (result.success) setLoginLogs(result.logs || []);
+    } catch (err) {
+      console.error("Failed to fetch login logs:", err);
+    } finally {
+      setIsLoginLogsLoading(false);
+    }
+  };
+
+  // GET /api/action-logs — Admin gets every account's actions; every other
+  // role is restricted server-side to its own username (see requireAuth() in
+  // src/server/app.ts) regardless of what this client requests.
+  const fetchActionLogs = async () => {
+    setIsActionLogsLoading(true);
+    try {
+      const result = await safeFetchJson("/api/action-logs?limit=300");
+      if (result.success) setActionLogs(result.logs || []);
+    } catch (err) {
+      console.error("Failed to fetch action logs:", err);
+    } finally {
+      setIsActionLogsLoading(false);
     }
   };
 
@@ -875,7 +1025,11 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) return;
     fetchServerData();
-    if (currentUser.role === "Admin") fetchServerUsers();
+    if (currentUser.role === "Admin") {
+      fetchServerUsers();
+      fetchLoginLogs();
+    }
+    if (currentUser.role !== "Viewer") fetchActionLogs();
   }, [currentUser]);
 
   // Auto-sync data to keep Viewer and Admin aligned (faster polling for Viewers to follow Admin live)
@@ -976,24 +1130,20 @@ export default function App() {
 
     if (editingUsername) {
       // Editing mode. Leave managerPassword blank to keep the current
-      // password unchanged; type a new one to rotate it.
-      let salt: string | null = null;
-      let passwordHash: string | null = null;
-      if (managerPassword) {
-        salt = generateSalt();
-        passwordHash = await hashPassword(managerPassword, salt);
-      }
-
+      // password unchanged; type a new one to rotate it. The password itself
+      // is never hashed here — it's sent as plaintext `newPassword` over
+      // HTTPS and only POST /api/save-users (server-side) turns it into a
+      // hash, so the client never computes or holds a password hash at all.
       const updatedUsers = users.map((u) =>
         u.username.toLowerCase() === editingUsername.toLowerCase()
-          ? { ...u, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) }
+          ? { ...u, name: managerName.trim(), role: managerRole, ...(managerPassword ? { newPassword: managerPassword } : {}) }
           : u
       );
-      setUsers(updatedUsers);
+      setUsers(updatedUsers.map(({ newPassword, ...rest }) => rest));
       await persistUsersToServer(updatedUsers);
 
       if (currentUser && currentUser.username.toLowerCase() === editingUsername.toLowerCase()) {
-        const updatedSelf = { ...currentUser, name: managerName.trim(), role: managerRole, ...(passwordHash && salt ? { passwordHash, salt } : {}) };
+        const updatedSelf = { ...currentUser, name: managerName.trim(), role: managerRole };
         setCurrentUser(updatedSelf);
         localStorage.setItem("marketing_current_user", JSON.stringify(updatedSelf));
       }
@@ -1008,18 +1158,15 @@ export default function App() {
         return;
       }
 
-      const salt = generateSalt();
-      const passwordHash = await hashPassword(managerPassword, salt);
       const newUser: UserAccount = {
         username: managerUsername.trim().toLowerCase(),
-        passwordHash,
-        salt,
+        newPassword: managerPassword,
         name: managerName.trim(),
         role: managerRole,
       };
 
       const updatedUsers = [...users, newUser];
-      setUsers(updatedUsers);
+      setUsers(updatedUsers.map(({ newPassword, ...rest }) => rest));
       await persistUsersToServer(updatedUsers);
       triggerNotification("success", `Đã thêm thành viên mới: ${managerName} (${managerRole})!`);
     }
@@ -1600,78 +1747,81 @@ export default function App() {
     };
   };
 
-  // JSON Offline File Sync handlers
-  const handleJsonFileParseAndSync = async (file: File) => {
+  // Given a parsed data object — from JSON.parse, or from parseSpreadsheetFile
+  // (src/lib/export.ts) — syncs/merges it into the server database, with a
+  // client-side-only fallback if the request can't reach the server. Shared
+  // by both the JSON and spreadsheet offline-upload paths below.
+  const syncOfflineDataToServer = async (parsed: any) => {
+    try {
+      const syncResult = await safeFetchJson("/api/sync-data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newData: parsed }),
+      });
+      if (syncResult.success) {
+        const safeData = normalizeMarketingData(syncResult.data);
+        setMarketingData(safeData);
+        setPastedJson(JSON.stringify(safeData, null, 2));
+        localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
+        if (syncResult.data && syncResult.data.comments) {
+          setPublishedComments(syncResult.data.comments);
+          localStorage.setItem("marketing_published_comments", JSON.stringify(syncResult.data.comments));
+        }
+        triggerNotification("success", "Tải lên và đồng bộ, sáp nhập dữ liệu thành công từ tệp ngoại tuyến!");
+      } else {
+        throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
+      }
+    } catch (syncErr: any) {
+      console.warn("Server sync failed, falling back to client-side merge:", syncErr);
+      const mergedData = clientSideMergeData(marketingData, parsed);
+      setMarketingData(mergedData);
+      setPastedJson(JSON.stringify(mergedData, null, 2));
+      localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
+      if (parsed && parsed.comments) {
+        const newComments = { ...publishedComments, ...parsed.comments };
+        setPublishedComments(newComments);
+        localStorage.setItem("marketing_published_comments", JSON.stringify(newComments));
+      }
+      // A 401/403 here means the merge above only ever touched this
+      // browser's local state — it was never persisted to Supabase, so
+      // no other viewer will see it. That must never be reported as a
+      // success; only a genuine network/offline failure (no status, the
+      // fetch itself never got a response) is the "offline mode" this
+      // fallback was originally built for.
+      if (syncErr?.status === 401) {
+        triggerNotification("error", "Phiên đăng nhập đã hết hạn — dữ liệu CHƯA được lưu lên máy chủ (chỉ tạm trên trình duyệt này). Vui lòng đăng nhập lại rồi tải tệp lên lần nữa.");
+      } else if (syncErr?.status === 403) {
+        triggerNotification("error", "Tài khoản của bạn không có quyền lưu dữ liệu lên máy chủ — dữ liệu CHƯA được đồng bộ cho người khác, chỉ tạm trên trình duyệt này.");
+      } else {
+        triggerNotification("success", "Đã sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến)!");
+      }
+    }
+  };
+
+  // Offline file upload handler — accepts JSON (.json) or spreadsheet
+  // (.xlsx/.xls/.csv) files. Spreadsheets are parsed client-side into the
+  // same shape JSON already used (parseSpreadsheetFile, src/lib/export.ts),
+  // then merged through the exact same sync codepath above.
+  const handleOfflineFileParseAndSync = async (file: File) => {
     if (!file) return;
-    if (file.type !== "application/json" && !file.name.endsWith(".json")) {
-      triggerNotification("error", "Định dạng tệp không hợp lệ. Vui lòng chọn tệp tin JSON (.json)");
+    const lowerName = file.name.toLowerCase();
+    const isJson = file.type === "application/json" || lowerName.endsWith(".json");
+    const isSpreadsheet = lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls") || lowerName.endsWith(".csv");
+    if (!isJson && !isSpreadsheet) {
+      triggerNotification("error", "Định dạng tệp không hợp lệ. Vui lòng chọn tệp JSON (.json) hoặc bảng tính (.xlsx, .xls, .csv)");
       return;
     }
 
     setIsFileUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string;
-        const parsed = JSON.parse(text);
-
-        // Send to server to sync/merge
-        try {
-          const syncResult = await safeFetchJson("/api/sync-data", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ newData: parsed }),
-          });
-          if (syncResult.success) {
-            const safeData = normalizeMarketingData(syncResult.data);
-            setMarketingData(safeData);
-            setPastedJson(JSON.stringify(safeData, null, 2));
-            localStorage.setItem("marketing_report_raw_data", JSON.stringify(safeData));
-            if (syncResult.data && syncResult.data.comments) {
-              setPublishedComments(syncResult.data.comments);
-              localStorage.setItem("marketing_published_comments", JSON.stringify(syncResult.data.comments));
-            }
-            triggerNotification("success", "Tải lên và đồng bộ, sáp nhập dữ liệu thành công từ tệp JSON ngoại tuyến!");
-          } else {
-            throw new Error(syncResult.error || "Lỗi đồng bộ dữ liệu vào cơ sở dữ liệu.");
-          }
-        } catch (syncErr: any) {
-          console.warn("Server sync failed, falling back to client-side merge:", syncErr);
-          const mergedData = clientSideMergeData(marketingData, parsed);
-          setMarketingData(mergedData);
-          setPastedJson(JSON.stringify(mergedData, null, 2));
-          localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
-          if (parsed && parsed.comments) {
-            const newComments = { ...publishedComments, ...parsed.comments };
-            setPublishedComments(newComments);
-            localStorage.setItem("marketing_published_comments", JSON.stringify(newComments));
-          }
-          // A 401/403 here means the merge above only ever touched this
-          // browser's local state — it was never persisted to Supabase, so
-          // no other viewer will see it. That must never be reported as a
-          // success; only a genuine network/offline failure (no status, the
-          // fetch itself never got a response) is the "offline mode" this
-          // fallback was originally built for.
-          if (syncErr?.status === 401) {
-            triggerNotification("error", "Phiên đăng nhập đã hết hạn — dữ liệu CHƯA được lưu lên máy chủ (chỉ tạm trên trình duyệt này). Vui lòng đăng nhập lại rồi tải tệp lên lần nữa.");
-          } else if (syncErr?.status === 403) {
-            triggerNotification("error", "Tài khoản của bạn không có quyền lưu dữ liệu lên máy chủ — dữ liệu CHƯA được đồng bộ cho người khác, chỉ tạm trên trình duyệt này.");
-          } else {
-            triggerNotification("success", "Đã sáp nhập thành công trên trình duyệt (Chạy Ngoại Tuyến)!");
-          }
-        }
-      } catch (err: any) {
-        console.error(err);
-        triggerNotification("error", "Lỗi đọc hoặc phân tích cú pháp tệp JSON: " + err.message);
-      } finally {
-        setIsFileUploading(false);
-      }
-    };
-    reader.onerror = () => {
-      triggerNotification("error", "Lỗi đọc tệp tin.");
+    try {
+      const parsed = isJson ? JSON.parse(await file.text()) : await parseSpreadsheetFile(file);
+      await syncOfflineDataToServer(parsed);
+    } catch (err: any) {
+      console.error(err);
+      triggerNotification("error", "Lỗi đọc hoặc phân tích cú pháp tệp: " + err.message);
+    } finally {
       setIsFileUploading(false);
-    };
-    reader.readAsText(file);
+    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -1689,13 +1839,13 @@ export default function App() {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleJsonFileParseAndSync(e.dataTransfer.files[0]);
+      handleOfflineFileParseAndSync(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      handleJsonFileParseAndSync(e.target.files[0]);
+      handleOfflineFileParseAndSync(e.target.files[0]);
     }
   };
 
@@ -1742,53 +1892,6 @@ export default function App() {
     }
   };
 
-  // Reset to default initial dataset on Server DB
-  const handleResetData = async () => {
-    if (window.confirm("Bạn có chắc chắn muốn khôi phục toàn bộ dữ liệu báo cáo và nhận định về mặc định ban đầu không?")) {
-      try {
-        const result = await safeFetchJson("/api/reset-data", { method: "POST" });
-        if (result.success) {
-          const safeData = normalizeMarketingData(result.data);
-          setMarketingData(safeData);
-          setPastedJson(JSON.stringify(safeData, null, 2));
-          
-          const defaultPublished = {
-            Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
-            Karofi: { ...DEFAULT_COMMENTS_KAROFI },
-          };
-          setPublishedComments(defaultPublished);
-          setDraftComments(JSON.parse(JSON.stringify(defaultPublished)));
-          
-          localStorage.removeItem("marketing_report_raw_data");
-          localStorage.removeItem("marketing_published_comments");
-          
-          setHasUnpublishedChanges(false);
-          triggerNotification("success", "Đã khôi phục dữ liệu trên máy chủ và trình duyệt về trạng thái mặc định.");
-        } else {
-          throw new Error(result.error || "Lỗi khôi phục cơ sở dữ liệu máy chủ.");
-        }
-      } catch (err: any) {
-        console.warn("Server reset failed, resetting locally inside browser:", err);
-        const safeData = normalizeMarketingData(INITIAL_MARKETING_DATA);
-        setMarketingData(safeData);
-        setPastedJson(JSON.stringify(safeData, null, 2));
-        
-        const defaultPublished = {
-          Livotec: { ...DEFAULT_COMMENTS_LIVOTEC },
-          Karofi: { ...DEFAULT_COMMENTS_KAROFI },
-        };
-        setPublishedComments(defaultPublished);
-        setDraftComments(JSON.parse(JSON.stringify(defaultPublished)));
-        
-        localStorage.removeItem("marketing_report_raw_data");
-        localStorage.removeItem("marketing_published_comments");
-        
-        setHasUnpublishedChanges(false);
-        triggerNotification("success", "Đã khôi phục dữ liệu trình duyệt về trạng thái mặc định ban đầu.");
-      }
-    }
-  };
-
   // Save mail configuration to Server DB
   const handleSaveMailConfig = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1815,6 +1918,26 @@ export default function App() {
       triggerNotification("error", `Không thể lưu cấu hình mail: ${err.message}`);
     } finally {
       setIsMailLoading(false);
+    }
+  };
+
+  // Manual test send — same email the Friday 17:00 ICT cron would send (see
+  // GET /api/cron/weekly-backup), triggered on demand so Admin can verify
+  // SMTP settings work right after saving them instead of waiting a week.
+  const [isSendingBackupNow, setIsSendingBackupNow] = useState(false);
+  const handleSendBackupNow = async () => {
+    setIsSendingBackupNow(true);
+    try {
+      const result = await safeFetchJson("/api/send-backup-now", { method: "POST" });
+      if (result.success) {
+        triggerNotification("success", `Đã gửi email backup thử tới ${mailRecipient || "địa chỉ đã cấu hình"}!`);
+      } else {
+        throw new Error(result.error || "Lỗi gửi email backup.");
+      }
+    } catch (err: any) {
+      triggerNotification("error", `Không thể gửi email backup: ${err.message}`);
+    } finally {
+      setIsSendingBackupNow(false);
     }
   };
 
@@ -2589,28 +2712,210 @@ export default function App() {
   }
 
   return (
-    <div id="app_root" className="min-h-screen bg-slate-50/60 font-sans text-slate-800">
+    <div id="app_root" className="flex min-h-screen flex-col bg-slate-50/60 font-sans text-slate-800 lg:flex-row">
+      {/* ------------------------------------------------------------
+          LEFT SIDEBAR: BRANDING + REPORT CATEGORY MENU
+         ------------------------------------------------------------ */}
+      <aside
+        id="app_sidebar"
+        className="no-print w-full shrink-0 border-b border-slate-200 bg-white lg:w-60 lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen lg:flex lg:flex-col"
+      >
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold tracking-tight text-slate-900">
+              Báo Cáo Hiệu Suất Marketing
+            </h1>
+            <p className="truncate font-mono text-[11px] text-slate-500 uppercase tracking-wider">
+              Livotec & Karofi • Analytical Hub
+            </p>
+          </div>
+        </div>
+
+        {activeTab === "dashboard" ? (
+          <nav
+            id="report_category_sidebar"
+            className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
+          >
+            <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
+              Danh Mục Báo Cáo
+            </p>
+            {REPORT_CATEGORIES.filter((cat) => cat.id !== "social" || currentUser.role === "Admin").map((cat) => {
+              const CatIcon = cat.icon;
+              const isActive = reportCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  id={`report_category_btn_${cat.id}`}
+                  onClick={() => setReportCategory(cat.id)}
+                  className={`flex w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                    isActive
+                      ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                      : "border-transparent text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <CatIcon className={`h-4 w-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                    {cat.label}
+                  </span>
+                  {cat.comingSoon && (
+                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                      Sắp ra mắt
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        ) : (
+          <nav
+            id="control_panel_sidebar"
+            className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
+          >
+            <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
+              Danh Mục Quản Trị
+            </p>
+            {CONTROL_PANEL_SECTIONS.filter((sec) => !sec.adminOnly || currentUser.role === "Admin").map((sec) => {
+              const SecIcon = sec.icon;
+              const isActive = controlPanelSection === sec.id;
+
+              if (sec.id === "logs") {
+                return (
+                  <div key={sec.id} className="w-full shrink-0">
+                    <button
+                      id={`control_section_btn_${sec.id}`}
+                      onClick={() => setControlPanelSection("logs")}
+                      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                        isActive
+                          ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                          : "border-transparent text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <SecIcon className={`h-4 w-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                      {sec.label}
+                    </button>
+                    <div className="ml-4 mt-1 space-y-1 border-l border-slate-100 pl-3">
+                      {currentUser.role === "Admin" && (
+                        <button
+                          id="control_section_btn_logs_login"
+                          onClick={() => {
+                            setControlPanelSection("logs");
+                            setLogsSubTab("login");
+                          }}
+                          className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
+                            isActive && logsSubTab === "login" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          Log đăng nhập
+                        </button>
+                      )}
+                      <button
+                        id="control_section_btn_logs_action"
+                        onClick={() => {
+                          setControlPanelSection("logs");
+                          setLogsSubTab("action");
+                        }}
+                        className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
+                          isActive && logsSubTab === "action" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        Nhật ký thao tác
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  key={sec.id}
+                  id={`control_section_btn_${sec.id}`}
+                  onClick={() => setControlPanelSection(sec.id)}
+                  className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                    isActive
+                      ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                      : "border-transparent text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <SecIcon className={`h-4 w-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                  {sec.label}
+                </button>
+              );
+            })}
+          </nav>
+        )}
+      </aside>
+
+      {/* ------------------------------------------------------------
+          RIGHT COLUMN: TOP BAR + PAGE CONTENT
+         ------------------------------------------------------------ */}
+      <div className="flex min-w-0 flex-1 flex-col">
       {/* ------------------------------------------------------------
           HEADER MENU BAR
          ------------------------------------------------------------ */}
       <header id="header_navbar" className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-3 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
-              <BarChart3 className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
-                Báo Cáo Hiệu Suất Marketing
-              </h1>
-              <p className="font-mono text-xs text-slate-500 uppercase tracking-wider">
-                Livotec & Karofi • Analytical Hub
-              </p>
-            </div>
+          {/* Navigation Tabs */}
+          <div className="flex items-center rounded-lg bg-slate-100 p-1">
+            <button
+              id="tab_nav_report"
+              onClick={() => setActiveTab("dashboard")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                activeTab === "dashboard"
+                  ? "bg-white text-slate-950 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Báo Cáo</span>
+            </button>
+
+            {currentUser.role !== "Viewer" && (
+              <button
+                id="tab_nav_control"
+                onClick={() => setActiveTab("control-panel")}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all relative cursor-pointer ${
+                  activeTab === "control-panel"
+                    ? "bg-white text-slate-950 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                <span>Control Panel</span>
+                {hasUnpublishedChanges && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
-          {/* User metadata & timeline info */}
+          {/* Timeline + user/session cluster — moved after the nav tabs */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {/* Timeline selector */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm">
+              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+              <select
+                id="timeline_select"
+                value={selectedTimeline.id}
+                onChange={(e) => {
+                  const found = timelines.find((t) => t.id === e.target.value);
+                  if (found) setSelectedTimeline(found);
+                }}
+                className="bg-transparent pr-2 font-medium text-slate-800 focus:outline-none cursor-pointer"
+              >
+                {timelines.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-1.5 font-sans text-xs text-indigo-700">
               <Shield className="h-3.5 w-3.5 text-indigo-500" />
               <span className="font-semibold text-indigo-950">{currentUser.name}</span>
@@ -2649,63 +2954,6 @@ export default function App() {
               <Printer className="h-3.5 w-3.5 text-indigo-500" />
               <span>Xuất PDF</span>
             </button>
-
-            {/* Timeline selector */}
-            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
-              <select
-                id="timeline_select"
-                value={selectedTimeline.id}
-                onChange={(e) => {
-                  const found = timelines.find((t) => t.id === e.target.value);
-                  if (found) setSelectedTimeline(found);
-                }}
-                className="bg-transparent pr-2 font-medium text-slate-800 focus:outline-none cursor-pointer"
-              >
-                {timelines.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Navigation Tabs */}
-            <div className="flex items-center rounded-lg bg-slate-100 p-1">
-              <button
-                id="tab_nav_report"
-                onClick={() => setActiveTab("dashboard")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                  activeTab === "dashboard"
-                    ? "bg-white text-slate-950 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <FileSpreadsheet className="h-3.5 w-3.5" />
-                <span>Báo Cáo</span>
-              </button>
-              
-              {currentUser.role !== "Viewer" && (
-                <button
-                  id="tab_nav_control"
-                  onClick={() => setActiveTab("control-panel")}
-                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all relative cursor-pointer ${
-                    activeTab === "control-panel"
-                      ? "bg-white text-slate-950 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                  <span>Control Panel</span>
-                  {hasUnpublishedChanges && (
-                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
           </div>
         </div>
       </header>
@@ -2730,57 +2978,71 @@ export default function App() {
       )}
 
       {/* ------------------------------------------------------------
-          BRAND SELECTION SUB-BAR
-         ------------------------------------------------------------ */}
-      <div className="border-b border-slate-200 bg-white/60 py-2.5">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Thương hiệu phân tích:
-            </span>
-            <div className="flex rounded-lg bg-slate-100/80 p-0.5 border border-slate-200/50">
-              <button
-                id="brand_btn_livotec"
-                onClick={() => setSelectedBrand("Livotec")}
-                className={`rounded-md px-4 py-1 text-xs font-bold transition-all ${
-                  selectedBrand === "Livotec"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                LIVOTEC
-              </button>
-              <button
-                id="brand_btn_karofi"
-                onClick={() => setSelectedBrand("Karofi")}
-                className={`rounded-md px-4 py-1 text-xs font-bold transition-all ${
-                  selectedBrand === "Karofi"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-900"
-                }`}
-              >
-                KAROFI
-              </button>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs text-slate-500 sm:inline">Trạng thái dữ liệu:</span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Đã kết nối
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------
           MAIN APPLICATION STAGE
          ------------------------------------------------------------ */}
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         {activeTab === "dashboard" ? (
           <div className="space-y-6">
-            
+            {/* ------------------------------------------------------------
+                BRAND SELECTION ROW — left-aligned with Box 1 below
+               ------------------------------------------------------------ */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Thương hiệu phân tích:
+                </span>
+                <div className="flex rounded-lg bg-slate-100/80 p-0.5 border border-slate-200/50">
+                  <button
+                    id="brand_btn_livotec"
+                    onClick={() => setSelectedBrand("Livotec")}
+                    className={`rounded-md px-4 py-1 text-xs font-bold transition-all ${
+                      selectedBrand === "Livotec"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    LIVOTEC
+                  </button>
+                  <button
+                    id="brand_btn_karofi"
+                    onClick={() => setSelectedBrand("Karofi")}
+                    className={`rounded-md px-4 py-1 text-xs font-bold transition-all ${
+                      selectedBrand === "Karofi"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    KAROFI
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="hidden text-xs text-slate-500 sm:inline">Trạng thái dữ liệu:</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Đã kết nối
+                </span>
+              </div>
+            </div>
+
+            {reportCategory === "social" && currentUser.role === "Admin" ? (
+              <SocialReportPage role={currentUser.role} />
+            ) : reportCategory !== "mkt_weekly" ? (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-24 text-center shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
+                  <Construction className="h-7 w-7" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {REPORT_CATEGORIES.find((c) => c.id === reportCategory)?.label}
+                </h3>
+                <p className="mt-1.5 max-w-sm text-sm text-slate-500">
+                  Phân hệ báo cáo này đang được phát triển và sẽ sớm ra mắt. Vui lòng chọn "MKT Weekly" để xem báo cáo hiện tại.
+                </p>
+              </div>
+            ) : (
+          <div className="space-y-6">
+
             {/* ------------------------------------------------------------
                 BOX 1: SCORE CARDS (MAX 8 CARDS)
                ------------------------------------------------------------ */}
@@ -4003,58 +4265,26 @@ export default function App() {
               </div>
             </section>
           </div>
+            )}
+          </div>
         ) : (
           /* ------------------------------------------------------------
               GIAO DIỆN CONTROL PANEL (BẢNG ĐIỀU KHIỂN RIÊNG BIỆT)
              ------------------------------------------------------------ */
           <div className="space-y-8 animate-fade-in">
-            <div id="editor_title_section" className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
-              <div>
-                <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
-                  <Settings2 className="h-6 w-6 text-indigo-600 animate-spin-slow" />
-                  Control Panel & Quản Trị Báo Cáo
-                </h2>
-                <p className="text-sm text-slate-500">
-                  Cung cấp nguồn dữ liệu JSON mới và biên tập trực tiếp các bài nhận định tiếp thị trước khi xuất bản báo cáo.
-                </p>
-              </div>
-
-              {/* Action buttons: Export & Reset */}
-              <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-                <button
-                  onClick={() => exportToExcel(marketingData)}
-                  className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
-                  title="Xuất cơ sở dữ liệu hiện tại thành định dạng Excel đa phân hệ (Multi-worksheet)"
-                >
-                  <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
-                  Xuất Excel (.xls)
-                </button>
-
-                <button
-                  onClick={() => exportToJSON(marketingData)}
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-sm"
-                  title="Xuất toàn bộ cấu trúc dữ liệu JSON để dự phòng hoặc phục hồi"
-                >
-                  <FileJson className="h-3.5 w-3.5 text-slate-600" />
-                  Xuất JSON
-                </button>
-
-                <button
-                  onClick={handleResetData}
-                  className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-sm"
-                  title="Xoá toàn bộ chỉnh sửa và khôi phục dữ liệu gốc mặc định"
-                >
-                  <RefreshCw className="h-3.5 w-3.5 text-rose-600" />
-                  Khôi phục mặc định
-                </button>
-              </div>
+            <div id="editor_title_section" className="border-b border-slate-200 pb-5">
+              <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
+                <Settings2 className="h-6 w-6 text-indigo-600 animate-spin-slow" />
+                {CONTROL_PANEL_SECTIONS.find((s) => s.id === controlPanelSection)?.label || "Control Panel"}
+              </h2>
+              <p className="text-sm text-slate-500">
+                Cung cấp nguồn dữ liệu JSON mới và biên tập trực tiếp các bài nhận định tiếp thị trước khi xuất bản báo cáo.
+              </p>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-12 items-start">
-              
-              {/* LEFT COLUMN: JSON DATA SOURCE MANAGEMENT (5 Cols) */}
-              <div className="lg:col-span-5 space-y-6">
-                
+            {controlPanelSection === "data-entry" && (
+              <div className="space-y-6">
+
                 {/* Option 1: Offline JSON File Upload */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
@@ -4062,7 +4292,7 @@ export default function App() {
                       <Upload className="h-4 w-4" />
                     </div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      1. Tải lên tệp JSON ngoại tuyến
+                      1. Tải lên tệp dữ liệu ngoại tuyến
                     </h3>
                   </div>
 
@@ -4080,7 +4310,7 @@ export default function App() {
                     <input
                       id="json_file_uploader"
                       type="file"
-                      accept=".json,application/json"
+                      accept=".json,application/json,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
                       onChange={handleFileChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       disabled={isFileUploading}
@@ -4098,7 +4328,7 @@ export default function App() {
                           <FileJson className="h-8 w-8 text-indigo-500" />
                           <div>
                             <p className="text-xs font-semibold text-slate-700">
-                              Kéo thả tệp tin JSON vào đây
+                              Kéo thả tệp JSON hoặc Excel/CSV vào đây
                             </p>
                             <p className="text-[11px] text-slate-400 mt-0.5">
                               hoặc nhấp chuột để chọn tệp từ máy tính của bạn
@@ -4116,7 +4346,8 @@ export default function App() {
                   <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1.5">
                     <span className="font-semibold text-slate-800 block">💡 Thông tin đồng bộ ngoại tuyến:</span>
                     <ul className="list-disc pl-4 space-y-1 leading-relaxed">
-                      <li>Tải tệp JSON báo cáo tuần mới của bạn lên từ máy tính.</li>
+                      <li>Hỗ trợ tệp <strong>.json</strong> hoặc bảng tính <strong>.xlsx / .xls / .csv</strong>.</li>
+                      <li>Với Excel: mỗi sheet là một nhóm dữ liệu, tên sheet phải là một trong: <code>digital_marketing</code>, <code>kol_koc</code>, <code>btl_trade</code>, <code>monthly_ooh_pr</code>, <code>btl_trade_monthly</code> (không phân biệt hoa/thường, dấu cách/gạch dưới). Dòng đầu tiên là tên cột đúng theo tên trường dữ liệu (ví dụ: <code>week</code>, <code>brand</code>, <code>hạng_mục</code>...) — có thể lấy mẫu từ nút "Xuất Database Đầy Đủ (.xlsx)" bên dưới rồi chỉnh sửa lại.</li>
                       <li>Hệ thống sẽ tự động đối chiếu, <strong>sáp nhập (merge) thông minh</strong> các bản ghi trùng lặp và bổ sung các dòng dữ liệu mới vào CSDL nội bộ.</li>
                       <li>Quy trình này hoàn toàn an toàn và không phụ thuộc vào kết nối mạng bên ngoài.</li>
                     </ul>
@@ -4161,10 +4392,11 @@ export default function App() {
                 </div>
 
               </div>
+            )}
 
-              {/* RIGHT COLUMN: REVIEWS & SUGGESTIONS WRITER (7 Cols) */}
-              <div className="lg:col-span-7 space-y-6">
-                
+            {controlPanelSection === "comments" && (
+              <div className="space-y-6">
+
                 {/* Assessment Editor Box */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-6">
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
@@ -4406,11 +4638,10 @@ export default function App() {
                 </div>
 
               </div>
+            )}
 
-            </div>
-
-            {/* Section 4: Advanced Database Row Manager (Only Admin) - Responsive Full-Width Layout */}
-            {currentUser && currentUser.role === "Admin" && (
+            {/* Section: Advanced Database Row Manager (Only Admin) */}
+            {controlPanelSection === "db-admin" && currentUser && currentUser.role === "Admin" && (
               <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
@@ -4494,6 +4725,42 @@ export default function App() {
                       OOH & PR
                     </button>
                   </div>
+                </div>
+
+                {/* Export & Reset actions */}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => exportToExcel(marketingData)}
+                    className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition shadow-sm"
+                    title="Xuất cơ sở dữ liệu hiện tại thành định dạng Excel đa phân hệ (Multi-worksheet)"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-indigo-600" />
+                    Xuất Excel (.xls)
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      exportFullDatabaseToExcel({
+                        ...marketingData,
+                        comments: publishedComments,
+                        users: users.map((u) => ({ username: u.username, name: u.name, role: u.role })),
+                      })
+                    }
+                    className="flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition shadow-sm"
+                    title="Xuất TOÀN BỘ database (bao gồm btl_trade_monthly, nhận định, danh sách tài khoản) thành 1 tệp .xlsx đầy đủ, có thể dùng làm mẫu tải lên lại"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                    Xuất Database Đầy Đủ (.xlsx)
+                  </button>
+
+                  <button
+                    onClick={() => exportToJSON(marketingData)}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition shadow-sm"
+                    title="Xuất toàn bộ cấu trúc dữ liệu JSON để dự phòng hoặc phục hồi"
+                  >
+                    <FileJson className="h-3.5 w-3.5 text-slate-600" />
+                    Xuất JSON
+                  </button>
                 </div>
 
                 {/* Filter & Search Bar */}
@@ -4963,8 +5230,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Section 5: User & Account Management (Only Admin) */}
-            {currentUser && currentUser.role === "Admin" && (
+            {/* Section: User & Account Management (Only Admin) */}
+            {controlPanelSection === "users" && currentUser && currentUser.role === "Admin" && (
               <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
                 <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -5121,6 +5388,288 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* ------------------------------------------------------------
+                AUTOMATED WEEKLY BACKUP EMAIL — Admin only
+               ------------------------------------------------------------ */}
+            {controlPanelSection === "backup" && currentUser && currentUser.role === "Admin" && (
+              <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      Sao Lưu Database Tự Động Qua Email
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Tự động gửi file Excel backup toàn bộ database vào <strong>17:00 thứ Sáu hàng tuần</strong> qua email cấu hình bên dưới.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-800">
+                  ⚠️ Lịch tự động (Vercel Cron) chỉ chạy trên bản deploy thật (Vercel) — máy local không kích hoạt lịch này. Dùng nút "Gửi thử ngay" bên dưới để kiểm tra cấu hình SMTP ngay tại đây.
+                </div>
+
+                <form onSubmit={handleSaveMailConfig} className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Email nhận backup
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={mailRecipient}
+                      onChange={(e) => setMailRecipient(e.target.value)}
+                      placeholder="ntkdung1206@gmail.com"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      SMTP Host
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={mailHost}
+                      onChange={(e) => setMailHost(e.target.value)}
+                      placeholder="smtp.gmail.com"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      SMTP Port
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={mailPort}
+                      onChange={(e) => setMailPort(e.target.value)}
+                      placeholder="587"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      SMTP User (email đăng nhập)
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={mailUser}
+                      onChange={(e) => setMailUser(e.target.value)}
+                      placeholder="your-account@gmail.com"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      SMTP Password (App Password)
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={mailPass}
+                      onChange={(e) => setMailPass(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 sm:col-span-2">
+                    <input
+                      id="mail_enabled_checkbox"
+                      type="checkbox"
+                      checked={mailEnabled}
+                      onChange={(e) => setMailEnabled(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <label htmlFor="mail_enabled_checkbox" className="text-xs font-medium text-slate-700">
+                      Bật gửi email backup tự động hàng tuần
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 sm:col-span-2 pt-2">
+                    <button
+                      type="submit"
+                      disabled={isMailLoading}
+                      className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {isMailLoading ? "Đang lưu..." : "Lưu cấu hình"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendBackupNow}
+                      disabled={isSendingBackupNow}
+                      className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 shadow-sm transition"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isSendingBackupNow ? "animate-spin" : ""}`} />
+                      {isSendingBackupNow ? "Đang gửi..." : "Gửi thử ngay"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------
+                LOGIN AUDIT LOG — Admin only
+               ------------------------------------------------------------ */}
+            {controlPanelSection === "logs" && logsSubTab === "login" && currentUser.role === "Admin" && (
+              <div id="login_logs_section" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">Nhật Ký Đăng Nhập</h3>
+                      <p className="text-[11px] text-slate-400">Chỉ Admin xem được · {loginLogs.length} lượt gần nhất</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={fetchLoginLogs}
+                    disabled={isLoginLogsLoading}
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isLoginLogsLoading ? "animate-spin" : ""}`} />
+                    Làm mới
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Thời gian (UTC)</th>
+                        <th className="px-3 py-2 text-left">Thời gian (Local)</th>
+                        <th className="px-3 py-2 text-left">Tài khoản</th>
+                        <th className="px-3 py-2 text-left">Trạng thái</th>
+                        <th className="px-3 py-2 text-left">IP</th>
+                        <th className="px-3 py-2 text-left">User Agent</th>
+                        <th className="px-3 py-2 text-left">Session ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loginLogs.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
+                            {isLoginLogsLoading ? "Đang tải..." : "Chưa có dữ liệu đăng nhập."}
+                          </td>
+                        </tr>
+                      ) : (
+                        loginLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-slate-50/50">
+                            <td className="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatLogUtc(log.created_at)}</td>
+                            <td className="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatLogLocal(log.created_at)}</td>
+                            <td className="px-3 py-2 font-semibold text-slate-700">{log.username}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                                  log.status === "success"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                                }`}
+                              >
+                                {log.status === "success" ? "Thành công" : "Thất bại"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{log.ip || "—"}</td>
+                            <td className="px-3 py-2 text-slate-500 max-w-[220px] truncate" title={log.user_agent || ""}>
+                              {log.user_agent || "—"}
+                            </td>
+                            <td className="px-3 py-2 font-mono text-[10px] text-slate-400 max-w-[120px] truncate" title={log.session_id || ""}>
+                              {log.session_id || "—"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ------------------------------------------------------------
+                USER ACTION LOG — Admin sees every account, everyone else
+                (Editor — Viewer has no Control Panel access) sees only their
+                own actions. Scoping happens server-side (GET /api/action-logs).
+               ------------------------------------------------------------ */}
+            {controlPanelSection === "logs" && logsSubTab === "action" && (
+            <div id="action_logs_section" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">Nhật Ký Thao Tác</h3>
+                    <p className="text-[11px] text-slate-400">
+                      {currentUser.role === "Admin" ? "Toàn bộ tài khoản" : "Chỉ hiển thị thao tác của bạn"} · {actionLogs.length} lượt gần nhất
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={fetchActionLogs}
+                  disabled={isActionLogsLoading}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isActionLogsLoading ? "animate-spin" : ""}`} />
+                  Làm mới
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Thời gian (UTC)</th>
+                      <th className="px-3 py-2 text-left">Thời gian (Local)</th>
+                      <th className="px-3 py-2 text-left">Tài khoản</th>
+                      <th className="px-3 py-2 text-left">Vai trò</th>
+                      <th className="px-3 py-2 text-left">Hành động</th>
+                      <th className="px-3 py-2 text-left">Chi tiết</th>
+                      <th className="px-3 py-2 text-left">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {actionLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
+                          {isActionLogsLoading ? "Đang tải..." : "Chưa có thao tác nào được ghi nhận."}
+                        </td>
+                      </tr>
+                    ) : (
+                      actionLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-slate-50/50">
+                          <td className="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatLogUtc(log.created_at)}</td>
+                          <td className="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">{formatLogLocal(log.created_at)}</td>
+                          <td className="px-3 py-2 font-semibold text-slate-700">{log.username}</td>
+                          <td className="px-3 py-2 text-slate-500">{log.role || "—"}</td>
+                          <td className="px-3 py-2">
+                            <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                              {ACTION_LABELS[log.action] || log.action}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-slate-500 max-w-[280px] truncate" title={log.details || ""}>
+                            {log.details || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{log.ip || "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            )}
           </div>
         )}
       </main>
@@ -5132,6 +5681,7 @@ export default function App() {
           <p className="mt-1 font-mono">Dữ liệu phân tích tuần • Thiết kế với triết lý tối giản tinh tế</p>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

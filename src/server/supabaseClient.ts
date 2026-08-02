@@ -14,16 +14,27 @@ import dotenv from "dotenv";
 // code runs, so if app.ts's dotenv.config() ran after `import "./supabaseClient"`,
 // this file would read process.env before it was populated and permanently
 // bake empty/placeholder values into the client below.
-dotenv.config({ path: ".env.local" });
-dotenv.config();
+dotenv.config({ path: ".env.local", quiet: true });
+dotenv.config({ quiet: true });
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+// Whether the real Supabase project is wired up. Intentionally false for
+// local dev by default: local testing must never touch the production
+// database (a "Khôi phục mặc định" click during local testing once wiped
+// real report data with no way to recover it — see git history / removed
+// POST /api/reset-data). When false, src/server/app.ts falls back to a
+// local-only JSON file (src/db_store.json, gitignored) plus in-memory rate
+// limiting and audit logs, so local dev still fully works — it's just
+// isolated from anything real. Only Vercel (production) sets these env vars.
+export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+
+if (!isSupabaseConfigured) {
   console.warn(
-    "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY chưa được cấu hình. " +
-    "Các API đọc/ghi dữ liệu sẽ báo lỗi cho đến khi bạn khai báo 2 biến này (xem .env.example)."
+    "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY chưa được cấu hình — đang chạy ở chế độ LOCAL-ONLY " +
+    "(dữ liệu lưu vào src/db_store.json, không đụng đến Supabase thật). Đây là hành vi mong muốn cho " +
+    "môi trường dev cục bộ; chỉ khai báo 2 biến này trên Vercel (production)."
   );
 }
 

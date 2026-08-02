@@ -9,20 +9,32 @@
 
 export interface UserAccount {
   username: string;
-  // Passwords are never stored in plaintext. `passwordHash` = SHA-256(`${salt}:${plainPassword}`), hex-encoded.
+  // Passwords are never stored in plaintext. Two hash formats exist:
+  //   - "scrypt:<hex>" — src/lib/serverPasswordHash.ts (current, server-only,
+  //     memory-hard). All new/rotated passwords use this.
+  //   - "<64 hex chars>" (no prefix) — legacy src/lib/passwordHash.ts
+  //     (single-round SHA-256). Verified for backward compatibility only;
+  //     transparently rehashed to scrypt on next successful login.
   passwordHash?: string;
   salt?: string;
+  // Client → server only, for POST /api/save-users: set to rotate/create a
+  // password. The server hashes it (scrypt) and never persists or echoes
+  // back this field. Never present on data read back from the server.
+  newPassword?: string;
   name: string;
   role: "Admin" | "Editor" | "Viewer";
 }
 
-// Precomputed with src/lib/passwordHash.ts (SHA-256 + per-user salt).
+// Precomputed with src/lib/serverPasswordHash.ts (scrypt + per-user salt),
+// except viewer1/viewer2 which are still on the legacy SHA-256 format (see
+// UserAccount.passwordHash doc above) since rotating their password wasn't
+// requested and doing so requires knowing the plaintext to rehash.
 // Plaintext passwords are intentionally NOT written anywhere in this repo
 // (it's public) — save them in your own password manager instead.
 export const DEFAULT_USERS: UserAccount[] = [
-  { username: "ntkdung1206@gmail.com", salt: "3e83a6d1a854840d5e1af6028d17224d", passwordHash: "77bb43ffd629f0621d85cd86a0b2e55551a8c0d7eadb7c3e9c65fddb35842511", name: "Dũng Nguyễn", role: "Admin" },
-  { username: "admin", salt: "8f89341202e6b122fd50319143c90700", passwordHash: "15725c760fe8dfef6c39c3ebc343183d7a7ceb6a8a964d1d60b07b4ac2c26020", name: "Quản trị hệ thống", role: "Admin" },
-  { username: "editor1", salt: "8a7a42e05d4a245bb937ff9e038ddae5", passwordHash: "70b94d7025353a71dbdcf0250875d6a54e640be672693aa3cea56d80a12bfd7a", name: "Nguyễn Biên Tập", role: "Editor" },
+  { username: "ntkdung1206@gmail.com", salt: "1b59cef3728bd945106ace0e2a8feaf1", passwordHash: "scrypt:2a8392a87ea3c81a625c6d9cc09ee876f9aaa0f2e27c7a473b4e1633d3b58a0d3106dfb1929520f89aededc338057488b9cf40d3a37cfb8aaf121963b21dc507", name: "Dũng Nguyễn", role: "Admin" },
+  { username: "admin", salt: "9a3400813aaa7e03ea5617378950727b", passwordHash: "scrypt:962b332155cc79a7d53dfd90efd38e43ab694c1eeb1f3758ab8d763c397b2b23241cd472afafc6fe39916bd6715df5b8b08c759a184dc618bb0df30a705c6065", name: "Quản trị hệ thống", role: "Admin" },
+  { username: "editor1", salt: "78352da124ad5c0f0590a1fb41e387ad", passwordHash: "scrypt:fba642d3dc46433ed8d869addd6d7eca85f7878257fe412bc12ee22f7f73c24a43ad28e644e1945d421f6391bc3d633f5230c34074379d77de2145faa92033b9", name: "Nguyễn Biên Tập", role: "Editor" },
   { username: "viewer1", salt: "9891b5004f979ed95778a77d487a15fc", passwordHash: "7fdc2efb593acbeb57e98d555a3fdce244f547a5a73fa13df66ad61678e2c7b9", name: "Người xem", role: "Viewer" },
   { username: "viewer2", salt: "1bc2d4bf855a868da0e6b85fe199bdc6", passwordHash: "a1d752a1b080a097507451db46a0d1fb1581ac9a7d3317c05af4b326123de5be", name: "Viewer 2", role: "Viewer" }
 ];
@@ -32,7 +44,7 @@ export const DEFAULT_USERS: UserAccount[] = [
 // DEFAULT_USERS whenever it sees a newer version — this guarantees credential
 // fixes always take effect everywhere. Any extra accounts that aren't part of
 // DEFAULT_USERS (added later through the user-management UI) are preserved as-is.
-export const USERS_CONFIG_VERSION = 3; // v3: switched from plaintext `password` to salted `passwordHash`
+export const USERS_CONFIG_VERSION = 5; // v5: rotated Admin/Editor passwords + migrated their hashes to scrypt
 
 export function reconcileUsers(savedList: UserAccount[], savedVersion: number): UserAccount[] {
   if (savedVersion >= USERS_CONFIG_VERSION) {

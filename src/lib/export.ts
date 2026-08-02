@@ -1,6 +1,61 @@
 /**
  * Utility functions for exporting the marketing database.
  */
+import * as XLSX from "xlsx";
+
+// Sheet names a spreadsheet upload is matched against (case/space/underscore
+// insensitive) — see parseSpreadsheetFile below. Kept as the internal field
+// keys (e.g. "week", "brand", "hạng_mục") rather than the pretty Vietnamese
+// labels used in exportToExcel's old .xls report, because those keys are
+// exactly what normalizeMarketingData's column matching already recognizes
+// (src/data.ts) — no separate label→key mapping to keep in sync.
+const SPREADSHEET_COLLECTION_ALIASES: Record<string, string[]> = {
+  digital_marketing: ["digital_marketing", "digital marketing"],
+  kol_koc: ["kol_koc", "kol koc", "kol/koc", "kol_kol"],
+  btl_trade: ["btl_trade", "btl trade"],
+  monthly_ooh_pr: ["monthly_ooh_pr", "monthly ooh pr", "ooh pr", "ooh_pr"],
+  btl_trade_monthly: ["btl_trade_monthly", "btl trade monthly"],
+};
+
+function normalizeSheetName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// Reads an uploaded .xlsx/.xls/.csv file and returns a plain object shaped
+// like { digital_marketing: [...], kol_koc: [...], ... } — the same shape
+// the offline JSON upload already produces — so it can be handed to the
+// exact same merge/sync codepath (POST /api/sync-data) without a separate
+// import pipeline. Sheets are matched by name (see aliases above); any sheet
+// that doesn't match a known collection is ignored rather than guessed at.
+export async function parseSpreadsheetFile(file: File): Promise<any> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+
+  const sheetByNormalizedName = new Map<string, string>();
+  workbook.SheetNames.forEach((name) => {
+    sheetByNormalizedName.set(normalizeSheetName(name), name);
+  });
+
+  const result: Record<string, any[]> = {};
+  Object.entries(SPREADSHEET_COLLECTION_ALIASES).forEach(([key, aliases]) => {
+    const matchedSheetName = aliases
+      .map((alias) => sheetByNormalizedName.get(normalizeSheetName(alias)))
+      .find((n): n is string => Boolean(n));
+    if (matchedSheetName) {
+      const sheet = workbook.Sheets[matchedSheetName];
+      result[key] = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
+    }
+  });
+
+  if (Object.keys(result).length === 0) {
+    throw new Error(
+      `Không tìm thấy sheet nào khớp với các mảng dữ liệu đã biết (digital_marketing, kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly). ` +
+      `Các sheet có trong tệp: ${workbook.SheetNames.join(", ") || "(không có)"}`
+    );
+  }
+
+  return result;
+}
 
 function escapeXML(str: any): string {
   if (str === null || str === undefined) return "";
@@ -128,4 +183,68 @@ export function exportToJSON(data: any) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export interface FullDatabaseExportPayload {
+  digital_marketing: any[];
+  kol_koc: any[];
+  btl_trade: any[];
+  monthly_ooh_pr: any[];
+  btl_trade_monthly: any[];
+  // { [week]: { [brand]: BrandComments } } — flattened into one row per field.
+  comments?: Record<string, any>;
+  // Safe fields only — never pass passwordHash/salt here.
+  users?: { username: string; name: string; role: string }[];
+}
+
+// Builds the full-database workbook (SheetJS WorkBook object) — one sheet
+// per collection, covering everything the old exportToExcel above left out
+// (btl_trade_monthly, comments, users). Row object keys are used as-is for
+// headers, which is why they double as a round-trippable upload template
+// for parseSpreadsheetFile above. Pure/isomorphic (no browser APIs), so the
+// weekly email backup (src/server/backupMailer.ts) reuses this exact same
+// sheet layout instead of maintaining a second copy server-side.
+export function buildFullDatabaseWorkbook(payload: FullDatabaseExportPayload): XLSX.WorkBook {
+  const workbook = XLSX.utils.book_new();
+
+  const addSheet = (name: string, rows: any[]) => {
+    const sheet = XLSX.utils.json_to_sheet(rows && rows.length > 0 ? rows : [{}]);
+    XLSX.utils.book_append_sheet(workbook, sheet, name.slice(0, 31));
+  };
+
+  addSheet("digital_marketing", payload.digital_marketing || []);
+  addSheet("kol_koc", payload.kol_koc || []);
+  addSheet("btl_trade", payload.btl_trade || []);
+  addSheet("monthly_ooh_pr", payload.monthly_ooh_pr || []);
+  addSheet("btl_trade_monthly", payload.btl_trade_monthly || []);
+
+  if (payload.comments) {
+    const commentRows: { week: string; brand: string; field: string; value: string }[] = [];
+    Object.entries(payload.comments).forEach(([week, byBrand]: [string, any]) => {
+      Object.entries(byBrand || {}).forEach(([brand, c]: [string, any]) => {
+        commentRows.push({ week, brand, field: "evaluation", value: c?.evaluation || "" });
+        commentRows.push({ week, brand, field: "proposals", value: c?.proposals || "" });
+        Object.entries(c?.categories || {}).forEach(([cat, value]: [string, any]) => {
+          commentRows.push({ week, brand, field: `category_${cat}`, value: value || "" });
+        });
+      });
+    });
+    addSheet("comments", commentRows);
+  }
+
+  if (payload.users) {
+    addSheet(
+      "users",
+      payload.users.map((u) => ({ username: u.username, name: u.name, role: u.role }))
+    );
+  }
+
+  return workbook;
+}
+
+// Full-database export (task: "xuất excel database hiện có") — downloads
+// buildFullDatabaseWorkbook's output as a .xlsx file in the browser.
+export function exportFullDatabaseToExcel(payload: FullDatabaseExportPayload) {
+  const workbook = buildFullDatabaseWorkbook(payload);
+  XLSX.writeFile(workbook, `marketing_database_full_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

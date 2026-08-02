@@ -1,60 +1,199 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { normalizeMarketingData, getBtlReportMonth } from "../data";
-import { supabase, APP_STATE_ROW_ID } from "./supabaseClient";
+import { supabase, APP_STATE_ROW_ID, isSupabaseConfigured } from "./supabaseClient";
 import { DEFAULT_USERS, reconcileUsers, UserAccount } from "../lib/defaultUsers";
-import { verifyPassword } from "../lib/passwordHash";
+import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny } from "../lib/serverPasswordHash";
 import { requireAuth, signSessionToken } from "./auth";
+import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
+import { encrypt, decrypt } from "./crypto";
+import { registerSocialReportRoutes } from "./socialReport/routes";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
 // directly into process.env by the platform, so this is a no-op there.
-dotenv.config({ path: ".env.local" });
-dotenv.config();
+dotenv.config({ path: ".env.local", quiet: true });
+dotenv.config({ quiet: true });
 
 export const app = express();
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "marketing_dashboard_key_32bytes_!"; // Must be 32 bytes
-const IV_LENGTH = 16;
-
-function encrypt(text: string): string {
-  if (!text) return "";
-  try {
-    const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString("hex") + ":" + encrypted.toString("hex");
-  } catch (err) {
-    console.error("Encryption error:", err);
-    return text;
-  }
-}
-
-function decrypt(text: string): string {
-  if (!text) return "";
-  if (!text.includes(":")) return text;
-  try {
-    const parts = text.split(":");
-    const iv = Buffer.from(parts.shift() || "", "hex");
-    const encryptedText = Buffer.from(parts.join(":"), "hex");
-    const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
-    const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
-  } catch (err) {
-    console.error("Decryption error:", err);
-    return text;
-  }
-}
-
 app.use(express.json({ limit: "20mb" }));
+
+// ---------------------------------------------------------------------------
+// POST /api/login rate limiting — keyed by "<ip>|<username>" (see
+// supabase/schema.sql: login_attempts table + record_login_failure /
+// reset_login_attempts functions). Backed by Supabase rather than an
+// in-memory counter because Vercel serverless functions don't share memory
+// across invocations/instances; an in-memory counter would reset on every
+// cold start and give no real protection.
+//
+// 5 failed attempts / 15-minute window → 15-minute lockout, auto-clears
+// itself (no permanent ban, no manual unlock needed). Deliberately not a
+// stricter 3-attempt cutoff: the default usernames in this very repo
+// (defaultUsers.ts) are public, so a low fixed cutoff would let anyone lock
+// out a real account just by failing a few logins on purpose. Keying by
+// ip+username (not username alone) keeps that DoS surface bounded to one
+// attacker IP, while still stopping credential stuffing against one account
+// from a botnet (each bot IP gets its own budget, but a slow escalating delay
+// below adds friction regardless of source IP).
+// ---------------------------------------------------------------------------
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_SECONDS = 15 * 60;
+const LOGIN_LOCKOUT_SECONDS = 15 * 60;
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  if (first) return first.split(",")[0].trim();
+  return req.socket.remoteAddress || "unknown";
+}
+
+function loginAttemptKey(req: express.Request, username: string): string {
+  return `${getClientIp(req)}|${username.trim().toLowerCase()}`;
+}
+
+// ---------------------------------------------------------------------------
+// Local-only in-memory fallbacks (rate limiting + audit logs), used only when
+// isSupabaseConfigured is false — i.e. local dev, which must never touch the
+// real database (see supabaseClient.ts). Process memory is fine here: it's
+// never running as Vercel serverless (Vercel always has Supabase configured),
+// so there's exactly one long-lived process and no cross-instance state to
+// keep consistent. Resets on every `npm run dev` restart, which is expected.
+// ---------------------------------------------------------------------------
+const localLoginAttempts = new Map<string, { failCount: number; windowStartedAt: number; lockedUntil: number | null }>();
+let localLoginLogId = 1;
+const localLoginLogs: {
+  id: number; username: string; status: "success" | "failure"; ip: string | null;
+  user_agent: string | null; session_id: string | null; created_at: string;
+}[] = [];
+let localActionLogId = 1;
+const localActionLogs: {
+  id: number; username: string; role: string | null; action: string;
+  details: string | null; ip: string | null; created_at: string;
+}[] = [];
+
+async function getLoginLockout(key: string): Promise<Date | null> {
+  if (!isSupabaseConfigured) {
+    const rec = localLoginAttempts.get(key);
+    if (!rec?.lockedUntil) return null;
+    return rec.lockedUntil > Date.now() ? new Date(rec.lockedUntil) : null;
+  }
+  const { data, error } = await supabase
+    .from("login_attempts")
+    .select("locked_until")
+    .eq("key", key)
+    .maybeSingle();
+  if (error || !data?.locked_until) return null;
+  const lockedUntil = new Date(data.locked_until);
+  return lockedUntil.getTime() > Date.now() ? lockedUntil : null;
+}
+
+// Returns the failure count after recording this attempt, used to scale the
+// escalating response delay below.
+async function recordLoginFailure(key: string): Promise<number> {
+  if (!isSupabaseConfigured) {
+    const now = Date.now();
+    const existing = localLoginAttempts.get(key);
+    const windowExpired = !existing || now - existing.windowStartedAt > LOGIN_WINDOW_SECONDS * 1000;
+    const rec = windowExpired
+      ? { failCount: 1, windowStartedAt: now, lockedUntil: null as number | null }
+      : { ...existing, failCount: existing.failCount + 1 };
+    if (rec.failCount >= LOGIN_MAX_ATTEMPTS) rec.lockedUntil = now + LOGIN_LOCKOUT_SECONDS * 1000;
+    localLoginAttempts.set(key, rec);
+    return rec.failCount;
+  }
+  const { data, error } = await supabase.rpc("record_login_failure", {
+    p_key: key,
+    p_window_seconds: LOGIN_WINDOW_SECONDS,
+    p_max_attempts: LOGIN_MAX_ATTEMPTS,
+    p_lockout_seconds: LOGIN_LOCKOUT_SECONDS,
+  });
+  if (error) {
+    console.error("record_login_failure error:", error.message);
+    return 1;
+  }
+  return data?.[0]?.fail_count ?? 1;
+}
+
+async function resetLoginAttempts(key: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    localLoginAttempts.delete(key);
+    return;
+  }
+  const { error } = await supabase.rpc("reset_login_attempts", { p_key: key });
+  if (error) console.error("reset_login_attempts error:", error.message);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function getUserAgent(req: express.Request): string {
+  return (req.headers["user-agent"] as string) || "unknown";
+}
+
+// Records every POST /api/login attempt (success or failure) to login_logs —
+// see supabase/schema.sql. Never throws: a logging failure must not block a
+// real login, so errors are swallowed here (and reported to the server
+// console only) rather than propagated to the route handler.
+async function logLoginAttempt(
+  username: string,
+  status: "success" | "failure",
+  req: express.Request,
+  sessionId: string | null
+): Promise<void> {
+  if (!isSupabaseConfigured) {
+    localLoginLogs.unshift({
+      id: localLoginLogId++,
+      username: username.trim().toLowerCase(),
+      status,
+      ip: getClientIp(req),
+      user_agent: getUserAgent(req),
+      session_id: sessionId,
+      created_at: new Date().toISOString(),
+    });
+    return;
+  }
+  const { error } = await supabase.from("login_logs").insert({
+    username: username.trim().toLowerCase(),
+    status,
+    ip: getClientIp(req),
+    user_agent: getUserAgent(req),
+    session_id: sessionId,
+  });
+  if (error) console.error("logLoginAttempt error:", error.message);
+}
+
+// Records a mutating action to action_logs for the audit trail (GET
+// /api/action-logs). Same never-throws contract as logLoginAttempt above.
+async function logAction(
+  session: { username: string; role: string },
+  req: express.Request,
+  action: string,
+  details?: string
+): Promise<void> {
+  if (!isSupabaseConfigured) {
+    localActionLogs.unshift({
+      id: localActionLogId++,
+      username: session.username,
+      role: session.role,
+      action,
+      details: details ?? null,
+      ip: getClientIp(req),
+      created_at: new Date().toISOString(),
+    });
+    return;
+  }
+  const { error } = await supabase.from("action_logs").insert({
+    username: session.username,
+    role: session.role,
+    action,
+    details: details ?? null,
+    ip: getClientIp(req),
+  });
+  if (error) console.error("logAction error:", error.message);
+}
 
 // POST /api/login — the only public data endpoint. Verifies credentials
 // server-side and issues a signed session token; the client never sees any
@@ -68,6 +207,15 @@ app.post("/api/login", async (req, res) => {
       return res.status(400).json({ error: "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu." });
     }
 
+    const attemptKey = loginAttemptKey(req, String(username));
+    const existingLockout = await getLoginLockout(attemptKey);
+    if (existingLockout) {
+      const minutesLeft = Math.max(1, Math.ceil((existingLockout.getTime() - Date.now()) / 60000));
+      return res.status(429).json({
+        error: `Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau khoảng ${minutesLeft} phút.`,
+      });
+    }
+
     const store = await getDatabaseData();
     const storedUsers: UserAccount[] = Array.isArray(store.users) ? store.users : [];
     // Same reconciliation the client applies to /api/get-users results: merge
@@ -76,14 +224,37 @@ app.post("/api/login", async (req, res) => {
 
     const candidate = allUsers.find((u) => u.username.toLowerCase() === String(username).trim().toLowerCase());
     const ok = candidate?.passwordHash && candidate?.salt
-      ? await verifyPassword(String(password), candidate.salt, candidate.passwordHash)
+      ? await verifyPasswordAny(String(password), candidate.salt, candidate.passwordHash)
       : false;
 
     if (!candidate || !ok) {
+      const failCount = await recordLoginFailure(attemptKey);
+      await logLoginAttempt(String(username), "failure", req, null);
+      // Escalating delay (1s, 2s, 3s, 4s... capped at 8s) slows down
+      // automated brute-forcing even before the lockout threshold trips.
+      await sleep(Math.min(failCount * 1000, 8000));
       return res.status(401).json({ error: "Tên đăng nhập hoặc mật khẩu không chính xác." });
     }
 
-    const token = signSessionToken(candidate);
+    await resetLoginAttempts(attemptKey);
+
+    // Transparently migrate accounts still on the legacy single-round
+    // SHA-256 format to scrypt now that we know the correct plaintext.
+    // No-op for accounts already on "scrypt:" and for the 5 hardcoded
+    // DEFAULT_USERS (their source of truth is defaultUsers.ts, not this
+    // Supabase row — see reconcileUsers above), but real for any custom
+    // account created through the user-management UI.
+    if (candidate.passwordHash && !isScryptHash(candidate.passwordHash)) {
+      const migratedHash = hashPasswordScrypt(String(password), candidate.salt!);
+      const migratedUsers = storedUsers.map((u) =>
+        u.username.toLowerCase() === candidate.username.toLowerCase() ? { ...u, passwordHash: migratedHash } : u
+      );
+      store.users = migratedUsers;
+      await saveDatabaseData(store).catch((err) => console.error("Login hash migration save failed:", err));
+    }
+
+    const { token, sid } = signSessionToken(candidate);
+    await logLoginAttempt(candidate.username, "success", req, sid);
     return res.json({
       success: true,
       token,
@@ -96,18 +267,23 @@ app.post("/api/login", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Persistent database, backed by Supabase (Postgres) instead of a local JSON
-// file. This is what actually fixes cross-user sync: Vercel serverless
-// functions have an ephemeral/read-only filesystem, so a file on disk cannot
-// be the source of truth anymore — every read/write now goes through Supabase,
-// which every deployed instance (and every user's browser) shares.
+// Persistent database. Production (Vercel) is always backed by Supabase
+// (Postgres) — Vercel serverless functions have an ephemeral/read-only
+// filesystem, so a file on disk cannot be the source of truth there, and
+// every deployed instance/browser needs to share one store.
 //
-// The whole app_state row is one JSONB blob shaped like the old db_store.json
-// (digital_marketing, kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly,
-// comments, active_state, mail_config, users) to keep this migration a
-// storage-layer swap rather than a full data-model rewrite.
+// Local dev (no SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY configured, the
+// default — see supabaseClient.ts) instead reads/writes a local file,
+// src/db_store.json (gitignored), so local testing is fully isolated from
+// the real database. This is a deliberate design constraint, not a fallback
+// of convenience: local testing must never be able to touch production data.
+//
+// Either way the stored shape is the same JSONB-like blob (digital_marketing,
+// kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly, comments,
+// active_state, mail_config, users).
 // ---------------------------------------------------------------------------
 const INITIAL_DATA_PATH = path.join(process.cwd(), "src", "initial_data.json");
+const LOCAL_DB_PATH = path.join(process.cwd(), "src", "db_store.json");
 
 function readInitialSeed(): any {
   try {
@@ -120,6 +296,16 @@ function readInitialSeed(): any {
 }
 
 async function getDatabaseData(): Promise<any> {
+  if (!isSupabaseConfigured) {
+    try {
+      return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
+    } catch {
+      const seed = readInitialSeed();
+      await saveDatabaseData(seed);
+      return seed;
+    }
+  }
+
   const { data, error } = await supabase
     .from("app_state")
     .select("data")
@@ -142,6 +328,11 @@ async function getDatabaseData(): Promise<any> {
 }
 
 async function saveDatabaseData(fullData: any): Promise<void> {
+  if (!isSupabaseConfigured) {
+    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(fullData, null, 2), "utf8");
+    return;
+  }
+
   const { error } = await supabase
     .from("app_state")
     .upsert({ id: APP_STATE_ROW_ID, data: fullData, updated_at: new Date().toISOString() });
@@ -225,6 +416,7 @@ app.post("/api/fetch-drive", requireAuth("Editor"), async (req, res) => {
 
     try {
       const jsonData = JSON.parse(text);
+      await logAction((req as any).session, req, "fetch-drive", `Tải tệp từ Google Drive (fileId: ${fileId})`);
       return res.json({ success: true, data: jsonData });
     } catch (parseError) {
       console.error("Failed to parse fetched content as JSON. Head:", text.substring(0, 200));
@@ -296,6 +488,7 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
     const text = response.text || "";
     try {
       const parsed = JSON.parse(text.trim());
+      await logAction((req as any).session, req, "analyze", `Phân tích AI cho thương hiệu ${brandName}`);
       return res.json({ success: true, analysis: parsed });
     } catch (e) {
       console.error("Gemini raw text parse failure:", text);
@@ -359,9 +552,84 @@ app.post("/api/save-mail-config", requireAuth("Admin"), async (req, res) => {
     };
 
     await saveDatabaseData(store);
+    await logAction((req as any).session, req, "save-mail-config", "Cập nhật cấu hình gửi mail SMTP");
     res.json({ success: true, message: "Cấu hình gửi mail tự động đã được lưu và mã hóa bảo mật!" });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Shared by POST /api/send-backup-now and GET /api/cron/weekly-backup:
+// builds the same full-database workbook as the "Xuất Database Đầy Đủ"
+// button, then emails it using the stored (encrypted) SMTP config.
+async function runDatabaseBackupEmail(): Promise<void> {
+  const store = await getDatabaseData();
+  const config = store.mail_config || {};
+
+  const normalized = normalizeMarketingData(store);
+  const safeUsers = (Array.isArray(store.users) ? store.users : []).map((u: UserAccount) => ({
+    username: u.username,
+    name: u.name,
+    role: u.role,
+  }));
+  const buffer = buildBackupAttachmentBuffer({
+    ...normalized,
+    comments: store.comments || {},
+    users: safeUsers,
+  });
+
+  await sendBackupEmail(
+    {
+      smtp_host: config.smtp_host || "",
+      smtp_port: config.smtp_port || "587",
+      smtp_user: config.smtp_user || "",
+      smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
+      notification_email: config.notification_email || "",
+      enabled: config.enabled !== false,
+    },
+    buffer,
+    `marketing_backup_${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+}
+
+// POST /api/send-backup-now — Admin-only manual trigger, mainly for testing
+// the SMTP config right after saving it (see "Sao Lưu Tự Động" section)
+// instead of waiting for the actual Friday 17:00 schedule.
+app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    await runDatabaseBackupEmail();
+    await logAction((req as any).session, req, "send-backup-now", "Gửi thử email backup database");
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("POST /api/send-backup-now error:", err);
+    return res.status(500).json({ error: err.message || "Lỗi gửi email backup." });
+  }
+});
+
+// GET /api/cron/weekly-backup — hit by Vercel Cron every Friday 17:00 ICT
+// (10:00 UTC, see vercel.json). Not session-authenticated (Vercel Cron has
+// no user to log in as) — instead requires the CRON_SECRET env var to match,
+// which Vercel automatically sends as `Authorization: Bearer <CRON_SECRET>`
+// when that env var is configured on the project. Never runs in local dev:
+// there's no real mail_config there anyway (see supabaseClient.ts), and this
+// route only matters for the deployed schedule.
+app.get("/api/cron/weekly-backup", async (req, res) => {
+  try {
+    const expected = process.env.CRON_SECRET;
+    if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const store = await getDatabaseData();
+    if (store.mail_config?.enabled === false) {
+      return res.json({ success: true, skipped: true, reason: "Gửi mail tự động đang tắt (enabled=false)." });
+    }
+
+    await runDatabaseBackupEmail();
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("GET /api/cron/weekly-backup error:", err);
+    return res.status(500).json({ error: err.message || "Lỗi gửi email backup định kỳ." });
   }
 });
 
@@ -399,12 +667,13 @@ app.get("/api/get-users", requireAuth("Admin"), async (req, res) => {
   }
 });
 
-// POST /api/save-users — Admin-only. The client no longer holds
-// passwordHash/salt for accounts it isn't actively editing (see
-// GET /api/get-users above), so incoming entries missing those fields are
-// merged against the existing stored record by username instead of being
-// overwritten with nothing — otherwise every save would wipe out every other
-// account's password.
+// POST /api/save-users — Admin-only. The client never computes or holds a
+// password hash at all (see UserAccount.newPassword doc in defaultUsers.ts):
+// it sends plaintext `newPassword` only when actually rotating/setting a
+// password, over HTTPS, and only this route ever turns that into a hash.
+// Any `passwordHash`/`salt` the client sends is ignored — trusting a
+// client-supplied hash would let a tampered request plant an
+// attacker-known password straight into the database.
 app.post("/api/save-users", requireAuth("Admin"), async (req, res) => {
   try {
     const { users } = req.body;
@@ -417,17 +686,24 @@ app.post("/api/save-users", requireAuth("Admin"), async (req, res) => {
     );
 
     const merged: UserAccount[] = users.map((incoming: UserAccount) => {
-      if (incoming.passwordHash && incoming.salt) return incoming;
+      const { passwordHash: _ignoredClientHash, salt: _ignoredClientSalt, newPassword, ...rest } = incoming;
       const existing = existingByUsername.get((incoming.username || "").toLowerCase());
-      return {
-        ...incoming,
-        passwordHash: existing?.passwordHash,
-        salt: existing?.salt,
-      };
+
+      if (newPassword) {
+        const salt = generateServerSalt();
+        return { ...rest, passwordHash: hashPasswordScrypt(newPassword, salt), salt };
+      }
+      return { ...rest, passwordHash: existing?.passwordHash, salt: existing?.salt };
     });
 
     store.users = merged;
     await saveDatabaseData(store);
+    await logAction(
+      (req as any).session,
+      req,
+      "save-users",
+      `Cập nhật danh sách tài khoản (${merged.length} tài khoản: ${merged.map((u) => u.username).join(", ")})`
+    );
     return res.json({ success: true });
   } catch (err: any) {
     console.error("POST /api/save-users error:", err);
@@ -449,6 +725,10 @@ app.post("/api/save-active-state", requireAuth("Editor"), async (req, res) => {
     };
 
     await saveDatabaseData(rawDbData);
+    // Not logged to action_logs on purpose: this fires on every brand/timeline
+    // switch (debounced, but still every few seconds while browsing) — it's
+    // navigation state, not a data-changing action, and would drown out the
+    // audit trail's meaningful entries.
     return res.json({ success: true });
   } catch (err: any) {
     console.error("POST /api/save-active-state error:", err);
@@ -471,6 +751,7 @@ app.post("/api/save-comments", requireAuth("Editor"), async (req, res) => {
 
     rawDbData.comments[week] = comments;
     await saveDatabaseData(rawDbData);
+    await logAction((req as any).session, req, "save-comments", `Cập nhật nhận định tuần ${week}`);
 
     return res.json({ success: true });
   } catch (err: any) {
@@ -543,6 +824,12 @@ app.post("/api/save-raw-data", requireAuth("Editor"), async (req, res) => {
 
     await saveDatabaseData(rawDbData);
     const normalized = normalizeMarketingData(rawDbData);
+    await logAction(
+      (req as any).session,
+      req,
+      "save-raw-data",
+      `Chỉnh sửa trực tiếp dữ liệu (${normalized.digital_marketing.length + normalized.kol_koc.length + normalized.btl_trade.length + normalized.monthly_ooh_pr.length} dòng)`
+    );
 
     return res.json({ success: true, data: normalized });
   } catch (err: any) {
@@ -662,6 +949,7 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
 
     // 4. Save the fully merged and normalized dataset back to Supabase
     await saveDatabaseData(mergedData);
+    await logAction((req as any).session, req, "sync-data", "Đồng bộ dữ liệu ngoại tuyến (JSON/Excel)");
 
     // The response only needs the report fields the client actually reads
     // (digital_marketing/kol_koc/.../comments) — `users` (password hashes +
@@ -676,25 +964,69 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
   }
 });
 
-// POST /api/reset-data — resets marketing report data to defaults, but keeps
-// account list (users) and mail config intact: resetting the dashboard's
-// weekly numbers should never silently delete everyone's login accounts.
-app.post("/api/reset-data", requireAuth("Admin"), async (req, res) => {
+// GET /api/login-logs — Admin-only audit trail of every login attempt
+// (success and failure), newest first. See supabase/schema.sql: login_logs.
+app.get("/api/login-logs", requireAuth("Admin"), async (req, res) => {
   try {
-    const current = await getDatabaseData();
-    const seed = readInitialSeed();
-    const resetData = {
-      ...seed,
-      users: current.users,
-      mail_config: current.mail_config,
-    };
-    await saveDatabaseData(resetData);
-    const normalized = normalizeMarketingData(resetData);
-    return res.json({ success: true, data: normalized });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+
+    if (!isSupabaseConfigured) {
+      return res.json({ success: true, logs: localLoginLogs.slice(0, limit) });
+    }
+
+    const { data, error } = await supabase
+      .from("login_logs")
+      .select("id, username, status, ip, user_agent, session_id, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) throw new Error(error.message);
+    return res.json({ success: true, logs: data || [] });
   } catch (err: any) {
-    console.error("POST /api/reset-data error:", err);
-    return res.status(500).json({ error: `Lỗi khôi phục cơ sở dữ liệu: ${err.message}` });
+    console.error("GET /api/login-logs error:", err);
+    return res.status(500).json({ error: `Lỗi đọc nhật ký đăng nhập: ${err.message}` });
   }
 });
+
+// GET /api/action-logs — Admin sees every user's actions; every other role
+// is restricted to its own username. This scoping happens here, server-side,
+// based on the verified session — never from a client-supplied parameter —
+// so there is no way to request someone else's history by tampering with
+// the request. See supabase/schema.sql: action_logs.
+app.get("/api/action-logs", requireAuth(), async (req, res) => {
+  try {
+    const session = (req as any).session as { username: string; role: string };
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 1000);
+
+    if (!isSupabaseConfigured) {
+      const scoped = session.role === "Admin" ? localActionLogs : localActionLogs.filter((l) => l.username === session.username);
+      return res.json({ success: true, logs: scoped.slice(0, limit) });
+    }
+
+    let query = supabase
+      .from("action_logs")
+      .select("id, username, role, action, details, ip, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (session.role !== "Admin") {
+      query = query.eq("username", session.username);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return res.json({ success: true, logs: data || [] });
+  } catch (err: any) {
+    console.error("GET /api/action-logs error:", err);
+    return res.status(500).json({ error: `Lỗi đọc nhật ký thao tác: ${err.message}` });
+  }
+});
+
+// Social Report (YouTube Analytics + Google Ads automation) — see
+// src/server/socialReport/routes.ts. Registered last, sharing this file's
+// getDatabaseData/saveDatabaseData so it reads/writes the exact same
+// app_state blob (Supabase in production, src/db_store.json locally) rather
+// than a second, separately-configured store.
+registerSocialReportRoutes(app, { getDatabaseData, saveDatabaseData });
 
 export default app;
