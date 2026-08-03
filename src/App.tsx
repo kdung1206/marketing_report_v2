@@ -46,8 +46,6 @@ import {
   UserMinus,
   Printer,
   Mail,
-  Share2,
-  Construction,
 } from "lucide-react";
 import {
   PieChart,
@@ -445,27 +443,10 @@ export default function App() {
 
   // Navigation & Brand States
   const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel">("dashboard");
-  // Left sidebar on the report view: which top-level report family is showing.
-  // "social" and "digital" are placeholders until those report types are built.
-  const [reportCategory, setReportCategory] = useState<"mkt_weekly" | "social" | "digital">(() => {
-    const saved = localStorage.getItem("marketing_report_category");
-    return saved === "social" || saved === "digital" ? saved : "mkt_weekly";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("marketing_report_category", reportCategory);
-  }, [reportCategory]);
-
-  const REPORT_CATEGORIES: { id: "mkt_weekly" | "social" | "digital"; label: string; icon: typeof FileSpreadsheet; comingSoon: boolean }[] = [
-    { id: "mkt_weekly", label: "MKT Weekly", icon: FileSpreadsheet, comingSoon: false },
-    { id: "social", label: "Social Report", icon: Share2, comingSoon: true },
-    { id: "digital", label: "Digital Report", icon: Globe, comingSoon: true },
-  ];
 
   // Left sidebar on the Control Panel view: which work-group section is
-  // showing. Entirely separate from `reportCategory` above (report sidebar
-  // vs control-panel sidebar never show at the same time — see the shared
-  // <aside> render, which switches its whole menu on `activeTab`).
+  // showing. Only shown when `activeTab === "control-panel"` — the report
+  // (dashboard) view has no sidebar of its own.
   type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "logs";
   const [controlPanelSection, setControlPanelSection] = useState<ControlPanelSection>(() => {
     const saved = localStorage.getItem("marketing_control_panel_section");
@@ -2704,8 +2685,11 @@ export default function App() {
   return (
     <div id="app_root" className="flex min-h-screen flex-col bg-slate-50/60 font-sans text-slate-800 lg:flex-row">
       {/* ------------------------------------------------------------
-          LEFT SIDEBAR: BRANDING + REPORT CATEGORY MENU
+          LEFT SIDEBAR: BRANDING + CONTROL PANEL MENU
+          Only rendered in Control Panel — the report (dashboard) view
+          shows plain report data full-width, with no sidebar.
          ------------------------------------------------------------ */}
+      {activeTab === "control-panel" && (
       <aside
         id="app_sidebar"
         className="no-print w-full shrink-0 border-b border-slate-200 bg-white lg:w-60 lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen lg:flex lg:flex-col"
@@ -2724,42 +2708,6 @@ export default function App() {
           </div>
         </div>
 
-        {activeTab === "dashboard" ? (
-          <nav
-            id="report_category_sidebar"
-            className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
-          >
-            <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
-              Danh Mục Báo Cáo
-            </p>
-            {REPORT_CATEGORIES.filter((cat) => cat.id !== "social" || currentUser.role === "Admin").map((cat) => {
-              const CatIcon = cat.icon;
-              const isActive = reportCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  id={`report_category_btn_${cat.id}`}
-                  onClick={() => setReportCategory(cat.id)}
-                  className={`flex w-full shrink-0 cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
-                    isActive
-                      ? "border-indigo-100 bg-indigo-50 text-indigo-700"
-                      : "border-transparent text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <CatIcon className={`h-4 w-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
-                    {cat.label}
-                  </span>
-                  {cat.comingSoon && (
-                    <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                      Sắp ra mắt
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        ) : (
           <nav
             id="control_panel_sidebar"
             className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
@@ -2835,8 +2783,8 @@ export default function App() {
               );
             })}
           </nav>
-        )}
       </aside>
+      )}
 
       {/* ------------------------------------------------------------
           RIGHT COLUMN: TOP BAR + PAGE CONTENT
@@ -3016,19 +2964,6 @@ export default function App() {
               </div>
             </div>
 
-            {reportCategory !== "mkt_weekly" ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-24 text-center shadow-sm">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-500">
-                  <Construction className="h-7 w-7" />
-                </div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  {REPORT_CATEGORIES.find((c) => c.id === reportCategory)?.label}
-                </h3>
-                <p className="mt-1.5 max-w-sm text-sm text-slate-500">
-                  Phân hệ báo cáo này đang được phát triển và sẽ sớm ra mắt. Vui lòng chọn "MKT Weekly" để xem báo cáo hiện tại.
-                </p>
-              </div>
-            ) : (
           <div className="space-y-6">
 
             {/* ------------------------------------------------------------
@@ -4253,7 +4188,6 @@ export default function App() {
               </div>
             </section>
           </div>
-            )}
           </div>
         ) : (
           /* ------------------------------------------------------------
