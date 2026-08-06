@@ -110,6 +110,8 @@ export async function getAdsPerformance(params: {
   }
 
   let query = supabase.from("ads_performance").select("*").gte("date", since).lte("date", until);
+  // Guard against .in() with an empty array (PostgREST syntax error) — same
+  // issue as getFbInsightsDaily/getFbPosts in facebookStore.ts.
   if (channels && channels.length > 0) query = query.in("channel", channels);
   if (brand) query = query.eq("brand", brand);
   const { data, error } = await query.order("date", { ascending: true });

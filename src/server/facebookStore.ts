@@ -207,6 +207,12 @@ export async function getFbInsightsDaily(pageIds: string[], since: string, until
     );
   }
 
+  // supabase-js's .in() with an empty array sends `page_id=in.()`, which
+  // PostgREST rejects as a syntax error (500 here, since every route wraps
+  // failures the same way) — happens whenever no Facebook Page is configured
+  // yet, not just as an edge case.
+  if (pageIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("fb_insights_daily")
     .select("*")
@@ -242,6 +248,8 @@ export async function getFbPosts(pageIds: string[], since: string, until: string
       .filter((r) => pageIds.includes(r.page_id) && r.created_time >= since && r.created_time <= until)
       .sort((a, b) => (a.created_time < b.created_time ? 1 : -1));
   }
+
+  if (pageIds.length === 0) return [];
 
   const { data, error } = await supabase
     .from("fb_posts")
