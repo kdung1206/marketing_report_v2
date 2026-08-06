@@ -22,17 +22,18 @@ const IV_LENGTH = 16;
 
 export function encrypt(text: string): string {
   if (!text) return "";
-  try {
-    const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString("hex") + ":" + encrypted.toString("hex");
-  } catch (err) {
-    console.error("Encryption error:", err);
-    return text;
-  }
+  // Every caller (upsertFbPage, upsertFbAdAccount, save-mail-config, ...)
+  // stores the return value straight into an "*_encrypted" column trusting
+  // it's actually encrypted. Silently falling back to the plaintext `text`
+  // here on any error would write a real access token/password to the
+  // database in the clear with no indication anything went wrong — throw
+  // instead so the write fails loudly and nothing gets persisted.
+  const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString("hex") + ":" + encrypted.toString("hex");
 }
 
 export function decrypt(text: string): string {

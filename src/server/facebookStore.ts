@@ -11,7 +11,7 @@
 // (src/db_store.json, via appStateStore's getDatabaseData/saveDatabaseData) —
 // consistent with that file's "same JSONB-like blob" local-dev convention.
 // ---------------------------------------------------------------------------
-import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { supabase, isSupabaseConfigured, fetchAllRows } from "./supabaseClient";
 import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 
 export interface FbPageConfig {
@@ -213,15 +213,18 @@ export async function getFbInsightsDaily(pageIds: string[], since: string, until
   // yet, not just as an edge case.
   if (pageIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from("fb_insights_daily")
-    .select("*")
-    .in("page_id", pageIds)
-    .gte("date", since)
-    .lte("date", until)
-    .order("date", { ascending: true });
-  if (error) throw new Error(`Lỗi đọc số liệu insights: ${error.message}`);
-  return data || [];
+  return fetchAllRows<FbInsightsDailyRow>((from, to) =>
+    supabase
+      .from("fb_insights_daily")
+      .select("*")
+      .in("page_id", pageIds)
+      .gte("date", since)
+      .lte("date", until)
+      .order("date", { ascending: true })
+      .range(from, to)
+  ).catch((err: any) => {
+    throw new Error(`Lỗi đọc số liệu insights: ${err.message}`);
+  });
 }
 
 // -- Posts -----------------------------------------------------------------------
@@ -251,13 +254,16 @@ export async function getFbPosts(pageIds: string[], since: string, until: string
 
   if (pageIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from("fb_posts")
-    .select("*")
-    .in("page_id", pageIds)
-    .gte("created_time", since)
-    .lte("created_time", until)
-    .order("created_time", { ascending: false });
-  if (error) throw new Error(`Lỗi đọc bài đăng: ${error.message}`);
-  return data || [];
+  return fetchAllRows<FbPostRow>((from, to) =>
+    supabase
+      .from("fb_posts")
+      .select("*")
+      .in("page_id", pageIds)
+      .gte("created_time", since)
+      .lte("created_time", until)
+      .order("created_time", { ascending: false })
+      .range(from, to)
+  ).catch((err: any) => {
+    throw new Error(`Lỗi đọc bài đăng: ${err.message}`);
+  });
 }

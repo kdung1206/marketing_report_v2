@@ -50,3 +50,27 @@ export const supabase = createClient(
 );
 
 export const APP_STATE_ROW_ID = "main";
+
+// PostgREST caps any single response at the project's max-rows setting
+// (Supabase's default is 1000) regardless of how the query is built — a
+// plain .select() with no .range() silently returns only the first page
+// instead of erroring, which is what made Digital Ads Report's totals look
+// far lower in production than the real data once ads_performance grew past
+// 1000 matching rows for a date range. Page through with .range() until a
+// page comes back short of pageSize, accumulating every row.
+export async function fetchAllRows<T>(
+  buildPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  pageSize = 1000
+): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildPage(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}

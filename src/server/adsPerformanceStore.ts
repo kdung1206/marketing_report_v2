@@ -13,7 +13,7 @@
 // two collections as extra arrays inside the existing local blob
 // (src/db_store.json, via appStateStore's getDatabaseData/saveDatabaseData).
 // ---------------------------------------------------------------------------
-import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { supabase, isSupabaseConfigured, fetchAllRows } from "./supabaseClient";
 import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 
 export type AdsChannel = "facebook" | "google" | "tiktok";
@@ -109,14 +109,17 @@ export async function getAdsPerformance(params: {
     });
   }
 
-  let query = supabase.from("ads_performance").select("*").gte("date", since).lte("date", until);
-  // Guard against .in() with an empty array (PostgREST syntax error) — same
-  // issue as getFbInsightsDaily/getFbPosts in facebookStore.ts.
-  if (channels && channels.length > 0) query = query.in("channel", channels);
-  if (brand) query = query.eq("brand", brand);
-  const { data, error } = await query.order("date", { ascending: true });
-  if (error) throw new Error(`Lỗi đọc số liệu quảng cáo: ${error.message}`);
-  return data || [];
+  const rows = await fetchAllRows<AdsPerformanceRow>((from, to) => {
+    let query = supabase.from("ads_performance").select("*").gte("date", since).lte("date", until);
+    // Guard against .in() with an empty array (PostgREST syntax error) — same
+    // issue as getFbInsightsDaily/getFbPosts in facebookStore.ts.
+    if (channels && channels.length > 0) query = query.in("channel", channels);
+    if (brand) query = query.eq("brand", brand);
+    return query.order("date", { ascending: true }).range(from, to);
+  }).catch((err: any) => {
+    throw new Error(`Lỗi đọc số liệu quảng cáo: ${err.message}`);
+  });
+  return rows;
 }
 
 // -- Facebook Ad Accounts (Marketing API config) -------------------------------
