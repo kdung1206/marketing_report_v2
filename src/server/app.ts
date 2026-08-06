@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -540,6 +541,23 @@ app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
   }
 });
 
+// Shared by both GET /api/cron/* routes below. Vercel Cron has no user to
+// log in as, so these gate on CRON_SECRET instead of a session — compared
+// with crypto.timingSafeEqual rather than `!==`/`===`, same reasoning as
+// verifySessionToken/verifyPasswordAny (auth.ts / serverPasswordHash.ts): a
+// plain string comparison short-circuits on the first mismatched byte, which
+// in principle leaks how many leading characters of the secret a guess got
+// right. timingSafeEqual requires equal-length buffers, so the length check
+// has to happen first — done via a fixed-size digest of both sides.
+function isValidCronRequest(req: express.Request): boolean {
+  const expected = process.env.CRON_SECRET;
+  const provided = req.headers.authorization;
+  if (!expected || !provided) return false;
+  const expectedDigest = crypto.createHash("sha256").update(`Bearer ${expected}`).digest();
+  const providedDigest = crypto.createHash("sha256").update(provided).digest();
+  return crypto.timingSafeEqual(expectedDigest, providedDigest);
+}
+
 // GET /api/cron/weekly-backup — hit by Vercel Cron every Friday 17:00 ICT
 // (10:00 UTC, see vercel.json). Not session-authenticated (Vercel Cron has
 // no user to log in as) — instead requires the CRON_SECRET env var to match,
@@ -549,8 +567,7 @@ app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
 // route only matters for the deployed schedule.
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
-    const expected = process.env.CRON_SECRET;
-    if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
+    if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -1042,8 +1059,7 @@ app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
 // separately even though one HTTP call triggers both.
 app.get("/api/cron/facebook-sync", async (req, res) => {
   try {
-    const expected = process.env.CRON_SECRET;
-    if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
+    if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const [pageResults, adsResults] = await Promise.all([
@@ -1107,6 +1123,15 @@ app.get("/api/fb/insights", requireAuth(), async (req, res) => {
 
 const ADS_CHANNELS: AdsChannel[] = ["facebook", "google", "tiktok"];
 
+// Real exports seen so far top out around 3-4k rows (a month of TikTok
+// ad-level data for one brand). Capped well above that rather than left
+// unbounded — the only other limit on this route is the 20mb express.json()
+// body cap (see app.use(express.json(...)) above), and a single .upsert()
+// call with tens of thousands of rows risks a slow/oversized request before
+// it ever gets that big. Reject with a clear message rather than letting a
+// huge payload silently eat most of the request's time budget.
+const MAX_UPLOAD_ROWS = 20000;
+
 function isValidAdsPerformanceRow(r: any): r is AdsPerformanceRow {
   return (
     r &&
@@ -1149,6 +1174,12 @@ app.post("/api/ads-performance/upload", requireAuth("Editor"), async (req, res) 
     const { rows } = req.body;
     if (!Array.isArray(rows) || rows.length === 0) {
       return res.status(400).json({ success: false, error: "Không có dòng dữ liệu nào để lưu." });
+    }
+    if (rows.length > MAX_UPLOAD_ROWS) {
+      return res.status(400).json({
+        success: false,
+        error: `File có ${rows.length} dòng, vượt quá giới hạn ${MAX_UPLOAD_ROWS} dòng/lần tải lên. Hãy chia nhỏ theo khoảng thời gian rồi tải lên từng phần.`,
+      });
     }
     const invalid = rows.filter((r) => !isValidAdsPerformanceRow(r));
     if (invalid.length > 0) {
