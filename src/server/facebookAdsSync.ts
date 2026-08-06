@@ -162,49 +162,53 @@ export interface FacebookAdsSyncResult {
 
 export async function runFacebookAdsSync(overrides?: { since?: string; until?: string }): Promise<FacebookAdsSyncResult[]> {
   const accounts = (await getFbAdAccounts()).filter((a) => a.is_active);
-  const results: FacebookAdsSyncResult[] = [];
 
   const now = new Date();
   const until = overrides?.until || toDateStr(now);
   const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS * 24 * 60 * 60 * 1000));
   const chunks = dateRangeChunks(since, until);
 
-  for (const account of accounts) {
-    const tokenStatus: TokenStatus = { invalid: false };
-    let rowsSynced = 0;
-    try {
-      const accessToken = decrypt(account.access_token_encrypted);
-      if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
+  // Accounts are independent (own token, own rows, own sync-status row) —
+  // run them concurrently rather than one at a time, same reasoning as
+  // facebookSync.ts's runFacebookSync (sequential-per-item was what produced
+  // the 504s on POST /api/fb/sync-now with just 2 pages configured).
+  return Promise.all(
+    accounts.map(async (account): Promise<FacebookAdsSyncResult> => {
+      const tokenStatus: TokenStatus = { invalid: false };
+      let rowsSynced = 0;
+      try {
+        const accessToken = decrypt(account.access_token_encrypted);
+        if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
 
-      // Each chunk is saved as soon as it's fetched — a failure on a later
-      // chunk (rate limit, transient API error) still keeps everything
-      // fetched so far instead of losing the whole backfill.
-      for (const chunk of chunks) {
-        const rows = await fetchAdAccountInsights(
-          account.ad_account_id,
-          accessToken,
-          chunk.since,
-          chunk.until,
-          account.brand,
-          tokenStatus
-        );
-        if (rows.length > 0) await upsertAdsPerformance(rows);
-        rowsSynced += rows.length;
+        // Chunks for one account stay sequential — each is saved as soon as
+        // it's fetched, so a failure on a later chunk (rate limit, transient
+        // API error) still keeps everything fetched so far instead of losing
+        // the whole backfill.
+        for (const chunk of chunks) {
+          const rows = await fetchAdAccountInsights(
+            account.ad_account_id,
+            accessToken,
+            chunk.since,
+            chunk.until,
+            account.brand,
+            tokenStatus
+          );
+          if (rows.length > 0) await upsertAdsPerformance(rows);
+          rowsSynced += rows.length;
+        }
+
+        await setFbAdAccountSyncStatus(account.ad_account_id, {
+          last_synced_at: new Date().toISOString(),
+          last_sync_error: null,
+          token_expired: tokenStatus.invalid,
+        });
+        return { ad_account_id: account.ad_account_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+      } catch (err: any) {
+        const message = err?.message || String(err);
+        console.error(`Đồng bộ Facebook Ads thất bại cho ${account.ad_account_id}:`, message);
+        await setFbAdAccountSyncStatus(account.ad_account_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {});
+        return { ad_account_id: account.ad_account_id, account_name: account.account_name, ok: false, rows_synced: rowsSynced, error: message };
       }
-
-      await setFbAdAccountSyncStatus(account.ad_account_id, {
-        last_synced_at: new Date().toISOString(),
-        last_sync_error: null,
-        token_expired: tokenStatus.invalid,
-      });
-      results.push({ ad_account_id: account.ad_account_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced });
-    } catch (err: any) {
-      const message = err?.message || String(err);
-      console.error(`Đồng bộ Facebook Ads thất bại cho ${account.ad_account_id}:`, message);
-      await setFbAdAccountSyncStatus(account.ad_account_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {});
-      results.push({ ad_account_id: account.ad_account_id, account_name: account.account_name, ok: false, rows_synced: rowsSynced, error: message });
-    }
-  }
-
-  return results;
+    })
+  );
 }

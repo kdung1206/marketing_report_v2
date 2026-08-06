@@ -33,6 +33,28 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 const INSIGHTS_BACKFILL_DAYS = 14;
 const POSTS_LOOKBACK_DAYS = 30;
 
+// How many posts to fetch metrics for at once. Each post needs ~5 sequential
+// Graph API round trips (4 metrics + a reactions batch); done one post at a
+// time, a page with 20-30 recent posts alone can take well past Vercel's
+// function timeout (see vercel.json's maxDuration) and get killed mid-run —
+// this is what was producing the 504 on POST /api/fb/sync-now in practice.
+// Capped rather than unbounded Promise.all to stay clear of Facebook's
+// per-token rate limits.
+const POST_FETCH_CONCURRENCY = 6;
+
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 // page_impressions*/page_fans* (and their _paid/_unique variants) are gone —
 // Meta returns "(#100) The value must be a valid insights metric" for all of
 // them as of Graph API v21 (confirmed against a real Page, 2026-08). Only
@@ -142,24 +164,29 @@ async function fetchPageDailyInsights(
     return row;
   };
 
-  for (const [metric, field] of Object.entries(METRIC_FIELD_MAP)) {
-    try {
-      const body = await graphGet(
-        `/${pageId}/insights?metric=${metric}&period=day&since=${since}&until=${until}`,
-        accessToken
-      );
-      const series = body?.data?.[0]?.values || [];
-      for (const point of series) {
-        const value = Number(point?.value);
-        if (!point?.end_time || Number.isNaN(value)) continue;
-        const date = String(point.end_time).slice(0, 10);
-        (getRow(date) as any)[field] = value;
+  // Each metric/the follower snapshot is an independent Graph API call — run
+  // them concurrently (each still individually try/caught) instead of
+  // sequentially, same reasoning as fetchRecentPosts below.
+  await Promise.all(
+    Object.entries(METRIC_FIELD_MAP).map(async ([metric, field]) => {
+      try {
+        const body = await graphGet(
+          `/${pageId}/insights?metric=${metric}&period=day&since=${since}&until=${until}`,
+          accessToken
+        );
+        const series = body?.data?.[0]?.values || [];
+        for (const point of series) {
+          const value = Number(point?.value);
+          if (!point?.end_time || Number.isNaN(value)) continue;
+          const date = String(point.end_time).slice(0, 10);
+          (getRow(date) as any)[field] = value;
+        }
+      } catch (err: any) {
+        if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+        console.error(`Facebook metric "${metric}" (page ${pageId}) lỗi:`, err.message || err);
       }
-    } catch (err: any) {
-      if (isTokenInvalidError(err)) tokenStatus.invalid = true;
-      console.error(`Facebook metric "${metric}" (page ${pageId}) lỗi:`, err.message || err);
-    }
-  }
+    })
+  );
 
   // page_fans/page_fan_adds/page_fan_removes (the old delta-based follower
   // metrics) are dead — see METRIC_FIELD_MAP's comment. The Page node itself
@@ -198,9 +225,12 @@ async function fetchRecentPosts(
     if (isTokenInvalidError(err)) tokenStatus.invalid = true;
     throw err; // no post list at all means nothing else here can proceed
   }
-  const rows: FbPostRow[] = [];
-
-  for (const post of posts) {
+  // Each post needs its own ~5 Graph API round trips (4 metrics + a
+  // reactions batch); fetched with bounded concurrency across posts (rather
+  // than one post fully at a time) so a page with many recent posts doesn't
+  // run the whole sync past Vercel's function timeout — see
+  // POST_FETCH_CONCURRENCY's comment.
+  return mapWithConcurrency(posts, POST_FETCH_CONCURRENCY, async (post) => {
     const row: FbPostRow = {
       post_id: post.id,
       page_id: pageId,
@@ -225,34 +255,34 @@ async function fetchRecentPosts(
 
     // Requested one metric at a time (like fetchPageDailyInsights) — Meta has
     // retired individual post metrics before without warning, and a single
-    // comma-joined request fails entirely if even one name is invalid.
-    for (const [metric, field] of Object.entries(POST_METRIC_FIELD_MAP)) {
-      try {
-        const insights = await graphGet(`/${post.id}/insights?metric=${metric}`, accessToken);
-        const value = insights?.data?.[0]?.values?.[0]?.value;
-        if (typeof value === "number") (row as any)[field] = value;
-      } catch (err: any) {
-        if (isTokenInvalidError(err)) tokenStatus.invalid = true;
-        console.error(`Facebook post metric "${metric}" (${post.id}) lỗi:`, err.message || err);
-      }
-    }
-
-    try {
-      await Promise.all(
-        REACTION_TYPES.map(async (type) => {
+    // comma-joined request fails entirely if even one name is invalid. Fired
+    // together with the reactions breakdown in one Promise.all (instead of
+    // two sequential round trips) — each call is still independently
+    // try/caught so one failing metric/reaction never affects the others.
+    await Promise.all([
+      ...Object.entries(POST_METRIC_FIELD_MAP).map(async ([metric, field]) => {
+        try {
+          const insights = await graphGet(`/${post.id}/insights?metric=${metric}`, accessToken);
+          const value = insights?.data?.[0]?.values?.[0]?.value;
+          if (typeof value === "number") (row as any)[field] = value;
+        } catch (err: any) {
+          if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+          console.error(`Facebook post metric "${metric}" (${post.id}) lỗi:`, err.message || err);
+        }
+      }),
+      ...REACTION_TYPES.map(async (type) => {
+        try {
           const r = await graphGet(`/${post.id}/reactions?type=${type}&summary=true&limit=0`, accessToken);
           (row as any)[REACTION_FIELD_BY_TYPE[type]] = r?.summary?.total_count ?? 0;
-        })
-      );
-    } catch (err: any) {
-      if (isTokenInvalidError(err)) tokenStatus.invalid = true;
-      console.error(`Facebook reactions breakdown (${post.id}) lỗi:`, err.message || err);
-    }
+        } catch (err: any) {
+          if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+          console.error(`Facebook reactions breakdown (${type}, ${post.id}) lỗi:`, err.message || err);
+        }
+      }),
+    ]);
 
-    rows.push(row);
-  }
-
-  return rows;
+    return row;
+  });
 }
 
 export interface FacebookSyncResult {
@@ -264,44 +294,49 @@ export interface FacebookSyncResult {
 
 export async function runFacebookSync(): Promise<FacebookSyncResult[]> {
   const pages = (await getFbPages()).filter((p) => p.is_active);
-  const results: FacebookSyncResult[] = [];
 
   const now = new Date();
   const until = toDateStr(now);
   const since = toDateStr(new Date(now.getTime() - INSIGHTS_BACKFILL_DAYS * 24 * 60 * 60 * 1000));
   const postsSince = toDateStr(new Date(now.getTime() - POSTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000));
 
-  for (const page of pages) {
-    // Threaded through every Graph API call made for this page — true the
-    // moment any of them comes back with a confirmed-dead token (code 190).
-    // Everything else (network blips, a retired metric, temporary API
-    // errors) leaves this false: the page stays connected and next sync
-    // just retries with the same stored token, per the "never auto-drop a
-    // connection unless Facebook itself says the token is dead" contract.
-    const tokenStatus: TokenStatus = { invalid: false };
-    try {
-      const accessToken = decrypt(page.access_token_encrypted);
-      if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
+  // Pages are fully independent of each other (own token, own rows, own
+  // sync-status row) — run them concurrently rather than one at a time.
+  // Sequential per-page was the other half of the 504s on
+  // POST /api/fb/sync-now: with N pages each taking tens of seconds for
+  // their posts, only the first page or two would finish before Vercel
+  // killed the whole request.
+  return Promise.all(
+    pages.map(async (page): Promise<FacebookSyncResult> => {
+      // Threaded through every Graph API call made for this page — true the
+      // moment any of them comes back with a confirmed-dead token (code 190).
+      // Everything else (network blips, a retired metric, temporary API
+      // errors) leaves this false: the page stays connected and next sync
+      // just retries with the same stored token, per the "never auto-drop a
+      // connection unless Facebook itself says the token is dead" contract.
+      const tokenStatus: TokenStatus = { invalid: false };
+      try {
+        const accessToken = decrypt(page.access_token_encrypted);
+        if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
 
-      const dailyRows = await fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus);
-      if (dailyRows.length > 0) await upsertFbInsightsDaily(dailyRows);
+        const dailyRows = await fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus);
+        if (dailyRows.length > 0) await upsertFbInsightsDaily(dailyRows);
 
-      const postRows = await fetchRecentPosts(page.page_id, accessToken, postsSince, tokenStatus);
-      if (postRows.length > 0) await upsertFbPosts(postRows);
+        const postRows = await fetchRecentPosts(page.page_id, accessToken, postsSince, tokenStatus);
+        if (postRows.length > 0) await upsertFbPosts(postRows);
 
-      await setFbPageSyncStatus(page.page_id, {
-        last_synced_at: new Date().toISOString(),
-        last_sync_error: null,
-        token_expired: tokenStatus.invalid,
-      });
-      results.push({ page_id: page.page_id, page_name: page.page_name, ok: true });
-    } catch (err: any) {
-      const message = err?.message || String(err);
-      console.error(`Đồng bộ Facebook thất bại cho page ${page.page_id}:`, message);
-      await setFbPageSyncStatus(page.page_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {});
-      results.push({ page_id: page.page_id, page_name: page.page_name, ok: false, error: message });
-    }
-  }
-
-  return results;
+        await setFbPageSyncStatus(page.page_id, {
+          last_synced_at: new Date().toISOString(),
+          last_sync_error: null,
+          token_expired: tokenStatus.invalid,
+        });
+        return { page_id: page.page_id, page_name: page.page_name, ok: true };
+      } catch (err: any) {
+        const message = err?.message || String(err);
+        console.error(`Đồng bộ Facebook thất bại cho page ${page.page_id}:`, message);
+        await setFbPageSyncStatus(page.page_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {});
+        return { page_id: page.page_id, page_name: page.page_name, ok: false, error: message };
+      }
+    })
+  );
 }
