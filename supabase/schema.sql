@@ -136,3 +136,80 @@ create index if not exists action_logs_created_at_idx on action_logs (created_at
 create index if not exists action_logs_username_idx on action_logs (username);
 
 alter table action_logs enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Facebook Page Insights module (src/server/facebookSync.ts). Deliberately
+-- normal relational tables, not another field in app_state's JSONB blob:
+-- this is time-series data that grows daily/per-post forever and needs
+-- date-range queries, unlike the report document which is read/written as a
+-- whole. access_token_encrypted uses the same AES-256-CBC helper
+-- (src/server/crypto.ts) as mail_config.smtp_pass.
+-- ---------------------------------------------------------------------------
+create table if not exists fb_pages (
+  page_id text primary key,
+  page_name text not null,
+  -- Which weekly-report brand this page belongs to (see the app's
+  -- Livotec/Karofi selectedBrand toggle) — lets the Facebook Insights tab
+  -- filter to the currently selected brand, same as the main report.
+  brand text,
+  access_token_encrypted text not null,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  -- True only once Facebook explicitly confirms the token is dead
+  -- (OAuthException code 190) — see facebookSync.ts's isTokenInvalidError.
+  -- A transient sync failure (network blip, temporary API error, or the
+  -- cron simply not having run yet) never sets this; the page stays
+  -- connected and sync keeps retrying with the same token indefinitely.
+  token_expired boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table fb_pages enable row level security;
+
+-- One row per page per day. Upserted on (page_id, date) so a rolling
+-- backfill window (see runFacebookSync) can safely re-write recent days
+-- without creating duplicates.
+create table if not exists fb_insights_daily (
+  page_id text not null references fb_pages(page_id) on delete cascade,
+  date date not null,
+  impressions int,
+  impressions_paid int,
+  reach int,
+  reach_paid int,
+  page_views int,
+  fan_count int,
+  fan_adds int,
+  fan_removes int,
+  engaged_users int,
+  primary key (page_id, date)
+);
+
+alter table fb_insights_daily enable row level security;
+
+create table if not exists fb_posts (
+  post_id text primary key,
+  page_id text not null references fb_pages(page_id) on delete cascade,
+  created_time timestamptz not null,
+  message text,
+  permalink text,
+  thumbnail_url text,
+  reach int,
+  impressions int,
+  engaged_users int,
+  clicks int,
+  likes int,
+  loves int,
+  wows int,
+  hahas int,
+  sorrys int,
+  angers int,
+  comments int,
+  shares int,
+  synced_at timestamptz not null default now()
+);
+
+create index if not exists fb_posts_page_id_created_time_idx on fb_posts (page_id, created_time desc);
+
+alter table fb_posts enable row level security;
+

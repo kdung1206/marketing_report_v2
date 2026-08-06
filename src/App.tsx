@@ -10,6 +10,8 @@ import {
 } from "./data";
 import { exportToExcel, exportToJSON, parseSpreadsheetFile, exportFullDatabaseToExcel } from "./lib/export";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
+import FacebookInsights from "./components/FacebookInsights";
+import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
 import {
   TrendingUp,
   Award,
@@ -46,6 +48,7 @@ import {
   UserMinus,
   Printer,
   Mail,
+  Facebook,
 } from "lucide-react";
 import {
   PieChart,
@@ -60,6 +63,25 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+
+// Brand mark shown in the header (top-left, always) and atop both left
+// sidebars (Control Panel's own sidebar, and the report-type sidebar below)
+// so the same logo appears consistently regardless of which sidebar is active.
+function AppLogoMark() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
+        <BarChart3 className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <h1 className="truncate text-base font-bold tracking-tight text-slate-900">Báo Cáo Hiệu Suất Marketing</h1>
+        <p className="truncate font-mono text-[11px] text-slate-500 uppercase tracking-wider">
+          Livotec & Karofi • Analytical Hub
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
@@ -79,7 +101,7 @@ function setAuthToken(token: string | null) {
   }
 }
 
-async function safeFetchJson(url: string, options?: RequestInit) {
+export async function safeFetchJson(url: string, options?: RequestInit) {
   const headers = { ...(options?.headers || {}), ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
   const response = await fetch(url, { ...options, headers });
   const text = await response.text();
@@ -442,15 +464,15 @@ export default function App() {
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
 
   // Navigation & Brand States
-  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights">("dashboard");
 
   // Left sidebar on the Control Panel view: which work-group section is
   // showing. Only shown when `activeTab === "control-panel"` — the report
   // (dashboard) view has no sidebar of its own.
-  type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "logs";
+  type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "facebook" | "logs";
   const [controlPanelSection, setControlPanelSection] = useState<ControlPanelSection>(() => {
     const saved = localStorage.getItem("marketing_control_panel_section");
-    return (["data-entry", "comments", "db-admin", "users", "backup", "logs"] as const).includes(saved as any)
+    return (["data-entry", "comments", "db-admin", "users", "backup", "facebook", "logs"] as const).includes(saved as any)
       ? (saved as ControlPanelSection)
       : "data-entry";
   });
@@ -473,6 +495,7 @@ export default function App() {
     { id: "db-admin", label: "Quản trị cơ sở dữ liệu", icon: Layers, adminOnly: true },
     { id: "users", label: "Quản trị người dùng", icon: Shield, adminOnly: true },
     { id: "backup", label: "Sao Lưu Tự Động", icon: Mail, adminOnly: true },
+    { id: "facebook", label: "Kết nối Facebook", icon: Facebook, adminOnly: true },
     { id: "logs", label: "Log hệ thống", icon: Lock, adminOnly: false },
   ];
   const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">(() => {
@@ -990,22 +1013,32 @@ export default function App() {
     }
   };
 
-  // Load marketing data, comments and (for Admins only — GET /api/get-users
-  // is now Admin-only) the shared account list on mount. Every /api/* route
-  // now requires a valid session, so there is nothing to fetch before login.
+  // Load only the data the currently active top-level menu needs, and only
+  // right when it becomes active — never eagerly for a menu the user isn't
+  // looking at. Fires on login (activeTab starts as "dashboard") and again
+  // every time activeTab changes. "fb-insights" fetches its own data inside
+  // FacebookInsights.tsx, so there's nothing to do for it here.
   useEffect(() => {
     if (!currentUser) return;
-    fetchServerData();
-    if (currentUser.role === "Admin") {
-      fetchServerUsers();
-      fetchLoginLogs();
+    if (activeTab === "dashboard") {
+      fetchServerData();
+    } else if (activeTab === "control-panel") {
+      if (currentUser.role === "Admin") {
+        fetchServerUsers();
+        fetchLoginLogs();
+      }
+      if (currentUser.role !== "Viewer") fetchActionLogs();
     }
-    if (currentUser.role !== "Viewer") fetchActionLogs();
-  }, [currentUser]);
+  }, [activeTab, currentUser]);
 
-  // Auto-sync data to keep Viewer and Admin aligned (faster polling for Viewers to follow Admin live)
+  // Auto-sync to keep Viewer and Admin aligned in near-real-time (faster
+  // polling for Viewers to follow Admin live) — but ONLY while the dashboard
+  // is the menu actually on screen. Switching to Facebook Insights or
+  // Control Panel stops this background refresh entirely; switching back to
+  // the dashboard re-fetches once immediately via the effect above, then
+  // this resumes.
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || activeTab !== "dashboard") return;
     const isViewer = currentUser.role === "Viewer";
     const delay = isViewer ? 4000 : 30000; // 4 seconds for Viewer to react rapidly to Admin presentation, 30 seconds for Admin
 
@@ -1013,10 +1046,9 @@ export default function App() {
       if (!hasUnpublishedChanges) {
         fetchServerData();
       }
-      if (currentUser.role === "Admin") fetchServerUsers();
     }, delay);
     return () => clearInterval(interval);
-  }, [hasUnpublishedChanges, currentUser, selectedBrand, selectedTimeline?.id, activeCategoryTab]);
+  }, [hasUnpublishedChanges, currentUser, activeTab, selectedBrand, selectedTimeline?.id, activeCategoryTab]);
 
   const triggerNotification = (type: "success" | "error", message: string) => {
     setNotification({ type, message });
@@ -2685,27 +2717,17 @@ export default function App() {
   return (
     <div id="app_root" className="flex min-h-screen flex-col bg-slate-50/60 font-sans text-slate-800 lg:flex-row">
       {/* ------------------------------------------------------------
-          LEFT SIDEBAR: BRANDING + CONTROL PANEL MENU
-          Only rendered in Control Panel — the report (dashboard) view
-          shows plain report data full-width, with no sidebar.
+          LEFT SIDEBAR — contextual: Control Panel's own section menu while
+          in Control Panel, or the 2-item report-type switcher (Báo Cáo /
+          Facebook Insights) everywhere else. Never both at once.
          ------------------------------------------------------------ */}
-      {activeTab === "control-panel" && (
+      {activeTab === "control-panel" ? (
       <aside
         id="app_sidebar"
         className="no-print w-full shrink-0 border-b border-slate-200 bg-white lg:w-60 lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen lg:flex lg:flex-col"
       >
-        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-bold tracking-tight text-slate-900">
-              Báo Cáo Hiệu Suất Marketing
-            </h1>
-            <p className="truncate font-mono text-[11px] text-slate-500 uppercase tracking-wider">
-              Livotec & Karofi • Analytical Hub
-            </p>
-          </div>
+        <div className="border-b border-slate-200 px-4 py-4">
+          <AppLogoMark />
         </div>
 
           <nav
@@ -2784,6 +2806,74 @@ export default function App() {
             })}
           </nav>
       </aside>
+      ) : (
+      <aside
+        id="app_report_sidebar"
+        className="no-print w-full shrink-0 border-b border-slate-200 bg-white lg:w-60 lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen lg:flex lg:flex-col"
+      >
+        <div className="border-b border-slate-200 px-4 py-4">
+          <AppLogoMark />
+        </div>
+
+        <nav
+          id="report_type_sidebar"
+          className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
+        >
+          <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
+            Loại Báo Cáo
+          </p>
+          <button
+            id="report_nav_dashboard"
+            onClick={() => setActiveTab("dashboard")}
+            className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+              activeTab === "dashboard"
+                ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                : "border-transparent text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <FileSpreadsheet className={`h-4 w-4 ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-400"}`} />
+            Báo Cáo
+          </button>
+          <button
+            id="report_nav_fb_insights"
+            onClick={() => setActiveTab("fb-insights")}
+            className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+              activeTab === "fb-insights"
+                ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                : "border-transparent text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Facebook className={`h-4 w-4 ${activeTab === "fb-insights" ? "text-indigo-600" : "text-slate-400"}`} />
+            Facebook Insights
+          </button>
+
+          {/* Admin action, not a report type — pinned to the bottom of the
+              menu, separate from the report-type buttons above. Editor also
+              gets Control Panel access (data entry etc.); Viewer never does. */}
+          {currentUser.role !== "Viewer" && (
+            <div className="lg:mt-auto lg:border-t lg:border-slate-100 lg:pt-3">
+              <button
+                id="tab_nav_control"
+                onClick={() => setActiveTab("control-panel")}
+                className={`relative flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                  activeTab === "control-panel"
+                    ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                    : "border-transparent text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Settings2 className={`h-4 w-4 ${activeTab === "control-panel" ? "text-indigo-600" : "text-slate-400"}`} />
+                Control Panel
+                {hasUnpublishedChanges && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+        </nav>
+      </aside>
       )}
 
       {/* ------------------------------------------------------------
@@ -2795,44 +2885,11 @@ export default function App() {
          ------------------------------------------------------------ */}
       <header id="header_navbar" className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-3 sm:flex-row sm:px-6">
-          {/* Navigation Tabs */}
-          <div className="flex items-center rounded-lg bg-slate-100 p-1">
-            <button
-              id="tab_nav_report"
-              onClick={() => setActiveTab("dashboard")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === "dashboard"
-                  ? "bg-white text-slate-950 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <span>Báo Cáo</span>
-            </button>
+          {/* Brand mark — nav switching (report types + Control Panel) moved
+              to the left sidebar */}
+          <AppLogoMark />
 
-            {currentUser.role !== "Viewer" && (
-              <button
-                id="tab_nav_control"
-                onClick={() => setActiveTab("control-panel")}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all relative cursor-pointer ${
-                  activeTab === "control-panel"
-                    ? "bg-white text-slate-950 shadow-sm"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                <span>Control Panel</span>
-                {hasUnpublishedChanges && (
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* Timeline + user/session cluster — moved after the nav tabs */}
+          {/* Timeline + user/session cluster */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {/* Timeline selector */}
             <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm">
@@ -4189,6 +4246,8 @@ export default function App() {
             </section>
           </div>
           </div>
+        ) : activeTab === "fb-insights" ? (
+          <FacebookInsights selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : (
           /* ------------------------------------------------------------
               GIAO DIỆN CONTROL PANEL (BẢNG ĐIỀU KHIỂN RIÊNG BIỆT)
@@ -5439,6 +5498,10 @@ export default function App() {
                   </div>
                 </form>
               </div>
+            )}
+
+            {controlPanelSection === "facebook" && currentUser && currentUser.role === "Admin" && (
+              <FacebookPagesAdmin />
             )}
 
             {/* ------------------------------------------------------------

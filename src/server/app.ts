@@ -1,15 +1,16 @@
 import express from "express";
-import fs from "fs";
-import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { normalizeMarketingData, getBtlReportMonth } from "../data";
-import { supabase, APP_STATE_ROW_ID, isSupabaseConfigured } from "./supabaseClient";
+import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 import { DEFAULT_USERS, reconcileUsers, UserAccount } from "../lib/defaultUsers";
 import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny } from "../lib/serverPasswordHash";
 import { requireAuth, signSessionToken } from "./auth";
 import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
+import { getFbPages, upsertFbPage, deleteFbPage, getFbInsightsDaily, getFbPosts } from "./facebookStore";
+import { runFacebookSync } from "./facebookSync";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -264,82 +265,6 @@ app.post("/api/login", async (req, res) => {
     return res.status(500).json({ error: `Lỗi đăng nhập: ${err.message}` });
   }
 });
-
-// ---------------------------------------------------------------------------
-// Persistent database. Production (Vercel) is always backed by Supabase
-// (Postgres) — Vercel serverless functions have an ephemeral/read-only
-// filesystem, so a file on disk cannot be the source of truth there, and
-// every deployed instance/browser needs to share one store.
-//
-// Local dev (no SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY configured, the
-// default — see supabaseClient.ts) instead reads/writes a local file,
-// src/db_store.json (gitignored), so local testing is fully isolated from
-// the real database. This is a deliberate design constraint, not a fallback
-// of convenience: local testing must never be able to touch production data.
-//
-// Either way the stored shape is the same JSONB-like blob (digital_marketing,
-// kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly, comments,
-// active_state, mail_config, users).
-// ---------------------------------------------------------------------------
-const INITIAL_DATA_PATH = path.join(process.cwd(), "src", "initial_data.json");
-const LOCAL_DB_PATH = path.join(process.cwd(), "src", "db_store.json");
-
-function readInitialSeed(): any {
-  try {
-    const raw = fs.readFileSync(INITIAL_DATA_PATH, "utf8");
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("Failed to read initial_data.json:", err);
-    return { digital_marketing: [], kol_koc: [], btl_trade: [], monthly_ooh_pr: [] };
-  }
-}
-
-async function getDatabaseData(): Promise<any> {
-  if (!isSupabaseConfigured) {
-    try {
-      return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
-    } catch {
-      const seed = readInitialSeed();
-      await saveDatabaseData(seed);
-      return seed;
-    }
-  }
-
-  const { data, error } = await supabase
-    .from("app_state")
-    .select("data")
-    .eq("id", APP_STATE_ROW_ID)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Lỗi đọc dữ liệu từ Supabase: ${error.message}`);
-  }
-
-  if (data?.data) {
-    return data.data;
-  }
-
-  // First run ever: seed the row from initial_data.json so the app has
-  // something to show, then persist it so subsequent reads hit Supabase directly.
-  const seed = readInitialSeed();
-  await saveDatabaseData(seed);
-  return seed;
-}
-
-async function saveDatabaseData(fullData: any): Promise<void> {
-  if (!isSupabaseConfigured) {
-    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(fullData, null, 2), "utf8");
-    return;
-  }
-
-  const { error } = await supabase
-    .from("app_state")
-    .upsert({ id: APP_STATE_ROW_ID, data: fullData, updated_at: new Date().toISOString() });
-
-  if (error) {
-    throw new Error(`Lỗi ghi dữ liệu vào Supabase: ${error.message}`);
-  }
-}
 
 // Initialize Gemini Client safely
 let ai: GoogleGenAI | null = null;
@@ -1018,6 +943,128 @@ app.get("/api/action-logs", requireAuth(), async (req, res) => {
   } catch (err: any) {
     console.error("GET /api/action-logs error:", err);
     return res.status(500).json({ error: `Lỗi đọc nhật ký thao tác: ${err.message}` });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Facebook Page Insights module. fb_pages/fb_insights_daily/fb_posts are
+// stored via facebookStore.ts (dedicated Supabase tables in production,
+// extra arrays in the local JSON blob in dev — see that file's header
+// comment). Access tokens are encrypted with the same AES-256-CBC helper
+// used for mail_config.smtp_pass (src/server/crypto.ts).
+// ---------------------------------------------------------------------------
+
+// GET /api/fb/pages — list configured pages (never returns the token itself).
+app.get("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pages = await getFbPages();
+    res.json({
+      success: true,
+      pages: pages.map((p) => ({
+        page_id: p.page_id,
+        page_name: p.page_name,
+        brand: p.brand,
+        is_active: p.is_active,
+        last_synced_at: p.last_synced_at,
+        last_sync_error: p.last_sync_error,
+        token_expired: p.token_expired,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/fb/pages — add or update a page's Page ID / name / Access Token.
+app.post("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { page_id, page_name, brand, access_token, is_active } = req.body;
+    if (!page_id || !page_name || !access_token) {
+      return res.status(400).json({ success: false, error: "Thiếu page_id, page_name hoặc access_token." });
+    }
+
+    await upsertFbPage({
+      page_id: String(page_id).trim(),
+      page_name: String(page_name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      access_token_encrypted: encrypt(String(access_token).trim()),
+      is_active: is_active !== undefined ? Boolean(is_active) : undefined,
+    });
+
+    await logAction((req as any).session, req, "save-fb-page", `Cập nhật cấu hình Facebook Page ${page_id}`);
+    res.json({ success: true, message: "Đã lưu cấu hình Facebook Page." });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/fb/pages/:page_id
+app.delete("/api/fb/pages/:page_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteFbPage(req.params.page_id);
+    await logAction((req as any).session, req, "delete-fb-page", `Xóa cấu hình Facebook Page ${req.params.page_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/fb/sync-now — Admin-only manual trigger, mirrors
+// POST /api/send-backup-now's "test it right after saving" UX.
+app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runFacebookSync();
+    await logAction((req as any).session, req, "sync-facebook", `Đồng bộ thủ công ${results.length} Facebook Page`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/cron/facebook-sync — hit by Vercel Cron once daily (see
+// vercel.json). Same CRON_SECRET pattern as GET /api/cron/weekly-backup.
+app.get("/api/cron/facebook-sync", async (req, res) => {
+  try {
+    const expected = process.env.CRON_SECRET;
+    if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const results = await runFacebookSync();
+    res.json({ success: true, results });
+  } catch (err: any) {
+    console.error("GET /api/cron/facebook-sync error:", err);
+    res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
+  }
+});
+
+// GET /api/fb/insights?pages=<id1,id2>&since=YYYY-MM-DD&until=YYYY-MM-DD —
+// shaped data for the "Facebook Insights" dashboard tab. Any logged-in role
+// can read it (it's a read-only report, same visibility as the main dashboard).
+app.get("/api/fb/insights", requireAuth(), async (req, res) => {
+  try {
+    const allPages = await getFbPages();
+    const requestedIds = typeof req.query.pages === "string" && req.query.pages.length > 0
+      ? req.query.pages.split(",").map((s) => s.trim())
+      : allPages.map((p) => p.page_id);
+
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date().toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [daily, posts] = await Promise.all([
+      getFbInsightsDaily(requestedIds, since, until),
+      getFbPosts(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`),
+    ]);
+
+    res.json({
+      success: true,
+      pages: allPages.map((p) => ({ page_id: p.page_id, page_name: p.page_name, brand: p.brand, is_active: p.is_active })),
+      daily,
+      posts,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

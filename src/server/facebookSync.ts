@@ -1,0 +1,307 @@
+// ---------------------------------------------------------------------------
+// Pulls Page + Post Insights from the Facebook Graph API for every active
+// row in fb_pages and upserts the results into fb_insights_daily/fb_posts
+// (see facebookStore.ts). Called from POST /api/fb/sync-now (manual, Admin)
+// and GET /api/cron/facebook-sync (daily, Vercel Cron) in app.ts.
+//
+// Metric names below are the best-known-current Page Insights field names —
+// Meta renames/retires these periodically. Verify against
+// https://developers.facebook.com/docs/graph-api/reference/page/insights (or
+// GET /{page-id}/insights with no `metric` param, which lists the metrics
+// actually valid for that page) if a metric starts erroring out. Each metric
+// is requested individually specifically so one renamed/retired metric
+// degrades gracefully (logged, field left null) instead of failing the
+// entire page's sync.
+// ---------------------------------------------------------------------------
+import { decrypt } from "./crypto";
+import {
+  getFbPages,
+  upsertFbInsightsDaily,
+  upsertFbPosts,
+  setFbPageSyncStatus,
+  FbInsightsDailyRow,
+  FbPostRow,
+} from "./facebookStore";
+
+const GRAPH_API_VERSION = "v21.0";
+const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+
+// How far back each sync run re-pulls data. Larger than "since the last
+// successful sync" on purpose: Meta backfills/revises insights values for
+// recent days after the fact, and this also self-heals any missed cron runs
+// without needing to track per-page sync cursors.
+const INSIGHTS_BACKFILL_DAYS = 14;
+const POSTS_LOOKBACK_DAYS = 30;
+
+// page_impressions*/page_fans* (and their _paid/_unique variants) are gone —
+// Meta returns "(#100) The value must be a valid insights metric" for all of
+// them as of Graph API v21 (confirmed against a real Page, 2026-08). Only
+// these two page-level metrics still return data:
+const METRIC_FIELD_MAP: Record<string, keyof FbInsightsDailyRow> = {
+  page_views_total: "page_views",
+  page_post_engagements: "engaged_users",
+};
+
+// Same per-metric probing for post-level insights — request individually so
+// a metric Meta has retired doesn't take down the others.
+const POST_METRIC_FIELD_MAP: Record<string, keyof FbPostRow> = {
+  post_impressions: "impressions",
+  post_impressions_unique: "reach",
+  post_engaged_users: "engaged_users",
+  post_clicks: "clicks",
+};
+
+// Confirmed against a real post's error message ("Param type must be one of
+// {NONE, LIKE, LOVE, WOW, HAHA, SAD, ANGRY, ...}") — SORRY/ANGER (an older
+// naming) are not valid; Meta's current enum is SAD/ANGRY.
+const REACTION_TYPES = ["LIKE", "LOVE", "WOW", "HAHA", "SAD", "ANGRY"] as const;
+const REACTION_FIELD_BY_TYPE: Record<(typeof REACTION_TYPES)[number], keyof FbPostRow> = {
+  LIKE: "likes",
+  LOVE: "loves",
+  WOW: "wows",
+  HAHA: "hahas",
+  SAD: "sorrys",
+  ANGRY: "angers",
+};
+
+// Shared with facebookAdsSync.ts (Marketing API sync uses the same Graph API
+// error shape and code-190-means-dead-token convention as this Page Insights
+// sync — no reason to duplicate the error class or the fetch wrapper).
+export function toDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+// Carries the Graph API's error `code`/`error_subcode` so callers can tell
+// "the token is dead" (code 190 — OAuthException) apart from every other
+// failure (rate limiting, a retired metric name, a transient API hiccup),
+// which must never be treated as a dropped connection.
+export class GraphApiError extends Error {
+  code?: number;
+  subcode?: number;
+  constructor(message: string, code?: number, subcode?: number) {
+    super(message);
+    this.code = code;
+    this.subcode = subcode;
+  }
+}
+
+export function isTokenInvalidError(err: unknown): boolean {
+  return err instanceof GraphApiError && err.code === 190;
+}
+
+// Mutable accumulator threaded through one page's sync run: true the moment
+// ANY call for that page hits a code-190 error, even if other calls for the
+// same page still succeed (most of ours are per-metric and individually
+// swallowed so partial data keeps flowing — this is how a real "reconnect
+// needed" signal still surfaces instead of getting lost in those catches).
+export interface TokenStatus {
+  invalid: boolean;
+}
+
+export async function graphGet(pathAndQuery: string, accessToken: string): Promise<any> {
+  const sep = pathAndQuery.includes("?") ? "&" : "?";
+  const url = `${GRAPH_API_BASE}${pathAndQuery}${sep}access_token=${encodeURIComponent(accessToken)}`;
+  const res = await fetch(url);
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GraphApiError(
+      body?.error?.message || `Graph API trả về lỗi HTTP ${res.status}`,
+      body?.error?.code,
+      body?.error?.error_subcode
+    );
+  }
+  return body;
+}
+
+async function fetchPageDailyInsights(
+  pageId: string,
+  accessToken: string,
+  since: string,
+  until: string,
+  tokenStatus: TokenStatus
+): Promise<FbInsightsDailyRow[]> {
+  const byDate = new Map<string, FbInsightsDailyRow>();
+  const getRow = (date: string): FbInsightsDailyRow => {
+    let row = byDate.get(date);
+    if (!row) {
+      row = {
+        page_id: pageId,
+        date,
+        impressions: null,
+        impressions_paid: null,
+        reach: null,
+        reach_paid: null,
+        page_views: null,
+        fan_count: null,
+        fan_adds: null,
+        fan_removes: null,
+        engaged_users: null,
+      };
+      byDate.set(date, row);
+    }
+    return row;
+  };
+
+  for (const [metric, field] of Object.entries(METRIC_FIELD_MAP)) {
+    try {
+      const body = await graphGet(
+        `/${pageId}/insights?metric=${metric}&period=day&since=${since}&until=${until}`,
+        accessToken
+      );
+      const series = body?.data?.[0]?.values || [];
+      for (const point of series) {
+        const value = Number(point?.value);
+        if (!point?.end_time || Number.isNaN(value)) continue;
+        const date = String(point.end_time).slice(0, 10);
+        (getRow(date) as any)[field] = value;
+      }
+    } catch (err: any) {
+      if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+      console.error(`Facebook metric "${metric}" (page ${pageId}) lỗi:`, err.message || err);
+    }
+  }
+
+  // page_fans/page_fan_adds/page_fan_removes (the old delta-based follower
+  // metrics) are dead — see METRIC_FIELD_MAP's comment. The Page node itself
+  // still exposes the current total via followers_count/fan_count, so we
+  // snapshot that into *today's* row every sync run; the "Follower Growth"
+  // chart is then built from our own accumulated daily snapshots rather than
+  // from Facebook's (retired) historical series.
+  try {
+    const page = await graphGet(`/${pageId}?fields=followers_count,fan_count`, accessToken);
+    const followers = typeof page.followers_count === "number" ? page.followers_count : page.fan_count;
+    if (typeof followers === "number") {
+      getRow(until).fan_count = followers;
+    }
+  } catch (err: any) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    console.error(`Facebook followers_count (page ${pageId}) lỗi:`, err.message || err);
+  }
+
+  return Array.from(byDate.values());
+}
+
+async function fetchRecentPosts(
+  pageId: string,
+  accessToken: string,
+  since: string,
+  tokenStatus: TokenStatus
+): Promise<FbPostRow[]> {
+  let posts: any[] = [];
+  try {
+    const body = await graphGet(
+      `/${pageId}/posts?since=${since}&fields=id,message,created_time,permalink_url,full_picture,shares,comments.limit(0).summary(true)`,
+      accessToken
+    );
+    posts = body?.data || [];
+  } catch (err: any) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    throw err; // no post list at all means nothing else here can proceed
+  }
+  const rows: FbPostRow[] = [];
+
+  for (const post of posts) {
+    const row: FbPostRow = {
+      post_id: post.id,
+      page_id: pageId,
+      created_time: post.created_time,
+      message: post.message || null,
+      permalink: post.permalink_url || null,
+      thumbnail_url: post.full_picture || null,
+      reach: null,
+      impressions: null,
+      engaged_users: null,
+      clicks: null,
+      likes: null,
+      loves: null,
+      wows: null,
+      hahas: null,
+      sorrys: null,
+      angers: null,
+      comments: post.comments?.summary?.total_count ?? null,
+      shares: post.shares?.count ?? null,
+      synced_at: new Date().toISOString(),
+    };
+
+    // Requested one metric at a time (like fetchPageDailyInsights) — Meta has
+    // retired individual post metrics before without warning, and a single
+    // comma-joined request fails entirely if even one name is invalid.
+    for (const [metric, field] of Object.entries(POST_METRIC_FIELD_MAP)) {
+      try {
+        const insights = await graphGet(`/${post.id}/insights?metric=${metric}`, accessToken);
+        const value = insights?.data?.[0]?.values?.[0]?.value;
+        if (typeof value === "number") (row as any)[field] = value;
+      } catch (err: any) {
+        if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+        console.error(`Facebook post metric "${metric}" (${post.id}) lỗi:`, err.message || err);
+      }
+    }
+
+    try {
+      await Promise.all(
+        REACTION_TYPES.map(async (type) => {
+          const r = await graphGet(`/${post.id}/reactions?type=${type}&summary=true&limit=0`, accessToken);
+          (row as any)[REACTION_FIELD_BY_TYPE[type]] = r?.summary?.total_count ?? 0;
+        })
+      );
+    } catch (err: any) {
+      if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+      console.error(`Facebook reactions breakdown (${post.id}) lỗi:`, err.message || err);
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+export interface FacebookSyncResult {
+  page_id: string;
+  page_name: string;
+  ok: boolean;
+  error?: string;
+}
+
+export async function runFacebookSync(): Promise<FacebookSyncResult[]> {
+  const pages = (await getFbPages()).filter((p) => p.is_active);
+  const results: FacebookSyncResult[] = [];
+
+  const now = new Date();
+  const until = toDateStr(now);
+  const since = toDateStr(new Date(now.getTime() - INSIGHTS_BACKFILL_DAYS * 24 * 60 * 60 * 1000));
+  const postsSince = toDateStr(new Date(now.getTime() - POSTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000));
+
+  for (const page of pages) {
+    // Threaded through every Graph API call made for this page — true the
+    // moment any of them comes back with a confirmed-dead token (code 190).
+    // Everything else (network blips, a retired metric, temporary API
+    // errors) leaves this false: the page stays connected and next sync
+    // just retries with the same stored token, per the "never auto-drop a
+    // connection unless Facebook itself says the token is dead" contract.
+    const tokenStatus: TokenStatus = { invalid: false };
+    try {
+      const accessToken = decrypt(page.access_token_encrypted);
+      if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
+
+      const dailyRows = await fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus);
+      if (dailyRows.length > 0) await upsertFbInsightsDaily(dailyRows);
+
+      const postRows = await fetchRecentPosts(page.page_id, accessToken, postsSince, tokenStatus);
+      if (postRows.length > 0) await upsertFbPosts(postRows);
+
+      await setFbPageSyncStatus(page.page_id, {
+        last_synced_at: new Date().toISOString(),
+        last_sync_error: null,
+        token_expired: tokenStatus.invalid,
+      });
+      results.push({ page_id: page.page_id, page_name: page.page_name, ok: true });
+    } catch (err: any) {
+      const message = err?.message || String(err);
+      console.error(`Đồng bộ Facebook thất bại cho page ${page.page_id}:`, message);
+      await setFbPageSyncStatus(page.page_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {});
+      results.push({ page_id: page.page_id, page_name: page.page_name, ok: false, error: message });
+    }
+  }
+
+  return results;
+}
