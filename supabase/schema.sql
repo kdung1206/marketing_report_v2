@@ -213,3 +213,56 @@ create index if not exists fb_posts_page_id_created_time_idx on fb_posts (page_i
 
 alter table fb_posts enable row level security;
 
+-- ---------------------------------------------------------------------------
+-- Digital Ads Report module (src/server/adsPerformanceStore.ts,
+-- src/server/facebookAdsSync.ts, src/components/DigitalAdsReport.tsx).
+-- Paid-ads campaign performance across Facebook/Google/TikTok — separate from
+-- fb_pages/fb_insights_daily above, which is organic Page Insights, not ads.
+--
+-- fb_ad_accounts is the Marketing-API counterpart of fb_pages: a Facebook
+-- Marketing API token (ads_read permission, scoped to an ad account act_<id>)
+-- is a DIFFERENT credential than a Page Insights token, so it gets its own
+-- config table rather than reusing fb_pages. Same encrypted-token/is_active/
+-- last_synced_at/token_expired shape for consistency with that table.
+-- ---------------------------------------------------------------------------
+create table if not exists fb_ad_accounts (
+  ad_account_id text primary key, -- e.g. "act_1234567890"
+  account_name text not null,
+  brand text,
+  access_token_encrypted text not null,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  token_expired boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table fb_ad_accounts enable row level security;
+
+-- One row per channel/campaign/ad group/ad/day. Upserted on the composite key
+-- below so a re-upload (Google/TikTok) or a re-sync (Facebook) safely
+-- overwrites just the matching rows instead of duplicating or requiring a
+-- separate "replace by date range" step.
+create table if not exists ads_performance (
+  channel text not null check (channel in ('facebook', 'google', 'tiktok')),
+  brand text,
+  campaign_name text not null,
+  ad_group_name text not null default '', -- ad set (FB) / ad group (Google, TikTok)
+  ad_name text not null default '',
+  date date not null,
+  spend numeric,
+  impressions bigint,
+  clicks bigint,
+  reach bigint, -- null for Google (not present in that export)
+  frequency numeric, -- null for Google
+  video_views bigint, -- TrueView views / video plays at 50% / 6s views — approximate, not identical definitions across channels
+  conversions int, -- Leads (FB) / Conversions (TikTok, Google)
+  extra jsonb not null default '{}'::jsonb, -- channel-specific leftovers (campaign_type, post_engagements, ...)
+  updated_at timestamptz not null default now(),
+  primary key (channel, campaign_name, ad_group_name, ad_name, date)
+);
+
+create index if not exists ads_performance_channel_date_idx on ads_performance (channel, date);
+create index if not exists ads_performance_brand_date_idx on ads_performance (brand, date);
+
+alter table ads_performance enable row level security;

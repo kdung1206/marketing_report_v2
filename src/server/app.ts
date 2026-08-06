@@ -11,6 +11,16 @@ import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
 import { getFbPages, upsertFbPage, deleteFbPage, getFbInsightsDaily, getFbPosts } from "./facebookStore";
 import { runFacebookSync } from "./facebookSync";
+import {
+  getAdsPerformance,
+  upsertAdsPerformance,
+  getFbAdAccounts,
+  upsertFbAdAccount,
+  deleteFbAdAccount,
+  AdsChannel,
+  AdsPerformanceRow,
+} from "./adsPerformanceStore";
+import { runFacebookAdsSync } from "./facebookAdsSync";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -1023,14 +1033,30 @@ app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
 
 // GET /api/cron/facebook-sync — hit by Vercel Cron once daily (see
 // vercel.json). Same CRON_SECRET pattern as GET /api/cron/weekly-backup.
+//
+// Also runs the Facebook Ads (Marketing API) sync here rather than adding a
+// third vercel.json cron entry — Vercel's Hobby plan caps a project at 2 cron
+// jobs, so a separate "/api/cron/facebook-ads-sync" entry would break
+// deployment for anyone still on that plan. Both syncs are independent and a
+// failure in one must not block the other, so they're run and reported
+// separately even though one HTTP call triggers both.
 app.get("/api/cron/facebook-sync", async (req, res) => {
   try {
     const expected = process.env.CRON_SECRET;
     if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const results = await runFacebookSync();
-    res.json({ success: true, results });
+    const [pageResults, adsResults] = await Promise.all([
+      runFacebookSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (page insights) error:", err);
+        return [];
+      }),
+      runFacebookAdsSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (ads) error:", err);
+        return [];
+      }),
+    ]);
+    res.json({ success: true, results: pageResults, adsResults });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -1063,6 +1089,162 @@ app.get("/api/fb/insights", requireAuth(), async (req, res) => {
       daily,
       posts,
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Digital Ads Report module. ads_performance is stored via
+// adsPerformanceStore.ts — one normalized table for all 3 channels (Facebook/
+// Google/TikTok), keyed by (channel, campaign_name, ad_group_name, ad_name,
+// date) so both the Facebook API sync and the Google/TikTok manual uploads
+// upsert through the exact same idempotent path. fb_ad_accounts is the
+// Marketing-API counterpart of fb_pages — a different token type (ads_read on
+// an ad account, not a Page token), so it gets its own Admin-only config
+// routes rather than reusing /api/fb/pages.
+// ---------------------------------------------------------------------------
+
+const ADS_CHANNELS: AdsChannel[] = ["facebook", "google", "tiktok"];
+
+function isValidAdsPerformanceRow(r: any): r is AdsPerformanceRow {
+  return (
+    r &&
+    typeof r === "object" &&
+    ADS_CHANNELS.includes(r.channel) &&
+    typeof r.campaign_name === "string" &&
+    typeof r.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(r.date)
+  );
+}
+
+// GET /api/ads-performance?channels=facebook,google&brand=Livotec&since=&until=
+// Any logged-in role can read it — same visibility as /api/fb/insights.
+app.get("/api/ads-performance", requireAuth(), async (req, res) => {
+  try {
+    const channels = typeof req.query.channels === "string" && req.query.channels.length > 0
+      ? (req.query.channels.split(",").map((s) => s.trim()) as AdsChannel[]).filter((c) => ADS_CHANNELS.includes(c))
+      : undefined;
+    const brand = typeof req.query.brand === "string" && req.query.brand ? req.query.brand : null;
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date().toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const rows = await getAdsPerformance({ channels, brand, since, until });
+    res.json({ success: true, rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/ads-performance/upload — Google/TikTok manual upload. Rows are
+// parsed client-side (src/lib/adsImport.ts: parseGoogleAdsExport /
+// parseTiktokAdsExport) and posted here already normalized — this route only
+// validates shape and upserts, same "parse in browser → POST normalized JSON"
+// pattern as the existing offline spreadsheet sync (parseSpreadsheetFile +
+// POST /api/sync-data).
+app.post("/api/ads-performance/upload", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: "Không có dòng dữ liệu nào để lưu." });
+    }
+    const invalid = rows.filter((r) => !isValidAdsPerformanceRow(r));
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `${invalid.length}/${rows.length} dòng thiếu channel/campaign_name/date hợp lệ.`,
+      });
+    }
+
+    await upsertAdsPerformance(rows as AdsPerformanceRow[]);
+    await logAction(
+      (req as any).session,
+      req,
+      "upload-ads-performance",
+      `Tải lên ${rows.length} dòng số liệu quảng cáo (${rows[0].channel})`
+    );
+    res.json({ success: true, count: rows.length });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/fb-ads/accounts — list configured Ad Accounts (never returns the token).
+app.get("/api/fb-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getFbAdAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        ad_account_id: a.ad_account_id,
+        account_name: a.account_name,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/fb-ads/accounts — add or update an Ad Account's ID / name / token.
+app.post("/api/fb-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { ad_account_id, account_name, brand, access_token, is_active } = req.body;
+    if (!ad_account_id || !account_name || !access_token) {
+      return res.status(400).json({ success: false, error: "Thiếu ad_account_id, account_name hoặc access_token." });
+    }
+
+    await upsertFbAdAccount({
+      ad_account_id: String(ad_account_id).trim(),
+      account_name: String(account_name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      access_token_encrypted: encrypt(String(access_token).trim()),
+      is_active: is_active !== undefined ? Boolean(is_active) : undefined,
+    });
+
+    await logAction((req as any).session, req, "save-fb-ad-account", `Cập nhật cấu hình Ad Account ${ad_account_id}`);
+    res.json({ success: true, message: "Đã lưu cấu hình Ad Account." });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/fb-ads/accounts/:ad_account_id
+app.delete("/api/fb-ads/accounts/:ad_account_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteFbAdAccount(req.params.ad_account_id);
+    await logAction((req as any).session, req, "delete-fb-ad-account", `Xóa cấu hình Ad Account ${req.params.ad_account_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/fb-ads/sync-now — Admin-only manual trigger, mirrors POST /api/fb/sync-now.
+app.post("/api/fb-ads/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    // Optional {since, until} lets an Admin trigger a one-off historical
+    // backfill (e.g. "from Jan 1st") from the same button, instead of only
+    // ever re-pulling the daily cron's rolling 30-day window.
+    const { since, until } = req.body || {};
+    const overrides =
+      typeof since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(since)
+        ? { since, until: typeof until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(until) ? until : undefined }
+        : undefined;
+    const results = await runFacebookAdsSync(overrides);
+    await logAction(
+      (req as any).session,
+      req,
+      "sync-facebook-ads",
+      overrides ? `Đồng bộ thủ công ${results.length} Ad Account (từ ${overrides.since})` : `Đồng bộ thủ công ${results.length} Ad Account`
+    );
+    res.json({ success: true, results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

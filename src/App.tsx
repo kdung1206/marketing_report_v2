@@ -12,6 +12,9 @@ import { exportToExcel, exportToJSON, parseSpreadsheetFile, exportFullDatabaseTo
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
 import FacebookInsights from "./components/FacebookInsights";
 import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
+import DigitalAdsReport from "./components/DigitalAdsReport";
+import FbAdAccountsAdmin from "./components/FbAdAccountsAdmin";
+import AdsUploadAdmin from "./components/AdsUploadAdmin";
 import {
   TrendingUp,
   Award,
@@ -49,6 +52,9 @@ import {
   Printer,
   Mail,
   Facebook,
+  Megaphone,
+  Link2,
+  ArrowLeft,
 } from "lucide-react";
 import {
   PieChart,
@@ -464,21 +470,30 @@ export default function App() {
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
 
   // Navigation & Brand States
-  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads">("dashboard");
 
   // Left sidebar on the Control Panel view: which work-group section is
   // showing. Only shown when `activeTab === "control-panel"` — the report
   // (dashboard) view has no sidebar of its own.
-  type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "facebook" | "logs";
+  type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "platform-connections" | "logs";
   const [controlPanelSection, setControlPanelSection] = useState<ControlPanelSection>(() => {
     const saved = localStorage.getItem("marketing_control_panel_section");
-    return (["data-entry", "comments", "db-admin", "users", "backup", "facebook", "logs"] as const).includes(saved as any)
+    return (["data-entry", "comments", "db-admin", "users", "backup", "platform-connections", "logs"] as const).includes(saved as any)
       ? (saved as ControlPanelSection)
       : "data-entry";
   });
   useEffect(() => {
     localStorage.setItem("marketing_control_panel_section", controlPanelSection);
   }, [controlPanelSection]);
+
+  // "Kết nối nền tảng" groups Facebook (API — Admin-only, has real credentials)
+  // with the Google/TikTok manual upload flows (Editor+) under one menu, per
+  // user request — same "section + sub-tab" shape as "Log hệ thống" below.
+  // Editors never see "facebook" (credentials are Admin-only) so they default
+  // straight to "google" instead of landing on a sub-tab they can't use.
+  const [platformSubTab, setPlatformSubTab] = useState<"facebook" | "google" | "tiktok">(() =>
+    currentUser?.role === "Admin" ? "facebook" : "google"
+  );
 
   // "Log hệ thống" has two sub-views; Editor accounts only ever see "action"
   // (Login Logs is Admin-only), so default accordingly per role below.
@@ -495,7 +510,7 @@ export default function App() {
     { id: "db-admin", label: "Quản trị cơ sở dữ liệu", icon: Layers, adminOnly: true },
     { id: "users", label: "Quản trị người dùng", icon: Shield, adminOnly: true },
     { id: "backup", label: "Sao Lưu Tự Động", icon: Mail, adminOnly: true },
-    { id: "facebook", label: "Kết nối Facebook", icon: Facebook, adminOnly: true },
+    { id: "platform-connections", label: "Kết nối nền tảng", icon: Link2, adminOnly: false },
     { id: "logs", label: "Log hệ thống", icon: Lock, adminOnly: false },
   ];
   const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">(() => {
@@ -2734,12 +2749,79 @@ export default function App() {
             id="control_panel_sidebar"
             className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
           >
+            <button
+              id="control_panel_back_to_report"
+              onClick={() => setActiveTab("dashboard")}
+              className="mb-2 flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-3 py-2 text-left text-sm font-semibold text-slate-600 transition-all hover:bg-slate-50 lg:mb-3 lg:border-b lg:border-slate-100 lg:pb-4 lg:rounded-none"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-400" />
+              Quay lại Báo Cáo
+            </button>
             <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
               Danh Mục Quản Trị
             </p>
             {CONTROL_PANEL_SECTIONS.filter((sec) => !sec.adminOnly || currentUser.role === "Admin").map((sec) => {
               const SecIcon = sec.icon;
               const isActive = controlPanelSection === sec.id;
+
+              if (sec.id === "platform-connections") {
+                return (
+                  <div key={sec.id} className="w-full shrink-0">
+                    <button
+                      id={`control_section_btn_${sec.id}`}
+                      onClick={() => setControlPanelSection("platform-connections")}
+                      className={`flex w-full cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                        isActive
+                          ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                          : "border-transparent text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <SecIcon className={`h-4 w-4 ${isActive ? "text-indigo-600" : "text-slate-400"}`} />
+                      {sec.label}
+                    </button>
+                    <div className="ml-4 mt-1 space-y-1 border-l border-slate-100 pl-3">
+                      {currentUser.role === "Admin" && (
+                        <button
+                          id="control_section_btn_platform_facebook"
+                          onClick={() => {
+                            setControlPanelSection("platform-connections");
+                            setPlatformSubTab("facebook");
+                          }}
+                          className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
+                            isActive && platformSubTab === "facebook" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          Facebook
+                        </button>
+                      )}
+                      <button
+                        id="control_section_btn_platform_google"
+                        onClick={() => {
+                          setControlPanelSection("platform-connections");
+                          setPlatformSubTab("google");
+                        }}
+                        className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
+                          isActive && platformSubTab === "google" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        Google Ads
+                      </button>
+                      <button
+                        id="control_section_btn_platform_tiktok"
+                        onClick={() => {
+                          setControlPanelSection("platform-connections");
+                          setPlatformSubTab("tiktok");
+                        }}
+                        className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
+                          isActive && platformSubTab === "tiktok" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
+                        }`}
+                      >
+                        TikTok Ads
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
 
               if (sec.id === "logs") {
                 return (
@@ -2846,6 +2928,18 @@ export default function App() {
             <Facebook className={`h-4 w-4 ${activeTab === "fb-insights" ? "text-indigo-600" : "text-slate-400"}`} />
             Facebook Insights
           </button>
+          <button
+            id="report_nav_digital_ads"
+            onClick={() => setActiveTab("digital-ads")}
+            className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+              activeTab === "digital-ads"
+                ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                : "border-transparent text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <Megaphone className={`h-4 w-4 ${activeTab === "digital-ads" ? "text-indigo-600" : "text-slate-400"}`} />
+            Digital Ads Report
+          </button>
 
           {/* Admin action, not a report type — pinned to the bottom of the
               menu, separate from the report-type buttons above. Editor also
@@ -2891,25 +2985,33 @@ export default function App() {
 
           {/* Timeline + user/session cluster */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            {/* Timeline selector */}
-            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
-              <select
-                id="timeline_select"
-                value={selectedTimeline.id}
-                onChange={(e) => {
-                  const found = timelines.find((t) => t.id === e.target.value);
-                  if (found) setSelectedTimeline(found);
-                }}
-                className="bg-transparent pr-2 font-medium text-slate-800 focus:outline-none cursor-pointer"
-              >
-                {timelines.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Timeline selector — only meaningful for the weekly report
+                (dashboard) view, which is the only tab whose data is sliced
+                by `selectedTimeline`. Facebook Insights and Digital Ads
+                Report have their own independent date-range pickers, and
+                Control Panel isn't date-scoped at all — showing this
+                selector there implied it controlled something on those
+                screens when it doesn't. */}
+            {activeTab === "dashboard" && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm">
+                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                <select
+                  id="timeline_select"
+                  value={selectedTimeline.id}
+                  onChange={(e) => {
+                    const found = timelines.find((t) => t.id === e.target.value);
+                    if (found) setSelectedTimeline(found);
+                  }}
+                  className="bg-transparent pr-2 font-medium text-slate-800 focus:outline-none cursor-pointer"
+                >
+                  {timelines.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-3 py-1.5 font-sans text-xs text-indigo-700">
               <Shield className="h-3.5 w-3.5 text-indigo-500" />
@@ -4248,6 +4350,8 @@ export default function App() {
           </div>
         ) : activeTab === "fb-insights" ? (
           <FacebookInsights selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
+        ) : activeTab === "digital-ads" ? (
+          <DigitalAdsReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : (
           /* ------------------------------------------------------------
               GIAO DIỆN CONTROL PANEL (BẢNG ĐIỀU KHIỂN RIÊNG BIỆT)
@@ -5500,8 +5604,18 @@ export default function App() {
               </div>
             )}
 
-            {controlPanelSection === "facebook" && currentUser && currentUser.role === "Admin" && (
-              <FacebookPagesAdmin />
+            {controlPanelSection === "platform-connections" && platformSubTab === "facebook" && currentUser && currentUser.role === "Admin" && (
+              <div className="space-y-6">
+                <FacebookPagesAdmin />
+                <FbAdAccountsAdmin />
+                <AdsUploadAdmin channel="facebook" />
+              </div>
+            )}
+            {controlPanelSection === "platform-connections" && platformSubTab === "google" && (
+              <AdsUploadAdmin channel="google" />
+            )}
+            {controlPanelSection === "platform-connections" && platformSubTab === "tiktok" && (
+              <AdsUploadAdmin channel="tiktok" />
             )}
 
             {/* ------------------------------------------------------------
