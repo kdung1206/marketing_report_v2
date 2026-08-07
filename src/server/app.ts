@@ -1338,6 +1338,13 @@ app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
     state,
     code_challenge: codeChallenge,
     code_challenge_method: "S256",
+    // Without this, TikTok silently re-authorizes using whatever scopes were
+    // granted the FIRST time the account approved this app, skipping the
+    // consent screen entirely on later logins — so a scope added afterwards
+    // (e.g. video.list) never reaches the user for approval until they
+    // revoke the app from their TikTok settings. Forcing the screen every
+    // time avoids depending on that manual revoke step.
+    disable_auto_auth: "1",
   });
   res.json({ success: true, authorizeUrl: `${TIKTOK_AUTHORIZE_URL}?${params.toString()}` });
 });

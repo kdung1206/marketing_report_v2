@@ -497,6 +497,22 @@ export default function App() {
     currentUser?.role === "Admin" ? "facebook" : "google"
   );
 
+  // TikTok's OAuth callback is a real server-side redirect (full page reload,
+  // not a client-side navigation), which would otherwise land back on this
+  // component's hardcoded default view ("dashboard") and lose whatever tab
+  // the admin was on. Restore Control Panel → Kết nối nền tảng → TikTok
+  // specifically when that redirect's marker query param is present, then
+  // strip it so a manual refresh afterwards doesn't re-trigger this.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tiktokConnected") === "1") {
+      setActiveTab("control-panel");
+      setControlPanelSection("platform-connections");
+      setPlatformSubTab("tiktok");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   // "Log hệ thống" has two sub-views; Editor accounts only ever see "action"
   // (Login Logs is Admin-only), so default accordingly per role below.
   const [logsSubTab, setLogsSubTab] = useState<"login" | "action">("login");
