@@ -1323,13 +1323,21 @@ app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
     });
   }
   const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const state = signOAuthState({ brand, username: (req as any).session.username });
+  // TikTok's v2 authorize endpoint now rejects requests without PKCE
+  // (error: "code_challenge") — codeVerifier rides inside the signed state
+  // rather than a server-side session, since oauth/callback may land on a
+  // different serverless instance than oauth/start.
+  const codeVerifier = crypto.randomBytes(48).toString("base64url");
+  const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
+  const state = signOAuthState({ brand, username: (req as any).session.username, codeVerifier });
   const params = new URLSearchParams({
     client_key: TIKTOK_CLIENT_KEY,
     scope: TIKTOK_SCOPES.join(","),
     response_type: "code",
     redirect_uri: TIKTOK_REDIRECT_URI,
     state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
   });
   res.json({ success: true, authorizeUrl: `${TIKTOK_AUTHORIZE_URL}?${params.toString()}` });
 });
@@ -1344,13 +1352,13 @@ app.get("/api/tiktok/oauth/callback", async (req, res) => {
   if (oauthError) {
     return res.status(400).send(`Kết nối TikTok bị hủy hoặc lỗi: ${error_description || oauthError}`);
   }
-  const payload = verifyOAuthState<{ brand: string | null; username: string }>(state);
+  const payload = verifyOAuthState<{ brand: string | null; username: string; codeVerifier: string }>(state);
   if (!payload || typeof code !== "string") {
     return res.status(400).send("Liên kết xác thực TikTok không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
   }
 
   try {
-    const tokens = await exchangeTiktokCode(code, TIKTOK_REDIRECT_URI);
+    const tokens = await exchangeTiktokCode(code, TIKTOK_REDIRECT_URI, payload.codeVerifier);
     let profile: { username?: string; display_name?: string } = {};
     try {
       profile = await fetchTiktokUserInfo(tokens.access_token);

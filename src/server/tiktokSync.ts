@@ -92,13 +92,14 @@ async function postTokenEndpoint(params: Record<string, string>): Promise<TokenR
 // Called once from the OAuth callback route (app.ts) right after the user
 // approves the consent screen — exchanges the one-time `code` for the first
 // access_token/refresh_token pair.
-export async function exchangeTiktokCode(code: string, redirectUri: string): Promise<TokenResponse> {
+export async function exchangeTiktokCode(code: string, redirectUri: string, codeVerifier: string): Promise<TokenResponse> {
   return postTokenEndpoint({
     client_key: TIKTOK_CLIENT_KEY,
     client_secret: TIKTOK_CLIENT_SECRET,
     code,
     grant_type: "authorization_code",
     redirect_uri: redirectUri,
+    code_verifier: codeVerifier,
   });
 }
 
