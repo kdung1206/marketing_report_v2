@@ -266,3 +266,67 @@ create index if not exists ads_performance_channel_date_idx on ads_performance (
 create index if not exists ads_performance_brand_date_idx on ads_performance (brand, date);
 
 alter table ads_performance enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- TikTok organic insights (src/server/tiktokSync.ts) — merges with Facebook
+-- Page Insights into the "Social Report" tab (src/components/SocialReport
+-- or wherever it lands in App.tsx). Same fb_pages/fb_insights_daily/fb_posts
+-- shape as Facebook Page Insights above, with one structural difference:
+-- TikTok's Display API is OAuth (Login Kit), not a static pasted token —
+-- access_token lives 24h and auto-refreshes, but refresh_token itself
+-- expires after 365 days and requires the account owner to click through
+-- TikTok's consent screen again (see /api/tiktok/oauth/start in app.ts).
+-- token_expired here means that re-auth, specifically — the refresh_token
+-- itself no longer works, not just a transient API error.
+-- ---------------------------------------------------------------------------
+create table if not exists tiktok_accounts (
+  open_id text primary key,
+  username text,
+  display_name text,
+  brand text,
+  access_token_encrypted text not null,
+  refresh_token_encrypted text not null,
+  access_token_expires_at timestamptz not null,
+  refresh_token_expires_at timestamptz not null,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  token_expired boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table tiktok_accounts enable row level security;
+
+-- TikTok's public API has no historical follower series (unlike video
+-- stats) — only a current snapshot via GET user/info. One row per account
+-- per day, same "snapshot today's value" convention as fb_insights_daily's
+-- fan_count column.
+create table if not exists tiktok_insights_daily (
+  open_id text not null references tiktok_accounts(open_id) on delete cascade,
+  date date not null,
+  follower_count int,
+  following_count int,
+  likes_count int,
+  video_count int,
+  primary key (open_id, date)
+);
+
+alter table tiktok_insights_daily enable row level security;
+
+create table if not exists tiktok_posts (
+  video_id text primary key,
+  open_id text not null references tiktok_accounts(open_id) on delete cascade,
+  create_time timestamptz not null,
+  title text,
+  cover_image_url text,
+  share_url text,
+  view_count int,
+  like_count int,
+  comment_count int,
+  share_count int,
+  synced_at timestamptz not null default now()
+);
+
+create index if not exists tiktok_posts_open_id_create_time_idx on tiktok_posts (open_id, create_time desc);
+
+alter table tiktok_posts enable row level security;

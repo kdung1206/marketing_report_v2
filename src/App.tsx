@@ -10,11 +10,12 @@ import {
 } from "./data";
 import { exportToExcel, exportToJSON, parseSpreadsheetFile, exportFullDatabaseToExcel } from "./lib/export";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
-import FacebookInsights from "./components/FacebookInsights";
+import SocialReport from "./components/SocialReport";
 import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
 import DigitalAdsReport from "./components/DigitalAdsReport";
 import FbAdAccountsAdmin from "./components/FbAdAccountsAdmin";
 import AdsUploadAdmin from "./components/AdsUploadAdmin";
+import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
 import {
   TrendingUp,
   Award,
@@ -55,6 +56,7 @@ import {
   Megaphone,
   Link2,
   ArrowLeft,
+  Share2,
 } from "lucide-react";
 import {
   PieChart,
@@ -2925,8 +2927,8 @@ export default function App() {
                 : "border-transparent text-slate-600 hover:bg-slate-50"
             }`}
           >
-            <Facebook className={`h-4 w-4 ${activeTab === "fb-insights" ? "text-indigo-600" : "text-slate-400"}`} />
-            Facebook Insights
+            <Share2 className={`h-4 w-4 ${activeTab === "fb-insights" ? "text-indigo-600" : "text-slate-400"}`} />
+            Social Report
           </button>
           <button
             id="report_nav_digital_ads"
@@ -4349,7 +4351,7 @@ export default function App() {
           </div>
           </div>
         ) : activeTab === "fb-insights" ? (
-          <FacebookInsights selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
+          <SocialReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : activeTab === "digital-ads" ? (
           <DigitalAdsReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : (
@@ -5615,7 +5617,10 @@ export default function App() {
               <AdsUploadAdmin channel="google" />
             )}
             {controlPanelSection === "platform-connections" && platformSubTab === "tiktok" && (
-              <AdsUploadAdmin channel="tiktok" />
+              <div className="space-y-6">
+                {currentUser && currentUser.role === "Admin" && <TiktokAccountsAdmin />}
+                <AdsUploadAdmin channel="tiktok" />
+              </div>
             )}
 
             {/* ------------------------------------------------------------

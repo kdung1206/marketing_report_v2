@@ -83,7 +83,11 @@ dùng nữa (đã được thêm vào `.gitignore`).
 2. Ở phần **Environment Variables**, khai báo: `SUPABASE_URL`,
    `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `ENCRYPTION_KEY`,
    `SESSION_SECRET`, và các biến SMTP nếu dùng — tất cả đều là biến server,
-   không cần tiền tố `VITE_`.
+   không cần tiền tố `VITE_`. Nếu dùng tab "Social Report" phần TikTok, khai
+   báo thêm `TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`,
+   `TIKTOK_REDIRECT_URI` (xem hướng dẫn lấy trong [.env.example](.env.example))
+   — `TIKTOK_REDIRECT_URI` trên production phải là domain thật, không phải
+   `localhost`.
 
    ⚠️ `ENCRYPTION_KEY` và `SESSION_SECRET` **bắt buộc phải có** — server sẽ
    crash ngay khi khởi động nếu thiếu (không còn giá trị mặc định fallback

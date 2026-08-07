@@ -7,7 +7,7 @@ import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 import { DEFAULT_USERS, reconcileUsers, UserAccount } from "../lib/defaultUsers";
 import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny } from "../lib/serverPasswordHash";
-import { requireAuth, signSessionToken } from "./auth";
+import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
 import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
 import { getFbPages, upsertFbPage, deleteFbPage, getFbInsightsDaily, getFbPosts } from "./facebookStore";
@@ -22,6 +22,17 @@ import {
   AdsPerformanceRow,
 } from "./adsPerformanceStore";
 import { runFacebookAdsSync } from "./facebookAdsSync";
+import { getTiktokAccounts, deleteTiktokAccount, upsertTiktokAccount, getTiktokInsightsDaily, getTiktokPosts } from "./tiktokStore";
+import {
+  exchangeTiktokCode,
+  runTiktokSync,
+  fetchUserInfo as fetchTiktokUserInfo,
+  isTiktokConfigured,
+  TIKTOK_CLIENT_KEY,
+  TIKTOK_REDIRECT_URI,
+  TIKTOK_AUTHORIZE_URL,
+  TIKTOK_SCOPES,
+} from "./tiktokSync";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -1062,7 +1073,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const [pageResults, adsResults] = await Promise.all([
+    const [pageResults, adsResults, tiktokResults] = await Promise.all([
       runFacebookSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (page insights) error:", err);
         return [];
@@ -1071,8 +1082,18 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
         console.error("GET /api/cron/facebook-sync (ads) error:", err);
         return [];
       }),
+      // TikTok organic insights piggybacks on this same cron for the same
+      // reason the Facebook Ads sync does — Vercel Hobby caps a project at
+      // 2 cron jobs, so this stays one HTTP trigger fanning out to all three
+      // independent syncs rather than a third vercel.json entry.
+      isTiktokConfigured
+        ? runTiktokSync().catch((err) => {
+            console.error("GET /api/cron/facebook-sync (tiktok) error:", err);
+            return [];
+          })
+        : Promise.resolve([]),
     ]);
-    res.json({ success: true, results: pageResults, adsResults });
+    res.json({ success: true, results: pageResults, adsResults, tiktokResults });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -1276,6 +1297,170 @@ app.post("/api/fb-ads/sync-now", requireAuth("Admin"), async (req, res) => {
       overrides ? `Đồng bộ thủ công ${results.length} Ad Account (từ ${overrides.since})` : `Đồng bộ thủ công ${results.length} Ad Account`
     );
     res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// TikTok organic insights module (src/server/tiktokSync.ts,
+// src/server/tiktokStore.ts) — merges with Facebook Page Insights into the
+// "Social Report" tab. Unlike every other integration in this file, the
+// connection step is a real OAuth redirect (TikTok's Login Kit), not a
+// pasted token — see oauth/start + oauth/callback below.
+// ---------------------------------------------------------------------------
+
+// GET /api/tiktok/oauth/start — Admin-only. Returns the TikTok authorize URL
+// (rather than redirecting directly) so the frontend can navigate the
+// browser there itself; this route is called via the normal authenticated
+// fetch() pattern (Authorization: Bearer), which a raw HTTP redirect
+// response couldn't carry through a full-page navigation anyway.
+app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isTiktokConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET / TIKTOK_REDIRECT_URI chưa được cấu hình đầy đủ.",
+    });
+  }
+  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
+  const state = signOAuthState({ brand, username: (req as any).session.username });
+  const params = new URLSearchParams({
+    client_key: TIKTOK_CLIENT_KEY,
+    scope: TIKTOK_SCOPES.join(","),
+    response_type: "code",
+    redirect_uri: TIKTOK_REDIRECT_URI,
+    state,
+  });
+  res.json({ success: true, authorizeUrl: `${TIKTOK_AUTHORIZE_URL}?${params.toString()}` });
+});
+
+// GET /api/tiktok/oauth/callback — hit by a real browser navigation (TikTok
+// redirecting the user back), never by fetch(). There is no Authorization
+// header to check here — the signed `state` param (minted by oauth/start
+// above, verified via verifyOAuthState) is what proves this callback
+// corresponds to a request an Admin actually initiated, not a forged hit.
+app.get("/api/tiktok/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError, error_description } = req.query as Record<string, string | undefined>;
+  if (oauthError) {
+    return res.status(400).send(`Kết nối TikTok bị hủy hoặc lỗi: ${error_description || oauthError}`);
+  }
+  const payload = verifyOAuthState<{ brand: string | null; username: string }>(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Liên kết xác thực TikTok không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
+  }
+
+  try {
+    const tokens = await exchangeTiktokCode(code, TIKTOK_REDIRECT_URI);
+    let profile: { username?: string; display_name?: string } = {};
+    try {
+      profile = await fetchTiktokUserInfo(tokens.access_token);
+    } catch (err: any) {
+      // Non-fatal — the account still connects; username/display_name just
+      // backfill on the next scheduled sync instead of showing immediately.
+      console.error("TikTok oauth/callback: fetchUserInfo lỗi (không chặn kết nối):", err.message || err);
+    }
+
+    await upsertTiktokAccount({
+      open_id: tokens.open_id,
+      username: profile.username || null,
+      display_name: profile.display_name || null,
+      brand: payload.brand,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + tokens.refresh_expires_in * 1000).toISOString(),
+      is_active: true,
+      last_synced_at: null,
+      last_sync_error: null,
+      token_expired: false,
+      created_at: new Date().toISOString(),
+    });
+
+    await logAction(
+      { username: payload.username, role: "Admin" },
+      req,
+      "connect-tiktok-account",
+      `Kết nối tài khoản TikTok ${profile.username || tokens.open_id}`
+    );
+
+    res.redirect(302, "/?tiktokConnected=1");
+  } catch (err: any) {
+    console.error("GET /api/tiktok/oauth/callback error:", err);
+    res.status(500).send(`Kết nối TikTok thất bại: ${err.message}`);
+  }
+});
+
+// GET /api/tiktok/accounts — list connected accounts (never returns tokens).
+app.get("/api/tiktok/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getTiktokAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        open_id: a.open_id,
+        username: a.username,
+        display_name: a.display_name,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+      })),
+      tiktokConfigured: isTiktokConfigured,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/tiktok/accounts/:open_id
+app.delete("/api/tiktok/accounts/:open_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteTiktokAccount(req.params.open_id);
+    await logAction((req as any).session, req, "delete-tiktok-account", `Xóa tài khoản TikTok ${req.params.open_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/tiktok/sync-now — Admin-only manual trigger.
+app.post("/api/tiktok/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runTiktokSync();
+    await logAction((req as any).session, req, "sync-tiktok", `Đồng bộ thủ công ${results.length} tài khoản TikTok`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/tiktok/insights?accounts=<open_id1,open_id2>&since=&until= — same
+// shape/visibility as GET /api/fb/insights (any logged-in role).
+app.get("/api/tiktok/insights", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getTiktokAccounts();
+    const requestedIds =
+      typeof req.query.accounts === "string" && req.query.accounts.length > 0
+        ? req.query.accounts.split(",").map((s) => s.trim())
+        : allAccounts.map((a) => a.open_id);
+
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date().toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [daily, posts] = await Promise.all([
+      getTiktokInsightsDaily(requestedIds, since, until),
+      getTiktokPosts(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`),
+    ]);
+
+    res.json({
+      success: true,
+      accounts: allAccounts.map((a) => ({ open_id: a.open_id, username: a.username, display_name: a.display_name, brand: a.brand, is_active: a.is_active })),
+      daily,
+      posts,
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

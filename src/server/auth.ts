@@ -75,6 +75,44 @@ export function verifySessionToken(token: string | undefined | null): SessionPay
   }
 }
 
+// Short-lived signed "state" param for OAuth redirect flows (currently
+// TikTok's — see /api/tiktok/oauth/start|callback in app.ts). Same HMAC
+// scheme as session tokens above, but deliberately separate: this carries
+// arbitrary caller-defined payload (e.g. {username, brand}) rather than a
+// login session, and lives for minutes, not hours — just long enough to
+// survive TikTok's authorize screen and redirect back. Stateless on purpose
+// (no server-side store to read on callback) since a serverless function
+// can't rely on in-memory state surviving between the redirect-out and the
+// redirect-back, which may hit a different instance.
+const OAUTH_STATE_TTL_SECONDS = 10 * 60;
+
+export function signOAuthState<T extends Record<string, unknown>>(payload: T): string {
+  const data = base64url(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1000) + OAUTH_STATE_TTL_SECONDS }));
+  const signature = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  return `${data}.${signature}`;
+}
+
+export function verifyOAuthState<T = Record<string, unknown>>(state: string | undefined | null): T | null {
+  if (!state || typeof state !== "string" || !state.includes(".")) return null;
+  const [data, signature] = state.split(".");
+  if (!data || !signature) return null;
+
+  const expected = crypto.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  const sigBuf = Buffer.from(signature);
+  const expectedBuf = Buffer.from(expected);
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf8")) as T & { exp: number };
+    if (!payload.exp || Math.floor(Date.now() / 1000) > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 const ROLE_RANK: Record<UserAccount["role"], number> = { Viewer: 0, Editor: 1, Admin: 2 };
 
 // requireAuth() — any logged-in role (Viewer+). requireAuth("Editor") — Editor
