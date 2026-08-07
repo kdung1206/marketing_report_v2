@@ -531,6 +531,57 @@ export default function App() {
     { id: "platform-connections", label: "Kết nối nền tảng", icon: Link2, adminOnly: false },
     { id: "logs", label: "Log hệ thống", icon: Lock, adminOnly: false },
   ];
+
+  // The 3 "Loại Báo Cáo" sidebar entries below — Admin always sees all of
+  // them; Editor/Viewer visibility is Admin-configurable (Control Panel →
+  // Quản trị người dùng → Phân quyền xem báo cáo, see reportPermissions
+  // state below) and defaults to "everyone sees everything" until an Admin
+  // explicitly restricts it, matching this app's prior (unrestricted) behavior.
+  type ReportCategoryId = "dashboard" | "fb-insights" | "digital-ads";
+  const REPORT_CATEGORIES: { id: ReportCategoryId; label: string; icon: typeof FileSpreadsheet }[] = [
+    { id: "dashboard", label: "Báo Cáo", icon: FileSpreadsheet },
+    { id: "fb-insights", label: "Social Report", icon: Share2 },
+    { id: "digital-ads", label: "Digital Ads Report", icon: Megaphone },
+  ];
+  const DEFAULT_REPORT_PERMISSIONS: Record<"Editor" | "Viewer", ReportCategoryId[]> = {
+    Editor: REPORT_CATEGORIES.map((c) => c.id),
+    Viewer: REPORT_CATEGORIES.map((c) => c.id),
+  };
+  const [reportPermissions, setReportPermissions] = useState<Record<"Editor" | "Viewer", ReportCategoryId[]>>(
+    DEFAULT_REPORT_PERMISSIONS
+  );
+  const canViewReportCategory = (id: ReportCategoryId) =>
+    !currentUser || currentUser.role === "Admin" || (reportPermissions[currentUser.role as "Editor" | "Viewer"] || []).includes(id);
+
+  // If Admin revokes access to whatever report tab an Editor/Viewer is
+  // currently sitting on (including on initial load, before their role's
+  // permissions have loaded from the server), bounce to the first tab
+  // they're still allowed to see instead of showing a dead/blank tab.
+  useEffect(() => {
+    if (!currentUser || currentUser.role === "Admin") return;
+    if (!REPORT_CATEGORIES.some((c) => c.id === activeTab)) return;
+    if (canViewReportCategory(activeTab as ReportCategoryId)) return;
+    const firstAllowed = REPORT_CATEGORIES.find((c) => canViewReportCategory(c.id));
+    setActiveTab(firstAllowed ? firstAllowed.id : "dashboard");
+  }, [currentUser, reportPermissions, activeTab]);
+
+  const handleToggleReportPermission = async (role: "Editor" | "Viewer", id: ReportCategoryId) => {
+    const current = reportPermissions[role] || [];
+    const next = current.includes(id) ? current.filter((c) => c !== id) : [...current, id];
+    const updated = { ...reportPermissions, [role]: next };
+    setReportPermissions(updated);
+    try {
+      const result = await safeFetchJson("/api/save-report-permissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      if (!result.success) throw new Error(result.error || "Lỗi lưu phân quyền báo cáo");
+    } catch (err: any) {
+      setReportPermissions(reportPermissions); // revert on failure
+      triggerNotification("error", `Không thể lưu phân quyền: ${err.message}`);
+    }
+  };
   const [selectedBrand, setSelectedBrand] = useState<"Livotec" | "Karofi">(() => {
     const saved = localStorage.getItem("marketing_selected_brand");
     return (saved === "Livotec" || saved === "Karofi") ? saved : "Livotec";
@@ -889,6 +940,10 @@ export default function App() {
         const serverComments = result.comments || {};
         setPublishedComments(serverComments);
         localStorage.setItem("marketing_published_comments", JSON.stringify(serverComments));
+
+        if (result.reportPermissions) {
+          setReportPermissions(result.reportPermissions);
+        }
 
         const list = getTimelines(safeData);
         
@@ -2922,42 +2977,48 @@ export default function App() {
           <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
             Loại Báo Cáo
           </p>
-          <button
-            id="report_nav_dashboard"
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
-              activeTab === "dashboard"
-                ? "border-indigo-100 bg-indigo-50 text-indigo-700"
-                : "border-transparent text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <FileSpreadsheet className={`h-4 w-4 ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-400"}`} />
-            Báo Cáo
-          </button>
-          <button
-            id="report_nav_fb_insights"
-            onClick={() => setActiveTab("fb-insights")}
-            className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
-              activeTab === "fb-insights"
-                ? "border-indigo-100 bg-indigo-50 text-indigo-700"
-                : "border-transparent text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Share2 className={`h-4 w-4 ${activeTab === "fb-insights" ? "text-indigo-600" : "text-slate-400"}`} />
-            Social Report
-          </button>
-          <button
-            id="report_nav_digital_ads"
-            onClick={() => setActiveTab("digital-ads")}
-            className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
-              activeTab === "digital-ads"
-                ? "border-indigo-100 bg-indigo-50 text-indigo-700"
-                : "border-transparent text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Megaphone className={`h-4 w-4 ${activeTab === "digital-ads" ? "text-indigo-600" : "text-slate-400"}`} />
-            Digital Ads Report
-          </button>
+          {canViewReportCategory("dashboard") && (
+            <button
+              id="report_nav_dashboard"
+              onClick={() => setActiveTab("dashboard")}
+              className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                activeTab === "dashboard"
+                  ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                  : "border-transparent text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <FileSpreadsheet className={`h-4 w-4 ${activeTab === "dashboard" ? "text-indigo-600" : "text-slate-400"}`} />
+              Báo Cáo
+            </button>
+          )}
+          {canViewReportCategory("fb-insights") && (
+            <button
+              id="report_nav_fb_insights"
+              onClick={() => setActiveTab("fb-insights")}
+              className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                activeTab === "fb-insights"
+                  ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                  : "border-transparent text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Share2 className={`h-4 w-4 ${activeTab === "fb-insights" ? "text-indigo-600" : "text-slate-400"}`} />
+              Social Report
+            </button>
+          )}
+          {canViewReportCategory("digital-ads") && (
+            <button
+              id="report_nav_digital_ads"
+              onClick={() => setActiveTab("digital-ads")}
+              className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                activeTab === "digital-ads"
+                  ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                  : "border-transparent text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Megaphone className={`h-4 w-4 ${activeTab === "digital-ads" ? "text-indigo-600" : "text-slate-400"}`} />
+              Digital Ads Report
+            </button>
+          )}
 
           {/* Admin action, not a report type — pinned to the bottom of the
               menu, separate from the report-type buttons above. Editor also
@@ -5335,6 +5396,7 @@ export default function App() {
 
             {/* Section: User & Account Management (Only Admin) */}
             {controlPanelSection === "users" && currentUser && currentUser.role === "Admin" && (
+              <>
               <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
                 <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -5490,6 +5552,57 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                    <Eye className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      Phân Quyền Xem Báo Cáo
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Chọn các loại báo cáo mà Editor/Viewer được phép xem. Admin luôn xem được tất cả, không giới hạn được.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-bold uppercase tracking-wider">Loại báo cáo</th>
+                        <th className="px-3 py-2 text-center font-bold uppercase tracking-wider">Editor</th>
+                        <th className="px-3 py-2 text-center font-bold uppercase tracking-wider">Viewer</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {REPORT_CATEGORIES.map((cat) => (
+                        <tr key={cat.id} className="hover:bg-slate-50/70">
+                          <td className="px-3 py-2 font-semibold text-slate-700">
+                            <div className="flex items-center gap-1.5">
+                              <cat.icon className="h-3.5 w-3.5 text-slate-400" />
+                              {cat.label}
+                            </div>
+                          </td>
+                          {(["Editor", "Viewer"] as const).map((role) => (
+                            <td key={role} className="px-3 py-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={reportPermissions[role].includes(cat.id)}
+                                onChange={() => handleToggleReportPermission(role, cat.id)}
+                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              </>
             )}
 
             {/* ------------------------------------------------------------
@@ -5798,7 +5911,7 @@ export default function App() {
       <footer className="mt-20 border-t border-slate-200 bg-white py-6">
         <div className="mx-auto max-w-7xl px-4 text-center text-xs text-slate-400 sm:px-6">
           <p>© 2026 Livotec & Karofi Marketing Reporting Console. All rights reserved.</p>
-          <p className="mt-1 font-mono">Dữ liệu phân tích tuần • Thiết kế với triết lý tối giản tinh tế</p>
+          <p className="mt-1 font-mono">Designed &amp; Developed by Nguyen Thi Kim Dung</p>
         </div>
       </footer>
       </div>

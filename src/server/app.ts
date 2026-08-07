@@ -595,6 +595,15 @@ app.get("/api/cron/weekly-backup", async (req, res) => {
   }
 });
 
+// Which "Loại Báo Cáo" sidebar entries (App.tsx) a role below Admin may see.
+// Admin always sees all of them — never restricted, never stored here.
+export const REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads"] as const;
+export type ReportCategoryId = (typeof REPORT_CATEGORY_IDS)[number];
+const DEFAULT_REPORT_PERMISSIONS: Record<"Editor" | "Viewer", ReportCategoryId[]> = {
+  Editor: [...REPORT_CATEGORY_IDS],
+  Viewer: [...REPORT_CATEGORY_IDS],
+};
+
 // GET /api/get-data
 app.get("/api/get-data", requireAuth(), async (req, res) => {
   try {
@@ -604,11 +613,42 @@ app.get("/api/get-data", requireAuth(), async (req, res) => {
       success: true,
       data: normalized,
       comments: rawDbData.comments || {},
-      activeState: rawDbData.active_state || null
+      activeState: rawDbData.active_state || null,
+      reportPermissions: rawDbData.report_permissions || DEFAULT_REPORT_PERMISSIONS
     });
   } catch (err: any) {
     console.error("GET /api/get-data error:", err);
     return res.status(500).json({ error: `Lỗi đọc cơ sở dữ liệu: ${err.message}` });
+  }
+});
+
+// POST /api/save-report-permissions — Admin-only. Controls which "Loại Báo
+// Cáo" sidebar entries Editor/Viewer accounts see (App.tsx REPORT_CATEGORIES).
+// Silently drops unknown category ids and non-Editor/Viewer role keys rather
+// than rejecting outright, so a stale client sending an old shape can't 500.
+app.post("/api/save-report-permissions", requireAuth("Admin"), async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sanitizeRole = (value: unknown): ReportCategoryId[] =>
+      Array.isArray(value) ? value.filter((id): id is ReportCategoryId => REPORT_CATEGORY_IDS.includes(id)) : [];
+    const reportPermissions = {
+      Editor: sanitizeRole(body.Editor),
+      Viewer: sanitizeRole(body.Viewer),
+    };
+
+    const store = await getDatabaseData();
+    store.report_permissions = reportPermissions;
+    await saveDatabaseData(store);
+    await logAction(
+      (req as any).session,
+      req,
+      "save-report-permissions",
+      `Cập nhật phân quyền xem báo cáo (Editor: ${reportPermissions.Editor.join(", ") || "không"}; Viewer: ${reportPermissions.Viewer.join(", ") || "không"})`
+    );
+    return res.json({ success: true, reportPermissions });
+  } catch (err: any) {
+    console.error("POST /api/save-report-permissions error:", err);
+    return res.status(500).json({ error: `Lỗi lưu phân quyền báo cáo: ${err.message}` });
   }
 });
 
