@@ -330,3 +330,59 @@ create table if not exists tiktok_posts (
 create index if not exists tiktok_posts_open_id_create_time_idx on tiktok_posts (open_id, create_time desc);
 
 alter table tiktok_posts enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- YouTube organic insights (src/server/youtubeSync.ts) — Data API v3 +
+-- Analytics API v2, OAuth (not a static pasted token, same shape as
+-- tiktok_accounts above). Unlike TikTok, Google does not expire the
+-- refresh_token on a fixed schedule, so there is no refresh_token_expires_at
+-- column here — token_expired is set only when a refresh attempt itself
+-- fails (revoked/invalid_grant).
+-- ---------------------------------------------------------------------------
+create table if not exists youtube_accounts (
+  channel_id text primary key,
+  channel_title text,
+  brand text,
+  access_token_encrypted text not null,
+  refresh_token_encrypted text not null,
+  access_token_expires_at timestamptz not null,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  token_expired boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table youtube_accounts enable row level security;
+
+-- One row per channel per day, same "snapshot today's value" convention as
+-- tiktok_insights_daily/fb_insights_daily.
+create table if not exists youtube_insights_daily (
+  channel_id text not null references youtube_accounts(channel_id) on delete cascade,
+  date date not null,
+  subscriber_count int,
+  view_count int,
+  video_count int,
+  primary key (channel_id, date)
+);
+
+alter table youtube_insights_daily enable row level security;
+
+-- Latest cumulative snapshot per video (overwritten every sync, no date
+-- dimension) — same convention as tiktok_posts. organic_views/
+-- advertising_views split via insightTrafficSourceType; views is their sum.
+create table if not exists youtube_videos (
+  video_id text primary key,
+  channel_id text not null references youtube_accounts(channel_id) on delete cascade,
+  published_at timestamptz not null,
+  title text,
+  thumbnail_url text,
+  views int,
+  organic_views int,
+  advertising_views int,
+  synced_at timestamptz not null default now()
+);
+
+create index if not exists youtube_videos_channel_id_published_at_idx on youtube_videos (channel_id, published_at desc);
+
+alter table youtube_videos enable row level security;

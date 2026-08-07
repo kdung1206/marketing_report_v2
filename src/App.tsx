@@ -16,6 +16,7 @@ import DigitalAdsReport from "./components/DigitalAdsReport";
 import FbAdAccountsAdmin from "./components/FbAdAccountsAdmin";
 import AdsUploadAdmin from "./components/AdsUploadAdmin";
 import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
+import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
 import {
   TrendingUp,
   Award,
@@ -493,7 +494,7 @@ export default function App() {
   // user request — same "section + sub-tab" shape as "Log hệ thống" below.
   // Editors never see "facebook" (credentials are Admin-only) so they default
   // straight to "google" instead of landing on a sub-tab they can't use.
-  const [platformSubTab, setPlatformSubTab] = useState<"facebook" | "google" | "tiktok">(() =>
+  const [platformSubTab, setPlatformSubTab] = useState<"facebook" | "google" | "tiktok" | "youtube">(() =>
     currentUser?.role === "Admin" ? "facebook" : "google"
   );
 
@@ -509,6 +510,13 @@ export default function App() {
       setActiveTab("control-panel");
       setControlPanelSection("platform-connections");
       setPlatformSubTab("tiktok");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("youtubeConnected") === "1") {
+      // Same full-page-redirect problem as TikTok's OAuth callback above,
+      // Google's flavor of it.
+      setActiveTab("control-panel");
+      setControlPanelSection("platform-connections");
+      setPlatformSubTab("youtube");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -2891,6 +2899,20 @@ export default function App() {
                       >
                         TikTok Ads
                       </button>
+                      {currentUser.role === "Admin" && (
+                        <button
+                          id="control_section_btn_platform_youtube"
+                          onClick={() => {
+                            setControlPanelSection("platform-connections");
+                            setPlatformSubTab("youtube");
+                          }}
+                          className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
+                            isActive && platformSubTab === "youtube" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
+                          }`}
+                        >
+                          YouTube
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -5750,6 +5772,9 @@ export default function App() {
                 {currentUser && currentUser.role === "Admin" && <TiktokAccountsAdmin />}
                 <AdsUploadAdmin channel="tiktok" />
               </div>
+            )}
+            {controlPanelSection === "platform-connections" && platformSubTab === "youtube" && currentUser && currentUser.role === "Admin" && (
+              <YoutubeAccountsAdmin />
             )}
 
             {/* ------------------------------------------------------------

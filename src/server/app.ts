@@ -33,6 +33,17 @@ import {
   TIKTOK_AUTHORIZE_URL,
   TIKTOK_SCOPES,
 } from "./tiktokSync";
+import { getYoutubeAccounts, deleteYoutubeAccount, upsertYoutubeAccount, getYoutubeInsightsDaily, getYoutubeVideos } from "./youtubeStore";
+import {
+  exchangeYoutubeCode,
+  runYoutubeSync,
+  fetchOwnChannel,
+  isYoutubeConfigured,
+  YOUTUBE_CLIENT_ID,
+  YOUTUBE_REDIRECT_URI,
+  YOUTUBE_AUTHORIZE_URL,
+  YOUTUBE_SCOPES,
+} from "./youtubeSync";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -1113,7 +1124,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const [pageResults, adsResults, tiktokResults] = await Promise.all([
+    const [pageResults, adsResults, tiktokResults, youtubeResults] = await Promise.all([
       runFacebookSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (page insights) error:", err);
         return [];
@@ -1124,16 +1135,22 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       }),
       // TikTok organic insights piggybacks on this same cron for the same
       // reason the Facebook Ads sync does — Vercel Hobby caps a project at
-      // 2 cron jobs, so this stays one HTTP trigger fanning out to all three
-      // independent syncs rather than a third vercel.json entry.
+      // 2 cron jobs, so this stays one HTTP trigger fanning out to all
+      // independent syncs rather than a third/fourth vercel.json entry.
       isTiktokConfigured
         ? runTiktokSync().catch((err) => {
             console.error("GET /api/cron/facebook-sync (tiktok) error:", err);
             return [];
           })
         : Promise.resolve([]),
+      isYoutubeConfigured
+        ? runYoutubeSync().catch((err) => {
+            console.error("GET /api/cron/facebook-sync (youtube) error:", err);
+            return [];
+          })
+        : Promise.resolve([]),
     ]);
-    res.json({ success: true, results: pageResults, adsResults, tiktokResults });
+    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -1515,6 +1532,169 @@ app.get("/api/tiktok/insights", requireAuth(), async (req, res) => {
       accounts: allAccounts.map((a) => ({ open_id: a.open_id, username: a.username, display_name: a.display_name, brand: a.brand, is_active: a.is_active })),
       daily,
       posts,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// YouTube organic insights module (src/server/youtubeSync.ts,
+// src/server/youtubeStore.ts) — third leg of the "Social Report" tab
+// alongside Facebook Page Insights and TikTok. Same real-OAuth-redirect
+// shape as TikTok's Login Kit (oauth/start + oauth/callback), Google's
+// flavor instead — no PKCE (this is a confidential Web-application client
+// with a client_secret), but access_type=offline (to actually get a
+// refresh_token back) and prompt=consent (so a reconnect always returns a
+// fresh refresh_token instead of only the very first authorization getting
+// one — Google's equivalent of TikTok's disable_auto_auth problem, solved
+// differently since Google has no disable_auto_auth parameter).
+// ---------------------------------------------------------------------------
+
+// GET /api/youtube/oauth/start — Admin-only. Returns the Google authorize
+// URL (rather than redirecting directly) so the frontend can navigate the
+// browser there itself, same reasoning as GET /api/tiktok/oauth/start.
+app.get("/api/youtube/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isYoutubeConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET / YOUTUBE_REDIRECT_URI chưa được cấu hình đầy đủ.",
+    });
+  }
+  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
+  const state = signOAuthState({ brand, username: (req as any).session.username });
+  const params = new URLSearchParams({
+    client_id: YOUTUBE_CLIENT_ID,
+    redirect_uri: YOUTUBE_REDIRECT_URI,
+    response_type: "code",
+    scope: YOUTUBE_SCOPES.join(" "),
+    state,
+    access_type: "offline",
+    prompt: "consent",
+  });
+  res.json({ success: true, authorizeUrl: `${YOUTUBE_AUTHORIZE_URL}?${params.toString()}` });
+});
+
+// GET /api/youtube/oauth/callback — hit by a real browser navigation
+// (Google redirecting the user back), never by fetch(). Same signed-state
+// verification contract as GET /api/tiktok/oauth/callback.
+app.get("/api/youtube/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+  if (oauthError) {
+    return res.status(400).send(`Kết nối YouTube bị hủy hoặc lỗi: ${oauthError}`);
+  }
+  const payload = verifyOAuthState<{ brand: string | null; username: string }>(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Liên kết xác thực YouTube không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
+  }
+
+  try {
+    const tokens = await exchangeYoutubeCode(code, YOUTUBE_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      // Shouldn't happen with prompt=consent, but if it does there is no way
+      // to sync later without one — fail loudly instead of silently storing
+      // an account this app can never refresh.
+      throw new Error("Google không trả về refresh_token — vui lòng thử kết nối lại (đảm bảo màn hình xin quyền hiện ra đầy đủ, không bị bỏ qua).");
+    }
+    const channel = await fetchOwnChannel(tokens.access_token);
+
+    await upsertYoutubeAccount({
+      channel_id: channel.channel_id,
+      channel_title: channel.channel_title,
+      brand: payload.brand,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      is_active: true,
+      last_synced_at: null,
+      last_sync_error: null,
+      token_expired: false,
+      created_at: new Date().toISOString(),
+    });
+
+    await logAction(
+      { username: payload.username, role: "Admin" },
+      req,
+      "connect-youtube-account",
+      `Kết nối kênh YouTube ${channel.channel_title}`
+    );
+
+    res.redirect(302, "/?youtubeConnected=1");
+  } catch (err: any) {
+    console.error("GET /api/youtube/oauth/callback error:", err);
+    res.status(500).send(`Kết nối YouTube thất bại: ${err.message}`);
+  }
+});
+
+// GET /api/youtube/accounts — list connected channels (never returns tokens).
+app.get("/api/youtube/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getYoutubeAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        channel_id: a.channel_id,
+        channel_title: a.channel_title,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+      })),
+      youtubeConfigured: isYoutubeConfigured,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/youtube/accounts/:channel_id
+app.delete("/api/youtube/accounts/:channel_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteYoutubeAccount(req.params.channel_id);
+    await logAction((req as any).session, req, "delete-youtube-account", `Xóa kênh YouTube ${req.params.channel_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/youtube/sync-now — Admin-only manual trigger.
+app.post("/api/youtube/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runYoutubeSync();
+    await logAction((req as any).session, req, "sync-youtube", `Đồng bộ thủ công ${results.length} kênh YouTube`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/youtube/insights?accounts=<channel_id1,channel_id2>&since=&until=
+// — same shape/visibility as GET /api/tiktok/insights (any logged-in role).
+app.get("/api/youtube/insights", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getYoutubeAccounts();
+    const requestedIds =
+      typeof req.query.accounts === "string" && req.query.accounts.length > 0
+        ? req.query.accounts.split(",").map((s) => s.trim())
+        : allAccounts.map((a) => a.channel_id);
+
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date().toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [daily, videos] = await Promise.all([
+      getYoutubeInsightsDaily(requestedIds, since, until),
+      getYoutubeVideos(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`),
+    ]);
+
+    res.json({
+      success: true,
+      accounts: allAccounts.map((a) => ({ channel_id: a.channel_id, channel_title: a.channel_title, brand: a.brand, is_active: a.is_active })),
+      daily,
+      videos,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
