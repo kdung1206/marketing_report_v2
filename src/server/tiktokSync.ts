@@ -45,7 +45,14 @@ export const isTiktokConfigured = Boolean(TIKTOK_CLIENT_KEY && TIKTOK_CLIENT_SEC
 // through TikTok's App Review) before a real account can grant them.
 export const TIKTOK_SCOPES = ["user.info.basic", "user.info.stats", "video.list"];
 
-const USER_INFO_FIELDS = ["open_id", "username", "display_name", "follower_count", "following_count", "likes_count", "video_count"].join(",");
+// "username" is deliberately excluded — it requires the user.info.profile
+// scope, which this app doesn't request (see ONBOARDING.md: only
+// user.info.basic/user.info.stats/video.list are approved). Asking for it
+// anyway makes TikTok reject the WHOLE user/info call with "the user did
+// not authorize the scope required", even when every requested scope was
+// granted. display_name (covered by user.info.basic) is enough to label
+// the connected account.
+const USER_INFO_FIELDS = ["open_id", "display_name", "follower_count", "following_count", "likes_count", "video_count"].join(",");
 const VIDEO_FIELDS = ["id", "title", "create_time", "cover_image_url", "share_url", "view_count", "like_count", "comment_count", "share_count"].join(",");
 
 class TiktokApiError extends Error {
