@@ -7,7 +7,8 @@ import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 import { DEFAULT_USERS, reconcileUsers, UserAccount } from "../lib/defaultUsers";
 import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny } from "../lib/serverPasswordHash";
-import { mergeCommentTrees } from "../lib/comments";
+import { mergeNewDataIntoDatabase } from "./dataMerge";
+import { runSpreadsheetAutoSync, getSpreadsheetSyncConfig, saveSpreadsheetSyncConfig } from "./spreadsheetSync";
 import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
 import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
@@ -860,102 +861,12 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
       return res.status(400).json({ error: "Không tìm thấy dữ liệu đồng bộ mới." });
     }
 
-    // 1. Normalize the incoming new data
-    const normalizedNew = normalizeMarketingData(newData);
-
-    // 2. Load the existing database data
-    const currentFullDb = await getDatabaseData();
-    const currentDb = normalizeMarketingData(currentFullDb);
-
-    // 3. Helper to merge lists type-safely by identifying identical keys, updating matching ones, and appending new ones
-    function mergeRowsByKey<T>(currentList: T[], newList: T[], keyFn: (row: T) => string): T[] {
-      if (!newList || newList.length === 0) return currentList;
-      const map = new Map<string, T>();
-      currentList.forEach((row) => {
-        map.set(keyFn(row), row);
-      });
-      newList.forEach((row) => {
-        map.set(keyFn(row), row);
-      });
-      return Array.from(map.values());
-    }
-
-    // Key extraction functions for identifying duplicates
-    const getDigitalKey = (row: any): string => {
-      const week = (row.week || "").toString().trim().toLowerCase();
-      const brand = (row.brand || "").toString().trim().toLowerCase();
-      const nhom = (row.nhóm_báo_cáo || "").toString().trim().toLowerCase();
-      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
-      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
-      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
-      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
-      return `${week}|${brand}|${nhom}|${hm}|${nganh}|${channel}|${metric}`;
-    };
-
-    const getKolKey = (row: any): string => {
-      const week = (row.week || "").toString().trim().toLowerCase();
-      const brand = (row.brand || "").toString().trim().toLowerCase();
-      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
-      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
-      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
-      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
-      return `${week}|${brand}|${hm}|${nganh}|${channel}|${metric}`;
-    };
-
-    const getBtlKey = (row: any): string => {
-      const week = (row.week || "").toString().trim().toLowerCase();
-      const brand = (row.brand || "").toString().trim().toLowerCase();
-      const hml = (row.hạng_mục_lớn || "").toString().trim().toLowerCase();
-      const cthm = (row.chi_tiết_hạng_mục || "").toString().trim().toLowerCase();
-      const pl = (row.phân_loại || "").toString().trim().toLowerCase();
-      const ts = (row.tần_suất || "").toString().trim().toLowerCase();
-      const dvt = (row.đơn_vị_tính || "").toString().trim().toLowerCase();
-      return `${week}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
-    };
-
-    const getOohPrKey = (row: any): string => {
-      const week = (row.week || "").toString().trim().toLowerCase();
-      const tbc = (row.tháng_báo_cáo || "").toString().trim().toLowerCase();
-      const hm = (row.hạng_mục || "").toString().trim().toLowerCase();
-      const brand = (row.brand || "").toString().trim().toLowerCase();
-      const nganh = (row.ngành_hàng || "").toString().trim().toLowerCase();
-      const channel = (row.kênh_channel || "").toString().trim().toLowerCase();
-      const metric = (row.chỉ_số_metric || "").toString().trim().toLowerCase();
-      return `${week}|${tbc}|${hm}|${brand}|${nganh}|${channel}|${metric}`;
-    };
-
-    const getBtlMonthlyKey = (row: any): string => {
-      const month = (row.month || 5).toString();
-      const year = (row.year || 2026).toString();
-      const brand = (row.brand || "").toString().trim().toLowerCase();
-      const hml = (row.hạng_mục_lớn || "").toString().trim().toLowerCase();
-      const cthm = (row.chi_tiết_hạng_mục || "").toString().trim().toLowerCase();
-      const pl = (row.phân_loại || "").toString().trim().toLowerCase();
-      const ts = (row.tần_suất || "").toString().trim().toLowerCase();
-      const dvt = (row.đơn_vị_tính || "").toString().trim().toLowerCase();
-      return `${month}|${year}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
-    };
-
-    // Merge comments if present in newData. Deep-merged down to the
-    // per-category note (see mergeCommentTrees): an upload carrying only one
-    // brand's evaluation for one week — which is exactly what editing a few
-    // cells of the exported "comments" sheet produces — used to replace that
-    // brand's whole block, silently dropping its proposals and per-category
-    // notes.
-    const mergedComments = mergeCommentTrees(currentFullDb.comments, newData?.comments);
-
-    const mergedData = {
-      ...currentFullDb,
-      digital_marketing: mergeRowsByKey(currentDb.digital_marketing, normalizedNew.digital_marketing, getDigitalKey),
-      kol_koc: mergeRowsByKey(currentDb.kol_koc, normalizedNew.kol_koc, getKolKey),
-      btl_trade: mergeRowsByKey(currentDb.btl_trade, normalizedNew.btl_trade, getBtlKey),
-      monthly_ooh_pr: mergeRowsByKey(currentDb.monthly_ooh_pr, normalizedNew.monthly_ooh_pr, getOohPrKey),
-      btl_trade_monthly: mergeRowsByKey(currentFullDb.btl_trade_monthly || [], normalizedNew.btl_trade_monthly || [], getBtlMonthlyKey),
-      comments: mergedComments
-    };
-
-    // 4. Save the fully merged and normalized dataset back to Supabase
-    await saveDatabaseData(mergedData);
+    // Normalize, load the current DB, dedupe-merge every collection plus a
+    // deep merge of weekly commentary, and persist — see dataMerge.ts. Shared
+    // with the automatic weekly spreadsheet sync (spreadsheetSync.ts) so a
+    // human upload and the scheduled pull can never disagree on what counts
+    // as a duplicate row.
+    const mergedData = await mergeNewDataIntoDatabase(newData);
     await logAction((req as any).session, req, "sync-data", "Đồng bộ dữ liệu ngoại tuyến (JSON/Excel)");
 
     // The response only needs the report fields the client actually reads
@@ -968,6 +879,72 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
   } catch (err: any) {
     console.error("POST /api/sync-data error:", err);
     return res.status(500).json({ error: `Lỗi đồng bộ hóa dữ liệu vào DB: ${err.message}` });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Automatic weekly spreadsheet sync — Control Panel → Nhập liệu → "3. Tự
+// động đồng bộ định kỳ từ Spreadsheet". Same permission level as the manual
+// upload above (Editor+, matching /api/sync-data) since this is really just
+// an automated trigger for the exact same action an Editor can already do by
+// hand. See spreadsheetSync.ts for the actual fetch/parse/merge.
+// ---------------------------------------------------------------------------
+
+// GET /api/spreadsheet-sync/config — current link + on/off + last-run status.
+app.get("/api/spreadsheet-sync/config", requireAuth("Editor"), async (req, res) => {
+  try {
+    const config = await getSpreadsheetSyncConfig();
+    res.json({ success: true, config });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/spreadsheet-sync/config — save the link + on/off toggle.
+app.post("/api/spreadsheet-sync/config", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { url, is_active } = req.body;
+    if (typeof url !== "string") {
+      return res.status(400).json({ success: false, error: "Thiếu url spreadsheet." });
+    }
+    await saveSpreadsheetSyncConfig({ url, is_active: is_active !== false });
+    await logAction((req as any).session, req, "save-spreadsheet-sync-config", "Cập nhật cấu hình tự động đồng bộ spreadsheet");
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/spreadsheet-sync/sync-now — Admin/Editor manual trigger, mirrors
+// POST /api/fb/sync-now's "test it right after saving" UX: lets whoever just
+// pasted a link confirm it actually works before trusting the Monday cron.
+app.post("/api/spreadsheet-sync/sync-now", requireAuth("Editor"), async (req, res) => {
+  try {
+    const result = await runSpreadsheetAutoSync();
+    await logAction((req as any).session, req, "sync-spreadsheet", result.skipped ? `Bỏ qua: ${result.reason}` : "Đồng bộ thủ công từ spreadsheet");
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/cron/weekly-spreadsheet-sync — hit by Vercel Cron every Monday
+// (see vercel.json; Hobby-plan cron timing is only accurate to within the
+// scheduled hour, so this can land anywhere in that hour rather than exactly
+// on the minute — see https://vercel.com/docs/cron-jobs/usage-and-pricing).
+// Same CRON_SECRET pattern as the other two GET /api/cron/* routes. A skipped
+// run (no link configured, or the toggle is off) is still a 200 — it isn't a
+// failure, just nothing to do.
+app.get("/api/cron/weekly-spreadsheet-sync", async (req, res) => {
+  try {
+    if (!isValidCronRequest(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const result = await runSpreadsheetAutoSync();
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    console.error("GET /api/cron/weekly-spreadsheet-sync error:", err);
+    res.status(500).json({ error: err.message || "Lỗi đồng bộ spreadsheet định kỳ." });
   }
 });
 
@@ -1127,12 +1104,17 @@ app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
 // GET /api/cron/facebook-sync — hit by Vercel Cron once daily (see
 // vercel.json). Same CRON_SECRET pattern as GET /api/cron/weekly-backup.
 //
-// Also runs the Facebook Ads (Marketing API) sync here rather than adding a
-// third vercel.json cron entry — Vercel's Hobby plan caps a project at 2 cron
-// jobs, so a separate "/api/cron/facebook-ads-sync" entry would break
-// deployment for anyone still on that plan. Both syncs are independent and a
-// failure in one must not block the other, so they're run and reported
-// separately even though one HTTP call triggers both.
+// Also runs the Facebook Ads (Marketing API) sync here rather than as a
+// separate vercel.json entry: Hobby-plan cron jobs are capped to firing once
+// per day EACH (not a cap on the number of distinct jobs — Vercel allows up
+// to 100/project — see
+// https://vercel.com/docs/cron-jobs/usage-and-pricing), and Facebook
+// Ads/TikTok/YouTube all need that exact same daily cadence, so grouping them
+// under one route avoids maintaining near-duplicate cron entries for no
+// behavioral difference. The weekly spreadsheet sync below gets its own
+// entry precisely because its cadence differs. Both syncs here are
+// independent and a failure in one must not block the other, so they're run
+// and reported separately even though one HTTP call triggers both.
 app.get("/api/cron/facebook-sync", async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
@@ -1148,9 +1130,8 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
         return [];
       }),
       // TikTok organic insights piggybacks on this same cron for the same
-      // reason the Facebook Ads sync does — Vercel Hobby caps a project at
-      // 2 cron jobs, so this stays one HTTP trigger fanning out to all
-      // independent syncs rather than a third/fourth vercel.json entry.
+      // reason the Facebook Ads sync does — same daily cadence, see this
+      // route's header comment.
       isTiktokConfigured
         ? runTiktokSync().catch((err) => {
             console.error("GET /api/cron/facebook-sync (tiktok) error:", err);

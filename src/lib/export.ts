@@ -69,14 +69,17 @@ export function summarizeParsedData(data: any): ImportSummary {
   return { collections, commentWeeks, commentEntries, ignoredSheets: [] };
 }
 
-// Reads an uploaded .xlsx/.xls/.csv file and returns a plain object shaped
-// like { digital_marketing: [...], kol_koc: [...], ... } — the same shape
-// the offline JSON upload already produces — so it can be handed to the
-// exact same merge/sync codepath (POST /api/sync-data) without a separate
-// import pipeline. Sheets are matched by name (see aliases above); any sheet
-// that doesn't match a known collection is ignored rather than guessed at.
-export async function parseSpreadsheetFile(file: File): Promise<ParsedImport> {
-  const buffer = await file.arrayBuffer();
+// Parses a workbook already in memory — shared by parseSpreadsheetFile below
+// (the browser upload path, which only has a File to read) and
+// src/server/spreadsheetSync.ts (the automatic weekly pull, which only has a
+// fetch() response body — no File/browser APIs available in a Vercel
+// function). Pure/isomorphic like buildFullDatabaseWorkbook elsewhere in this
+// file: no browser or Node-specific API, just XLSX.read over bytes already in
+// hand, so the exact same sheet-matching logic runs on both sides without a
+// second implementation to keep in sync. Sheets are matched by name (see
+// aliases above); any sheet that doesn't match a known collection is ignored
+// rather than guessed at.
+export function parseWorkbookFromBuffer(buffer: ArrayBuffer | Uint8Array): ParsedImport {
   const workbook = XLSX.read(buffer, { type: "array" });
 
   const sheetByNormalizedName = new Map<string, string>();
@@ -131,6 +134,16 @@ export async function parseSpreadsheetFile(file: File): Promise<ParsedImport> {
   }
 
   return { data, summary: { collections, commentWeeks, commentEntries, ignoredSheets } };
+}
+
+// Reads an uploaded .xlsx/.xls/.csv file and returns a plain object shaped
+// like { digital_marketing: [...], kol_koc: [...], ... } — the same shape
+// the offline JSON upload already produces — so it can be handed to the
+// exact same merge/sync codepath (POST /api/sync-data) without a separate
+// import pipeline. Thin File→ArrayBuffer wrapper around parseWorkbookFromBuffer.
+export async function parseSpreadsheetFile(file: File): Promise<ParsedImport> {
+  const buffer = await file.arrayBuffer();
+  return parseWorkbookFromBuffer(buffer);
 }
 
 function escapeXML(str: any): string {

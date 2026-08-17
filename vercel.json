@@ -10,6 +10,7 @@
   },
   "crons": [
     { "path": "/api/cron/weekly-backup", "schedule": "0 10 * * 5" },
-    { "path": "/api/cron/facebook-sync", "schedule": "0 1 * * *" }
+    { "path": "/api/cron/facebook-sync", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/weekly-spreadsheet-sync", "schedule": "0 5 * * 1" }
   ]
 }

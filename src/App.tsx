@@ -66,6 +66,7 @@ import {
   Link2,
   ArrowLeft,
   Share2,
+  Clock,
 } from "lucide-react";
 import {
   PieChart,
@@ -906,6 +907,89 @@ export default function App() {
     };
     fetchMailConfig();
   }, [currentUser]);
+
+  // Weekly-report "Nhập liệu" auto-sync-from-spreadsheet states — a saved
+  // link, an on/off toggle, and the last run's status, all served by
+  // /api/spreadsheet-sync/config (Editor+, same gate as /api/sync-data since
+  // this just automates the same upload an Editor can already do by hand).
+  interface SpreadsheetSyncConfig {
+    url: string;
+    is_active: boolean;
+    last_synced_at: string | null;
+    last_sync_error: string | null;
+    last_sync_summary: ImportSummary | null;
+  }
+  const [spreadsheetSyncConfig, setSpreadsheetSyncConfig] = useState<SpreadsheetSyncConfig | null>(null);
+  const [spreadsheetUrlDraft, setSpreadsheetUrlDraft] = useState("");
+  const [spreadsheetActiveDraft, setSpreadsheetActiveDraft] = useState(true);
+  const [isSpreadsheetConfigSaving, setIsSpreadsheetConfigSaving] = useState(false);
+  const [isSpreadsheetSyncTesting, setIsSpreadsheetSyncTesting] = useState(false);
+  const [spreadsheetSyncMessage, setSpreadsheetSyncMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const loadSpreadsheetSyncConfig = async () => {
+    try {
+      const result = await safeFetchJson("/api/spreadsheet-sync/config");
+      if (result.success && result.config) {
+        setSpreadsheetSyncConfig(result.config);
+        setSpreadsheetUrlDraft(result.config.url || "");
+        setSpreadsheetActiveDraft(result.config.is_active !== false);
+      }
+    } catch (err) {
+      console.error("Failed to load spreadsheet sync config:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role === "Viewer") return;
+    loadSpreadsheetSyncConfig();
+  }, [currentUser]);
+
+  const handleSaveSpreadsheetSyncConfig = async () => {
+    setIsSpreadsheetConfigSaving(true);
+    setSpreadsheetSyncMessage(null);
+    try {
+      const result = await safeFetchJson("/api/spreadsheet-sync/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: spreadsheetUrlDraft.trim(), is_active: spreadsheetActiveDraft }),
+      });
+      if (result.success) {
+        setSpreadsheetSyncMessage({ type: "success", text: "Đã lưu cấu hình. Bấm \"Đồng bộ thử ngay\" để kiểm tra link trước khi tin tưởng lịch tự động." });
+        await loadSpreadsheetSyncConfig();
+      } else {
+        setSpreadsheetSyncMessage({ type: "error", text: result.error || "Lưu cấu hình thất bại." });
+      }
+    } catch (err: any) {
+      setSpreadsheetSyncMessage({ type: "error", text: err.message || "Lưu cấu hình thất bại." });
+    } finally {
+      setIsSpreadsheetConfigSaving(false);
+    }
+  };
+
+  const handleTestSpreadsheetSyncNow = async () => {
+    setIsSpreadsheetSyncTesting(true);
+    setSpreadsheetSyncMessage(null);
+    try {
+      const result = await safeFetchJson("/api/spreadsheet-sync/sync-now", { method: "POST" });
+      if (result.success) {
+        if (result.skipped) {
+          setSpreadsheetSyncMessage({ type: "error", text: result.reason || "Đã bỏ qua lần đồng bộ này." });
+        } else {
+          setSpreadsheetSyncMessage({ type: "success", text: "Đồng bộ thành công từ spreadsheet." });
+          // Merged data may include rows/comments relevant to what's currently
+          // on screen — refresh the same way a manual upload's success path does.
+          await fetchServerData();
+        }
+        await loadSpreadsheetSyncConfig();
+      } else {
+        setSpreadsheetSyncMessage({ type: "error", text: result.error || "Đồng bộ thất bại." });
+      }
+    } catch (err: any) {
+      setSpreadsheetSyncMessage({ type: "error", text: err.message || "Đồng bộ thất bại." });
+    } finally {
+      setIsSpreadsheetSyncTesting(false);
+    }
+  };
 
   // Safety guard: Viewer accounts must never remain on the Control Panel tab
   useEffect(() => {
@@ -4757,14 +4841,132 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Option 2: Offline JSON File Upload */}
+                {/* Option 2: Automatic weekly spreadsheet sync — the
+                    scheduled counterpart to Option 1 above. Same source link
+                    (Google Sheets/Drive, shared "Anyone with the link"), but
+                    pulled by Vercel Cron every Monday instead of requiring
+                    someone to pick a file by hand each week. */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">
+                        2. Tự động đồng bộ định kỳ từ Spreadsheet
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Tự động kéo và đồng bộ file này vào <strong>trưa Thứ Hai hàng tuần</strong> (khoảng 12:00–12:59, giờ
+                        Việt Nam) — không cần tải file lên thủ công nữa.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Link Google Sheets / Google Drive (chia sẻ chế độ "Anyone with the link")
+                    </label>
+                    <input
+                      type="text"
+                      value={spreadsheetUrlDraft}
+                      onChange={(e) => setSpreadsheetUrlDraft(e.target.value)}
+                      placeholder="https://docs.google.com/spreadsheets/d/..."
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={spreadsheetActiveDraft}
+                      onChange={(e) => setSpreadsheetActiveDraft(e.target.checked)}
+                      className="h-3.5 w-3.5 rounded border-slate-300"
+                    />
+                    Bật tự động đồng bộ hàng tuần
+                  </label>
+
+                  {spreadsheetSyncMessage && (
+                    <div
+                      className={`flex items-center gap-2 rounded-lg border p-2.5 text-xs ${
+                        spreadsheetSyncMessage.type === "success"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-rose-200 bg-rose-50 text-rose-700"
+                      }`}
+                    >
+                      {spreadsheetSyncMessage.type === "success" ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      {spreadsheetSyncMessage.text}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveSpreadsheetSyncConfig}
+                      disabled={isSpreadsheetConfigSaving}
+                      className="flex items-center gap-1.5 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {isSpreadsheetConfigSaving ? "Đang lưu..." : "Lưu cấu hình"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestSpreadsheetSyncNow}
+                      disabled={isSpreadsheetSyncTesting || !spreadsheetSyncConfig?.url}
+                      className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isSpreadsheetSyncTesting ? "animate-spin" : ""}`} />
+                      {isSpreadsheetSyncTesting ? "Đang đồng bộ..." : "Đồng bộ thử ngay"}
+                    </button>
+                  </div>
+
+                  {spreadsheetSyncConfig?.url && (
+                    <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1">
+                      <p>
+                        Lần đồng bộ thành công gần nhất:{" "}
+                        <strong className="text-slate-700">
+                          {spreadsheetSyncConfig.last_synced_at
+                            ? new Date(spreadsheetSyncConfig.last_synced_at).toLocaleString("vi-VN")
+                            : "Chưa lần nào"}
+                        </strong>
+                      </p>
+                      {spreadsheetSyncConfig.last_sync_error && (
+                        <p className="text-rose-600">⚠️ Lỗi lần gần nhất: {spreadsheetSyncConfig.last_sync_error}</p>
+                      )}
+                      {spreadsheetSyncConfig.last_sync_summary && (
+                        <p>
+                          Nhóm dữ liệu lần gần nhất:{" "}
+                          {spreadsheetSyncConfig.last_sync_summary.collections.map((c) => `${c.key} (${c.rows})`).join(", ") || "—"}
+                          {spreadsheetSyncConfig.last_sync_summary.commentEntries > 0
+                            ? `, nhận định tuần (${spreadsheetSyncConfig.last_sync_summary.commentEntries})`
+                            : ""}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1.5">
+                    <span className="font-semibold text-slate-800 block">💡 Lưu ý:</span>
+                    <ul className="list-disc pl-4 space-y-1 leading-relaxed">
+                      <li>Dùng đúng cấu trúc sheet như Option 1 ở trên (digital_marketing, kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly, comments).</li>
+                      <li>Link phải ở chế độ chia sẻ công khai xem được ("Anyone with the link can view") — nếu không, lần đồng bộ sẽ báo lỗi vì Google trả về trang đăng nhập thay vì tệp thật.</li>
+                      <li>Vercel chỉ đảm bảo cron chạy đâu đó trong khung giờ đã đặt (12:00–12:59 giờ VN vào thứ Hai), không đảm bảo đúng phút 12:00:00.</li>
+                      <li>Bấm "Đồng bộ thử ngay" để kiểm tra link hoạt động đúng trước khi tin tưởng lịch tự động — chạy đúng luồng merge như tải file lên thủ công.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Option 3: Offline JSON File Upload */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
                     <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                       <Upload className="h-4 w-4" />
                     </div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      2. Tải lên tệp dữ liệu JSON
+                      3. Tải lên tệp dữ liệu JSON
                     </h3>
                   </div>
 
@@ -4896,7 +5098,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Option 3: Paste Raw JSON */}
+                {/* Option 4: Paste Raw JSON */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -4904,7 +5106,7 @@ export default function App() {
                         <FileJson className="h-4 w-4" />
                       </div>
                       <h3 className="font-bold text-slate-900 text-sm">
-                        3. Soạn thảo hoặc Paste JSON thủ công
+                        4. Soạn thảo hoặc Paste JSON thủ công
                       </h3>
                     </div>
                   </div>
