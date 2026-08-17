@@ -20052,14 +20052,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto5.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto7.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22952,11 +22952,11 @@ var require_request = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     exports2.sign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val2 + "." + crypto5.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
+      return val2 + "." + crypto7.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Signed cookie string must be provided.");
@@ -22965,7 +22965,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val2) ? str : false;
     };
     function sha1(str) {
-      return crypto5.createHash("sha1").update(str).digest("hex");
+      return crypto7.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -35478,22 +35478,22 @@ var require_crypto2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NodeCrypto = void 0;
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var NodeCrypto = class {
       async sha256DigestBase64(str) {
-        return crypto5.createHash("sha256").update(str).digest("base64");
+        return crypto7.createHash("sha256").update(str).digest("base64");
       }
       randomBytesBase64(count) {
-        return crypto5.randomBytes(count).toString("base64");
+        return crypto7.randomBytes(count).toString("base64");
       }
       async verify(pubkey, data, signature) {
-        const verifier = crypto5.createVerify("RSA-SHA256");
+        const verifier = crypto7.createVerify("RSA-SHA256");
         verifier.update(data);
         verifier.end();
         return verifier.verify(pubkey, signature, "base64");
       }
       async sign(privateKey, data) {
-        const signer = crypto5.createSign("RSA-SHA256");
+        const signer = crypto7.createSign("RSA-SHA256");
         signer.update(data);
         signer.end();
         return signer.sign(privateKey, "base64");
@@ -35511,7 +35511,7 @@ var require_crypto2 = __commonJS({
        *   string in hexadecimal encoding.
        */
       async sha256DigestHex(str) {
-        return crypto5.createHash("sha256").update(str).digest("hex");
+        return crypto7.createHash("sha256").update(str).digest("hex");
       }
       /**
        * Computes the HMAC hash of a message using the provided crypto key and the
@@ -35523,7 +35523,7 @@ var require_crypto2 = __commonJS({
        */
       async signWithHmacSha256(key, msg) {
         const cryptoKey = typeof key === "string" ? key : toBuffer(key);
-        return toArrayBuffer(crypto5.createHmac("sha256", cryptoKey).update(msg).digest());
+        return toArrayBuffer(crypto7.createHmac("sha256", cryptoKey).update(msg).digest());
       }
     };
     exports2.NodeCrypto = NodeCrypto;
@@ -36378,10 +36378,10 @@ var require_oauth2client = __commonJS({
        * https://github.com/googleapis/google-auth-library-nodejs/blob/main/samples/oauth2-codeVerifier.js
        */
       async generateCodeVerifierAsync() {
-        const crypto5 = (0, crypto_1.createCrypto)();
-        const randomString = crypto5.randomBytesBase64(96);
+        const crypto7 = (0, crypto_1.createCrypto)();
+        const randomString = crypto7.randomBytesBase64(96);
         const codeVerifier = randomString.replace(/\+/g, "~").replace(/=/g, "_").replace(/\//g, "-");
-        const unencodedCodeChallenge = await crypto5.sha256DigestBase64(codeVerifier);
+        const unencodedCodeChallenge = await crypto7.sha256DigestBase64(codeVerifier);
         const codeChallenge = unencodedCodeChallenge.split("=")[0].replace(/\+/g, "-").replace(/\//g, "_");
         return { codeVerifier, codeChallenge };
       }
@@ -36822,7 +36822,7 @@ var require_oauth2client = __commonJS({
        * @return Returns a promise resolving to LoginTicket on verification.
        */
       async verifySignedJwtWithCertsAsync(jwt, certs, requiredAudience, issuers, maxExpiry) {
-        const crypto5 = (0, crypto_1.createCrypto)();
+        const crypto7 = (0, crypto_1.createCrypto)();
         if (!maxExpiry) {
           maxExpiry = _OAuth2Client.DEFAULT_MAX_TOKEN_LIFETIME_SECS_;
         }
@@ -36835,7 +36835,7 @@ var require_oauth2client = __commonJS({
         let envelope;
         let payload;
         try {
-          envelope = JSON.parse(crypto5.decodeBase64StringUtf8(segments[0]));
+          envelope = JSON.parse(crypto7.decodeBase64StringUtf8(segments[0]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token envelope: ${segments[0]}': ${err.message}`;
@@ -36846,7 +36846,7 @@ var require_oauth2client = __commonJS({
           throw new Error("Can't parse token envelope: " + segments[0]);
         }
         try {
-          payload = JSON.parse(crypto5.decodeBase64StringUtf8(segments[1]));
+          payload = JSON.parse(crypto7.decodeBase64StringUtf8(segments[1]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token payload '${segments[0]}`;
@@ -36863,7 +36863,7 @@ var require_oauth2client = __commonJS({
         if (envelope.alg === "ES256") {
           signature = formatEcdsa.joseToDer(signature, "ES256").toString("base64");
         }
-        const verified = await crypto5.verify(cert, signed, signature);
+        const verified = await crypto7.verify(cert, signed, signature);
         if (!verified) {
           throw new Error("Invalid token signature: " + jwt);
         }
@@ -37238,14 +37238,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "node_modules/jwa/index.js"(exports2, module2) {
     var Buffer4 = require_safe_buffer().Buffer;
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util = require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto5.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto7.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -37335,17 +37335,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac = crypto5.createHmac("sha" + bits, secret);
+        var hmac = crypto7.createHmac("sha" + bits, secret);
         var sig = (hmac.update(thing), hmac.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto5 ? function timingSafeEqual2(a, b) {
+    var timingSafeEqual = "timingSafeEqual" in crypto7 ? function timingSafeEqual2(a, b) {
       if (a.byteLength !== b.byteLength) {
         return false;
       }
-      return crypto5.timingSafeEqual(a, b);
+      return crypto7.timingSafeEqual(a, b);
     } : function timingSafeEqual2(a, b) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -37362,7 +37362,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto5.createSign("RSA-SHA" + bits);
+        var signer = crypto7.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -37372,7 +37372,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto5.createVerify("RSA-SHA" + bits);
+        var verifier = crypto7.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -37381,11 +37381,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto5.createSign("RSA-SHA" + bits);
+        var signer = crypto7.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto5.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto5.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto7.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto7.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -37395,12 +37395,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto5.createVerify("RSA-SHA" + bits);
+        var verifier = crypto7.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto5.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto5.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto7.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto7.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -39976,14 +39976,14 @@ var require_awsrequestsigner = __commonJS({
       }
     };
     exports2.AwsRequestSigner = AwsRequestSigner;
-    async function sign(crypto5, key, msg) {
-      return await crypto5.signWithHmacSha256(key, msg);
+    async function sign(crypto7, key, msg) {
+      return await crypto7.signWithHmacSha256(key, msg);
     }
-    async function getSigningKey(crypto5, key, dateStamp, region, serviceName) {
-      const kDate = await sign(crypto5, `AWS4${key}`, dateStamp);
-      const kRegion = await sign(crypto5, kDate, region);
-      const kService = await sign(crypto5, kRegion, serviceName);
-      const kSigning = await sign(crypto5, kService, "aws4_request");
+    async function getSigningKey(crypto7, key, dateStamp, region, serviceName) {
+      const kDate = await sign(crypto7, `AWS4${key}`, dateStamp);
+      const kRegion = await sign(crypto7, kDate, region);
+      const kService = await sign(crypto7, kRegion, serviceName);
+      const kSigning = await sign(crypto7, kService, "aws4_request");
       return kSigning;
     }
     async function generateAuthenticationHeaderMap(options) {
@@ -40949,7 +40949,7 @@ var require_gdchclient = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.GdchClient = exports2.GDCH_SERVICE_ACCOUNT_TYPE = void 0;
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var fs4 = require("fs");
     var https2 = require("https");
     var oauth2client_1 = require_oauth2client();
@@ -41140,7 +41140,7 @@ var require_gdchclient = __commonJS({
         const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
         const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
         const signingInput = `${encodedHeader}.${encodedPayload}`;
-        const signature = crypto5.sign("sha256", Buffer.from(signingInput), {
+        const signature = crypto7.sign("sha256", Buffer.from(signingInput), {
           key: this.privateKey,
           dsaEncoding: "ieee-p1363"
         });
@@ -42001,24 +42001,24 @@ var require_googleauth = __commonJS({
           const signed = await client.sign(data);
           return signed.signedBlob;
         }
-        const crypto5 = (0, crypto_1.createCrypto)();
+        const crypto7 = (0, crypto_1.createCrypto)();
         if (client instanceof jwtclient_1.JWT && client.key) {
-          const sign = await crypto5.sign(client.key, data);
+          const sign = await crypto7.sign(client.key, data);
           return sign;
         }
         const creds = await this.getCredentials();
         if (!creds.client_email) {
           throw new Error("Cannot sign data without `client_email`.");
         }
-        return this.signBlob(crypto5, creds.client_email, data, endpoint);
+        return this.signBlob(crypto7, creds.client_email, data, endpoint);
       }
-      async signBlob(crypto5, emailOrUniqueId, data, endpoint) {
+      async signBlob(crypto7, emailOrUniqueId, data, endpoint) {
         const url = new URL(endpoint + `${emailOrUniqueId}:signBlob`);
         const res = await this.request({
           method: "POST",
           url: url.href,
           data: {
-            payload: crypto5.encodeBase64StringUtf8(data)
+            payload: crypto7.encodeBase64StringUtf8(data)
           },
           retry: true,
           retryConfig: {
@@ -46119,7 +46119,7 @@ var require_main = __commonJS({
     var fs4 = require("fs");
     var path3 = require("path");
     var os = require("os");
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var TIPS = [
       "\u25C8 encrypted .env [www.dotenvx.com]",
       "\u25C8 secrets for agents [www.dotenvx.com]",
@@ -46363,7 +46363,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto5.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto7.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -64579,7 +64579,7 @@ var require_le_unix = __commonJS({
 var require_mime_node = __commonJS({
   "node_modules/nodemailer/lib/mime-node/index.js"(exports2, module2) {
     "use strict";
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var fs4 = require("fs");
     var punycode = require_punycode();
     var { PassThrough: PassThrough3 } = require("stream");
@@ -64598,7 +64598,7 @@ var require_mime_node = __commonJS({
       constructor(contentType, options) {
         this.nodeCounter = 0;
         options = options || {};
-        this.baseBoundary = options.baseBoundary || crypto5.randomBytes(8).toString("hex");
+        this.baseBoundary = options.baseBoundary || crypto7.randomBytes(8).toString("hex");
         this.boundaryPrefix = options.boundaryPrefix || "--_NmP";
         this.disableFileAccess = !!options.disableFileAccess;
         this.disableUrlAccess = !!options.disableUrlAccess;
@@ -65557,8 +65557,8 @@ var require_mime_node = __commonJS({
       _generateMessageId() {
         return "<" + [2, 2, 2, 6].reduce(
           // crux to generate UUID-like random strings
-          (prev, len) => prev + "-" + crypto5.randomBytes(len).toString("hex"),
-          crypto5.randomBytes(4).toString("hex")
+          (prev, len) => prev + "-" + crypto7.randomBytes(len).toString("hex"),
+          crypto7.randomBytes(4).toString("hex")
         ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
         (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
       }
@@ -66188,14 +66188,14 @@ var require_relaxed_body = __commonJS({
   "node_modules/nodemailer/lib/dkim/relaxed-body.js"(exports2, module2) {
     "use strict";
     var { Transform } = require("stream");
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var RelaxedBody = class extends Transform {
       constructor(options) {
         super();
         options = options || {};
         this.chunkBuffer = [];
         this.chunkBufferLen = 0;
-        this.bodyHash = crypto5.createHash(options.hashAlgo || "sha256");
+        this.bodyHash = crypto7.createHash(options.hashAlgo || "sha256");
         this.remainder = "";
         this.byteLength = 0;
         this.debug = options.debug;
@@ -66298,7 +66298,7 @@ var require_sign2 = __commonJS({
     "use strict";
     var punycode = require_punycode();
     var mimeFuncs = require_mime_funcs();
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     module2.exports = (headers, hashAlgo, bodyHash, options) => {
       options = options || {};
       const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive";
@@ -66306,7 +66306,7 @@ var require_sign2 = __commonJS({
       const canonicalizedHeaderData = relaxedHeaders(headers, fieldNames, options.skipFields);
       const dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
       canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
-      const signer = crypto5.createSign(("rsa-" + hashAlgo).toUpperCase());
+      const signer = crypto7.createSign(("rsa-" + hashAlgo).toUpperCase());
       signer.update(canonicalizedHeaderData.headers);
       let signature;
       try {
@@ -66375,7 +66375,7 @@ var require_dkim = __commonJS({
     var { PassThrough: PassThrough3 } = require("stream");
     var fs4 = require("fs");
     var path3 = require("path");
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var DKIM_ALGO = "sha256";
     var MAX_MESSAGE_SIZE = 2 * 1024 * 1024;
     var DKIMSigner = class {
@@ -66388,7 +66388,7 @@ var require_dkim = __commonJS({
         this.chunks = [];
         this.chunklen = 0;
         this.readPos = 0;
-        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto5.randomBytes(14).toString("hex")) : false;
+        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto7.randomBytes(14).toString("hex")) : false;
         this.cache = false;
         this.headers = false;
         this.bodyHash = false;
@@ -66957,7 +66957,7 @@ var require_mailer = __commonJS({
     var MailMessage = require_mail_message();
     var net = require("net");
     var dns = require("dns");
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var Mail = class extends EventEmitter {
       constructor(transporter, options, defaults) {
         super();
@@ -67300,7 +67300,7 @@ var require_mailer = __commonJS({
             html = (html || "").toString().replace(
               /(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;]+);[^"'>\s]+)/gi,
               (match2, prefix, dataUri, mimeType) => {
-                const cid = crypto5.randomBytes(10).toString("hex") + "@localhost";
+                const cid = crypto7.randomBytes(10).toString("hex") + "@localhost";
                 if (!mail.data.attachments) {
                   mail.data.attachments = [];
                 }
@@ -67427,7 +67427,7 @@ var require_smtp_connection = __commonJS({
     var net = require("net");
     var tls = require("tls");
     var os = require("os");
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var DataStream = require_data_stream2();
     var { PassThrough: PassThrough3 } = require("stream");
     var shared = require_shared3();
@@ -67447,7 +67447,7 @@ var require_smtp_connection = __commonJS({
     var SMTPConnection = class extends EventEmitter {
       constructor(options) {
         super(options);
-        this.id = crypto5.randomBytes(8).toString("base64").replace(/\W/g, "");
+        this.id = crypto7.randomBytes(8).toString("base64").replace(/\W/g, "");
         this.stage = "init";
         this.options = options || {};
         this.secureConnection = !!this.options.secure;
@@ -68632,7 +68632,7 @@ var require_smtp_connection = __commonJS({
           );
         }
         const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-        const hmacMD5 = crypto5.createHmac("md5", this._auth.credentials.pass);
+        const hmacMD5 = crypto7.createHmac("md5", this._auth.credentials.pass);
         hmacMD5.update(base64decoded);
         const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
         this._responseActions.push((str2) => {
@@ -68925,7 +68925,7 @@ var require_xoauth2 = __commonJS({
     "use strict";
     var { Stream: Stream4 } = require("stream");
     var nmfetch = require_fetch2();
-    var crypto5 = require("crypto");
+    var crypto7 = require("crypto");
     var shared = require_shared3();
     var errors = require_errors2();
     var XOAuth2 = class extends Stream4 {
@@ -69271,7 +69271,7 @@ var require_xoauth2 = __commonJS({
        */
       jwtSignRS256(payload) {
         payload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val2) => this.toBase64URL(val2)).join(".");
-        const signature = crypto5.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
+        const signature = crypto7.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
         return payload + "." + this.toBase64URL(signature);
       }
     };
@@ -71712,13 +71712,13 @@ var require_nodemailer = __commonJS({
 // src/server/app.ts
 var app_exports = {};
 __export(app_exports, {
+  REPORT_CATEGORY_IDS: () => REPORT_CATEGORY_IDS,
   app: () => app,
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
+var import_crypto9 = __toESM(require("crypto"), 1);
 var import_express = __toESM(require_express2(), 1);
-var import_fs2 = __toESM(require("fs"), 1);
-var import_path = __toESM(require("path"), 1);
 
 // node_modules/@google/genai/dist/node/index.mjs
 var import_p_retry = __toESM(require_p_retry(), 1);
@@ -108354,16 +108354,87 @@ var supabase = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 var APP_STATE_ROW_ID = "main";
+async function fetchAllRows(buildPage, pageSize = 1e3) {
+  const all = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildPage(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
+// src/server/appStateStore.ts
+var import_fs2 = __toESM(require("fs"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
+var INITIAL_DATA_PATH = import_path.default.join(process.cwd(), "src", "initial_data.json");
+var LOCAL_DB_PATH = import_path.default.join(process.cwd(), "src", "db_store.json");
+function readInitialSeed() {
+  try {
+    const raw = import_fs2.default.readFileSync(INITIAL_DATA_PATH, "utf8");
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error("Failed to read initial_data.json:", err);
+    return { digital_marketing: [], kol_koc: [], btl_trade: [], monthly_ooh_pr: [] };
+  }
+}
+async function getDatabaseData() {
+  if (!isSupabaseConfigured) {
+    let raw;
+    try {
+      raw = import_fs2.default.readFileSync(LOCAL_DB_PATH, "utf8");
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+      const seed2 = readInitialSeed();
+      await saveDatabaseData(seed2);
+      return seed2;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      throw new Error(
+        `src/db_store.json ch\u1EE9a JSON kh\xF4ng h\u1EE3p l\u1EC7 \u2014 c\xF3 th\u1EC3 b\u1ECB \u0111\u1ECDc gi\u1EEFa l\xFAc m\u1ED9t ti\u1EBFn tr\xECnh kh\xE1c \u0111ang ghi file. Kh\xF4ng t\u1EF1 \u0111\u1ED9ng ghi \u0111\xE8/seed l\u1EA1i \u0111\u1EC3 tr\xE1nh m\u1EA5t d\u1EEF li\u1EC7u th\u1EADt; h\xE3y ki\u1EC3m tra th\u1EE7 c\xF4ng file n\xE0y. L\u1ED7i g\u1ED1c: ${err.message}`
+      );
+    }
+  }
+  const { data, error } = await supabase.from("app_state").select("data").eq("id", APP_STATE_ROW_ID).maybeSingle();
+  if (error) {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u t\u1EEB Supabase: ${error.message}`);
+  }
+  if (data?.data) {
+    return data.data;
+  }
+  const seed = readInitialSeed();
+  await saveDatabaseData(seed);
+  return seed;
+}
+async function saveDatabaseData(fullData) {
+  if (!isSupabaseConfigured) {
+    const tmpPath = `${LOCAL_DB_PATH}.tmp-${process.pid}-${import_crypto.default.randomBytes(4).toString("hex")}`;
+    import_fs2.default.writeFileSync(tmpPath, JSON.stringify(fullData, null, 2), "utf8");
+    import_fs2.default.renameSync(tmpPath, LOCAL_DB_PATH);
+    return;
+  }
+  const { error } = await supabase.from("app_state").upsert({ id: APP_STATE_ROW_ID, data: fullData, updated_at: (/* @__PURE__ */ new Date()).toISOString() });
+  if (error) {
+    throw new Error(`L\u1ED7i ghi d\u1EEF li\u1EC7u v\xE0o Supabase: ${error.message}`);
+  }
+}
 
 // src/lib/defaultUsers.ts
 var DEFAULT_USERS = [
-  { username: "ntkdung1206@gmail.com", salt: "1b59cef3728bd945106ace0e2a8feaf1", passwordHash: "scrypt:2a8392a87ea3c81a625c6d9cc09ee876f9aaa0f2e27c7a473b4e1633d3b58a0d3106dfb1929520f89aededc338057488b9cf40d3a37cfb8aaf121963b21dc507", name: "D\u0169ng Nguy\u1EC5n", role: "Admin" },
-  { username: "admin", salt: "9a3400813aaa7e03ea5617378950727b", passwordHash: "scrypt:962b332155cc79a7d53dfd90efd38e43ab694c1eeb1f3758ab8d763c397b2b23241cd472afafc6fe39916bd6715df5b8b08c759a184dc618bb0df30a705c6065", name: "Qu\u1EA3n tr\u1ECB h\u1EC7 th\u1ED1ng", role: "Admin" },
+  { username: "ntkdung1206@gmail.com", salt: "10b719ed9788c27e8eedc341150f2071", passwordHash: "scrypt:aeb25dbaf087dc8900789b00c8f8ba1d898f94f3cab1151fa2c0337bf7c05a4ea7c56b96c265cbcc7fa3d1b80a3a015ac4d107a96404714d382134f5253af429", name: "D\u0169ng Nguy\u1EC5n", role: "Admin" },
+  { username: "admin", salt: "f6a3da9e990c22652f9e5a0290ba93ad", passwordHash: "scrypt:ff3635506275d642067b77ab4eeb73931ba1eac656b8e848737132f93619cc1c17b43656cbf1e755b7373e9ab29d8f1e267a7a26e96c4f1a91c5e1a8b0cd71ee", name: "Qu\u1EA3n tr\u1ECB h\u1EC7 th\u1ED1ng", role: "Admin" },
   { username: "editor1", salt: "78352da124ad5c0f0590a1fb41e387ad", passwordHash: "scrypt:fba642d3dc46433ed8d869addd6d7eca85f7878257fe412bc12ee22f7f73c24a43ad28e644e1945d421f6391bc3d633f5230c34074379d77de2145faa92033b9", name: "Nguy\u1EC5n Bi\xEAn T\u1EADp", role: "Editor" },
   { username: "viewer1", salt: "9891b5004f979ed95778a77d487a15fc", passwordHash: "7fdc2efb593acbeb57e98d555a3fdce244f547a5a73fa13df66ad61678e2c7b9", name: "Ng\u01B0\u1EDDi xem", role: "Viewer" },
   { username: "viewer2", salt: "1bc2d4bf855a868da0e6b85fe199bdc6", passwordHash: "a1d752a1b080a097507451db46a0d1fb1581ac9a7d3317c05af4b326123de5be", name: "Viewer 2", role: "Viewer" }
 ];
-var USERS_CONFIG_VERSION = 5;
+var USERS_CONFIG_VERSION = 6;
 function reconcileUsers(savedList, savedVersion) {
   if (savedVersion >= USERS_CONFIG_VERSION) {
     return savedList;
@@ -108376,7 +108447,7 @@ function reconcileUsers(savedList, savedVersion) {
 }
 
 // src/lib/serverPasswordHash.ts
-var import_crypto = __toESM(require("crypto"), 1);
+var import_crypto2 = __toESM(require("crypto"), 1);
 
 // src/lib/passwordHash.ts
 async function hashPassword(password, salt) {
@@ -108393,10 +108464,10 @@ async function verifyPassword(password, salt, expectedHash) {
 var SCRYPT_PREFIX = "scrypt:";
 var SCRYPT_KEYLEN = 64;
 function generateServerSalt() {
-  return import_crypto.default.randomBytes(16).toString("hex");
+  return import_crypto2.default.randomBytes(16).toString("hex");
 }
 function hashPasswordScrypt(password, salt) {
-  const derived = import_crypto.default.scryptSync(password, salt, SCRYPT_KEYLEN);
+  const derived = import_crypto2.default.scryptSync(password, salt, SCRYPT_KEYLEN);
   return SCRYPT_PREFIX + derived.toString("hex");
 }
 function isScryptHash(hash) {
@@ -108408,13 +108479,35 @@ async function verifyPasswordAny(password, salt, storedHash) {
     const expected = hashPasswordScrypt(password, salt);
     const expectedBuf = Buffer.from(expected);
     const storedBuf = Buffer.from(storedHash);
-    return expectedBuf.length === storedBuf.length && import_crypto.default.timingSafeEqual(expectedBuf, storedBuf);
+    return expectedBuf.length === storedBuf.length && import_crypto2.default.timingSafeEqual(expectedBuf, storedBuf);
   }
   return verifyPassword(password, salt, storedHash);
 }
 
+// src/lib/comments.ts
+function mergeCommentTrees(base, incoming) {
+  const merged = {};
+  for (const [week, byBrand] of Object.entries(base || {})) {
+    merged[week] = { ...byBrand || {} };
+  }
+  for (const [week, incomingByBrand] of Object.entries(incoming || {})) {
+    const existingByBrand = merged[week] || {};
+    const nextByBrand = { ...existingByBrand };
+    for (const [brand, incomingComments] of Object.entries(incomingByBrand || {})) {
+      const existing = existingByBrand[brand] || {};
+      nextByBrand[brand] = {
+        ...existing,
+        ...incomingComments || {},
+        categories: { ...existing.categories || {}, ...(incomingComments || {}).categories || {} }
+      };
+    }
+    merged[week] = nextByBrand;
+  }
+  return merged;
+}
+
 // src/server/auth.ts
-var import_crypto2 = __toESM(require("crypto"), 1);
+var import_crypto3 = __toESM(require("crypto"), 1);
 var SESSION_SECRET = process.env.SESSION_SECRET;
 if (!SESSION_SECRET) {
   throw new Error(
@@ -108431,20 +108524,44 @@ function signSessionToken(user) {
     name: user.name,
     role: user.role,
     exp: Math.floor(Date.now() / 1e3) + SESSION_TTL_SECONDS,
-    sid: import_crypto2.default.randomBytes(12).toString("hex")
+    sid: import_crypto3.default.randomBytes(12).toString("hex")
   };
   const data = base64url(JSON.stringify(payload));
-  const signature = import_crypto2.default.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  const signature = import_crypto3.default.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
   return { token: `${data}.${signature}`, sid: payload.sid };
 }
 function verifySessionToken(token) {
   if (!token || typeof token !== "string" || !token.includes(".")) return null;
   const [data, signature] = token.split(".");
   if (!data || !signature) return null;
-  const expected = import_crypto2.default.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  const expected = import_crypto3.default.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
   const sigBuf = Buffer.from(signature);
   const expectedBuf = Buffer.from(expected);
-  if (sigBuf.length !== expectedBuf.length || !import_crypto2.default.timingSafeEqual(sigBuf, expectedBuf)) {
+  if (sigBuf.length !== expectedBuf.length || !import_crypto3.default.timingSafeEqual(sigBuf, expectedBuf)) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf8"));
+    if (!payload.exp || Math.floor(Date.now() / 1e3) > payload.exp) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+var OAUTH_STATE_TTL_SECONDS = 10 * 60;
+function signOAuthState(payload) {
+  const data = base64url(JSON.stringify({ ...payload, exp: Math.floor(Date.now() / 1e3) + OAUTH_STATE_TTL_SECONDS }));
+  const signature = import_crypto3.default.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  return `${data}.${signature}`;
+}
+function verifyOAuthState(state) {
+  if (!state || typeof state !== "string" || !state.includes(".")) return null;
+  const [data, signature] = state.split(".");
+  if (!data || !signature) return null;
+  const expected = import_crypto3.default.createHmac("sha256", SESSION_SECRET).update(data).digest("base64url");
+  const sigBuf = Buffer.from(signature);
+  const expectedBuf = Buffer.from(expected);
+  if (sigBuf.length !== expectedBuf.length || !import_crypto3.default.timingSafeEqual(sigBuf, expectedBuf)) {
     return null;
   }
   try {
@@ -130287,7 +130404,7 @@ async function sendBackupEmail(config, attachmentBuffer, filename) {
 }
 
 // src/server/crypto.ts
-var import_crypto3 = __toESM(require("crypto"), 1);
+var import_crypto4 = __toESM(require("crypto"), 1);
 var ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 if (!ENCRYPTION_KEY) {
   throw new Error(
@@ -130297,17 +130414,12 @@ if (!ENCRYPTION_KEY) {
 var IV_LENGTH = 16;
 function encrypt(text) {
   if (!text) return "";
-  try {
-    const key = import_crypto3.default.createHash("sha256").update(ENCRYPTION_KEY).digest();
-    const iv = import_crypto3.default.randomBytes(IV_LENGTH);
-    const cipher = import_crypto3.default.createCipheriv("aes-256-cbc", key, iv);
-    let encrypted = cipher.update(text);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString("hex") + ":" + encrypted.toString("hex");
-  } catch (err) {
-    console.error("Encryption error:", err);
-    return text;
-  }
+  const key = import_crypto4.default.createHash("sha256").update(ENCRYPTION_KEY).digest();
+  const iv = import_crypto4.default.randomBytes(IV_LENGTH);
+  const cipher = import_crypto4.default.createCipheriv("aes-256-cbc", key, iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString("hex") + ":" + encrypted.toString("hex");
 }
 function decrypt(text) {
   if (!text) return "";
@@ -130316,8 +130428,8 @@ function decrypt(text) {
     const parts = text.split(":");
     const iv = Buffer.from(parts.shift() || "", "hex");
     const encryptedText = Buffer.from(parts.join(":"), "hex");
-    const key = import_crypto3.default.createHash("sha256").update(ENCRYPTION_KEY).digest();
-    const decipher = import_crypto3.default.createDecipheriv("aes-256-cbc", key, iv);
+    const key = import_crypto4.default.createHash("sha256").update(ENCRYPTION_KEY).digest();
+    const decipher = import_crypto4.default.createDecipheriv("aes-256-cbc", key, iv);
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
@@ -130325,6 +130437,1224 @@ function decrypt(text) {
     console.error("Decryption error:", err);
     return text;
   }
+}
+
+// src/server/facebookStore.ts
+async function readLocalCollections() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    fb_pages: Array.isArray(store.fb_pages) ? store.fb_pages : [],
+    fb_insights_daily: Array.isArray(store.fb_insights_daily) ? store.fb_insights_daily : [],
+    fb_posts: Array.isArray(store.fb_posts) ? store.fb_posts : []
+  };
+}
+async function writeLocalCollections(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+async function getFbPages() {
+  if (!isSupabaseConfigured) {
+    const { fb_pages } = await readLocalCollections();
+    return fb_pages;
+  }
+  const { data, error } = await supabase.from("fb_pages").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch Facebook Page: ${error.message}`);
+  return data || [];
+}
+async function upsertFbPage(input) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_pages } = await readLocalCollections();
+    const existing = fb_pages.find((p) => p.page_id === input.page_id);
+    const next = {
+      page_id: input.page_id,
+      page_name: input.page_name,
+      brand: input.brand !== void 0 ? input.brand : existing?.brand ?? null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== void 0 ? input.is_active : existing?.is_active !== false,
+      last_synced_at: existing?.last_synced_at || null,
+      last_sync_error: existing?.last_sync_error || null,
+      // A fresh save always clears this — Admin just pasted a (presumably
+      // valid) token, so give it the benefit of the doubt until the next
+      // sync says otherwise. The stored expiry deadlines belong to the token
+      // being replaced, so they're cleared for the same reason and refilled
+      // by the next debug_token probe.
+      token_expired: false,
+      token_expires_at: null,
+      token_data_access_expires_at: null,
+      token_checked_at: null,
+      created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const rest = fb_pages.filter((p) => p.page_id !== input.page_id);
+    await writeLocalCollections(store, { fb_pages: [...rest, next] });
+    return;
+  }
+  const { error } = await supabase.from("fb_pages").upsert(
+    {
+      page_id: input.page_id,
+      page_name: input.page_name,
+      brand: input.brand !== void 0 ? input.brand : null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== void 0 ? input.is_active : true,
+      token_expired: false,
+      token_expires_at: null,
+      token_data_access_expires_at: null,
+      token_checked_at: null
+    },
+    { onConflict: "page_id" }
+  );
+  if (error) throw new Error(`L\u1ED7i l\u01B0u Facebook Page: ${error.message}`);
+}
+async function deleteFbPage(pageId) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_pages, fb_insights_daily, fb_posts } = await readLocalCollections();
+    await writeLocalCollections(store, {
+      fb_pages: fb_pages.filter((p) => p.page_id !== pageId),
+      fb_insights_daily: fb_insights_daily.filter((r2) => r2.page_id !== pageId),
+      fb_posts: fb_posts.filter((r2) => r2.page_id !== pageId)
+    });
+    return;
+  }
+  const { error } = await supabase.from("fb_pages").delete().eq("page_id", pageId);
+  if (error) throw new Error(`L\u1ED7i x\xF3a Facebook Page: ${error.message}`);
+}
+async function setFbPageSyncStatus(pageId, status) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_pages } = await readLocalCollections();
+    const next = fb_pages.map((p) => p.page_id === pageId ? { ...p, ...status } : p);
+    await writeLocalCollections(store, { fb_pages: next });
+    return;
+  }
+  const { error } = await supabase.from("fb_pages").update(status).eq("page_id", pageId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9: ${error.message}`);
+}
+async function upsertFbInsightsDaily(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, fb_insights_daily } = await readLocalCollections();
+    const key = (r2) => `${r2.page_id}|${r2.date}`;
+    const byKey = new Map(fb_insights_daily.map((r2) => [key(r2), r2]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections(store, { fb_insights_daily: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("fb_insights_daily").upsert(rows, { onConflict: "page_id,date" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u insights: ${error.message}`);
+}
+async function getFbInsightsDaily(pageIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { fb_insights_daily } = await readLocalCollections();
+    return fb_insights_daily.filter(
+      (r2) => pageIds.includes(r2.page_id) && r2.date >= since && r2.date <= until
+    );
+  }
+  if (pageIds.length === 0) return [];
+  return fetchAllRows(
+    (from, to) => supabase.from("fb_insights_daily").select("*").in("page_id", pageIds).gte("date", since).lte("date", until).order("date", { ascending: true }).range(from, to)
+  ).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u insights: ${err.message}`);
+  });
+}
+async function upsertFbPosts(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, fb_posts } = await readLocalCollections();
+    const byId = new Map(fb_posts.map((r2) => [r2.post_id, r2]));
+    for (const row of rows) byId.set(row.post_id, row);
+    await writeLocalCollections(store, { fb_posts: Array.from(byId.values()) });
+    return;
+  }
+  const { error } = await supabase.from("fb_posts").upsert(rows, { onConflict: "post_id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u b\xE0i \u0111\u0103ng: ${error.message}`);
+}
+async function getFbPosts(pageIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { fb_posts } = await readLocalCollections();
+    return fb_posts.filter((r2) => pageIds.includes(r2.page_id) && r2.created_time >= since && r2.created_time <= until).sort((a, b) => a.created_time < b.created_time ? 1 : -1);
+  }
+  if (pageIds.length === 0) return [];
+  return fetchAllRows(
+    (from, to) => supabase.from("fb_posts").select("*").in("page_id", pageIds).gte("created_time", since).lte("created_time", until).order("created_time", { ascending: false }).range(from, to)
+  ).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc b\xE0i \u0111\u0103ng: ${err.message}`);
+  });
+}
+
+// src/server/facebookSync.ts
+var GRAPH_API_VERSION = "v21.0";
+var GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+var INSIGHTS_BACKFILL_DAYS = 14;
+var POSTS_LOOKBACK_DAYS = 30;
+var POST_FETCH_CONCURRENCY = 6;
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i2 = next++;
+      results[i2] = await fn(items[i2]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+var METRIC_FIELD_MAP = {
+  page_views_total: "page_views",
+  page_post_engagements: "engaged_users"
+};
+var POST_METRIC_FIELD_MAP = {
+  post_impressions: "impressions",
+  post_impressions_unique: "reach",
+  post_engaged_users: "engaged_users",
+  post_clicks: "clicks"
+};
+var REACTION_TYPES = ["LIKE", "LOVE", "WOW", "HAHA", "SAD", "ANGRY"];
+var REACTION_FIELD_BY_TYPE = {
+  LIKE: "likes",
+  LOVE: "loves",
+  WOW: "wows",
+  HAHA: "hahas",
+  SAD: "sorrys",
+  ANGRY: "angers"
+};
+function toDateStr(d) {
+  return d.toISOString().slice(0, 10);
+}
+var GraphApiError = class extends Error {
+  constructor(message, code, subcode) {
+    super(message);
+    this.code = code;
+    this.subcode = subcode;
+  }
+};
+function isTokenInvalidError(err) {
+  return err instanceof GraphApiError && err.code === 190;
+}
+async function graphGet(pathAndQuery, accessToken) {
+  const sep = pathAndQuery.includes("?") ? "&" : "?";
+  const url = `${GRAPH_API_BASE}${pathAndQuery}${sep}access_token=${encodeURIComponent(accessToken)}`;
+  const res = await fetch(url);
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GraphApiError(
+      body?.error?.message || `Graph API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`,
+      body?.error?.code,
+      body?.error?.error_subcode
+    );
+  }
+  return body;
+}
+async function fetchPageDailyInsights(pageId, accessToken, since, until, tokenStatus) {
+  const byDate = /* @__PURE__ */ new Map();
+  const getRow = (date) => {
+    let row = byDate.get(date);
+    if (!row) {
+      row = {
+        page_id: pageId,
+        date,
+        impressions: null,
+        impressions_paid: null,
+        reach: null,
+        reach_paid: null,
+        page_views: null,
+        fan_count: null,
+        fan_adds: null,
+        fan_removes: null,
+        engaged_users: null
+      };
+      byDate.set(date, row);
+    }
+    return row;
+  };
+  await Promise.all(
+    Object.entries(METRIC_FIELD_MAP).map(async ([metric, field]) => {
+      try {
+        const body = await graphGet(
+          `/${pageId}/insights?metric=${metric}&period=day&since=${since}&until=${until}`,
+          accessToken
+        );
+        const series = body?.data?.[0]?.values || [];
+        for (const point of series) {
+          const value = Number(point?.value);
+          if (!point?.end_time || Number.isNaN(value)) continue;
+          const date = String(point.end_time).slice(0, 10);
+          getRow(date)[field] = value;
+        }
+      } catch (err) {
+        if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+        console.error(`Facebook metric "${metric}" (page ${pageId}) l\u1ED7i:`, err.message || err);
+      }
+    })
+  );
+  try {
+    const page = await graphGet(`/${pageId}?fields=followers_count,fan_count`, accessToken);
+    const followers = typeof page.followers_count === "number" ? page.followers_count : page.fan_count;
+    if (typeof followers === "number") {
+      getRow(until).fan_count = followers;
+    }
+  } catch (err) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    console.error(`Facebook followers_count (page ${pageId}) l\u1ED7i:`, err.message || err);
+  }
+  return Array.from(byDate.values());
+}
+async function fetchRecentPosts(pageId, accessToken, since, tokenStatus) {
+  let posts = [];
+  try {
+    const body = await graphGet(
+      `/${pageId}/posts?since=${since}&fields=id,message,created_time,permalink_url,full_picture,shares,comments.limit(0).summary(true)`,
+      accessToken
+    );
+    posts = body?.data || [];
+  } catch (err) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    throw err;
+  }
+  return mapWithConcurrency(posts, POST_FETCH_CONCURRENCY, async (post2) => {
+    const row = {
+      post_id: post2.id,
+      page_id: pageId,
+      created_time: post2.created_time,
+      message: post2.message || null,
+      permalink: post2.permalink_url || null,
+      thumbnail_url: post2.full_picture || null,
+      reach: null,
+      impressions: null,
+      engaged_users: null,
+      clicks: null,
+      likes: null,
+      loves: null,
+      wows: null,
+      hahas: null,
+      sorrys: null,
+      angers: null,
+      comments: post2.comments?.summary?.total_count ?? null,
+      shares: post2.shares?.count ?? null,
+      synced_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await Promise.all([
+      ...Object.entries(POST_METRIC_FIELD_MAP).map(async ([metric, field]) => {
+        try {
+          const insights = await graphGet(`/${post2.id}/insights?metric=${metric}`, accessToken);
+          const value = insights?.data?.[0]?.values?.[0]?.value;
+          if (typeof value === "number") row[field] = value;
+        } catch (err) {
+          if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+          console.error(`Facebook post metric "${metric}" (${post2.id}) l\u1ED7i:`, err.message || err);
+        }
+      }),
+      ...REACTION_TYPES.map(async (type) => {
+        try {
+          const r2 = await graphGet(`/${post2.id}/reactions?type=${type}&summary=true&limit=0`, accessToken);
+          row[REACTION_FIELD_BY_TYPE[type]] = r2?.summary?.total_count ?? 0;
+        } catch (err) {
+          if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+          console.error(`Facebook reactions breakdown (${type}, ${post2.id}) l\u1ED7i:`, err.message || err);
+        }
+      })
+    ]);
+    return row;
+  });
+}
+function expiryToIso(seconds) {
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return new Date(n * 1e3).toISOString();
+}
+async function fetchTokenExpiry(accessToken) {
+  const appId = process.env.FB_APP_ID;
+  const appSecret = process.env.FB_APP_SECRET;
+  const inspectorToken = appId && appSecret ? `${appId}|${appSecret}` : accessToken;
+  try {
+    const body = await graphGet(`/debug_token?input_token=${encodeURIComponent(accessToken)}`, inspectorToken);
+    if (!body?.data) return null;
+    return {
+      expires_at: expiryToIso(body.data.expires_at),
+      data_access_expires_at: expiryToIso(body.data.data_access_expires_at)
+    };
+  } catch (err) {
+    console.error("Facebook debug_token l\u1ED7i:", err.message || err);
+    return null;
+  }
+}
+async function preserveStoredValues(pageId, rows, since, until) {
+  const stored = await getFbInsightsDaily([pageId], since, until);
+  if (stored.length === 0) return rows;
+  const storedByDate = new Map(stored.map((r2) => [r2.date, r2]));
+  return rows.map((row) => {
+    const old = storedByDate.get(row.date);
+    if (!old) return row;
+    const merged = { ...row };
+    for (const key of Object.keys(merged)) {
+      if (key === "page_id" || key === "date") continue;
+      if (merged[key] == null && old[key] != null) merged[key] = old[key];
+    }
+    return merged;
+  });
+}
+async function runFacebookSync() {
+  const pages = (await getFbPages()).filter((p) => p.is_active);
+  const now = /* @__PURE__ */ new Date();
+  const until = toDateStr(now);
+  const since = toDateStr(new Date(now.getTime() - INSIGHTS_BACKFILL_DAYS * 24 * 60 * 60 * 1e3));
+  const postsSince = toDateStr(new Date(now.getTime() - POSTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1e3));
+  return Promise.all(
+    pages.map(async (page) => {
+      const tokenStatus = { invalid: false };
+      try {
+        const accessToken = decrypt(page.access_token_encrypted);
+        if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+        const [expiry, dailyRows] = await Promise.all([
+          fetchTokenExpiry(accessToken),
+          fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus)
+        ]);
+        if (dailyRows.length > 0) {
+          await upsertFbInsightsDaily(await preserveStoredValues(page.page_id, dailyRows, since, until));
+        }
+        const postRows = await fetchRecentPosts(page.page_id, accessToken, postsSince, tokenStatus);
+        if (postRows.length > 0) await upsertFbPosts(postRows);
+        await setFbPageSyncStatus(page.page_id, {
+          last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
+          last_sync_error: null,
+          token_expired: tokenStatus.invalid,
+          // Only written when the probe actually answered — a failed probe
+          // must leave the last known deadlines in place rather than blanking
+          // them back to "unknown".
+          ...expiry ? {
+            token_expires_at: expiry.expires_at,
+            token_data_access_expires_at: expiry.data_access_expires_at,
+            token_checked_at: (/* @__PURE__ */ new Date()).toISOString()
+          } : {}
+        });
+        return { page_id: page.page_id, page_name: page.page_name, ok: true };
+      } catch (err) {
+        const message = err?.message || String(err);
+        console.error(`\u0110\u1ED3ng b\u1ED9 Facebook th\u1EA5t b\u1EA1i cho page ${page.page_id}:`, message);
+        await setFbPageSyncStatus(page.page_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {
+        });
+        return { page_id: page.page_id, page_name: page.page_name, ok: false, error: message };
+      }
+    })
+  );
+}
+
+// src/server/adsPerformanceStore.ts
+async function readLocalCollections2() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    ads_performance: Array.isArray(store.ads_performance) ? store.ads_performance : [],
+    fb_ad_accounts: Array.isArray(store.fb_ad_accounts) ? store.fb_ad_accounts : []
+  };
+}
+async function writeLocalCollections2(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+function adsPerformanceKey(r2) {
+  return `${r2.channel}|${r2.campaign_name}|${r2.ad_group_name}|${r2.ad_name}|${r2.date}`;
+}
+async function upsertAdsPerformance(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, ads_performance } = await readLocalCollections2();
+    const byKey = new Map(ads_performance.map((r2) => [adsPerformanceKey(r2), r2]));
+    for (const row of rows) byKey.set(adsPerformanceKey(row), row);
+    await writeLocalCollections2(store, { ads_performance: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("ads_performance").upsert(rows, { onConflict: "channel,campaign_name,ad_group_name,ad_name,date" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o: ${error.message}`);
+}
+async function getAdsPerformance(params) {
+  const { channels, brand, since, until } = params;
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections2();
+    return ads_performance.filter((r2) => {
+      if (channels && channels.length > 0 && !channels.includes(r2.channel)) return false;
+      if (brand && r2.brand !== brand) return false;
+      return r2.date >= since && r2.date <= until;
+    });
+  }
+  const rows = await fetchAllRows((from, to) => {
+    let query = supabase.from("ads_performance").select("*").gte("date", since).lte("date", until);
+    if (channels && channels.length > 0) query = query.in("channel", channels);
+    if (brand) query = query.eq("brand", brand);
+    return query.order("date", { ascending: true }).range(from, to);
+  }).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o: ${err.message}`);
+  });
+  return rows;
+}
+async function getFbAdAccounts() {
+  if (!isSupabaseConfigured) {
+    const { fb_ad_accounts } = await readLocalCollections2();
+    return fb_ad_accounts;
+  }
+  const { data, error } = await supabase.from("fb_ad_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch Ad Account: ${error.message}`);
+  return data || [];
+}
+async function upsertFbAdAccount(input) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_ad_accounts } = await readLocalCollections2();
+    const existing = fb_ad_accounts.find((a) => a.ad_account_id === input.ad_account_id);
+    const next = {
+      ad_account_id: input.ad_account_id,
+      account_name: input.account_name,
+      brand: input.brand !== void 0 ? input.brand : existing?.brand ?? null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== void 0 ? input.is_active : existing?.is_active !== false,
+      last_synced_at: existing?.last_synced_at || null,
+      last_sync_error: existing?.last_sync_error || null,
+      token_expired: existing?.token_expired || false,
+      created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
+    };
+    const rest = fb_ad_accounts.filter((a) => a.ad_account_id !== input.ad_account_id);
+    await writeLocalCollections2(store, { fb_ad_accounts: [...rest, next] });
+    return;
+  }
+  const { error } = await supabase.from("fb_ad_accounts").upsert(
+    {
+      ad_account_id: input.ad_account_id,
+      account_name: input.account_name,
+      brand: input.brand !== void 0 ? input.brand : null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== void 0 ? input.is_active : true
+    },
+    { onConflict: "ad_account_id" }
+  );
+  if (error) throw new Error(`L\u1ED7i l\u01B0u c\u1EA5u h\xECnh Ad Account: ${error.message}`);
+}
+async function deleteFbAdAccount(adAccountId) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_ad_accounts, ads_performance } = await readLocalCollections2();
+    await writeLocalCollections2(store, {
+      fb_ad_accounts: fb_ad_accounts.filter((a) => a.ad_account_id !== adAccountId),
+      // Ad-account-scoped rows aren't keyed by ad_account_id (only by
+      // channel/campaign/ad_group/ad/date), so deleting the account config
+      // intentionally leaves already-synced facebook rows in place — same
+      // "config removal doesn't retroactively delete history" behavior as
+      // fb_pages deletion has for fb_insights_daily in production (there it
+      // cascades via FK; here there's no FK to cascade through by design,
+      // since one ads_performance row isn't tied to a single ad account).
+      ads_performance
+    });
+    return;
+  }
+  const { error } = await supabase.from("fb_ad_accounts").delete().eq("ad_account_id", adAccountId);
+  if (error) throw new Error(`L\u1ED7i x\xF3a c\u1EA5u h\xECnh Ad Account: ${error.message}`);
+}
+async function setFbAdAccountSyncStatus(adAccountId, status) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_ad_accounts } = await readLocalCollections2();
+    const next = fb_ad_accounts.map((a) => a.ad_account_id === adAccountId ? { ...a, ...status } : a);
+    await writeLocalCollections2(store, { fb_ad_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("fb_ad_accounts").update(status).eq("ad_account_id", adAccountId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 Ad Account: ${error.message}`);
+}
+
+// src/server/facebookAdsSync.ts
+var ADS_BACKFILL_DAYS = 30;
+var MAX_CHUNK_DAYS = 90;
+function dateRangeChunks(since, until) {
+  const chunks = [];
+  let chunkStart = /* @__PURE__ */ new Date(`${since}T00:00:00Z`);
+  const end = /* @__PURE__ */ new Date(`${until}T00:00:00Z`);
+  while (chunkStart <= end) {
+    const chunkEnd = new Date(chunkStart.getTime() + (MAX_CHUNK_DAYS - 1) * 24 * 60 * 60 * 1e3);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+    chunks.push({ since: toDateStr(chunkStart), until: toDateStr(chunkEnd) });
+    chunkStart = new Date(chunkEnd.getTime() + 24 * 60 * 60 * 1e3);
+  }
+  return chunks;
+}
+var INSIGHTS_FIELDS = [
+  "campaign_name",
+  "adset_name",
+  "ad_name",
+  "spend",
+  "impressions",
+  "reach",
+  "frequency",
+  "clicks",
+  "actions",
+  "video_play_actions"
+].join(",");
+var CONVERSION_ACTION_TYPES = /* @__PURE__ */ new Set(["lead", "onsite_conversion.lead_grouped"]);
+function sumActionValues(actions, types3) {
+  if (!Array.isArray(actions)) return 0;
+  return actions.filter((a) => types3.has(a.action_type)).reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+}
+function sumAllActionValues(actions) {
+  if (!Array.isArray(actions)) return 0;
+  return actions.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+}
+async function fetchAdAccountInsights(adAccountId, accessToken, since, until, brand, tokenStatus) {
+  const rows = [];
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
+  let body;
+  try {
+    body = await graphGet(
+      `/${adAccountId}/insights?level=ad&time_increment=1&time_range=${timeRange}&fields=${INSIGHTS_FIELDS}&limit=500`,
+      accessToken
+    );
+  } catch (err) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    throw err;
+  }
+  while (body) {
+    for (const item of body.data || []) {
+      if (!item.date_start || !item.campaign_name) continue;
+      rows.push({
+        channel: "facebook",
+        brand,
+        campaign_name: item.campaign_name,
+        ad_group_name: item.adset_name || "",
+        ad_name: item.ad_name || "",
+        date: String(item.date_start).slice(0, 10),
+        spend: item.spend != null ? Number(item.spend) : null,
+        impressions: item.impressions != null ? Number(item.impressions) : null,
+        clicks: item.clicks != null ? Number(item.clicks) : null,
+        reach: item.reach != null ? Number(item.reach) : null,
+        frequency: item.frequency != null ? Number(item.frequency) : null,
+        video_views: item.video_play_actions ? sumAllActionValues(item.video_play_actions) : null,
+        conversions: sumActionValues(item.actions, CONVERSION_ACTION_TYPES),
+        extra: {}
+      });
+    }
+    const nextUrl = body.paging?.next;
+    if (!nextUrl) break;
+    try {
+      const res = await fetch(nextUrl);
+      body = await res.json();
+      if (!res.ok || body?.error) {
+        throw new GraphApiError(
+          body?.error?.message || `Graph API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`,
+          body?.error?.code,
+          body?.error?.error_subcode
+        );
+      }
+    } catch (err) {
+      if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+      console.error(`Facebook Ads insights (paging, ${adAccountId}) l\u1ED7i:`, err.message || err);
+      break;
+    }
+  }
+  return rows;
+}
+async function runFacebookAdsSync(overrides) {
+  const accounts = (await getFbAdAccounts()).filter((a) => a.is_active);
+  const now = /* @__PURE__ */ new Date();
+  const until = overrides?.until || toDateStr(now);
+  const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS * 24 * 60 * 60 * 1e3));
+  const chunks = dateRangeChunks(since, until);
+  return Promise.all(
+    accounts.map(async (account) => {
+      const tokenStatus = { invalid: false };
+      let rowsSynced = 0;
+      try {
+        const accessToken = decrypt(account.access_token_encrypted);
+        if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+        for (const chunk of chunks) {
+          const rows = await fetchAdAccountInsights(
+            account.ad_account_id,
+            accessToken,
+            chunk.since,
+            chunk.until,
+            account.brand,
+            tokenStatus
+          );
+          if (rows.length > 0) await upsertAdsPerformance(rows);
+          rowsSynced += rows.length;
+        }
+        await setFbAdAccountSyncStatus(account.ad_account_id, {
+          last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
+          last_sync_error: null,
+          token_expired: tokenStatus.invalid
+        });
+        return { ad_account_id: account.ad_account_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+      } catch (err) {
+        const message = err?.message || String(err);
+        console.error(`\u0110\u1ED3ng b\u1ED9 Facebook Ads th\u1EA5t b\u1EA1i cho ${account.ad_account_id}:`, message);
+        await setFbAdAccountSyncStatus(account.ad_account_id, { last_sync_error: message, token_expired: tokenStatus.invalid }).catch(() => {
+        });
+        return { ad_account_id: account.ad_account_id, account_name: account.account_name, ok: false, rows_synced: rowsSynced, error: message };
+      }
+    })
+  );
+}
+
+// src/server/tiktokStore.ts
+async function readLocalCollections3() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    tiktok_accounts: Array.isArray(store.tiktok_accounts) ? store.tiktok_accounts : [],
+    tiktok_insights_daily: Array.isArray(store.tiktok_insights_daily) ? store.tiktok_insights_daily : [],
+    tiktok_posts: Array.isArray(store.tiktok_posts) ? store.tiktok_posts : []
+  };
+}
+async function writeLocalCollections3(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+async function getTiktokAccounts() {
+  if (!isSupabaseConfigured) {
+    const { tiktok_accounts } = await readLocalCollections3();
+    return tiktok_accounts;
+  }
+  const { data, error } = await supabase.from("tiktok_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch t\xE0i kho\u1EA3n TikTok: ${error.message}`);
+  return data || [];
+}
+async function upsertTiktokAccount(account) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_accounts } = await readLocalCollections3();
+    const rest = tiktok_accounts.filter((a) => a.open_id !== account.open_id);
+    await writeLocalCollections3(store, { tiktok_accounts: [...rest, account] });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_accounts").upsert(account, { onConflict: "open_id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u t\xE0i kho\u1EA3n TikTok: ${error.message}`);
+}
+async function deleteTiktokAccount(openId) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_accounts, tiktok_insights_daily, tiktok_posts } = await readLocalCollections3();
+    await writeLocalCollections3(store, {
+      tiktok_accounts: tiktok_accounts.filter((a) => a.open_id !== openId),
+      tiktok_insights_daily: tiktok_insights_daily.filter((r2) => r2.open_id !== openId),
+      tiktok_posts: tiktok_posts.filter((r2) => r2.open_id !== openId)
+    });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_accounts").delete().eq("open_id", openId);
+  if (error) throw new Error(`L\u1ED7i x\xF3a t\xE0i kho\u1EA3n TikTok: ${error.message}`);
+}
+async function setTiktokAccountSyncStatus(openId, status) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_accounts } = await readLocalCollections3();
+    const next = tiktok_accounts.map((a) => a.open_id === openId ? { ...a, ...status } : a);
+    await writeLocalCollections3(store, { tiktok_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_accounts").update(status).eq("open_id", openId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 TikTok: ${error.message}`);
+}
+async function updateTiktokAccountTokens(openId, tokens) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_accounts } = await readLocalCollections3();
+    const next = tiktok_accounts.map((a) => a.open_id === openId ? { ...a, ...tokens } : a);
+    await writeLocalCollections3(store, { tiktok_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_accounts").update(tokens).eq("open_id", openId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt token TikTok: ${error.message}`);
+}
+async function upsertTiktokInsightsDaily(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_insights_daily } = await readLocalCollections3();
+    const key = (r2) => `${r2.open_id}|${r2.date}`;
+    const byKey = new Map(tiktok_insights_daily.map((r2) => [key(r2), r2]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections3(store, { tiktok_insights_daily: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_insights_daily").upsert(rows, { onConflict: "open_id,date" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u insights TikTok: ${error.message}`);
+}
+async function getTiktokInsightsDaily(openIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { tiktok_insights_daily } = await readLocalCollections3();
+    return tiktok_insights_daily.filter((r2) => openIds.includes(r2.open_id) && r2.date >= since && r2.date <= until);
+  }
+  const { data, error } = await supabase.from("tiktok_insights_daily").select("*").in("open_id", openIds).gte("date", since).lte("date", until).order("date", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u insights TikTok: ${error.message}`);
+  return data || [];
+}
+async function upsertTiktokPosts(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_posts } = await readLocalCollections3();
+    const byId = new Map(tiktok_posts.map((r2) => [r2.video_id, r2]));
+    for (const row of rows) byId.set(row.video_id, row);
+    await writeLocalCollections3(store, { tiktok_posts: Array.from(byId.values()) });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_posts").upsert(rows, { onConflict: "video_id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u video TikTok: ${error.message}`);
+}
+async function getTiktokPosts(openIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { tiktok_posts } = await readLocalCollections3();
+    return tiktok_posts.filter((r2) => openIds.includes(r2.open_id) && r2.create_time >= since && r2.create_time <= until).sort((a, b) => a.create_time < b.create_time ? 1 : -1);
+  }
+  const { data, error } = await supabase.from("tiktok_posts").select("*").in("open_id", openIds).gte("create_time", since).lte("create_time", until).order("create_time", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc video TikTok: ${error.message}`);
+  return data || [];
+}
+
+// src/server/tiktokSync.ts
+var TIKTOK_API_BASE = "https://open.tiktokapis.com";
+var TIKTOK_AUTHORIZE_URL = "https://www.tiktok.com/v2/auth/authorize/";
+var TIKTOK_CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY || "";
+var TIKTOK_CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET || "";
+var TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI || "";
+var isTiktokConfigured = Boolean(TIKTOK_CLIENT_KEY && TIKTOK_CLIENT_SECRET && TIKTOK_REDIRECT_URI);
+var TIKTOK_SCOPES = ["user.info.basic", "user.info.stats", "video.list"];
+var USER_INFO_FIELDS = ["open_id", "display_name", "follower_count", "following_count", "likes_count", "video_count"].join(",");
+var VIDEO_FIELDS = ["id", "title", "create_time", "cover_image_url", "share_url", "view_count", "like_count", "comment_count", "share_count"].join(",");
+var TiktokApiError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+  }
+};
+function isRefreshTokenInvalidError(err) {
+  return err instanceof TiktokApiError && (err.code === "refresh_token_invalid" || err.code === "invalid_grant");
+}
+async function postTokenEndpoint(params) {
+  const res = await fetch(`${TIKTOK_API_BASE}/v2/oauth/token/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "Cache-Control": "no-cache" },
+    body: new URLSearchParams(params).toString()
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new TiktokApiError(body?.error_description || body?.error?.message || `TikTok token endpoint tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, body?.error);
+  }
+  return body;
+}
+async function exchangeTiktokCode(code, redirectUri, codeVerifier) {
+  return postTokenEndpoint({
+    client_key: TIKTOK_CLIENT_KEY,
+    client_secret: TIKTOK_CLIENT_SECRET,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri,
+    code_verifier: codeVerifier
+  });
+}
+async function refreshTiktokToken(refreshToken) {
+  return postTokenEndpoint({
+    client_key: TIKTOK_CLIENT_KEY,
+    client_secret: TIKTOK_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
+}
+async function fetchUserInfo(accessToken) {
+  const res = await fetch(`${TIKTOK_API_BASE}/v2/user/info/?fields=${USER_INFO_FIELDS}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error && body.error.code !== "ok") {
+    throw new TiktokApiError(body?.error?.message || `TikTok user/info tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, body?.error?.code);
+  }
+  return body?.data?.user || {};
+}
+var MAX_VIDEO_PAGES = 5;
+async function fetchRecentVideos(accessToken) {
+  const videos = [];
+  let cursor;
+  for (let page = 0; page < MAX_VIDEO_PAGES; page++) {
+    const res = await fetch(`${TIKTOK_API_BASE}/v2/video/list/?fields=${VIDEO_FIELDS}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ max_count: 20, ...cursor ? { cursor } : {} })
+    });
+    const body = await res.json();
+    if (!res.ok || body?.error && body.error.code !== "ok") {
+      throw new TiktokApiError(body?.error?.message || `TikTok video/list tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, body?.error?.code);
+    }
+    const pageVideos = body?.data?.videos || [];
+    videos.push(...pageVideos);
+    if (!body?.data?.has_more || pageVideos.length === 0) break;
+    cursor = body.data.cursor;
+  }
+  return videos;
+}
+function toDateStr2(d) {
+  return d.toISOString().slice(0, 10);
+}
+async function runTiktokSync() {
+  if (!isTiktokConfigured) {
+    throw new Error("TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  }
+  const accounts = (await getTiktokAccounts()).filter((a) => a.is_active);
+  const results = [];
+  const today = toDateStr2(/* @__PURE__ */ new Date());
+  for (const account of accounts) {
+    let refreshTokenInvalid = false;
+    try {
+      let accessToken = decrypt(account.access_token_encrypted);
+      if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+      const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
+      if (Date.now() > accessExpiresAt - 5 * 60 * 1e3) {
+        const refreshToken = decrypt(account.refresh_token_encrypted);
+        try {
+          const refreshed = await refreshTiktokToken(refreshToken);
+          accessToken = refreshed.access_token;
+          await updateTiktokAccountTokens(account.open_id, {
+            access_token_encrypted: encrypt(refreshed.access_token),
+            refresh_token_encrypted: encrypt(refreshed.refresh_token),
+            access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString(),
+            refresh_token_expires_at: new Date(Date.now() + refreshed.refresh_expires_in * 1e3).toISOString()
+          });
+        } catch (err) {
+          if (isRefreshTokenInvalidError(err)) refreshTokenInvalid = true;
+          throw err;
+        }
+      }
+      const userInfo = await fetchUserInfo(accessToken);
+      await upsertTiktokInsightsDaily([
+        {
+          open_id: account.open_id,
+          date: today,
+          follower_count: userInfo.follower_count ?? null,
+          following_count: userInfo.following_count ?? null,
+          likes_count: userInfo.likes_count ?? null,
+          video_count: userInfo.video_count ?? null
+        }
+      ]);
+      const videos = await fetchRecentVideos(accessToken);
+      const postRows = videos.map((v) => ({
+        video_id: v.id,
+        open_id: account.open_id,
+        create_time: new Date(v.create_time * 1e3).toISOString(),
+        title: v.title || null,
+        cover_image_url: v.cover_image_url || null,
+        share_url: v.share_url || null,
+        view_count: v.view_count ?? null,
+        like_count: v.like_count ?? null,
+        comment_count: v.comment_count ?? null,
+        share_count: v.share_count ?? null,
+        synced_at: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+      if (postRows.length > 0) await upsertTiktokPosts(postRows);
+      await setTiktokAccountSyncStatus(account.open_id, {
+        last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
+        last_sync_error: null,
+        token_expired: false
+      });
+      results.push({ open_id: account.open_id, username: account.username, ok: true, videos_synced: postRows.length });
+    } catch (err) {
+      const message = err?.message || String(err);
+      console.error(`\u0110\u1ED3ng b\u1ED9 TikTok th\u1EA5t b\u1EA1i cho ${account.open_id}:`, message);
+      await setTiktokAccountSyncStatus(account.open_id, { last_sync_error: message, token_expired: refreshTokenInvalid }).catch(() => {
+      });
+      results.push({ open_id: account.open_id, username: account.username, ok: false, error: message });
+    }
+  }
+  return results;
+}
+
+// src/server/youtubeStore.ts
+async function readLocalCollections4() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    youtube_accounts: Array.isArray(store.youtube_accounts) ? store.youtube_accounts : [],
+    youtube_insights_daily: Array.isArray(store.youtube_insights_daily) ? store.youtube_insights_daily : [],
+    youtube_videos: Array.isArray(store.youtube_videos) ? store.youtube_videos : []
+  };
+}
+async function writeLocalCollections4(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+async function getYoutubeAccounts() {
+  if (!isSupabaseConfigured) {
+    const { youtube_accounts } = await readLocalCollections4();
+    return youtube_accounts;
+  }
+  const { data, error } = await supabase.from("youtube_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch k\xEAnh YouTube: ${error.message}`);
+  return data || [];
+}
+async function upsertYoutubeAccount(account) {
+  if (!isSupabaseConfigured) {
+    const { store, youtube_accounts } = await readLocalCollections4();
+    const rest = youtube_accounts.filter((a) => a.channel_id !== account.channel_id);
+    await writeLocalCollections4(store, { youtube_accounts: [...rest, account] });
+    return;
+  }
+  const { error } = await supabase.from("youtube_accounts").upsert(account, { onConflict: "channel_id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u k\xEAnh YouTube: ${error.message}`);
+}
+async function deleteYoutubeAccount(channelId) {
+  if (!isSupabaseConfigured) {
+    const { store, youtube_accounts, youtube_insights_daily, youtube_videos } = await readLocalCollections4();
+    await writeLocalCollections4(store, {
+      youtube_accounts: youtube_accounts.filter((a) => a.channel_id !== channelId),
+      youtube_insights_daily: youtube_insights_daily.filter((r2) => r2.channel_id !== channelId),
+      youtube_videos: youtube_videos.filter((r2) => r2.channel_id !== channelId)
+    });
+    return;
+  }
+  const { error } = await supabase.from("youtube_accounts").delete().eq("channel_id", channelId);
+  if (error) throw new Error(`L\u1ED7i x\xF3a k\xEAnh YouTube: ${error.message}`);
+}
+async function setYoutubeAccountSyncStatus(channelId, status) {
+  if (!isSupabaseConfigured) {
+    const { store, youtube_accounts } = await readLocalCollections4();
+    const next = youtube_accounts.map((a) => a.channel_id === channelId ? { ...a, ...status } : a);
+    await writeLocalCollections4(store, { youtube_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("youtube_accounts").update(status).eq("channel_id", channelId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 YouTube: ${error.message}`);
+}
+async function updateYoutubeAccountAccessToken(channelId, tokens) {
+  if (!isSupabaseConfigured) {
+    const { store, youtube_accounts } = await readLocalCollections4();
+    const next = youtube_accounts.map((a) => a.channel_id === channelId ? { ...a, ...tokens } : a);
+    await writeLocalCollections4(store, { youtube_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("youtube_accounts").update(tokens).eq("channel_id", channelId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt token YouTube: ${error.message}`);
+}
+async function upsertYoutubeInsightsDaily(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, youtube_insights_daily } = await readLocalCollections4();
+    const key = (r2) => `${r2.channel_id}|${r2.date}`;
+    const byKey = new Map(youtube_insights_daily.map((r2) => [key(r2), r2]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections4(store, { youtube_insights_daily: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("youtube_insights_daily").upsert(rows, { onConflict: "channel_id,date" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u insights YouTube: ${error.message}`);
+}
+async function getYoutubeInsightsDaily(channelIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { youtube_insights_daily } = await readLocalCollections4();
+    return youtube_insights_daily.filter((r2) => channelIds.includes(r2.channel_id) && r2.date >= since && r2.date <= until);
+  }
+  const { data, error } = await supabase.from("youtube_insights_daily").select("*").in("channel_id", channelIds).gte("date", since).lte("date", until).order("date", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u insights YouTube: ${error.message}`);
+  return data || [];
+}
+async function upsertYoutubeVideos(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, youtube_videos } = await readLocalCollections4();
+    const byId = new Map(youtube_videos.map((r2) => [r2.video_id, r2]));
+    for (const row of rows) byId.set(row.video_id, row);
+    await writeLocalCollections4(store, { youtube_videos: Array.from(byId.values()) });
+    return;
+  }
+  const { error } = await supabase.from("youtube_videos").upsert(rows, { onConflict: "video_id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u video YouTube: ${error.message}`);
+}
+async function getYoutubeVideos(channelIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { youtube_videos } = await readLocalCollections4();
+    return youtube_videos.filter((r2) => channelIds.includes(r2.channel_id) && r2.published_at >= since && r2.published_at <= until).sort((a, b) => a.published_at < b.published_at ? 1 : -1);
+  }
+  const { data, error } = await supabase.from("youtube_videos").select("*").in("channel_id", channelIds).gte("published_at", since).lte("published_at", until).order("published_at", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc video YouTube: ${error.message}`);
+  return data || [];
+}
+
+// src/server/youtubeSync.ts
+var YOUTUBE_DATA_API_BASE = "https://www.googleapis.com/youtube/v3";
+var YOUTUBE_ANALYTICS_API_BASE = "https://youtubeanalytics.googleapis.com/v2";
+var YOUTUBE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+var YOUTUBE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+var YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID || "";
+var YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET || "";
+var YOUTUBE_REDIRECT_URI = process.env.YOUTUBE_REDIRECT_URI || "";
+var isYoutubeConfigured = Boolean(YOUTUBE_CLIENT_ID && YOUTUBE_CLIENT_SECRET && YOUTUBE_REDIRECT_URI);
+var YOUTUBE_SCOPES = [
+  "https://www.googleapis.com/auth/youtube.readonly",
+  "https://www.googleapis.com/auth/yt-analytics.readonly"
+];
+var YoutubeApiError = class extends Error {
+  constructor(message, status, reason) {
+    super(message);
+    this.status = status;
+    this.reason = reason;
+  }
+};
+function isRefreshTokenInvalidError2(err) {
+  return err instanceof YoutubeApiError && (err.reason === "invalid_grant" || err.status === 400);
+}
+async function postTokenEndpoint2(params) {
+  const res = await fetch(YOUTUBE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params).toString()
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new YoutubeApiError(body?.error_description || body?.error || `Google token endpoint tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error);
+  }
+  return body;
+}
+async function exchangeYoutubeCode(code, redirectUri) {
+  return postTokenEndpoint2({
+    client_id: YOUTUBE_CLIENT_ID,
+    client_secret: YOUTUBE_CLIENT_SECRET,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri
+  });
+}
+async function refreshYoutubeToken(refreshToken) {
+  return postTokenEndpoint2({
+    client_id: YOUTUBE_CLIENT_ID,
+    client_secret: YOUTUBE_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
+}
+async function fetchOwnChannel(accessToken) {
+  const params = new URLSearchParams({ part: "snippet,contentDetails,statistics", mine: "true" });
+  const res = await fetch(`${YOUTUBE_DATA_API_BASE}/channels?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new YoutubeApiError(body?.error?.message || `YouTube channels.list tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  const channel = body?.items?.[0];
+  if (!channel) throw new YoutubeApiError("Kh\xF4ng t\xECm th\u1EA5y k\xEAnh YouTube n\xE0o cho t\xE0i kho\u1EA3n Google n\xE0y.");
+  return {
+    channel_id: channel.id,
+    channel_title: channel.snippet?.title || channel.id,
+    uploads_playlist_id: channel.contentDetails?.relatedPlaylists?.uploads,
+    subscriber_count: channel.statistics?.subscriberCount != null ? Number(channel.statistics.subscriberCount) : null,
+    view_count: channel.statistics?.viewCount != null ? Number(channel.statistics.viewCount) : null,
+    video_count: channel.statistics?.videoCount != null ? Number(channel.statistics.videoCount) : null
+  };
+}
+var MAX_VIDEOS_PER_SYNC = 20;
+async function fetchRecentVideos2(accessToken, uploadsPlaylistId) {
+  const params = new URLSearchParams({
+    part: "snippet,contentDetails",
+    playlistId: uploadsPlaylistId,
+    maxResults: String(MAX_VIDEOS_PER_SYNC)
+  });
+  const res = await fetch(`${YOUTUBE_DATA_API_BASE}/playlistItems?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new YoutubeApiError(body?.error?.message || `YouTube playlistItems.list tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  const items = body?.items || [];
+  return items.map((item) => ({
+    video_id: item.contentDetails?.videoId,
+    title: item.snippet?.title || null,
+    thumbnail_url: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || null,
+    published_at: item.contentDetails?.videoPublishedAt || item.snippet?.publishedAt
+  }));
+}
+async function fetchVideoViewsBySource(accessToken, videoId, publishedAt) {
+  const startDate = publishedAt.slice(0, 10);
+  const params = new URLSearchParams({
+    ids: "channel==MINE",
+    startDate,
+    endDate: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+    metrics: "views",
+    dimensions: "insightTrafficSourceType",
+    filters: `video==${videoId}`
+  });
+  const res = await fetch(`${YOUTUBE_ANALYTICS_API_BASE}/reports?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new YoutubeApiError(body?.error?.message || `YouTube Analytics reports tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  let organic = 0;
+  let advertising = 0;
+  for (const row of body?.rows || []) {
+    const [sourceType, views] = row;
+    if (sourceType === "ADVERTISING") advertising += Number(views) || 0;
+    else organic += Number(views) || 0;
+  }
+  return { organic, advertising };
+}
+function toDateStr3(d) {
+  return d.toISOString().slice(0, 10);
+}
+async function runYoutubeSync() {
+  if (!isYoutubeConfigured) {
+    throw new Error("YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  }
+  const accounts = (await getYoutubeAccounts()).filter((a) => a.is_active);
+  const results = [];
+  const today = toDateStr3(/* @__PURE__ */ new Date());
+  for (const account of accounts) {
+    let refreshTokenInvalid = false;
+    try {
+      let accessToken = decrypt(account.access_token_encrypted);
+      if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+      const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
+      if (Date.now() > accessExpiresAt - 5 * 60 * 1e3) {
+        const refreshToken = decrypt(account.refresh_token_encrypted);
+        try {
+          const refreshed = await refreshYoutubeToken(refreshToken);
+          accessToken = refreshed.access_token;
+          await updateYoutubeAccountAccessToken(account.channel_id, {
+            access_token_encrypted: encrypt(refreshed.access_token),
+            access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString()
+          });
+        } catch (err) {
+          if (isRefreshTokenInvalidError2(err)) refreshTokenInvalid = true;
+          throw err;
+        }
+      }
+      const channel = await fetchOwnChannel(accessToken);
+      await upsertYoutubeInsightsDaily([
+        {
+          channel_id: account.channel_id,
+          date: today,
+          subscriber_count: channel.subscriber_count,
+          view_count: channel.view_count,
+          video_count: channel.video_count
+        }
+      ]);
+      const videos = channel.uploads_playlist_id ? await fetchRecentVideos2(accessToken, channel.uploads_playlist_id) : [];
+      const videoRows = [];
+      for (const v of videos) {
+        if (!v.video_id) continue;
+        try {
+          const { organic, advertising } = await fetchVideoViewsBySource(accessToken, v.video_id, v.published_at);
+          videoRows.push({
+            video_id: v.video_id,
+            channel_id: account.channel_id,
+            published_at: v.published_at,
+            title: v.title,
+            thumbnail_url: v.thumbnail_url,
+            views: organic + advertising,
+            organic_views: organic,
+            advertising_views: advertising,
+            synced_at: (/* @__PURE__ */ new Date()).toISOString()
+          });
+        } catch (err) {
+          console.error(`YouTube Analytics l\u1ED7i cho video ${v.video_id}:`, err.message || err);
+        }
+      }
+      if (videoRows.length > 0) await upsertYoutubeVideos(videoRows);
+      await setYoutubeAccountSyncStatus(account.channel_id, {
+        last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
+        last_sync_error: null,
+        token_expired: false
+      });
+      results.push({ channel_id: account.channel_id, channel_title: account.channel_title, ok: true, videos_synced: videoRows.length });
+    } catch (err) {
+      const message = err?.message || String(err);
+      console.error(`\u0110\u1ED3ng b\u1ED9 YouTube th\u1EA5t b\u1EA1i cho ${account.channel_id}:`, message);
+      await setYoutubeAccountSyncStatus(account.channel_id, { last_sync_error: message, token_expired: refreshTokenInvalid }).catch(() => {
+      });
+      results.push({ channel_id: account.channel_id, channel_title: account.channel_title, ok: false, error: message });
+    }
+  }
+  return results;
 }
 
 // src/server/app.ts
@@ -130484,48 +131814,6 @@ app.post("/api/login", async (req, res) => {
     return res.status(500).json({ error: `L\u1ED7i \u0111\u0103ng nh\u1EADp: ${err.message}` });
   }
 });
-var INITIAL_DATA_PATH = import_path.default.join(process.cwd(), "src", "initial_data.json");
-var LOCAL_DB_PATH = import_path.default.join(process.cwd(), "src", "db_store.json");
-function readInitialSeed() {
-  try {
-    const raw = import_fs2.default.readFileSync(INITIAL_DATA_PATH, "utf8");
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("Failed to read initial_data.json:", err);
-    return { digital_marketing: [], kol_koc: [], btl_trade: [], monthly_ooh_pr: [] };
-  }
-}
-async function getDatabaseData() {
-  if (!isSupabaseConfigured) {
-    try {
-      return JSON.parse(import_fs2.default.readFileSync(LOCAL_DB_PATH, "utf8"));
-    } catch {
-      const seed2 = readInitialSeed();
-      await saveDatabaseData(seed2);
-      return seed2;
-    }
-  }
-  const { data, error } = await supabase.from("app_state").select("data").eq("id", APP_STATE_ROW_ID).maybeSingle();
-  if (error) {
-    throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u t\u1EEB Supabase: ${error.message}`);
-  }
-  if (data?.data) {
-    return data.data;
-  }
-  const seed = readInitialSeed();
-  await saveDatabaseData(seed);
-  return seed;
-}
-async function saveDatabaseData(fullData) {
-  if (!isSupabaseConfigured) {
-    import_fs2.default.writeFileSync(LOCAL_DB_PATH, JSON.stringify(fullData, null, 2), "utf8");
-    return;
-  }
-  const { error } = await supabase.from("app_state").upsert({ id: APP_STATE_ROW_ID, data: fullData, updated_at: (/* @__PURE__ */ new Date()).toISOString() });
-  if (error) {
-    throw new Error(`L\u1ED7i ghi d\u1EEF li\u1EC7u v\xE0o Supabase: ${error.message}`);
-  }
-}
 var ai = null;
 try {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -130745,10 +132033,17 @@ app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
     return res.status(500).json({ error: err.message || "L\u1ED7i g\u1EEDi email backup." });
   }
 });
+function isValidCronRequest(req) {
+  const expected = process.env.CRON_SECRET;
+  const provided = req.headers.authorization;
+  if (!expected || !provided) return false;
+  const expectedDigest = import_crypto9.default.createHash("sha256").update(`Bearer ${expected}`).digest();
+  const providedDigest = import_crypto9.default.createHash("sha256").update(provided).digest();
+  return import_crypto9.default.timingSafeEqual(expectedDigest, providedDigest);
+}
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
-    const expected = process.env.CRON_SECRET;
-    if (!expected || req.headers.authorization !== `Bearer ${expected}`) {
+    if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const store = await getDatabaseData();
@@ -130762,6 +132057,11 @@ app.get("/api/cron/weekly-backup", async (req, res) => {
     return res.status(500).json({ error: err.message || "L\u1ED7i g\u1EEDi email backup \u0111\u1ECBnh k\u1EF3." });
   }
 });
+var REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads"];
+var DEFAULT_REPORT_PERMISSIONS = {
+  Editor: [...REPORT_CATEGORY_IDS],
+  Viewer: [...REPORT_CATEGORY_IDS]
+};
 app.get("/api/get-data", requireAuth(), async (req, res) => {
   try {
     const rawDbData = await getDatabaseData();
@@ -130770,11 +132070,35 @@ app.get("/api/get-data", requireAuth(), async (req, res) => {
       success: true,
       data: normalized,
       comments: rawDbData.comments || {},
-      activeState: rawDbData.active_state || null
+      activeState: rawDbData.active_state || null,
+      reportPermissions: rawDbData.report_permissions || DEFAULT_REPORT_PERMISSIONS
     });
   } catch (err) {
     console.error("GET /api/get-data error:", err);
     return res.status(500).json({ error: `L\u1ED7i \u0111\u1ECDc c\u01A1 s\u1EDF d\u1EEF li\u1EC7u: ${err.message}` });
+  }
+});
+app.post("/api/save-report-permissions", requireAuth("Admin"), async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sanitizeRole = (value) => Array.isArray(value) ? value.filter((id) => REPORT_CATEGORY_IDS.includes(id)) : [];
+    const reportPermissions = {
+      Editor: sanitizeRole(body.Editor),
+      Viewer: sanitizeRole(body.Viewer)
+    };
+    const store = await getDatabaseData();
+    store.report_permissions = reportPermissions;
+    await saveDatabaseData(store);
+    await logAction(
+      req.session,
+      req,
+      "save-report-permissions",
+      `C\u1EADp nh\u1EADt ph\xE2n quy\u1EC1n xem b\xE1o c\xE1o (Editor: ${reportPermissions.Editor.join(", ") || "kh\xF4ng"}; Viewer: ${reportPermissions.Viewer.join(", ") || "kh\xF4ng"})`
+    );
+    return res.json({ success: true, reportPermissions });
+  } catch (err) {
+    console.error("POST /api/save-report-permissions error:", err);
+    return res.status(500).json({ error: `L\u1ED7i l\u01B0u ph\xE2n quy\u1EC1n b\xE1o c\xE1o: ${err.message}` });
   }
 });
 app.get("/api/get-users", requireAuth("Admin"), async (req, res) => {
@@ -130985,19 +132309,7 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
       const dvt = (row.\u0111\u01A1n_v\u1ECB_t\u00EDnh || "").toString().trim().toLowerCase();
       return `${month}|${year}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
     };
-    const mergedComments = { ...currentFullDb.comments || {} };
-    if (newData && newData.comments) {
-      Object.keys(newData.comments).forEach((weekKey) => {
-        if (!mergedComments[weekKey]) {
-          mergedComments[weekKey] = newData.comments[weekKey];
-        } else {
-          mergedComments[weekKey] = {
-            ...mergedComments[weekKey],
-            ...newData.comments[weekKey]
-          };
-        }
-      });
-    }
+    const mergedComments = mergeCommentTrees(currentFullDb.comments, newData?.comments);
     const mergedData = {
       ...currentFullDb,
       digital_marketing: mergeRowsByKey(currentDb.digital_marketing, normalizedNew.digital_marketing, getDigitalKey),
@@ -131050,9 +132362,503 @@ app.get("/api/action-logs", requireAuth(), async (req, res) => {
     return res.status(500).json({ error: `L\u1ED7i \u0111\u1ECDc nh\u1EADt k\xFD thao t\xE1c: ${err.message}` });
   }
 });
+app.get("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pages = await getFbPages();
+    res.json({
+      success: true,
+      pages: pages.map((p) => ({
+        page_id: p.page_id,
+        page_name: p.page_name,
+        brand: p.brand,
+        is_active: p.is_active,
+        last_synced_at: p.last_synced_at,
+        last_sync_error: p.last_sync_error,
+        token_expired: p.token_expired,
+        // Deadlines only — still never the token itself. Lets the Admin table
+        // warn before a token dies instead of only after (facebookStore.ts's
+        // FbPageConfig explains the two deadlines).
+        token_expires_at: p.token_expires_at ?? null,
+        token_data_access_expires_at: p.token_data_access_expires_at ?? null,
+        token_checked_at: p.token_checked_at ?? null
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { page_id, page_name, brand, access_token, is_active } = req.body;
+    if (!page_id || !page_name || !access_token) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu page_id, page_name ho\u1EB7c access_token." });
+    }
+    const token = String(access_token).trim();
+    await upsertFbPage({
+      page_id: String(page_id).trim(),
+      page_name: String(page_name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      access_token_encrypted: encrypt(token),
+      is_active: is_active !== void 0 ? Boolean(is_active) : void 0
+    });
+    const expiry = await fetchTokenExpiry(token);
+    if (expiry) {
+      await setFbPageSyncStatus(String(page_id).trim(), {
+        token_expires_at: expiry.expires_at,
+        token_data_access_expires_at: expiry.data_access_expires_at,
+        token_checked_at: (/* @__PURE__ */ new Date()).toISOString()
+      }).catch(() => {
+      });
+    }
+    await logAction(req.session, req, "save-fb-page", `C\u1EADp nh\u1EADt c\u1EA5u h\xECnh Facebook Page ${page_id}`);
+    res.json({ success: true, message: "\u0110\xE3 l\u01B0u c\u1EA5u h\xECnh Facebook Page." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/fb/pages/:page_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteFbPage(req.params.page_id);
+    await logAction(req.session, req, "delete-fb-page", `X\xF3a c\u1EA5u h\xECnh Facebook Page ${req.params.page_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runFacebookSync();
+    await logAction(req.session, req, "sync-facebook", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} Facebook Page`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/cron/facebook-sync", async (req, res) => {
+  try {
+    if (!isValidCronRequest(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const [pageResults, adsResults, tiktokResults, youtubeResults] = await Promise.all([
+      runFacebookSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (page insights) error:", err);
+        return [];
+      }),
+      runFacebookAdsSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (ads) error:", err);
+        return [];
+      }),
+      // TikTok organic insights piggybacks on this same cron for the same
+      // reason the Facebook Ads sync does — Vercel Hobby caps a project at
+      // 2 cron jobs, so this stays one HTTP trigger fanning out to all
+      // independent syncs rather than a third/fourth vercel.json entry.
+      isTiktokConfigured ? runTiktokSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (tiktok) error:", err);
+        return [];
+      }) : Promise.resolve([]),
+      isYoutubeConfigured ? runYoutubeSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (youtube) error:", err);
+        return [];
+      }) : Promise.resolve([])
+    ]);
+    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults });
+  } catch (err) {
+    console.error("GET /api/cron/facebook-sync error:", err);
+    res.status(500).json({ error: err.message || "L\u1ED7i \u0111\u1ED3ng b\u1ED9 Facebook \u0111\u1ECBnh k\u1EF3." });
+  }
+});
+app.get("/api/fb/insights", requireAuth(), async (req, res) => {
+  try {
+    const allPages = await getFbPages();
+    const requestedIds = typeof req.query.pages === "string" && req.query.pages.length > 0 ? req.query.pages.split(",").map((s2) => s2.trim()) : allPages.map((p) => p.page_id);
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const [daily, posts] = await Promise.all([
+      getFbInsightsDaily(requestedIds, since, until),
+      getFbPosts(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`)
+    ]);
+    res.json({
+      success: true,
+      pages: allPages.map((p) => ({ page_id: p.page_id, page_name: p.page_name, brand: p.brand, is_active: p.is_active })),
+      daily,
+      posts
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+var ADS_CHANNELS = ["facebook", "google", "tiktok"];
+var MAX_UPLOAD_ROWS = 2e4;
+function isValidAdsPerformanceRow(r2) {
+  return r2 && typeof r2 === "object" && ADS_CHANNELS.includes(r2.channel) && typeof r2.campaign_name === "string" && typeof r2.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r2.date);
+}
+app.get("/api/ads-performance", requireAuth(), async (req, res) => {
+  try {
+    const channels = typeof req.query.channels === "string" && req.query.channels.length > 0 ? req.query.channels.split(",").map((s2) => s2.trim()).filter((c) => ADS_CHANNELS.includes(c)) : void 0;
+    const brand = typeof req.query.brand === "string" && req.query.brand ? req.query.brand : null;
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const rows = await getAdsPerformance({ channels, brand, since, until });
+    res.json({ success: true, rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/ads-performance/upload", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: "Kh\xF4ng c\xF3 d\xF2ng d\u1EEF li\u1EC7u n\xE0o \u0111\u1EC3 l\u01B0u." });
+    }
+    if (rows.length > MAX_UPLOAD_ROWS) {
+      return res.status(400).json({
+        success: false,
+        error: `File c\xF3 ${rows.length} d\xF2ng, v\u01B0\u1EE3t qu\xE1 gi\u1EDBi h\u1EA1n ${MAX_UPLOAD_ROWS} d\xF2ng/l\u1EA7n t\u1EA3i l\xEAn. H\xE3y chia nh\u1ECF theo kho\u1EA3ng th\u1EDDi gian r\u1ED3i t\u1EA3i l\xEAn t\u1EEBng ph\u1EA7n.`
+      });
+    }
+    const invalid = rows.filter((r2) => !isValidAdsPerformanceRow(r2));
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `${invalid.length}/${rows.length} d\xF2ng thi\u1EBFu channel/campaign_name/date h\u1EE3p l\u1EC7.`
+      });
+    }
+    await upsertAdsPerformance(rows);
+    await logAction(
+      req.session,
+      req,
+      "upload-ads-performance",
+      `T\u1EA3i l\xEAn ${rows.length} d\xF2ng s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o (${rows[0].channel})`
+    );
+    res.json({ success: true, count: rows.length });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/fb-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getFbAdAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        ad_account_id: a.ad_account_id,
+        account_name: a.account_name,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/fb-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { ad_account_id, account_name, brand, access_token, is_active } = req.body;
+    if (!ad_account_id || !account_name || !access_token) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu ad_account_id, account_name ho\u1EB7c access_token." });
+    }
+    await upsertFbAdAccount({
+      ad_account_id: String(ad_account_id).trim(),
+      account_name: String(account_name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      access_token_encrypted: encrypt(String(access_token).trim()),
+      is_active: is_active !== void 0 ? Boolean(is_active) : void 0
+    });
+    await logAction(req.session, req, "save-fb-ad-account", `C\u1EADp nh\u1EADt c\u1EA5u h\xECnh Ad Account ${ad_account_id}`);
+    res.json({ success: true, message: "\u0110\xE3 l\u01B0u c\u1EA5u h\xECnh Ad Account." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/fb-ads/accounts/:ad_account_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteFbAdAccount(req.params.ad_account_id);
+    await logAction(req.session, req, "delete-fb-ad-account", `X\xF3a c\u1EA5u h\xECnh Ad Account ${req.params.ad_account_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/fb-ads/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { since, until } = req.body || {};
+    const overrides = typeof since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(since) ? { since, until: typeof until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(until) ? until : void 0 } : void 0;
+    const results = await runFacebookAdsSync(overrides);
+    await logAction(
+      req.session,
+      req,
+      "sync-facebook-ads",
+      overrides ? `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} Ad Account (t\u1EEB ${overrides.since})` : `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} Ad Account`
+    );
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isTiktokConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "TIKTOK_CLIENT_KEY / TIKTOK_CLIENT_SECRET / TIKTOK_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
+    });
+  }
+  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
+  const codeVerifier = import_crypto9.default.randomBytes(48).toString("base64url");
+  const codeChallenge = import_crypto9.default.createHash("sha256").update(codeVerifier).digest("base64url");
+  const state = signOAuthState({ brand, username: req.session.username, codeVerifier });
+  const params = new URLSearchParams({
+    client_key: TIKTOK_CLIENT_KEY,
+    scope: TIKTOK_SCOPES.join(","),
+    response_type: "code",
+    redirect_uri: TIKTOK_REDIRECT_URI,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+    // Without this, TikTok silently re-authorizes using whatever scopes were
+    // granted the FIRST time the account approved this app, skipping the
+    // consent screen entirely on later logins — so a scope added afterwards
+    // (e.g. video.list) never reaches the user for approval until they
+    // revoke the app from their TikTok settings. Forcing the screen every
+    // time avoids depending on that manual revoke step.
+    disable_auto_auth: "1"
+  });
+  res.json({ success: true, authorizeUrl: `${TIKTOK_AUTHORIZE_URL}?${params.toString()}` });
+});
+app.get("/api/tiktok/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError, error_description } = req.query;
+  if (oauthError) {
+    return res.status(400).send(`K\u1EBFt n\u1ED1i TikTok b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${error_description || oauthError}`);
+  }
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c TikTok kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i t\u1EEB Control Panel.");
+  }
+  try {
+    const tokens = await exchangeTiktokCode(code, TIKTOK_REDIRECT_URI, payload.codeVerifier);
+    let profile = {};
+    try {
+      profile = await fetchUserInfo(tokens.access_token);
+    } catch (err) {
+      console.error("TikTok oauth/callback: fetchUserInfo l\u1ED7i (kh\xF4ng ch\u1EB7n k\u1EBFt n\u1ED1i):", err.message || err);
+    }
+    await upsertTiktokAccount({
+      open_id: tokens.open_id,
+      username: profile.username || null,
+      display_name: profile.display_name || null,
+      brand: payload.brand,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + tokens.refresh_expires_in * 1e3).toISOString(),
+      is_active: true,
+      last_synced_at: null,
+      last_sync_error: null,
+      token_expired: false,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    await logAction(
+      { username: payload.username, role: "Admin" },
+      req,
+      "connect-tiktok-account",
+      `K\u1EBFt n\u1ED1i t\xE0i kho\u1EA3n TikTok ${profile.username || tokens.open_id}`
+    );
+    res.redirect(302, "/?tiktokConnected=1");
+  } catch (err) {
+    console.error("GET /api/tiktok/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i TikTok th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.get("/api/tiktok/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getTiktokAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        open_id: a.open_id,
+        username: a.username,
+        display_name: a.display_name,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+        // Deadlines only, never the tokens themselves. The access token is
+        // refreshed automatically every sync so its deadline is just
+        // diagnostic; refresh_token_expires_at is the one that actually ends
+        // the connection — TikTok gives no way to extend it server-side, the
+        // account owner has to click through the consent screen again.
+        access_token_expires_at: a.access_token_expires_at ?? null,
+        refresh_token_expires_at: a.refresh_token_expires_at ?? null
+      })),
+      tiktokConfigured: isTiktokConfigured
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/tiktok/accounts/:open_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteTiktokAccount(req.params.open_id);
+    await logAction(req.session, req, "delete-tiktok-account", `X\xF3a t\xE0i kho\u1EA3n TikTok ${req.params.open_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/tiktok/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runTiktokSync();
+    await logAction(req.session, req, "sync-tiktok", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} t\xE0i kho\u1EA3n TikTok`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/tiktok/insights", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getTiktokAccounts();
+    const requestedIds = typeof req.query.accounts === "string" && req.query.accounts.length > 0 ? req.query.accounts.split(",").map((s2) => s2.trim()) : allAccounts.map((a) => a.open_id);
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const [daily, posts] = await Promise.all([
+      getTiktokInsightsDaily(requestedIds, since, until),
+      getTiktokPosts(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`)
+    ]);
+    res.json({
+      success: true,
+      accounts: allAccounts.map((a) => ({ open_id: a.open_id, username: a.username, display_name: a.display_name, brand: a.brand, is_active: a.is_active })),
+      daily,
+      posts
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/youtube/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isYoutubeConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET / YOUTUBE_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
+    });
+  }
+  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
+  const state = signOAuthState({ brand, username: req.session.username });
+  const params = new URLSearchParams({
+    client_id: YOUTUBE_CLIENT_ID,
+    redirect_uri: YOUTUBE_REDIRECT_URI,
+    response_type: "code",
+    scope: YOUTUBE_SCOPES.join(" "),
+    state,
+    access_type: "offline",
+    prompt: "consent"
+  });
+  res.json({ success: true, authorizeUrl: `${YOUTUBE_AUTHORIZE_URL}?${params.toString()}` });
+});
+app.get("/api/youtube/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError) {
+    return res.status(400).send(`K\u1EBFt n\u1ED1i YouTube b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${oauthError}`);
+  }
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c YouTube kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i t\u1EEB Control Panel.");
+  }
+  try {
+    const tokens = await exchangeYoutubeCode(code, YOUTUBE_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google kh\xF4ng tr\u1EA3 v\u1EC1 refresh_token \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i (\u0111\u1EA3m b\u1EA3o m\xE0n h\xECnh xin quy\u1EC1n hi\u1EC7n ra \u0111\u1EA7y \u0111\u1EE7, kh\xF4ng b\u1ECB b\u1ECF qua).");
+    }
+    const channel = await fetchOwnChannel(tokens.access_token);
+    await upsertYoutubeAccount({
+      channel_id: channel.channel_id,
+      channel_title: channel.channel_title,
+      brand: payload.brand,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+      is_active: true,
+      last_synced_at: null,
+      last_sync_error: null,
+      token_expired: false,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    await logAction(
+      { username: payload.username, role: "Admin" },
+      req,
+      "connect-youtube-account",
+      `K\u1EBFt n\u1ED1i k\xEAnh YouTube ${channel.channel_title}`
+    );
+    res.redirect(302, "/?youtubeConnected=1");
+  } catch (err) {
+    console.error("GET /api/youtube/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i YouTube th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.get("/api/youtube/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getYoutubeAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        channel_id: a.channel_id,
+        channel_title: a.channel_title,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired
+      })),
+      youtubeConfigured: isYoutubeConfigured
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/youtube/accounts/:channel_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteYoutubeAccount(req.params.channel_id);
+    await logAction(req.session, req, "delete-youtube-account", `X\xF3a k\xEAnh YouTube ${req.params.channel_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/youtube/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runYoutubeSync();
+    await logAction(req.session, req, "sync-youtube", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} k\xEAnh YouTube`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/youtube/insights", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getYoutubeAccounts();
+    const requestedIds = typeof req.query.accounts === "string" && req.query.accounts.length > 0 ? req.query.accounts.split(",").map((s2) => s2.trim()) : allAccounts.map((a) => a.channel_id);
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const [daily, videos] = await Promise.all([
+      getYoutubeInsightsDaily(requestedIds, since, until),
+      getYoutubeVideos(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`)
+    ]);
+    res.json({
+      success: true,
+      accounts: allAccounts.map((a) => ({ channel_id: a.channel_id, channel_title: a.channel_title, brand: a.brand, is_active: a.is_active })),
+      daily,
+      videos
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 var app_default = app;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  REPORT_CATEGORY_IDS,
   app
 });
 /*! Bundled license information:

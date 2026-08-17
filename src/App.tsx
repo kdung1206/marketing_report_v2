@@ -839,8 +839,11 @@ export default function App() {
   // from a correct one until after it had already been written — same
   // parse → preview → confirm flow the Ads upload (AdsUploadAdmin.tsx) uses.
   const [pendingImport, setPendingImport] = useState<
-    { fileName: string; data: Record<string, any>; summary: ImportSummary } | null
+    { fileName: string; data: Record<string, any>; summary: ImportSummary; kind: "spreadsheet" | "json" } | null
   >(null);
+  // Its own dropzone highlight state, separate from the JSON dropzone's
+  // `dragActive` below — otherwise dragging over one box would light up both.
+  const [dragActiveSpreadsheet, setDragActiveSpreadsheet] = useState(false);
   const [pastedJson, setPastedJson] = useState(JSON.stringify(INITIAL_MARKETING_DATA, null, 2));
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -1996,10 +1999,10 @@ export default function App() {
     try {
       if (isJson) {
         const data = JSON.parse(await file.text());
-        setPendingImport({ fileName: file.name, data, summary: summarizeParsedData(data) });
+        setPendingImport({ fileName: file.name, data, summary: summarizeParsedData(data), kind: "json" });
       } else {
         const { data, summary } = await parseSpreadsheetFile(file);
-        setPendingImport({ fileName: file.name, data, summary });
+        setPendingImport({ fileName: file.name, data, summary, kind: "spreadsheet" });
       }
     } catch (err: any) {
       console.error(err);
@@ -2044,6 +2047,37 @@ export default function App() {
       handleOfflineFileParse(e.target.files[0]);
       // Cleared so picking the same file again after cancelling still fires
       // onChange (the browser suppresses it when the value is unchanged).
+      e.target.value = "";
+    }
+  };
+
+  // Its own dropzone (Control Panel → Nhập liệu → "Đồng bộ từ file
+  // Spreadsheet"), separate from the JSON dropzone above — split out because
+  // sharing one generic "JSON hoặc Excel" box read as a single JSON feature
+  // with spreadsheet support mentioned only in small print underneath, not as
+  // its own capability.
+  const handleDragSpreadsheet = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActiveSpreadsheet(true);
+    } else if (e.type === "dragleave") {
+      setDragActiveSpreadsheet(false);
+    }
+  };
+
+  const handleDropSpreadsheet = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActiveSpreadsheet(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleOfflineFileParse(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleSpreadsheetFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleOfflineFileParse(e.target.files[0]);
       e.target.value = "";
     }
   };
@@ -4571,57 +4605,58 @@ export default function App() {
             {controlPanelSection === "data-entry" && (
               <div className="space-y-6">
 
-                {/* Option 1: Offline JSON File Upload */}
+                {/* Option 1: Spreadsheet sync (Excel/CSV) — its own card,
+                    not folded into the JSON uploader below, precisely so it
+                    reads as its own capability rather than fine print under
+                    a JSON feature. */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                      <Upload className="h-4 w-4" />
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                      <FileSpreadsheet className="h-4 w-4" />
                     </div>
                     <h3 className="font-bold text-slate-900 text-sm">
-                      1. Tải lên tệp dữ liệu ngoại tuyến
+                      1. Đồng bộ dữ liệu từ file Spreadsheet (Excel/CSV)
                     </h3>
                   </div>
 
                   <div
-                    onDragEnter={handleDrag}
-                    onDragOver={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDrop={handleDrop}
+                    onDragEnter={handleDragSpreadsheet}
+                    onDragOver={handleDragSpreadsheet}
+                    onDragLeave={handleDragSpreadsheet}
+                    onDrop={handleDropSpreadsheet}
                     className={`relative rounded-xl border-2 border-dashed p-6 text-center transition ${
-                      dragActive
-                        ? "border-indigo-500 bg-indigo-50/50"
-                        : "border-slate-300 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50"
+                      dragActiveSpreadsheet
+                        ? "border-emerald-500 bg-emerald-50/50"
+                        : "border-slate-300 hover:border-emerald-400 bg-slate-50/50 hover:bg-slate-50"
                     } ${isFileUploading ? "pointer-events-none opacity-60" : ""}`}
                   >
                     <input
-                      id="json_file_uploader"
+                      id="spreadsheet_file_uploader"
                       type="file"
-                      accept=".json,application/json,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
-                      onChange={handleFileChange}
+                      accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                      onChange={handleSpreadsheetFileChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       disabled={isFileUploading}
                     />
                     <div className="flex flex-col items-center justify-center gap-2.5">
                       {isFileUploading ? (
                         <>
-                          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
-                          <p className="text-xs font-semibold text-slate-600">
-                            Đang xử lý và đồng bộ dữ liệu...
-                          </p>
+                          <RefreshCw className="h-8 w-8 animate-spin text-emerald-600" />
+                          <p className="text-xs font-semibold text-slate-600">Đang đọc tệp...</p>
                         </>
                       ) : (
                         <>
-                          <FileJson className="h-8 w-8 text-indigo-500" />
+                          <FileSpreadsheet className="h-8 w-8 text-emerald-500" />
                           <div>
                             <p className="text-xs font-semibold text-slate-700">
-                              Kéo thả tệp JSON hoặc Excel/CSV vào đây
+                              Kéo thả file Excel (.xlsx/.xls) hoặc CSV vào đây
                             </p>
                             <p className="text-[11px] text-slate-400 mt-0.5">
                               hoặc nhấp chuột để chọn tệp từ máy tính của bạn
                             </p>
                           </div>
-                          <span className="inline-block rounded bg-indigo-100/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 uppercase tracking-wider">
-                            Hỗ trợ sáp nhập tự động
+                          <span className="inline-block rounded bg-emerald-100/80 px-2 py-0.5 text-[9px] font-bold text-emerald-700 uppercase tracking-wider">
+                            Số liệu tuần + nhận định tuần
                           </span>
                         </>
                       )}
@@ -4630,8 +4665,8 @@ export default function App() {
 
                   {/* Parsed-file preview — nothing has touched the database
                       yet at this point; "Xác nhận & Đồng bộ" is what merges. */}
-                  {pendingImport && (
-                    <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                  {pendingImport && pendingImport.kind === "spreadsheet" && (
+                    <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold text-slate-900">Đã đọc xong tệp — kiểm tra trước khi đồng bộ</p>
@@ -4701,7 +4736,7 @@ export default function App() {
                           isFileUploading ||
                           (pendingImport.summary.collections.length === 0 && pendingImport.summary.commentEntries === 0)
                         }
-                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         {isFileUploading ? "Đang đồng bộ..." : "Xác nhận & Đồng bộ vào cơ sở dữ liệu"}
@@ -4711,11 +4746,149 @@ export default function App() {
 
                   {/* Guide info */}
                   <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1.5">
+                    <span className="font-semibold text-slate-800 block">💡 Thông tin đồng bộ từ Spreadsheet:</span>
+                    <ul className="list-disc pl-4 space-y-1 leading-relaxed">
+                      <li>Hỗ trợ <strong>.xlsx / .xls / .csv</strong>.</li>
+                      <li>Mỗi sheet là một nhóm dữ liệu, tên sheet phải là một trong: <code>digital_marketing</code>, <code>kol_koc</code>, <code>btl_trade</code>, <code>monthly_ooh_pr</code>, <code>btl_trade_monthly</code> (không phân biệt hoa/thường, dấu cách/gạch dưới). Dòng đầu tiên là tên cột đúng theo tên trường dữ liệu (ví dụ: <code>week</code>, <code>brand</code>, <code>hạng_mục</code>...) — có thể lấy mẫu từ nút "Xuất Database Đầy Đủ (.xlsx)" bên dưới rồi chỉnh sửa lại.</li>
+                      <li><strong>Nhận định tuần</strong> nhập được luôn bằng sheet <code>comments</code> (4 cột <code>week</code>, <code>brand</code>, <code>field</code>, <code>value</code>; <code>field</code> nhận <code>evaluation</code>, <code>proposals</code>, hoặc <code>category_&lt;tên hạng mục&gt;</code>) — đúng như tệp "Xuất Database Đầy Đủ (.xlsx)" đang xuất ra, nên chỉ cần tải file đó về, sửa ô cần sửa rồi tải lên lại. Ô nào không có trong tệp thì giữ nguyên giá trị cũ, không bị xóa.</li>
+                      <li>Chọn tệp xong hệ thống chỉ <strong>đọc và hiển thị trước</strong> những gì tìm thấy — dữ liệu chỉ được ghi vào CSDL khi bạn bấm "Xác nhận &amp; Đồng bộ".</li>
+                      <li>Hệ thống sẽ tự động đối chiếu, <strong>sáp nhập (merge) thông minh</strong> các bản ghi trùng lặp và bổ sung các dòng dữ liệu mới vào CSDL nội bộ.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Option 2: Offline JSON File Upload */}
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                      <Upload className="h-4 w-4" />
+                    </div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      2. Tải lên tệp dữ liệu JSON
+                    </h3>
+                  </div>
+
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragOver={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDrop={handleDrop}
+                    className={`relative rounded-xl border-2 border-dashed p-6 text-center transition ${
+                      dragActive
+                        ? "border-indigo-500 bg-indigo-50/50"
+                        : "border-slate-300 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50"
+                    } ${isFileUploading ? "pointer-events-none opacity-60" : ""}`}
+                  >
+                    <input
+                      id="json_file_uploader"
+                      type="file"
+                      accept=".json,application/json"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isFileUploading}
+                    />
+                    <div className="flex flex-col items-center justify-center gap-2.5">
+                      {isFileUploading ? (
+                        <>
+                          <RefreshCw className="h-8 w-8 animate-spin text-indigo-600" />
+                          <p className="text-xs font-semibold text-slate-600">Đang đọc tệp...</p>
+                        </>
+                      ) : (
+                        <>
+                          <FileJson className="h-8 w-8 text-indigo-500" />
+                          <div>
+                            <p className="text-xs font-semibold text-slate-700">
+                              Kéo thả tệp JSON vào đây
+                            </p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              hoặc nhấp chuột để chọn tệp từ máy tính của bạn
+                            </p>
+                          </div>
+                          <span className="inline-block rounded bg-indigo-100/80 px-2 py-0.5 text-[9px] font-bold text-indigo-700 uppercase tracking-wider">
+                            Toàn bộ CSDL (digital_marketing, kol_koc, comments...)
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {pendingImport && pendingImport.kind === "json" && (
+                    <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Đã đọc xong tệp — kiểm tra trước khi đồng bộ</p>
+                          <p className="font-mono text-[11px] text-slate-500">{pendingImport.fileName}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPendingImport(null)}
+                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+
+                      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <table className="w-full text-[11px]">
+                          <thead className="bg-slate-50 text-slate-500">
+                            <tr>
+                              <th className="px-3 py-1.5 text-left">Nhóm dữ liệu</th>
+                              <th className="px-3 py-1.5 text-right">Số dòng</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {pendingImport.summary.collections.length === 0 && pendingImport.summary.commentEntries === 0 ? (
+                              <tr>
+                                <td colSpan={2} className="px-3 py-3 text-center text-amber-600">
+                                  Tệp không chứa dữ liệu nào hệ thống đọc được.
+                                </td>
+                              </tr>
+                            ) : (
+                              <>
+                                {pendingImport.summary.collections.map((c) => (
+                                  <tr key={c.key}>
+                                    <td className="px-3 py-1.5 font-mono text-slate-700">{c.key}</td>
+                                    <td className="px-3 py-1.5 text-right font-semibold text-slate-700">{c.rows}</td>
+                                  </tr>
+                                ))}
+                                {pendingImport.summary.commentEntries > 0 && (
+                                  <tr>
+                                    <td className="px-3 py-1.5 font-mono text-slate-700">
+                                      comments (nhận định tuần)
+                                      <span className="ml-1 font-sans text-slate-400">
+                                        — tuần: {pendingImport.summary.commentWeeks.join(", ")}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right font-semibold text-slate-700">
+                                      {pendingImport.summary.commentEntries}
+                                    </td>
+                                  </tr>
+                                )}
+                              </>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmPendingImport}
+                        disabled={
+                          isFileUploading ||
+                          (pendingImport.summary.collections.length === 0 && pendingImport.summary.commentEntries === 0)
+                        }
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {isFileUploading ? "Đang đồng bộ..." : "Xác nhận & Đồng bộ vào cơ sở dữ liệu"}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1.5">
                     <span className="font-semibold text-slate-800 block">💡 Thông tin đồng bộ ngoại tuyến:</span>
                     <ul className="list-disc pl-4 space-y-1 leading-relaxed">
-                      <li>Hỗ trợ tệp <strong>.json</strong> hoặc bảng tính <strong>.xlsx / .xls / .csv</strong>.</li>
-                      <li>Với Excel: mỗi sheet là một nhóm dữ liệu, tên sheet phải là một trong: <code>digital_marketing</code>, <code>kol_koc</code>, <code>btl_trade</code>, <code>monthly_ooh_pr</code>, <code>btl_trade_monthly</code> (không phân biệt hoa/thường, dấu cách/gạch dưới). Dòng đầu tiên là tên cột đúng theo tên trường dữ liệu (ví dụ: <code>week</code>, <code>brand</code>, <code>hạng_mục</code>...) — có thể lấy mẫu từ nút "Xuất Database Đầy Đủ (.xlsx)" bên dưới rồi chỉnh sửa lại.</li>
-                      <li><strong>Nhận định tuần</strong> nhập được luôn bằng sheet <code>comments</code> (4 cột <code>week</code>, <code>brand</code>, <code>field</code>, <code>value</code>; <code>field</code> nhận <code>evaluation</code>, <code>proposals</code>, hoặc <code>category_&lt;tên hạng mục&gt;</code>) — đúng như tệp "Xuất Database Đầy Đủ (.xlsx)" đang xuất ra, nên chỉ cần tải file đó về, sửa ô cần sửa rồi tải lên lại. Ô nào không có trong tệp thì giữ nguyên giá trị cũ, không bị xóa.</li>
+                      <li>Tệp JSON có cấu trúc giống hệt bản xuất từ "Xuất Toàn Bộ CSDL (.json)" — dùng để sao lưu/khôi phục hoặc chuyển dữ liệu giữa các môi trường.</li>
                       <li>Chọn tệp xong hệ thống chỉ <strong>đọc và hiển thị trước</strong> những gì tìm thấy — dữ liệu chỉ được ghi vào CSDL khi bạn bấm "Xác nhận &amp; Đồng bộ".</li>
                       <li>Hệ thống sẽ tự động đối chiếu, <strong>sáp nhập (merge) thông minh</strong> các bản ghi trùng lặp và bổ sung các dòng dữ liệu mới vào CSDL nội bộ.</li>
                       <li>Quy trình này hoàn toàn an toàn và không phụ thuộc vào kết nối mạng bên ngoài.</li>
@@ -4723,7 +4896,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Option 2: Paste Raw JSON */}
+                {/* Option 3: Paste Raw JSON */}
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -4731,7 +4904,7 @@ export default function App() {
                         <FileJson className="h-4 w-4" />
                       </div>
                       <h3 className="font-bold text-slate-900 text-sm">
-                        2. Soạn thảo hoặc Paste JSON thủ công
+                        3. Soạn thảo hoặc Paste JSON thủ công
                       </h3>
                     </div>
                   </div>
