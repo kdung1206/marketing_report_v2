@@ -10,6 +10,53 @@ interface FbPageRow {
   last_synced_at: string | null;
   last_sync_error: string | null;
   token_expired: boolean;
+  token_expires_at: string | null;
+  token_data_access_expires_at: string | null;
+  token_checked_at: string | null;
+}
+
+// Warn this far ahead of a token dying. Facebook gives no grace period once a
+// deadline passes — the sync just starts failing — so this needs to be long
+// enough for an Admin to notice and re-issue the token without the report
+// going stale in between.
+const WARN_WITHIN_DAYS = 7;
+
+// A Page connection dies at whichever of the two deadlines lands first: the
+// token's own expiry, or Meta's ~90-day cutoff of the app's access to the
+// granting user's data (see facebookStore.ts's FbPageConfig). null means no
+// deadline of that kind — a Page token from a long-lived User Token normally
+// has none at all, which is the "không có hạn" case below.
+function tokenDeadline(p: FbPageRow): { date: Date; days: number } | null {
+  const times = [p.token_expires_at, p.token_data_access_expires_at]
+    .filter((v): v is string => !!v)
+    .map((v) => new Date(v).getTime())
+    .filter((t) => !Number.isNaN(t));
+  if (times.length === 0) return null;
+  const date = new Date(Math.min(...times));
+  return { date, days: Math.ceil((date.getTime() - Date.now()) / 86400000) };
+}
+
+function TokenExpiryNote({ page }: { page: FbPageRow }) {
+  if (!page.token_checked_at) {
+    return <div className="mt-0.5 text-slate-400">Hạn token: chưa kiểm tra được</div>;
+  }
+  const deadline = tokenDeadline(page);
+  if (!deadline) {
+    return <div className="mt-0.5 text-slate-400">Token không có hạn — Facebook không đặt ngày hết hạn</div>;
+  }
+  const dateText = deadline.date.toLocaleDateString("vi-VN");
+  if (deadline.days <= WARN_WITHIN_DAYS) {
+    return (
+      <div className="mt-0.5 font-semibold text-amber-600">
+        🟠 Token sắp hết hạn: còn {Math.max(deadline.days, 0)} ngày ({dateText}) — cần cấp token mới
+      </div>
+    );
+  }
+  return (
+    <div className="mt-0.5 text-slate-400">
+      Hạn token: {dateText} (còn {deadline.days} ngày)
+    </div>
+  );
 }
 
 interface SyncResult {
@@ -108,6 +155,15 @@ export default function FacebookPagesAdmin() {
     }
   }
 
+  // Surfaced as a banner as well as per-row: the point of the warning is that
+  // someone acts on it before the token dies, and the status column is easy to
+  // scroll past.
+  const expiringSoon = pages.filter((p) => {
+    if (p.token_expired || !p.token_checked_at) return false;
+    const deadline = tokenDeadline(p);
+    return deadline !== null && deadline.days <= WARN_WITHIN_DAYS;
+  });
+
   return (
     <div className="w-full animate-fade-in space-y-4 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -150,6 +206,22 @@ export default function FacebookPagesAdmin() {
           </li>
         </ol>
       </div>
+
+      {expiringSoon.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div>
+            <strong>Token sắp hết hạn</strong> — cấp Page Access Token mới theo hướng dẫn phía trên rồi lưu lại, trước
+            khi dữ liệu ngừng cập nhật:{" "}
+            {expiringSoon
+              .map((p) => {
+                const deadline = tokenDeadline(p);
+                return `${p.page_name} (còn ${Math.max(deadline?.days ?? 0, 0)} ngày)`;
+              })
+              .join(", ")}
+          </div>
+        </div>
+      )}
 
       {message && (
         <div
@@ -273,6 +345,7 @@ export default function FacebookPagesAdmin() {
                     ) : (
                       <span className="text-emerald-600">OK — đang kết nối</span>
                     )}
+                    {!p.token_expired && <TokenExpiryNote page={p} />}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button

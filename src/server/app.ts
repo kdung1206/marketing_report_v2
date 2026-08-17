@@ -10,8 +10,8 @@ import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny
 import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
 import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
-import { getFbPages, upsertFbPage, deleteFbPage, getFbInsightsDaily, getFbPosts } from "./facebookStore";
-import { runFacebookSync } from "./facebookSync";
+import { getFbPages, upsertFbPage, deleteFbPage, setFbPageSyncStatus, getFbInsightsDaily, getFbPosts } from "./facebookStore";
+import { runFacebookSync, fetchTokenExpiry } from "./facebookSync";
 import {
   getAdsPerformance,
   upsertAdsPerformance,
@@ -1057,6 +1057,12 @@ app.get("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
         last_synced_at: p.last_synced_at,
         last_sync_error: p.last_sync_error,
         token_expired: p.token_expired,
+        // Deadlines only — still never the token itself. Lets the Admin table
+        // warn before a token dies instead of only after (facebookStore.ts's
+        // FbPageConfig explains the two deadlines).
+        token_expires_at: p.token_expires_at ?? null,
+        token_data_access_expires_at: p.token_data_access_expires_at ?? null,
+        token_checked_at: p.token_checked_at ?? null,
       })),
     });
   } catch (err: any) {
@@ -1072,13 +1078,27 @@ app.post("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
       return res.status(400).json({ success: false, error: "Thiếu page_id, page_name hoặc access_token." });
     }
 
+    const token = String(access_token).trim();
     await upsertFbPage({
       page_id: String(page_id).trim(),
       page_name: String(page_name).trim(),
       brand: brand ? String(brand).trim() : null,
-      access_token_encrypted: encrypt(String(access_token).trim()),
+      access_token_encrypted: encrypt(token),
       is_active: is_active !== undefined ? Boolean(is_active) : undefined,
     });
+
+    // Probe the new token's deadlines right away so the Admin table shows them
+    // immediately instead of only after the next sync. Best effort: a token
+    // that can't be inspected still saves fine (it just reads as "chưa kiểm
+    // tra được" until a later probe succeeds).
+    const expiry = await fetchTokenExpiry(token);
+    if (expiry) {
+      await setFbPageSyncStatus(String(page_id).trim(), {
+        token_expires_at: expiry.expires_at,
+        token_data_access_expires_at: expiry.data_access_expires_at,
+        token_checked_at: new Date().toISOString(),
+      }).catch(() => {});
+    }
 
     await logAction((req as any).session, req, "save-fb-page", `Cập nhật cấu hình Facebook Page ${page_id}`);
     res.json({ success: true, message: "Đã lưu cấu hình Facebook Page." });

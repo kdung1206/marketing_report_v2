@@ -31,6 +31,17 @@ export interface FbPageConfig {
   // keeps retrying with the same stored token on every run until Facebook
   // itself says otherwise; only this flag means "Admin action needed".
   token_expired: boolean;
+  // Filled in from the Graph API's debug_token endpoint on every sync (and
+  // right after an Admin saves a token) — see fetchTokenExpiry() in
+  // facebookSync.ts. token_expired above is the *after the fact* signal
+  // (Facebook already rejected us); these three are what let the UI warn
+  // *before* that happens. null in either deadline means "no such deadline"
+  // (a Page token derived from a long-lived User Token normally never
+  // expires); token_checked_at null means the probe hasn't succeeded yet, so
+  // the deadlines are unknown rather than absent.
+  token_expires_at: string | null;
+  token_data_access_expires_at: string | null;
+  token_checked_at: string | null;
   created_at: string;
 }
 
@@ -127,8 +138,13 @@ export async function upsertFbPage(input: {
       last_sync_error: existing?.last_sync_error || null,
       // A fresh save always clears this — Admin just pasted a (presumably
       // valid) token, so give it the benefit of the doubt until the next
-      // sync says otherwise.
+      // sync says otherwise. The stored expiry deadlines belong to the token
+      // being replaced, so they're cleared for the same reason and refilled
+      // by the next debug_token probe.
       token_expired: false,
+      token_expires_at: null,
+      token_data_access_expires_at: null,
+      token_checked_at: null,
       created_at: existing?.created_at || new Date().toISOString(),
     };
     const rest = fb_pages.filter((p) => p.page_id !== input.page_id);
@@ -144,6 +160,9 @@ export async function upsertFbPage(input: {
       access_token_encrypted: input.access_token_encrypted,
       is_active: input.is_active !== undefined ? input.is_active : true,
       token_expired: false,
+      token_expires_at: null,
+      token_data_access_expires_at: null,
+      token_checked_at: null,
     },
     { onConflict: "page_id" }
   );
@@ -168,7 +187,14 @@ export async function deleteFbPage(pageId: string): Promise<void> {
 
 export async function setFbPageSyncStatus(
   pageId: string,
-  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean }
+  status: {
+    last_synced_at?: string | null;
+    last_sync_error?: string | null;
+    token_expired?: boolean;
+    token_expires_at?: string | null;
+    token_data_access_expires_at?: string | null;
+    token_checked_at?: string | null;
+  }
 ): Promise<void> {
   if (!isSupabaseConfigured) {
     const { store, fb_pages } = await readLocalCollections();

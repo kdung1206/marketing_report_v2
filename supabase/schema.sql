@@ -162,8 +162,22 @@ create table if not exists fb_pages (
   -- cron simply not having run yet) never sets this; the page stays
   -- connected and sync keeps retrying with the same token indefinitely.
   token_expired boolean not null default false,
+  -- Refreshed from the Graph API's debug_token on every sync (facebookSync.ts's
+  -- fetchTokenExpiry) so the Control Panel can warn *before* a token dies,
+  -- rather than only after token_expired above flips. Either deadline being
+  -- null means "no deadline of that kind" (a Page token derived from a
+  -- long-lived User Token normally has neither); token_checked_at null means
+  -- the probe hasn't succeeded yet, i.e. the deadlines are simply unknown.
+  token_expires_at timestamptz,
+  token_data_access_expires_at timestamptz,
+  token_checked_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+-- Existing projects created before the token-expiry warning shipped.
+alter table fb_pages add column if not exists token_expires_at timestamptz;
+alter table fb_pages add column if not exists token_data_access_expires_at timestamptz;
+alter table fb_pages add column if not exists token_checked_at timestamptz;
 
 alter table fb_pages enable row level security;
 

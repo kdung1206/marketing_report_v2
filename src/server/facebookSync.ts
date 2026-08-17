@@ -286,6 +286,54 @@ async function fetchRecentPosts(
   });
 }
 
+// Facebook never volunteers a token's remaining lifetime — it just starts
+// answering with code 190 once the token is already dead, which is why an
+// expired connection could only ever be noticed after the report had already
+// gone stale. debug_token reports both deadlines that can kill a Page token:
+//
+//   expires_at             the token's own lifetime. 0/absent = never expires,
+//                          which is what a Page token derived from a
+//                          long-lived User Token normally gets.
+//   data_access_expires_at Meta cuts the app off from the granting user's data
+//                          ~90 days after they last used the app — this one
+//                          bites even when the token itself never expires.
+//
+// The endpoint's `access_token` param officially wants an App token; we use
+// one when FB_APP_ID/FB_APP_SECRET are set (both optional — see .env.example)
+// and otherwise inspect the token with itself, which works for Page tokens and
+// keeps this zero-config. Best effort throughout: this is a nice-to-have
+// warning, so a failure here must never fail a sync that is otherwise pulling
+// data fine.
+export interface TokenExpiryInfo {
+  expires_at: string | null;
+  data_access_expires_at: string | null;
+}
+
+function expiryToIso(seconds: unknown): string | null {
+  const n = Number(seconds);
+  // 0 (and a missing field) is Facebook's "no such deadline", not "expired in
+  // 1970" — both must read as null, never as a date in the past.
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return new Date(n * 1000).toISOString();
+}
+
+export async function fetchTokenExpiry(accessToken: string): Promise<TokenExpiryInfo | null> {
+  const appId = process.env.FB_APP_ID;
+  const appSecret = process.env.FB_APP_SECRET;
+  const inspectorToken = appId && appSecret ? `${appId}|${appSecret}` : accessToken;
+  try {
+    const body = await graphGet(`/debug_token?input_token=${encodeURIComponent(accessToken)}`, inspectorToken);
+    if (!body?.data) return null;
+    return {
+      expires_at: expiryToIso(body.data.expires_at),
+      data_access_expires_at: expiryToIso(body.data.data_access_expires_at),
+    };
+  } catch (err: any) {
+    console.error("Facebook debug_token lỗi:", err.message || err);
+    return null;
+  }
+}
+
 // Every run re-pulls a rolling INSIGHTS_BACKFILL_DAYS window and upserts whole
 // rows, so any field Facebook didn't return this run comes back null and
 // overwrites what an earlier run had already stored. That silently destroyed
@@ -353,7 +401,13 @@ export async function runFacebookSync(): Promise<FacebookSyncResult[]> {
         const accessToken = decrypt(page.access_token_encrypted);
         if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
 
-        const dailyRows = await fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus);
+        // The token probe is independent of the data pull — fired alongside it
+        // rather than before, so refreshing the expiry costs no extra wall
+        // clock against Vercel's function timeout.
+        const [expiry, dailyRows] = await Promise.all([
+          fetchTokenExpiry(accessToken),
+          fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus),
+        ]);
         if (dailyRows.length > 0) {
           await upsertFbInsightsDaily(await preserveStoredValues(page.page_id, dailyRows, since, until));
         }
@@ -365,6 +419,16 @@ export async function runFacebookSync(): Promise<FacebookSyncResult[]> {
           last_synced_at: new Date().toISOString(),
           last_sync_error: null,
           token_expired: tokenStatus.invalid,
+          // Only written when the probe actually answered — a failed probe
+          // must leave the last known deadlines in place rather than blanking
+          // them back to "unknown".
+          ...(expiry
+            ? {
+                token_expires_at: expiry.expires_at,
+                token_data_access_expires_at: expiry.data_access_expires_at,
+                token_checked_at: new Date().toISOString(),
+              }
+            : {}),
         });
         return { page_id: page.page_id, page_name: page.page_name, ok: true };
       } catch (err: any) {
