@@ -2,6 +2,7 @@
  * Utility functions for exporting the marketing database.
  */
 import * as XLSX from "xlsx";
+import { commentRowsToTree, CommentsTree } from "./comments";
 
 // Sheet names a spreadsheet upload is matched against (case/space/underscore
 // insensitive) — see parseSpreadsheetFile below. Kept as the internal field
@@ -17,8 +18,55 @@ const SPREADSHEET_COLLECTION_ALIASES: Record<string, string[]> = {
   btl_trade_monthly: ["btl_trade_monthly", "btl trade monthly"],
 };
 
+// The weekly commentary sheet (see buildFullDatabaseWorkbook) — flat
+// week/brand/field/value rows rather than one row per record, so it's read
+// separately from the collections above and rebuilt into the nested shape the
+// report stores (src/lib/comments.ts).
+const COMMENTS_SHEET_ALIASES = ["comments", "nhận định", "nhan dinh"];
+
+// Sheets the full-database export writes that are deliberately NOT imported
+// back: `users` carries account rows whose real source of truth is the user
+// manager (and whose password hashes the export omits) — silently upserting
+// accounts from a spreadsheet is not something an offline data upload should
+// ever do.
+const IGNORED_KNOWN_SHEETS = ["users"];
+
 function normalizeSheetName(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// What a parsed file turned out to contain, so the Control Panel can show it
+// for confirmation before anything is merged into the database — an upload
+// that quietly did nothing (wrong sheet names) and one that rewrote hundreds
+// of rows used to look identical from the outside.
+export interface ImportSummary {
+  collections: { key: string; rows: number; sheet?: string }[];
+  commentWeeks: string[];
+  commentEntries: number;
+  ignoredSheets: string[];
+}
+
+export interface ParsedImport {
+  // Shaped exactly like the offline JSON upload — handed straight to
+  // POST /api/sync-data.
+  data: Record<string, any>;
+  summary: ImportSummary;
+}
+
+// Summarizes an already-parsed object (the .json upload path, which has no
+// sheets to report on) using the same shape as the spreadsheet path so the
+// preview UI only has one thing to render.
+export function summarizeParsedData(data: any): ImportSummary {
+  const collections: { key: string; rows: number }[] = [];
+  Object.keys(SPREADSHEET_COLLECTION_ALIASES).forEach((key) => {
+    if (Array.isArray(data?.[key])) collections.push({ key, rows: data[key].length });
+  });
+
+  const comments: CommentsTree = data?.comments || {};
+  const commentWeeks = Object.keys(comments);
+  const commentEntries = commentWeeks.reduce((sum, week) => sum + Object.keys(comments[week] || {}).length, 0);
+
+  return { collections, commentWeeks, commentEntries, ignoredSheets: [] };
 }
 
 // Reads an uploaded .xlsx/.xls/.csv file and returns a plain object shaped
@@ -27,7 +75,7 @@ function normalizeSheetName(name: string): string {
 // exact same merge/sync codepath (POST /api/sync-data) without a separate
 // import pipeline. Sheets are matched by name (see aliases above); any sheet
 // that doesn't match a known collection is ignored rather than guessed at.
-export async function parseSpreadsheetFile(file: File): Promise<any> {
+export async function parseSpreadsheetFile(file: File): Promise<ParsedImport> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
 
@@ -36,25 +84,53 @@ export async function parseSpreadsheetFile(file: File): Promise<any> {
     sheetByNormalizedName.set(normalizeSheetName(name), name);
   });
 
-  const result: Record<string, any[]> = {};
+  const data: Record<string, any> = {};
+  const collections: { key: string; rows: number; sheet: string }[] = [];
+  const usedSheetNames = new Set<string>();
+
   Object.entries(SPREADSHEET_COLLECTION_ALIASES).forEach(([key, aliases]) => {
     const matchedSheetName = aliases
       .map((alias) => sheetByNormalizedName.get(normalizeSheetName(alias)))
       .find((n): n is string => Boolean(n));
     if (matchedSheetName) {
       const sheet = workbook.Sheets[matchedSheetName];
-      result[key] = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true });
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true }) as any[];
+      data[key] = rows;
+      collections.push({ key, rows: rows.length, sheet: matchedSheetName });
+      usedSheetNames.add(matchedSheetName);
     }
   });
 
-  if (Object.keys(result).length === 0) {
+  // Weekly commentary — the same sheet the full-database export writes, read
+  // back into the nested shape the report stores, so an exported workbook is
+  // a true editable template for the weekly write-up too and not just for the
+  // numbers.
+  const commentsSheetName = COMMENTS_SHEET_ALIASES.map((alias) => sheetByNormalizedName.get(normalizeSheetName(alias))).find(
+    (n): n is string => Boolean(n)
+  );
+  let commentWeeks: string[] = [];
+  let commentEntries = 0;
+  if (commentsSheetName) {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[commentsSheetName], { defval: null, raw: false }) as any[];
+    const tree = commentRowsToTree(rows);
+    commentWeeks = Object.keys(tree);
+    commentEntries = commentWeeks.reduce((sum, week) => sum + Object.keys(tree[week] || {}).length, 0);
+    if (commentWeeks.length > 0) data.comments = tree;
+    usedSheetNames.add(commentsSheetName);
+  }
+
+  const ignoredSheets = workbook.SheetNames.filter(
+    (name) => !usedSheetNames.has(name) && !IGNORED_KNOWN_SHEETS.includes(normalizeSheetName(name))
+  );
+
+  if (Object.keys(data).length === 0) {
     throw new Error(
-      `Không tìm thấy sheet nào khớp với các mảng dữ liệu đã biết (digital_marketing, kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly). ` +
+      `Không tìm thấy sheet nào khớp với các mảng dữ liệu đã biết (digital_marketing, kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly, comments). ` +
       `Các sheet có trong tệp: ${workbook.SheetNames.join(", ") || "(không có)"}`
     );
   }
 
-  return result;
+  return { data, summary: { collections, commentWeeks, commentEntries, ignoredSheets } };
 }
 
 function escapeXML(str: any): string {

@@ -11,6 +11,47 @@ interface TiktokAccountRow {
   last_synced_at: string | null;
   last_sync_error: string | null;
   token_expired: boolean;
+  access_token_expires_at: string | null;
+  refresh_token_expires_at: string | null;
+}
+
+// Warn this far ahead of the refresh token dying. Longer than the Facebook
+// equivalent (7 days) on purpose: re-issuing a Facebook Page token is an
+// Admin-only desk job, whereas reviving a TikTok connection needs the brand's
+// own TikTok account owner to sit down and click through the consent screen —
+// which has to be scheduled with someone outside this tool.
+const WARN_WITHIN_DAYS = 30;
+
+function daysUntil(iso: string | null): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / 86400000);
+}
+
+// TikTok hands out two tokens with very different lifetimes: the access token
+// (24h) is refreshed automatically on every sync, so it's never something to
+// act on; the refresh token (365 days, and its deadline does NOT roll forward
+// when refreshed — confirmed against production data) is the one that ends the
+// connection for good. Only the latter is worth a warning.
+function TiktokTokenExpiryNote({ account }: { account: TiktokAccountRow }) {
+  const days = daysUntil(account.refresh_token_expires_at);
+  if (days === null) {
+    return <div className="mt-0.5 text-slate-400">Hạn đăng nhập: chưa xác định</div>;
+  }
+  const dateText = new Date(account.refresh_token_expires_at as string).toLocaleDateString("vi-VN");
+  if (days <= WARN_WITHIN_DAYS) {
+    return (
+      <div className="mt-0.5 font-semibold text-amber-600">
+        🟠 Sắp phải đăng nhập lại: còn {Math.max(days, 0)} ngày ({dateText})
+      </div>
+    );
+  }
+  return (
+    <div className="mt-0.5 text-slate-400">
+      Hạn đăng nhập lại: {dateText} (còn {days} ngày)
+    </div>
+  );
 }
 
 interface SyncResult {
@@ -115,6 +156,14 @@ export default function TiktokAccountsAdmin() {
     }
   }
 
+  // Same reasoning as the Facebook admin's banner: the status column is easy
+  // to scroll past, and this warning is only useful if someone acts on it.
+  const expiringSoon = accounts.filter((a) => {
+    if (a.token_expired) return false;
+    const days = daysUntil(a.refresh_token_expires_at);
+    return days !== null && days <= WARN_WITHIN_DAYS;
+  });
+
   return (
     <div className="w-full animate-fade-in space-y-4 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -138,6 +187,19 @@ export default function TiktokAccountsAdmin() {
             <code className="rounded bg-amber-100 px-1">TIKTOK_CLIENT_SECRET</code>,{" "}
             <code className="rounded bg-amber-100 px-1">TIKTOK_REDIRECT_URI</code> (xem README) trước khi nút "Kết nối TikTok" hoạt động được.
           </p>
+        </div>
+      )}
+
+      {expiringSoon.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div>
+            <strong>Sắp phải đăng nhập lại TikTok</strong> — nhờ chủ tài khoản bấm "Kết nối TikTok" và duyệt lại quyền
+            trước hạn, nếu không dữ liệu sẽ ngừng cập nhật:{" "}
+            {expiringSoon
+              .map((a) => `${a.display_name || a.username || a.open_id} (còn ${Math.max(daysUntil(a.refresh_token_expires_at) ?? 0, 0)} ngày)`)
+              .join(", ")}
+          </div>
         </div>
       )}
 
@@ -229,6 +291,7 @@ export default function TiktokAccountsAdmin() {
                     ) : (
                       <span className="text-emerald-600">OK — đang kết nối</span>
                     )}
+                    {!a.token_expired && <TiktokTokenExpiryNote account={a} />}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button

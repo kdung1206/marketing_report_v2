@@ -7,6 +7,7 @@ import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 import { DEFAULT_USERS, reconcileUsers, UserAccount } from "../lib/defaultUsers";
 import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny } from "../lib/serverPasswordHash";
+import { mergeCommentTrees } from "../lib/comments";
 import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
 import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
@@ -935,20 +936,13 @@ app.post("/api/sync-data", requireAuth("Editor"), async (req, res) => {
       return `${month}|${year}|${brand}|${hml}|${cthm}|${pl}|${ts}|${dvt}`;
     };
 
-    // Merge comments if present in newData
-    const mergedComments = { ...(currentFullDb.comments || {}) };
-    if (newData && newData.comments) {
-      Object.keys(newData.comments).forEach((weekKey) => {
-        if (!mergedComments[weekKey]) {
-          mergedComments[weekKey] = newData.comments[weekKey];
-        } else {
-          mergedComments[weekKey] = {
-            ...mergedComments[weekKey],
-            ...newData.comments[weekKey],
-          };
-        }
-      });
-    }
+    // Merge comments if present in newData. Deep-merged down to the
+    // per-category note (see mergeCommentTrees): an upload carrying only one
+    // brand's evaluation for one week — which is exactly what editing a few
+    // cells of the exported "comments" sheet produces — used to replace that
+    // brand's whole block, silently dropping its proposals and per-category
+    // notes.
+    const mergedComments = mergeCommentTrees(currentFullDb.comments, newData?.comments);
 
     const mergedData = {
       ...currentFullDb,
@@ -1497,6 +1491,13 @@ app.get("/api/tiktok/accounts", requireAuth("Admin"), async (req, res) => {
         last_synced_at: a.last_synced_at,
         last_sync_error: a.last_sync_error,
         token_expired: a.token_expired,
+        // Deadlines only, never the tokens themselves. The access token is
+        // refreshed automatically every sync so its deadline is just
+        // diagnostic; refresh_token_expires_at is the one that actually ends
+        // the connection — TikTok gives no way to extend it server-side, the
+        // account owner has to click through the consent screen again.
+        access_token_expires_at: a.access_token_expires_at ?? null,
+        refresh_token_expires_at: a.refresh_token_expires_at ?? null,
       })),
       tiktokConfigured: isTiktokConfigured,
     });

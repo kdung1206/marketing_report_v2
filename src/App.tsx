@@ -8,7 +8,15 @@ import {
   CategoryComments,
   normalizeMarketingData,
 } from "./data";
-import { exportToExcel, exportToJSON, parseSpreadsheetFile, exportFullDatabaseToExcel } from "./lib/export";
+import {
+  exportToExcel,
+  exportToJSON,
+  parseSpreadsheetFile,
+  exportFullDatabaseToExcel,
+  summarizeParsedData,
+  ImportSummary,
+} from "./lib/export";
+import { mergeCommentTrees } from "./lib/comments";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
 import SocialReport from "./components/SocialReport";
 import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
@@ -94,6 +102,20 @@ function AppLogoMark() {
 
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
+
+// The Control Panel's own address. Every other view stays on "/" — the report
+// tabs are a view switch within one report, not separate pages. Both hosting
+// setups already serve index.html for an unknown path, so deep-linking here
+// works without extra routing config: vercel.json rewrites "/(.*)" to
+// "/index.html" in production, and the dev server runs Vite in appType "spa"
+// (see server.ts).
+const ADMIN_PATH = "/admin";
+
+// Tolerates a trailing slash and odd casing so "/Admin/" doesn't silently
+// render the report dashboard at an admin-looking URL.
+function isAdminPath(pathname: string): boolean {
+  return pathname.replace(/\/+$/, "").toLowerCase() === ADMIN_PATH;
+}
 
 // Session token issued by POST /api/login (see src/server/auth.ts). Kept as a
 // module-level variable (mirrored to localStorage) rather than React state so
@@ -473,7 +495,49 @@ export default function App() {
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
 
   // Navigation & Brand States
-  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads">(() =>
+    isAdminPath(window.location.pathname) ? "control-panel" : "dashboard"
+  );
+
+  // Keep the URL and the Control Panel view in step, in both directions.
+  //
+  // Everything used to live at "/", so refreshing (or bookmarking, or opening
+  // a second tab) always dropped whoever was in the Control Panel back onto
+  // the report dashboard. The Control Panel now has its own address; the
+  // report tabs deliberately stay on "/" since they're a view switch inside
+  // one report, not separate pages.
+  //
+  // pushState (not replaceState) so Back/Forward walks between the report and
+  // the Control Panel the way the browser buttons are expected to behave. The
+  // query string is carried across untouched — the OAuth callbacks land back
+  // here with markers on it (see the tiktokConnected/youtubeConnected effect
+  // below) and stripping it here would race that.
+  useEffect(() => {
+    // Logged out, the login screen is all there is to show and the tab state
+    // underneath it is meaningless — leave the address alone so that opening
+    // /admin directly still lands in the Control Panel after signing in
+    // (handleLogin restores it), instead of being rewritten to "/" by the
+    // Viewer guard that also fires while nobody is logged in.
+    if (!currentUser) return;
+    const wantsAdminPath = activeTab === "control-panel";
+    if (wantsAdminPath === isAdminPath(window.location.pathname)) return;
+    window.history.pushState({}, "", (wantsAdminPath ? ADMIN_PATH : "/") + window.location.search);
+  }, [activeTab, currentUser]);
+
+  // Back/Forward changes the URL without re-mounting this component, so the
+  // view has to follow it. Leaving from /admin returns to the report the user
+  // was last on rather than forcing "dashboard" — the report tabs share "/",
+  // so the path alone can't say which one it was.
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      setActiveTab((prev) => {
+        if (isAdminPath(window.location.pathname)) return "control-panel";
+        return prev === "control-panel" ? "dashboard" : prev;
+      });
+    };
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, []);
 
   // Left sidebar on the Control Panel view: which work-group section is
   // showing. Only shown when `activeTab === "control-panel"` — the report
@@ -769,6 +833,14 @@ export default function App() {
   // Control Panel Import states
   const [isFileUploading, setIsFileUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  // A file that's been read and understood but NOT yet merged into the
+  // database. Selecting a file used to sync it on the spot, which made a
+  // mis-picked file or a workbook with the wrong sheet names indistinguishable
+  // from a correct one until after it had already been written — same
+  // parse → preview → confirm flow the Ads upload (AdsUploadAdmin.tsx) uses.
+  const [pendingImport, setPendingImport] = useState<
+    { fileName: string; data: Record<string, any>; summary: ImportSummary } | null
+  >(null);
   const [pastedJson, setPastedJson] = useState(JSON.stringify(INITIAL_MARKETING_DATA, null, 2));
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -1188,6 +1260,11 @@ export default function App() {
       triggerNotification("success", `Chào mừng ${result.user.name} (${result.user.role}) quay lại hệ thống!`);
       if (result.user.role === "Viewer") {
         setActiveTab("dashboard");
+      } else if (isAdminPath(window.location.pathname)) {
+        // Signed in from a /admin link (or a refresh there) — land where the
+        // address says, not on the report dashboard. The Viewer branch above
+        // still wins: Viewers have no Control Panel at all.
+        setActiveTab("control-panel");
       }
       fetchServerData();
     } catch (err) {
@@ -1877,7 +1954,9 @@ export default function App() {
       setPastedJson(JSON.stringify(mergedData, null, 2));
       localStorage.setItem("marketing_report_raw_data", JSON.stringify(mergedData));
       if (parsed && parsed.comments) {
-        const newComments = { ...publishedComments, ...parsed.comments };
+        // Same deep merge the server does (see POST /api/sync-data) so the
+        // offline path can't drop fields the uploaded file didn't carry.
+        const newComments = mergeCommentTrees(publishedComments as any, parsed.comments) as any;
         setPublishedComments(newComments);
         localStorage.setItem("marketing_published_comments", JSON.stringify(newComments));
       }
@@ -1899,9 +1978,10 @@ export default function App() {
 
   // Offline file upload handler — accepts JSON (.json) or spreadsheet
   // (.xlsx/.xls/.csv) files. Spreadsheets are parsed client-side into the
-  // same shape JSON already used (parseSpreadsheetFile, src/lib/export.ts),
-  // then merged through the exact same sync codepath above.
-  const handleOfflineFileParseAndSync = async (file: File) => {
+  // same shape JSON already used (parseSpreadsheetFile, src/lib/export.ts).
+  // Parsing only: what was found is shown for confirmation
+  // (handleConfirmPendingImport below) before anything reaches the database.
+  const handleOfflineFileParse = async (file: File) => {
     if (!file) return;
     const lowerName = file.name.toLowerCase();
     const isJson = file.type === "application/json" || lowerName.endsWith(".json");
@@ -1912,12 +1992,29 @@ export default function App() {
     }
 
     setIsFileUploading(true);
+    setPendingImport(null);
     try {
-      const parsed = isJson ? JSON.parse(await file.text()) : await parseSpreadsheetFile(file);
-      await syncOfflineDataToServer(parsed);
+      if (isJson) {
+        const data = JSON.parse(await file.text());
+        setPendingImport({ fileName: file.name, data, summary: summarizeParsedData(data) });
+      } else {
+        const { data, summary } = await parseSpreadsheetFile(file);
+        setPendingImport({ fileName: file.name, data, summary });
+      }
     } catch (err: any) {
       console.error(err);
       triggerNotification("error", "Lỗi đọc hoặc phân tích cú pháp tệp: " + err.message);
+    } finally {
+      setIsFileUploading(false);
+    }
+  };
+
+  const handleConfirmPendingImport = async () => {
+    if (!pendingImport) return;
+    setIsFileUploading(true);
+    try {
+      await syncOfflineDataToServer(pendingImport.data);
+      setPendingImport(null);
     } finally {
       setIsFileUploading(false);
     }
@@ -1938,13 +2035,16 @@ export default function App() {
     e.stopPropagation();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleOfflineFileParseAndSync(e.dataTransfer.files[0]);
+      handleOfflineFileParse(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      handleOfflineFileParseAndSync(e.target.files[0]);
+      handleOfflineFileParse(e.target.files[0]);
+      // Cleared so picking the same file again after cancelling still fires
+      // onChange (the browser suppresses it when the value is unchanged).
+      e.target.value = "";
     }
   };
 
@@ -4528,12 +4628,95 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Parsed-file preview — nothing has touched the database
+                      yet at this point; "Xác nhận & Đồng bộ" is what merges. */}
+                  {pendingImport && (
+                    <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">Đã đọc xong tệp — kiểm tra trước khi đồng bộ</p>
+                          <p className="font-mono text-[11px] text-slate-500">{pendingImport.fileName}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPendingImport(null)}
+                          className="rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white"
+                        >
+                          Hủy
+                        </button>
+                      </div>
+
+                      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                        <table className="w-full text-[11px]">
+                          <thead className="bg-slate-50 text-slate-500">
+                            <tr>
+                              <th className="px-3 py-1.5 text-left">Nhóm dữ liệu</th>
+                              <th className="px-3 py-1.5 text-right">Số dòng</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {pendingImport.summary.collections.length === 0 && pendingImport.summary.commentEntries === 0 ? (
+                              <tr>
+                                <td colSpan={2} className="px-3 py-3 text-center text-amber-600">
+                                  Tệp không chứa dữ liệu nào hệ thống đọc được — kiểm tra lại tên sheet/cột.
+                                </td>
+                              </tr>
+                            ) : (
+                              <>
+                                {pendingImport.summary.collections.map((c) => (
+                                  <tr key={c.key}>
+                                    <td className="px-3 py-1.5 font-mono text-slate-700">{c.key}</td>
+                                    <td className="px-3 py-1.5 text-right font-semibold text-slate-700">{c.rows}</td>
+                                  </tr>
+                                ))}
+                                {pendingImport.summary.commentEntries > 0 && (
+                                  <tr>
+                                    <td className="px-3 py-1.5 font-mono text-slate-700">
+                                      comments (nhận định tuần)
+                                      <span className="ml-1 font-sans text-slate-400">
+                                        — tuần: {pendingImport.summary.commentWeeks.join(", ")}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right font-semibold text-slate-700">
+                                      {pendingImport.summary.commentEntries}
+                                    </td>
+                                  </tr>
+                                )}
+                              </>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {pendingImport.summary.ignoredSheets.length > 0 && (
+                        <p className="text-[11px] text-amber-700">
+                          ⚠️ Bỏ qua sheet không nhận diện được: {pendingImport.summary.ignoredSheets.join(", ")}
+                        </p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleConfirmPendingImport}
+                        disabled={
+                          isFileUploading ||
+                          (pendingImport.summary.collections.length === 0 && pendingImport.summary.commentEntries === 0)
+                        }
+                        className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {isFileUploading ? "Đang đồng bộ..." : "Xác nhận & Đồng bộ vào cơ sở dữ liệu"}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Guide info */}
                   <div className="rounded-lg bg-slate-50 p-3 border border-slate-100 text-[11px] text-slate-500 space-y-1.5">
                     <span className="font-semibold text-slate-800 block">💡 Thông tin đồng bộ ngoại tuyến:</span>
                     <ul className="list-disc pl-4 space-y-1 leading-relaxed">
                       <li>Hỗ trợ tệp <strong>.json</strong> hoặc bảng tính <strong>.xlsx / .xls / .csv</strong>.</li>
                       <li>Với Excel: mỗi sheet là một nhóm dữ liệu, tên sheet phải là một trong: <code>digital_marketing</code>, <code>kol_koc</code>, <code>btl_trade</code>, <code>monthly_ooh_pr</code>, <code>btl_trade_monthly</code> (không phân biệt hoa/thường, dấu cách/gạch dưới). Dòng đầu tiên là tên cột đúng theo tên trường dữ liệu (ví dụ: <code>week</code>, <code>brand</code>, <code>hạng_mục</code>...) — có thể lấy mẫu từ nút "Xuất Database Đầy Đủ (.xlsx)" bên dưới rồi chỉnh sửa lại.</li>
+                      <li><strong>Nhận định tuần</strong> nhập được luôn bằng sheet <code>comments</code> (4 cột <code>week</code>, <code>brand</code>, <code>field</code>, <code>value</code>; <code>field</code> nhận <code>evaluation</code>, <code>proposals</code>, hoặc <code>category_&lt;tên hạng mục&gt;</code>) — đúng như tệp "Xuất Database Đầy Đủ (.xlsx)" đang xuất ra, nên chỉ cần tải file đó về, sửa ô cần sửa rồi tải lên lại. Ô nào không có trong tệp thì giữ nguyên giá trị cũ, không bị xóa.</li>
+                      <li>Chọn tệp xong hệ thống chỉ <strong>đọc và hiển thị trước</strong> những gì tìm thấy — dữ liệu chỉ được ghi vào CSDL khi bạn bấm "Xác nhận &amp; Đồng bộ".</li>
                       <li>Hệ thống sẽ tự động đối chiếu, <strong>sáp nhập (merge) thông minh</strong> các bản ghi trùng lặp và bổ sung các dòng dữ liệu mới vào CSDL nội bộ.</li>
                       <li>Quy trình này hoàn toàn an toàn và không phụ thuộc vào kết nối mạng bên ngoài.</li>
                     </ul>
