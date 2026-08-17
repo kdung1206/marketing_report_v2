@@ -16,6 +16,7 @@
 import { decrypt } from "./crypto";
 import {
   getFbPages,
+  getFbInsightsDaily,
   upsertFbInsightsDaily,
   upsertFbPosts,
   setFbPageSyncStatus,
@@ -285,6 +286,39 @@ async function fetchRecentPosts(
   });
 }
 
+// Every run re-pulls a rolling INSIGHTS_BACKFILL_DAYS window and upserts whole
+// rows, so any field Facebook didn't return this run comes back null and
+// overwrites what an earlier run had already stored. That silently destroyed
+// the follower history: fan_count only ever lands on *today's* row (Meta
+// retired the historical page_fans* series — see METRIC_FIELD_MAP), so every
+// earlier date in the window was being reset to null the next morning, leaving
+// the "Follower Growth" chart with a single usable data point and "Follower
+// mới" permanently at 0. Also covers the page_views/engaged_users case where a
+// transient per-metric failure would otherwise blank out days that were
+// already collected correctly. A null here always means "no value from this
+// run", never a real zero — so stored values win over new nulls.
+async function preserveStoredValues(
+  pageId: string,
+  rows: FbInsightsDailyRow[],
+  since: string,
+  until: string
+): Promise<FbInsightsDailyRow[]> {
+  const stored = await getFbInsightsDaily([pageId], since, until);
+  if (stored.length === 0) return rows;
+
+  const storedByDate = new Map(stored.map((r) => [r.date, r]));
+  return rows.map((row) => {
+    const old = storedByDate.get(row.date);
+    if (!old) return row;
+    const merged: FbInsightsDailyRow = { ...row };
+    for (const key of Object.keys(merged) as (keyof FbInsightsDailyRow)[]) {
+      if (key === "page_id" || key === "date") continue;
+      if (merged[key] == null && old[key] != null) (merged as any)[key] = old[key];
+    }
+    return merged;
+  });
+}
+
 export interface FacebookSyncResult {
   page_id: string;
   page_name: string;
@@ -320,7 +354,9 @@ export async function runFacebookSync(): Promise<FacebookSyncResult[]> {
         if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
 
         const dailyRows = await fetchPageDailyInsights(page.page_id, accessToken, since, until, tokenStatus);
-        if (dailyRows.length > 0) await upsertFbInsightsDaily(dailyRows);
+        if (dailyRows.length > 0) {
+          await upsertFbInsightsDaily(await preserveStoredValues(page.page_id, dailyRows, since, until));
+        }
 
         const postRows = await fetchRecentPosts(page.page_id, accessToken, postsSince, tokenStatus);
         if (postRows.length > 0) await upsertFbPosts(postRows);
