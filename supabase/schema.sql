@@ -360,12 +360,19 @@ create table if not exists youtube_accounts (
   access_token_encrypted text not null,
   refresh_token_encrypted text not null,
   access_token_expires_at timestamptz not null,
+  -- Conservative estimate (connected_at + 7 days), not a value Google
+  -- actually reports — see YoutubeAccountConfig's comment in
+  -- src/server/youtubeStore.ts for why this exists and why it's a guess.
+  refresh_token_expires_at timestamptz,
   is_active boolean not null default true,
   last_synced_at timestamptz,
   last_sync_error text,
   token_expired boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+-- Existing projects created before the token-expiry warning shipped.
+alter table youtube_accounts add column if not exists refresh_token_expires_at timestamptz;
 
 alter table youtube_accounts enable row level security;
 

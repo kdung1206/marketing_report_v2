@@ -10,6 +10,47 @@ interface YoutubeAccountRow {
   last_synced_at: string | null;
   last_sync_error: string | null;
   token_expired: boolean;
+  refresh_token_expires_at: string | null;
+}
+
+// Warn this far ahead of the estimated deadline. Short on purpose — Google's
+// Testing-mode refresh_token only lives 7 days total (see this row's field
+// comment server-side), so a 30-day window like TikTok's would warn
+// permanently. 2 days still leaves enough runway to notice and reconnect
+// before the connection actually goes dead and Social Report data goes stale.
+const WARN_WITHIN_DAYS = 2;
+
+function daysUntil(iso: string | null): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / 86400000);
+}
+
+// The estimate is conservative (assumes the OAuth consent screen is still in
+// "Testing" publish status) — see YoutubeAccountConfig's comment in
+// youtubeStore.ts. If the app has since been published/verified or switched
+// to "Internal" (Workspace-owned projects only), the real token outlives
+// this date; the copy below is worded to reflect that this is a "by this
+// date at the latest" estimate, not a certainty.
+function YoutubeTokenExpiryNote({ account }: { account: YoutubeAccountRow }) {
+  const days = daysUntil(account.refresh_token_expires_at);
+  if (days === null) {
+    return <div className="mt-0.5 text-slate-400">Hạn kết nối: chưa xác định</div>;
+  }
+  const dateText = new Date(account.refresh_token_expires_at as string).toLocaleDateString("vi-VN");
+  if (days <= WARN_WITHIN_DAYS) {
+    return (
+      <div className="mt-0.5 font-semibold text-amber-600">
+        🟠 Có thể cần đăng nhập lại: còn tối đa {Math.max(days, 0)} ngày ({dateText}, nếu app còn ở chế độ Testing)
+      </div>
+    );
+  }
+  return (
+    <div className="mt-0.5 text-slate-400">
+      Ước tính hạn kết nối (chế độ Testing): {dateText} (còn {days} ngày)
+    </div>
+  );
 }
 
 interface SyncResult {
@@ -112,6 +153,14 @@ export default function YoutubeAccountsAdmin() {
     }
   }
 
+  // Same reasoning as Facebook/TikTok's banner — the status column is easy to
+  // scroll past, and this warning only helps if someone actually acts on it.
+  const expiringSoon = accounts.filter((a) => {
+    if (a.token_expired) return false;
+    const days = daysUntil(a.refresh_token_expires_at);
+    return days !== null && days <= WARN_WITHIN_DAYS;
+  });
+
   return (
     <div className="w-full animate-fade-in space-y-4 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
@@ -136,6 +185,21 @@ export default function YoutubeAccountsAdmin() {
             <code className="rounded bg-amber-100 px-1">YOUTUBE_CLIENT_SECRET</code>,{" "}
             <code className="rounded bg-amber-100 px-1">YOUTUBE_REDIRECT_URI</code> (xem README) trước khi nút "Kết nối YouTube" hoạt động được.
           </p>
+        </div>
+      )}
+
+      {expiringSoon.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <div>
+            <strong>Có thể sắp cần đăng nhập lại YouTube</strong> — nếu OAuth consent screen của app còn ở chế độ "Testing"
+            trên Google Cloud Console, kết nối sẽ tự hết hạn sau đúng 7 ngày kể từ lúc kết nối, không phụ thuộc việc có
+            đồng bộ hay không. Bấm "Kết nối YouTube" lại trước hạn dưới đây để không bị gián đoạn dữ liệu, hoặc chuyển OAuth
+            consent screen sang "Internal"/đã xác minh (Published) để hết hẳn giới hạn này:{" "}
+            {expiringSoon
+              .map((a) => `${a.channel_title || a.channel_id} (còn tối đa ${Math.max(daysUntil(a.refresh_token_expires_at) ?? 0, 0)} ngày)`)
+              .join(", ")}
+          </div>
         </div>
       )}
 
@@ -227,6 +291,7 @@ export default function YoutubeAccountsAdmin() {
                     ) : (
                       <span className="text-emerald-600">OK — đang kết nối</span>
                     )}
+                    {!a.token_expired && <YoutubeTokenExpiryNote account={a} />}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <button

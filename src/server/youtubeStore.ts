@@ -18,6 +18,20 @@ export interface YoutubeAccountConfig {
   access_token_encrypted: string;
   refresh_token_encrypted: string;
   access_token_expires_at: string;
+  // Set once at connect time, never updated by a later access-token refresh
+  // (same "fixed at grant, not rolling" behavior confirmed for TikTok). Google
+  // normally never expires a refresh_token on a schedule — but while this
+  // app's OAuth consent screen sits in "Testing" publish status (the default
+  // until verified/published, or switched to "Internal" for a Workspace-owned
+  // project), Google hard-expires it after 7 days regardless of use. There is
+  // no API to ask Google which publish status applies, so this is always
+  // computed as connected_at + 7 days — a deliberately conservative estimate:
+  // if the app is later published or made Internal, the real token outlives
+  // this estimate and the "sắp hết hạn" warning becomes a false alarm (safe
+  // direction to be wrong in), but it will never miss the real Testing-mode
+  // cutoff, which is the failure this is guarding against (see the actual
+  // 2026-08-17 incident where this connection died with no warning at all).
+  refresh_token_expires_at: string | null;
   is_active: boolean;
   last_synced_at: string | null;
   last_sync_error: string | null;

@@ -144755,6 +144755,9 @@ app.get("/api/youtube/oauth/callback", async (req, res) => {
       access_token_encrypted: encrypt(tokens.access_token),
       refresh_token_encrypted: encrypt(tokens.refresh_token),
       access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+      // Conservative estimate, not a real Google-reported deadline — see
+      // YoutubeAccountConfig's comment in youtubeStore.ts for why.
+      refresh_token_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3).toISOString(),
       is_active: true,
       last_synced_at: null,
       last_sync_error: null,
@@ -144785,7 +144788,10 @@ app.get("/api/youtube/accounts", requireAuth("Admin"), async (req, res) => {
         is_active: a.is_active,
         last_synced_at: a.last_synced_at,
         last_sync_error: a.last_sync_error,
-        token_expired: a.token_expired
+        token_expired: a.token_expired,
+        // See YoutubeAccountConfig's comment (youtubeStore.ts) — a
+        // conservative estimate, not a value Google actually reports.
+        refresh_token_expires_at: a.refresh_token_expires_at ?? null
       })),
       youtubeConfigured: isYoutubeConfigured
     });
