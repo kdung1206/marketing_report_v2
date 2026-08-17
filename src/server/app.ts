@@ -1572,7 +1572,21 @@ app.get("/api/youtube/oauth/start", requireAuth("Admin"), (req, res) => {
     scope: YOUTUBE_SCOPES.join(" "),
     state,
     access_type: "offline",
-    prompt: "consent",
+    // "consent" alone doesn't ask Google to show an account/channel chooser —
+    // Google just silently re-uses whatever Google Account/Brand Account
+    // context is already active in the browser at that moment. For an
+    // account managing several YouTube channels (e.g. Livotec, Karofi,
+    // several others under one Google Account — confirmed 2026-08-17: this
+    // is exactly what connected the wrong, unrelated 0-subscriber channel
+    // under "Karofi" instead of the intended brand channel), that silently
+    // picks whichever channel happened to be active, with no way to choose.
+    // "select_account" gives Google a chance to surface its picker instead
+    // of assuming; it's not a guarantee (Google's actual channel-chooser step
+    // is Google's own UI, outside this app's control), so switching to the
+    // intended channel identity on youtube.com in the same browser tab
+    // *before* clicking "Kết nối YouTube" is still the reliable way to be
+    // sure which channel gets connected.
+    prompt: "select_account consent",
   });
   res.json({ success: true, authorizeUrl: `${YOUTUBE_AUTHORIZE_URL}?${params.toString()}` });
 });
