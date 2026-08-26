@@ -46,6 +46,18 @@ import {
   YOUTUBE_AUTHORIZE_URL,
   YOUTUBE_SCOPES,
 } from "./youtubeSync";
+import {
+  exchangeDriveCode,
+  fetchGoogleEmail,
+  runDriveBackup,
+  getDriveBackupConfig,
+  saveDriveBackupConfig,
+  isDriveBackupConfigured,
+  GOOGLE_DRIVE_CLIENT_ID,
+  GOOGLE_DRIVE_REDIRECT_URI,
+  DRIVE_AUTHORIZE_URL,
+  DRIVE_SCOPES,
+} from "./driveBackup";
 
 // .env.local (documented in README) takes precedence for local dev; .env is
 // the fallback. On Vercel neither file exists — env vars are injected
@@ -565,6 +577,133 @@ app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Google Drive full-database backup (src/server/driveBackup.ts) — same real
+// OAuth redirect shape as TikTok/YouTube (Google's flavor: no PKCE needed,
+// this is a confidential Web-application client with a client_secret).
+// ---------------------------------------------------------------------------
+
+app.get("/api/backup/drive/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isDriveBackupConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "GOOGLE_DRIVE_CLIENT_ID / GOOGLE_DRIVE_CLIENT_SECRET / GOOGLE_DRIVE_REDIRECT_URI chưa được cấu hình đầy đủ.",
+    });
+  }
+  const state = signOAuthState({ username: (req as any).session.username });
+  const params = new URLSearchParams({
+    client_id: GOOGLE_DRIVE_CLIENT_ID,
+    redirect_uri: GOOGLE_DRIVE_REDIRECT_URI,
+    response_type: "code",
+    scope: DRIVE_SCOPES.join(" "),
+    state,
+    access_type: "offline",
+    prompt: "consent",
+  });
+  res.json({ success: true, authorizeUrl: `${DRIVE_AUTHORIZE_URL}?${params.toString()}` });
+});
+
+app.get("/api/backup/drive/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+  if (oauthError) {
+    return res.status(400).send(`Kết nối Google Drive bị hủy hoặc lỗi: ${oauthError}`);
+  }
+  const payload = verifyOAuthState<{ username: string }>(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Liên kết xác thực Google Drive không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
+  }
+
+  try {
+    const tokens = await exchangeDriveCode(code, GOOGLE_DRIVE_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google không trả về refresh_token — vui lòng thử kết nối lại (đảm bảo màn hình xin quyền hiện ra đầy đủ, không bị bỏ qua).");
+    }
+    const email = await fetchGoogleEmail(tokens.access_token);
+
+    await saveDriveBackupConfig({
+      connected_email: email,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      enabled: true,
+      last_backup_error: null,
+    });
+
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-drive-backup", `Kết nối Google Drive backup (${email || "?"})`);
+    res.redirect(302, "/?driveBackupConnected=1");
+  } catch (err: any) {
+    console.error("GET /api/backup/drive/oauth/callback error:", err);
+    res.status(500).send(`Kết nối Google Drive thất bại: ${err.message}`);
+  }
+});
+
+// GET /api/backup/drive/status — never returns tokens.
+app.get("/api/backup/drive/status", requireAuth("Admin"), async (req, res) => {
+  try {
+    const config = await getDriveBackupConfig();
+    res.json({
+      success: true,
+      configured: isDriveBackupConfigured,
+      connected: Boolean(config.refresh_token_encrypted),
+      connected_email: config.connected_email,
+      enabled: config.enabled,
+      folder_id: config.folder_id,
+      retention_days: config.retention_days,
+      last_backup_at: config.last_backup_at,
+      last_backup_error: config.last_backup_error,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/backup/drive/config — Admin-only, save folder/retention/enabled.
+app.post("/api/backup/drive/config", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { folder_id, retention_days, enabled } = req.body || {};
+    const patch: Record<string, unknown> = {};
+    if (folder_id !== undefined) patch.folder_id = typeof folder_id === "string" && folder_id.trim() ? folder_id.trim() : null;
+    if (retention_days !== undefined) {
+      const n = Number(retention_days);
+      patch.retention_days = Number.isFinite(n) && n > 0 ? Math.round(n) : 30;
+    }
+    if (enabled !== undefined) patch.enabled = Boolean(enabled);
+    const config = await saveDriveBackupConfig(patch);
+    await logAction((req as any).session, req, "save-drive-backup-config", "Cập nhật cấu hình sao lưu Google Drive");
+    res.json({ success: true, config: { folder_id: config.folder_id, retention_days: config.retention_days, enabled: config.enabled } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/backup/drive/disconnect — clears tokens; keeps folder_id/retention_days.
+app.delete("/api/backup/drive/disconnect", requireAuth("Admin"), async (req, res) => {
+  try {
+    await saveDriveBackupConfig({
+      connected_email: null,
+      access_token_encrypted: null,
+      refresh_token_encrypted: null,
+      access_token_expires_at: null,
+      enabled: false,
+    });
+    await logAction((req as any).session, req, "disconnect-drive-backup", "Ngắt kết nối Google Drive backup");
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/backup/drive/run-now — Admin-only manual trigger.
+app.post("/api/backup/drive/run-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const result = await runDriveBackup();
+    await logAction((req as any).session, req, "run-drive-backup", `Sao lưu Google Drive thủ công: ${result.filename}`);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Shared by both GET /api/cron/* routes below. Vercel Cron has no user to
 // log in as, so these gate on CRON_SECRET instead of a session — compared
 // with crypto.timingSafeEqual rather than `!==`/`===`, same reasoning as
@@ -582,13 +721,25 @@ function isValidCronRequest(req: express.Request): boolean {
   return crypto.timingSafeEqual(expectedDigest, providedDigest);
 }
 
-// GET /api/cron/weekly-backup — hit by Vercel Cron every Friday 17:00 ICT
-// (10:00 UTC, see vercel.json). Not session-authenticated (Vercel Cron has
-// no user to log in as) — instead requires the CRON_SECRET env var to match,
-// which Vercel automatically sends as `Authorization: Bearer <CRON_SECRET>`
-// when that env var is configured on the project. Never runs in local dev:
-// there's no real mail_config there anyway (see supabaseClient.ts), and this
-// route only matters for the deployed schedule.
+// GET /api/cron/weekly-backup — route name is legacy (kept so existing
+// Admin muscle-memory/docs referencing it still work); hit by Vercel Cron
+// once DAILY now, not weekly (10:00 UTC = 17:00 ICT, see vercel.json). Not
+// session-authenticated (Vercel Cron has no user to log in as) — instead
+// requires the CRON_SECRET env var to match, which Vercel automatically
+// sends as `Authorization: Bearer <CRON_SECRET>` when that env var is
+// configured on the project. Never runs in local dev: there's no real
+// mail_config/Drive connection there anyway (see supabaseClient.ts), and
+// this route only matters for the deployed schedule.
+//
+// Two independent backup channels fan out from one daily trigger, same
+// "don't add a 3rd vercel.json cron entry, Vercel Hobby caps at 2" reasoning
+// as facebook-sync folding in Ads/TikTok/YouTube:
+//   - Email (Excel attachment): kept at its ORIGINAL weekly cadence by
+//     checking the ICT day-of-week here in code, even though the cron
+//     itself now fires daily — only covers the original report tables
+//     (see src/lib/export.ts's FullDatabaseExportPayload).
+//   - Google Drive (JSON dump of every table): genuinely NEW, runs every
+//     day this fires — the actual full-database backup this app never had.
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
@@ -596,15 +747,33 @@ app.get("/api/cron/weekly-backup", async (req, res) => {
     }
 
     const store = await getDatabaseData();
-    if (store.mail_config?.enabled === false) {
-      return res.json({ success: true, skipped: true, reason: "Gửi mail tự động đang tắt (enabled=false)." });
+    const ictDay = new Date(Date.now() + 7 * 60 * 60 * 1000).getUTCDay(); // 5 = Friday in ICT
+    let email: { skipped: boolean; reason?: string } = { skipped: true, reason: "Không phải thứ Sáu (giữ nguyên chu kỳ hàng tuần)." };
+    if (ictDay === 5) {
+      if (store.mail_config?.enabled === false) {
+        email = { skipped: true, reason: "Gửi mail tự động đang tắt (enabled=false)." };
+      } else {
+        await runDatabaseBackupEmail();
+        email = { skipped: false };
+      }
     }
 
-    await runDatabaseBackupEmail();
-    return res.json({ success: true });
+    let drive: { skipped: boolean; reason?: string; filename?: string } = { skipped: true, reason: "Chưa cấu hình hoặc chưa kết nối Google Drive." };
+    const driveConfig = await getDriveBackupConfig();
+    if (isDriveBackupConfigured && driveConfig.enabled && driveConfig.refresh_token_encrypted) {
+      try {
+        const result = await runDriveBackup();
+        drive = { skipped: false, filename: result.filename };
+      } catch (err: any) {
+        console.error("GET /api/cron/weekly-backup (drive) error:", err);
+        drive = { skipped: true, reason: err.message };
+      }
+    }
+
+    return res.json({ success: true, email, drive });
   } catch (err: any) {
     console.error("GET /api/cron/weekly-backup error:", err);
-    return res.status(500).json({ error: err.message || "Lỗi gửi email backup định kỳ." });
+    return res.status(500).json({ error: err.message || "Lỗi backup định kỳ." });
   }
 });
 

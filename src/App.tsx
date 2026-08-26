@@ -25,6 +25,7 @@ import FbAdAccountsAdmin from "./components/FbAdAccountsAdmin";
 import AdsUploadAdmin from "./components/AdsUploadAdmin";
 import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
 import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
+import DriveBackupAdmin from "./components/DriveBackupAdmin";
 import {
   TrendingUp,
   Award,
@@ -582,6 +583,12 @@ export default function App() {
       setActiveTab("control-panel");
       setControlPanelSection("platform-connections");
       setPlatformSubTab("youtube");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("driveBackupConnected") === "1") {
+      // Same OAuth-redirect problem, this time for the Drive backup
+      // connection under "Sao Lưu Tự Động" rather than "Kết nối nền tảng".
+      setActiveTab("control-panel");
+      setControlPanelSection("backup");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -6189,6 +6196,7 @@ export default function App() {
                 AUTOMATED WEEKLY BACKUP EMAIL — Admin only
                ------------------------------------------------------------ */}
             {controlPanelSection === "backup" && currentUser && currentUser.role === "Admin" && (
+              <>
               <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
                 <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
                   <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
@@ -6313,6 +6321,9 @@ export default function App() {
                   </div>
                 </form>
               </div>
+
+              <DriveBackupAdmin />
+              </>
             )}
 
             {controlPanelSection === "platform-connections" && platformSubTab === "facebook" && currentUser && currentUser.role === "Admin" && (
