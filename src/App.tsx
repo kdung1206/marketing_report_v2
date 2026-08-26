@@ -883,38 +883,6 @@ export default function App() {
   const [actionLogs, setActionLogs] = useState<ActionLogEntry[]>([]);
   const [isActionLogsLoading, setIsActionLogsLoading] = useState(false);
 
-  // Mail configuration states
-  const [mailHost, setMailHost] = useState("");
-  const [mailPort, setMailPort] = useState("587");
-  const [mailUser, setMailUser] = useState("");
-  const [mailPass, setMailPass] = useState("");
-  const [mailRecipient, setMailRecipient] = useState("");
-  const [mailEnabled, setMailEnabled] = useState(true);
-  const [isMailLoading, setIsMailLoading] = useState(false);
-
-  // Load mail configuration from server on load. GET /api/get-mail-config is
-  // Admin-only server-side (it returns the decrypted SMTP password), so only
-  // fetch it for Admins — Editor/Viewer have no use for it anyway.
-  useEffect(() => {
-    if (!currentUser || currentUser.role !== "Admin") return;
-    const fetchMailConfig = async () => {
-      try {
-        const result = await safeFetchJson("/api/get-mail-config");
-        if (result.success && result.config) {
-          setMailHost(result.config.smtp_host || "");
-          setMailPort(result.config.smtp_port || "587");
-          setMailUser(result.config.smtp_user || "");
-          setMailPass(result.config.smtp_pass || "");
-          setMailRecipient(result.config.notification_email || "ntkdung1206@gmail.com");
-          setMailEnabled(result.config.enabled !== false);
-        }
-      } catch (err) {
-        console.error("Failed to load mail config:", err);
-      }
-    };
-    fetchMailConfig();
-  }, [currentUser]);
-
   // Weekly-report "Nhập liệu" auto-sync-from-spreadsheet states — a saved
   // link, an on/off toggle, and the last run's status, all served by
   // /api/spreadsheet-sync/config (Editor+, same gate as /api/sync-data since
@@ -2213,55 +2181,6 @@ export default function App() {
       }
     } catch (err: any) {
       triggerNotification("error", `Lỗi định dạng JSON hoặc Lỗi đồng bộ: ${err.message}`);
-    }
-  };
-
-  // Save mail configuration to Server DB
-  const handleSaveMailConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsMailLoading(true);
-    try {
-      const result = await safeFetchJson("/api/save-mail-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          smtp_host: mailHost,
-          smtp_port: mailPort,
-          smtp_user: mailUser,
-          smtp_pass: mailPass,
-          notification_email: mailRecipient,
-          enabled: mailEnabled
-        }),
-      });
-      if (result.success) {
-        triggerNotification("success", "Cấu hình gửi mail tự động đã được lưu và mã hóa bảo mật!");
-      } else {
-        throw new Error(result.error || "Lỗi lưu cấu hình mail");
-      }
-    } catch (err: any) {
-      triggerNotification("error", `Không thể lưu cấu hình mail: ${err.message}`);
-    } finally {
-      setIsMailLoading(false);
-    }
-  };
-
-  // Manual test send — same email the Friday 17:00 ICT cron would send (see
-  // GET /api/cron/weekly-backup), triggered on demand so Admin can verify
-  // SMTP settings work right after saving them instead of waiting a week.
-  const [isSendingBackupNow, setIsSendingBackupNow] = useState(false);
-  const handleSendBackupNow = async () => {
-    setIsSendingBackupNow(true);
-    try {
-      const result = await safeFetchJson("/api/send-backup-now", { method: "POST" });
-      if (result.success) {
-        triggerNotification("success", `Đã gửi email backup thử tới ${mailRecipient || "địa chỉ đã cấu hình"}!`);
-      } else {
-        throw new Error(result.error || "Lỗi gửi email backup.");
-      }
-    } catch (err: any) {
-      triggerNotification("error", `Không thể gửi email backup: ${err.message}`);
-    } finally {
-      setIsSendingBackupNow(false);
     }
   };
 
@@ -6193,137 +6112,14 @@ export default function App() {
             )}
 
             {/* ------------------------------------------------------------
-                AUTOMATED WEEKLY BACKUP EMAIL — Admin only
+                SAO LƯU TỰ ĐỘNG — Admin only. Email-based backup (SMTP) was
+                removed 2026-08-26 in favor of the Google Drive backup below,
+                which actually covers every table instead of just the
+                original report tables, and never needed an SMTP password no
+                Gmail account here could produce (see HANDOFF.md).
                ------------------------------------------------------------ */}
             {controlPanelSection === "backup" && currentUser && currentUser.role === "Admin" && (
-              <>
-              <div className="rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm space-y-4 animate-fade-in w-full">
-                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                    <Mail className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">
-                      Sao Lưu Database Tự Động Qua Email
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Tự động gửi file Excel backup toàn bộ database vào <strong>17:00 thứ Sáu hàng tuần</strong> qua email cấu hình bên dưới.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-800">
-                  ⚠️ Lịch tự động (Vercel Cron) chỉ chạy trên bản deploy thật (Vercel) — máy local không kích hoạt lịch này. Dùng nút "Gửi thử ngay" bên dưới để kiểm tra cấu hình SMTP ngay tại đây.
-                </div>
-
-                <form onSubmit={handleSaveMailConfig} className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Email nhận backup
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={mailRecipient}
-                      onChange={(e) => setMailRecipient(e.target.value)}
-                      placeholder="ntkdung1206@gmail.com"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      SMTP Host
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={mailHost}
-                      onChange={(e) => setMailHost(e.target.value)}
-                      placeholder="smtp.gmail.com"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      SMTP Port
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={mailPort}
-                      onChange={(e) => setMailPort(e.target.value)}
-                      placeholder="587"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      SMTP User (email đăng nhập)
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={mailUser}
-                      onChange={(e) => setMailUser(e.target.value)}
-                      placeholder="your-account@gmail.com"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      SMTP Password (App Password)
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={mailPass}
-                      onChange={(e) => setMailPass(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 sm:col-span-2">
-                    <input
-                      id="mail_enabled_checkbox"
-                      type="checkbox"
-                      checked={mailEnabled}
-                      onChange={(e) => setMailEnabled(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <label htmlFor="mail_enabled_checkbox" className="text-xs font-medium text-slate-700">
-                      Bật gửi email backup tự động hàng tuần
-                    </label>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 sm:col-span-2 pt-2">
-                    <button
-                      type="submit"
-                      disabled={isMailLoading}
-                      className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {isMailLoading ? "Đang lưu..." : "Lưu cấu hình"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSendBackupNow}
-                      disabled={isSendingBackupNow}
-                      className="flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 shadow-sm transition"
-                    >
-                      <RefreshCw className={`h-3.5 w-3.5 ${isSendingBackupNow ? "animate-spin" : ""}`} />
-                      {isSendingBackupNow ? "Đang gửi..." : "Gửi thử ngay"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
               <DriveBackupAdmin />
-              </>
             )}
 
             {controlPanelSection === "platform-connections" && platformSubTab === "facebook" && currentUser && currentUser.role === "Admin" && (

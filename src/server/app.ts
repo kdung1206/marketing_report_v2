@@ -10,7 +10,6 @@ import { hashPasswordScrypt, generateServerSalt, isScryptHash, verifyPasswordAny
 import { mergeNewDataIntoDatabase } from "./dataMerge";
 import { runSpreadsheetAutoSync, getSpreadsheetSyncConfig, saveSpreadsheetSyncConfig } from "./spreadsheetSync";
 import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
-import { buildBackupAttachmentBuffer, sendBackupEmail } from "./backupMailer";
 import { encrypt, decrypt } from "./crypto";
 import { getFbPages, upsertFbPage, deleteFbPage, setFbPageSyncStatus, getFbInsightsDaily, getFbPosts } from "./facebookStore";
 import { runFacebookSync, fetchTokenExpiry } from "./facebookSync";
@@ -46,6 +45,7 @@ import {
   YOUTUBE_AUTHORIZE_URL,
   YOUTUBE_SCOPES,
 } from "./youtubeSync";
+import { checkExpiringConnectionsAndNotify } from "./expiryNotifier";
 import {
   exchangeDriveCode,
   fetchGoogleEmail,
@@ -483,99 +483,14 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
   }
 });
 
-// GET /api/get-mail-config
-app.get("/api/get-mail-config", requireAuth("Admin"), async (req, res) => {
-  try {
-    const store = await getDatabaseData();
-    const config = store.mail_config || {};
-    const decryptedPass = config.smtp_pass ? decrypt(config.smtp_pass) : "";
-    res.json({
-      success: true,
-      config: {
-        smtp_host: config.smtp_host || "",
-        smtp_port: config.smtp_port || "587",
-        smtp_user: config.smtp_user || "",
-        smtp_pass: decryptedPass,
-        notification_email: config.notification_email || "ntkdung1206@gmail.com",
-        enabled: config.enabled !== undefined ? config.enabled : true
-      }
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/save-mail-config
-app.post("/api/save-mail-config", requireAuth("Admin"), async (req, res) => {
-  try {
-    const { smtp_host, smtp_port, smtp_user, smtp_pass, notification_email, enabled } = req.body;
-    const store = await getDatabaseData();
-
-    const encryptedPass = smtp_pass ? encrypt(smtp_pass) : "";
-
-    store.mail_config = {
-      smtp_host: smtp_host || "",
-      smtp_port: smtp_port || "587",
-      smtp_user: smtp_user || "",
-      smtp_pass: encryptedPass,
-      notification_email: notification_email || "",
-      enabled: enabled === true
-    };
-
-    await saveDatabaseData(store);
-    await logAction((req as any).session, req, "save-mail-config", "Cập nhật cấu hình gửi mail SMTP");
-    res.json({ success: true, message: "Cấu hình gửi mail tự động đã được lưu và mã hóa bảo mật!" });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Shared by POST /api/send-backup-now and GET /api/cron/weekly-backup:
-// builds the same full-database workbook as the "Xuất Database Đầy Đủ"
-// button, then emails it using the stored (encrypted) SMTP config.
-async function runDatabaseBackupEmail(): Promise<void> {
-  const store = await getDatabaseData();
-  const config = store.mail_config || {};
-
-  const normalized = normalizeMarketingData(store);
-  const safeUsers = (Array.isArray(store.users) ? store.users : []).map((u: UserAccount) => ({
-    username: u.username,
-    name: u.name,
-    role: u.role,
-  }));
-  const buffer = buildBackupAttachmentBuffer({
-    ...normalized,
-    comments: store.comments || {},
-    users: safeUsers,
-  });
-
-  await sendBackupEmail(
-    {
-      smtp_host: config.smtp_host || "",
-      smtp_port: config.smtp_port || "587",
-      smtp_user: config.smtp_user || "",
-      smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
-      notification_email: config.notification_email || "",
-      enabled: config.enabled !== false,
-    },
-    buffer,
-    `marketing_backup_${new Date().toISOString().slice(0, 10)}.xlsx`
-  );
-}
-
-// POST /api/send-backup-now — Admin-only manual trigger, mainly for testing
-// the SMTP config right after saving it (see "Sao Lưu Tự Động" section)
-// instead of waiting for the actual Friday 17:00 schedule.
-app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
-  try {
-    await runDatabaseBackupEmail();
-    await logAction((req as any).session, req, "send-backup-now", "Gửi thử email backup database");
-    return res.json({ success: true });
-  } catch (err: any) {
-    console.error("POST /api/send-backup-now error:", err);
-    return res.status(500).json({ error: err.message || "Lỗi gửi email backup." });
-  }
-});
+// Email database backup (SMTP-based) was removed 2026-08-26 — replaced
+// entirely by the Google Drive backup below (src/server/driveBackup.ts),
+// which actually covers every table instead of just the original report
+// tables, and never needed an SMTP password no Gmail account here could
+// ever produce. GET /api/get-mail-config, POST /api/save-mail-config,
+// POST /api/send-backup-now, and runDatabaseBackupEmail() used to live
+// here; mail_config itself is left alone in the database (already null —
+// it was never successfully configured) rather than migrated away.
 
 // ---------------------------------------------------------------------------
 // Google Drive full-database backup (src/server/driveBackup.ts) — same real
@@ -722,40 +637,20 @@ function isValidCronRequest(req: express.Request): boolean {
 }
 
 // GET /api/cron/weekly-backup — route name is legacy (kept so existing
-// Admin muscle-memory/docs referencing it still work); hit by Vercel Cron
-// once DAILY now, not weekly (10:00 UTC = 17:00 ICT, see vercel.json). Not
+// docs/muscle-memory referencing it still work, even though the schedule is
+// now daily, not weekly, and the email step this was originally named after
+// was removed 2026-08-26 in favor of the Google Drive backup below). Hit by
+// Vercel Cron once daily (10:00 UTC = 17:00 ICT, see vercel.json). Not
 // session-authenticated (Vercel Cron has no user to log in as) — instead
 // requires the CRON_SECRET env var to match, which Vercel automatically
 // sends as `Authorization: Bearer <CRON_SECRET>` when that env var is
 // configured on the project. Never runs in local dev: there's no real
-// mail_config/Drive connection there anyway (see supabaseClient.ts), and
-// this route only matters for the deployed schedule.
-//
-// Two independent backup channels fan out from one daily trigger, same
-// "don't add a 3rd vercel.json cron entry, Vercel Hobby caps at 2" reasoning
-// as facebook-sync folding in Ads/TikTok/YouTube:
-//   - Email (Excel attachment): kept at its ORIGINAL weekly cadence by
-//     checking the ICT day-of-week here in code, even though the cron
-//     itself now fires daily — only covers the original report tables
-//     (see src/lib/export.ts's FullDatabaseExportPayload).
-//   - Google Drive (JSON dump of every table): genuinely NEW, runs every
-//     day this fires — the actual full-database backup this app never had.
+// Drive connection there anyway (see supabaseClient.ts), and this route
+// only matters for the deployed schedule.
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const store = await getDatabaseData();
-    const ictDay = new Date(Date.now() + 7 * 60 * 60 * 1000).getUTCDay(); // 5 = Friday in ICT
-    let email: { skipped: boolean; reason?: string } = { skipped: true, reason: "Không phải thứ Sáu (giữ nguyên chu kỳ hàng tuần)." };
-    if (ictDay === 5) {
-      if (store.mail_config?.enabled === false) {
-        email = { skipped: true, reason: "Gửi mail tự động đang tắt (enabled=false)." };
-      } else {
-        await runDatabaseBackupEmail();
-        email = { skipped: false };
-      }
     }
 
     let drive: { skipped: boolean; reason?: string; filename?: string } = { skipped: true, reason: "Chưa cấu hình hoặc chưa kết nối Google Drive." };
@@ -770,7 +665,7 @@ app.get("/api/cron/weekly-backup", async (req, res) => {
       }
     }
 
-    return res.json({ success: true, email, drive });
+    return res.json({ success: true, drive });
   } catch (err: any) {
     console.error("GET /api/cron/weekly-backup error:", err);
     return res.status(500).json({ error: err.message || "Lỗi backup định kỳ." });
@@ -1180,7 +1075,7 @@ app.get("/api/action-logs", requireAuth(), async (req, res) => {
 // stored via facebookStore.ts (dedicated Supabase tables in production,
 // extra arrays in the local JSON blob in dev — see that file's header
 // comment). Access tokens are encrypted with the same AES-256-CBC helper
-// used for mail_config.smtp_pass (src/server/crypto.ts).
+// used for the Drive backup's OAuth tokens (src/server/crypto.ts).
 // ---------------------------------------------------------------------------
 
 // GET /api/fb/pages — list configured pages (never returns the token itself).
@@ -1259,7 +1154,7 @@ app.delete("/api/fb/pages/:page_id", requireAuth("Admin"), async (req, res) => {
 });
 
 // POST /api/fb/sync-now — Admin-only manual trigger, mirrors
-// POST /api/send-backup-now's "test it right after saving" UX.
+// POST /api/backup/drive/run-now's "test it right after saving" UX.
 app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
   try {
     const results = await runFacebookSync();
@@ -1314,7 +1209,18 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
           })
         : Promise.resolve([]),
     ]);
-    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults });
+
+    // Runs after the syncs above (not inside the same Promise.all) so it
+    // reads each platform's freshest token_checked_at/expires_at — Facebook's
+    // debug_token probe in particular only just ran as part of runFacebookSync.
+    // Never lets an expiry-check failure fail the whole cron response; the
+    // syncs above are the part that actually keeps data fresh.
+    const expiryCheck = await checkExpiringConnectionsAndNotify().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (expiry check) error:", err);
+      return { checked: false, expiringCount: 0, notified: false, error: err.message };
+    });
+
+    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults, expiryCheck });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -1609,6 +1515,7 @@ app.get("/api/tiktok/oauth/callback", async (req, res) => {
       last_synced_at: null,
       last_sync_error: null,
       token_expired: false,
+      expiry_alert_sent_at: null,
       created_at: new Date().toISOString(),
     });
 
@@ -1797,6 +1704,7 @@ app.get("/api/youtube/oauth/callback", async (req, res) => {
       last_synced_at: null,
       last_sync_error: null,
       token_expired: false,
+      expiry_alert_sent_at: null,
       created_at: new Date().toISOString(),
     });
 
