@@ -12,6 +12,17 @@
 // rather than inventing new ones — same deadline fields, same "how many days
 // left" formula, just evaluated server-side once a day instead of whenever
 // an Admin happens to look.
+//
+// Two independent alert tiers per connection:
+//   - "standard": fires once when the deadline first enters the platform's
+//     usual warning window (7 / 30 / 2 days) — the early heads-up.
+//   - "urgent": fires once more at <= URGENT_WARN_WITHIN_DAYS (1 day) left,
+//     regardless of whether the standard tier already fired — a final,
+//     harder-to-miss nudge right before the connection actually dies. Each
+//     tier has its own dedupe column so getting the early warning doesn't
+//     suppress the later urgent one.
+// A connection that qualifies for both in the same run only shows once, as
+// urgent (the more actionable message) — see pickTier().
 // ---------------------------------------------------------------------------
 import { getFbPages, setFbPageSyncStatus, FbPageConfig } from "./facebookStore";
 import { getTiktokAccounts, setTiktokAccountSyncStatus, TiktokAccountConfig } from "./tiktokStore";
@@ -21,6 +32,7 @@ import { sendTelegramMessage, isTelegramConfigured } from "./telegramNotifier";
 const FACEBOOK_WARN_WITHIN_DAYS = 7;
 const TIKTOK_WARN_WITHIN_DAYS = 30;
 const YOUTUBE_WARN_WITHIN_DAYS = 2;
+const URGENT_WARN_WITHIN_DAYS = 1;
 
 function daysUntil(iso: string | null): number | null {
   if (!iso) return null;
@@ -40,7 +52,24 @@ function facebookDaysUntil(p: FbPageConfig): number | null {
   return Math.ceil((Math.min(...times) - Date.now()) / 86400000);
 }
 
+type Tier = "urgent" | "standard";
+
+// Decides which tier (if any) a connection should be alerted at this run,
+// preferring urgent over standard when both would otherwise fire.
+function pickTier(
+  days: number | null,
+  warnWithinDays: number,
+  standardAlreadySent: boolean,
+  urgentAlreadySent: boolean
+): Tier | null {
+  if (days === null) return null;
+  if (days <= URGENT_WARN_WITHIN_DAYS && !urgentAlreadySent) return "urgent";
+  if (days <= warnWithinDays && !standardAlreadySent) return "standard";
+  return null;
+}
+
 interface ExpiringItem {
+  tier: Tier;
   emoji: string;
   platform: string;
   label: string;
@@ -54,46 +83,61 @@ async function collectExpiring(): Promise<ExpiringItem[]> {
 
   const pages = await getFbPages();
   for (const p of pages) {
-    if (!p.is_active || p.token_expired || p.expiry_alert_sent_at) continue;
+    if (!p.is_active || p.token_expired) continue;
     const days = facebookDaysUntil(p);
-    if (days === null || days > FACEBOOK_WARN_WITHIN_DAYS) continue;
+    const tier = pickTier(days, FACEBOOK_WARN_WITHIN_DAYS, !!p.expiry_alert_sent_at, !!p.urgent_alert_sent_at);
+    if (!tier || days === null) continue;
     items.push({
+      tier,
       emoji: "🔵",
       platform: "Facebook",
       label: p.page_name,
       brand: p.brand,
       days,
-      markNotified: () => setFbPageSyncStatus(p.page_id, { expiry_alert_sent_at: new Date().toISOString() }),
+      markNotified: () =>
+        setFbPageSyncStatus(p.page_id, {
+          [tier === "urgent" ? "urgent_alert_sent_at" : "expiry_alert_sent_at"]: new Date().toISOString(),
+        }),
     });
   }
 
   const tiktokAccounts = await getTiktokAccounts();
   for (const a of tiktokAccounts) {
-    if (!a.is_active || a.token_expired || a.expiry_alert_sent_at) continue;
+    if (!a.is_active || a.token_expired) continue;
     const days = daysUntil(a.refresh_token_expires_at);
-    if (days === null || days > TIKTOK_WARN_WITHIN_DAYS) continue;
+    const tier = pickTier(days, TIKTOK_WARN_WITHIN_DAYS, !!a.expiry_alert_sent_at, !!a.urgent_alert_sent_at);
+    if (!tier || days === null) continue;
     items.push({
+      tier,
       emoji: "⚫",
       platform: "TikTok",
       label: a.display_name || a.username || a.open_id,
       brand: a.brand,
       days,
-      markNotified: () => setTiktokAccountSyncStatus(a.open_id, { expiry_alert_sent_at: new Date().toISOString() }),
+      markNotified: () =>
+        setTiktokAccountSyncStatus(a.open_id, {
+          [tier === "urgent" ? "urgent_alert_sent_at" : "expiry_alert_sent_at"]: new Date().toISOString(),
+        }),
     });
   }
 
   const youtubeAccounts = await getYoutubeAccounts();
   for (const a of youtubeAccounts) {
-    if (!a.is_active || a.token_expired || a.expiry_alert_sent_at) continue;
+    if (!a.is_active || a.token_expired) continue;
     const days = daysUntil(a.refresh_token_expires_at);
-    if (days === null || days > YOUTUBE_WARN_WITHIN_DAYS) continue;
+    const tier = pickTier(days, YOUTUBE_WARN_WITHIN_DAYS, !!a.expiry_alert_sent_at, !!a.urgent_alert_sent_at);
+    if (!tier || days === null) continue;
     items.push({
+      tier,
       emoji: "🔴",
       platform: "YouTube",
       label: a.channel_title || a.channel_id,
       brand: a.brand,
       days,
-      markNotified: () => setYoutubeAccountSyncStatus(a.channel_id, { expiry_alert_sent_at: new Date().toISOString() }),
+      markNotified: () =>
+        setYoutubeAccountSyncStatus(a.channel_id, {
+          [tier === "urgent" ? "urgent_alert_sent_at" : "expiry_alert_sent_at"]: new Date().toISOString(),
+        }),
     });
   }
 
@@ -109,6 +153,12 @@ export interface ExpiryCheckResult {
   expiringCount: number;
   notified: boolean;
   error?: string;
+}
+
+function formatLine(it: ExpiringItem): string {
+  const prefix = it.tier === "urgent" ? "🚨 <b>KHẨN CẤP</b>" : it.emoji;
+  const daysText = it.days <= 0 ? "hôm nay hoặc đã quá hạn" : `còn <b>${it.days} ngày</b>`;
+  return `${prefix} <b>${escapeHtml(it.platform)}</b> — ${escapeHtml(it.label)}${it.brand ? ` (${escapeHtml(it.brand)})` : ""}: ${daysText}`;
 }
 
 // Called from GET /api/cron/facebook-sync (see app.ts) — same daily cadence
@@ -127,9 +177,13 @@ export async function checkExpiringConnectionsAndNotify(): Promise<ExpiryCheckRe
     return { checked: true, expiringCount: expiring.length, notified: false, error: "Telegram chưa cấu hình" };
   }
 
-  const lines = expiring
-    .sort((a, b) => a.days - b.days)
-    .map((it) => `${it.emoji} <b>${escapeHtml(it.platform)}</b> — ${escapeHtml(it.label)}${it.brand ? ` (${escapeHtml(it.brand)})` : ""}: còn <b>${Math.max(it.days, 0)} ngày</b>`);
+  // Urgent items first (most actionable), then standard, each group sorted
+  // by days remaining ascending.
+  const sorted = [...expiring].sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier === "urgent" ? -1 : 1;
+    return a.days - b.days;
+  });
+  const lines = sorted.map(formatLine);
 
   const text = `⚠️ <b>Cảnh báo kết nối sắp hết hạn</b>\n\n${lines.join("\n")}\n\nVào Control Panel → "Kết nối nền tảng" để cấp lại token/kết nối lại trước khi hết hạn.`;
 

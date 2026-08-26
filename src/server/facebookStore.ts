@@ -48,6 +48,13 @@ export interface FbPageConfig {
   // Reset to null by upsertFbPage whenever the Admin saves a fresh token
   // (new token = new deadline = worth re-arming the alert).
   expiry_alert_sent_at: string | null;
+  // Separate, independent dedupe for the 1-day "urgent" escalation tier (see
+  // expiryNotifier.ts) — fires once more, on top of expiry_alert_sent_at
+  // above, as the deadline gets critical, so a connection that already got
+  // the first warning still gets one final urgent nudge instead of going
+  // quiet until it actually dies. Reset to null on reconnect, same as
+  // expiry_alert_sent_at.
+  urgent_alert_sent_at: string | null;
   created_at: string;
 }
 
@@ -152,6 +159,7 @@ export async function upsertFbPage(input: {
       token_data_access_expires_at: null,
       token_checked_at: null,
       expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
       created_at: existing?.created_at || new Date().toISOString(),
     };
     const rest = fb_pages.filter((p) => p.page_id !== input.page_id);
@@ -171,6 +179,7 @@ export async function upsertFbPage(input: {
       token_data_access_expires_at: null,
       token_checked_at: null,
       expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
     },
     { onConflict: "page_id" }
   );
@@ -203,6 +212,7 @@ export async function setFbPageSyncStatus(
     token_data_access_expires_at?: string | null;
     token_checked_at?: string | null;
     expiry_alert_sent_at?: string | null;
+    urgent_alert_sent_at?: string | null;
   }
 ): Promise<void> {
   if (!isSupabaseConfigured) {

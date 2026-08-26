@@ -32,6 +32,9 @@ export interface TiktokAccountConfig {
   // OAuth exchange, full-row replace) passes null here so a reconnect
   // re-arms it — see tiktokSync.ts's OAuth callback.
   expiry_alert_sent_at: string | null;
+  // Separate, independent dedupe for the 1-day "urgent" escalation tier (see
+  // expiryNotifier.ts) — same purpose as fb_pages' column of the same name.
+  urgent_alert_sent_at: string | null;
   created_at: string;
 }
 
@@ -132,7 +135,7 @@ export async function deleteTiktokAccount(openId: string): Promise<void> {
 
 export async function setTiktokAccountSyncStatus(
   openId: string,
-  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean; expiry_alert_sent_at?: string | null }
+  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean; expiry_alert_sent_at?: string | null; urgent_alert_sent_at?: string | null }
 ): Promise<void> {
   if (!isSupabaseConfigured) {
     const { store, tiktok_accounts } = await readLocalCollections();

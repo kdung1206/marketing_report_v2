@@ -182,6 +182,10 @@ alter table fb_pages add column if not exists token_checked_at timestamptz;
 -- (see src/server/expiryNotifier.ts) — set once an alert actually goes out
 -- for the current token, cleared on reconnect so a new token re-arms it.
 alter table fb_pages add column if not exists expiry_alert_sent_at timestamptz;
+-- Existing projects created before the 1-day "urgent" escalation tier
+-- shipped — independent dedupe from expiry_alert_sent_at above, see
+-- expiryNotifier.ts.
+alter table fb_pages add column if not exists urgent_alert_sent_at timestamptz;
 
 alter table fb_pages enable row level security;
 
@@ -316,6 +320,7 @@ create table if not exists tiktok_accounts (
 -- Existing projects created before the Telegram expiry-alert push shipped
 -- (see src/server/expiryNotifier.ts) — same purpose as fb_pages' column.
 alter table tiktok_accounts add column if not exists expiry_alert_sent_at timestamptz;
+alter table tiktok_accounts add column if not exists urgent_alert_sent_at timestamptz;
 
 alter table tiktok_accounts enable row level security;
 
@@ -384,6 +389,7 @@ alter table youtube_accounts add column if not exists refresh_token_expires_at t
 -- Existing projects created before the Telegram expiry-alert push shipped
 -- (see src/server/expiryNotifier.ts) — same purpose as fb_pages' column.
 alter table youtube_accounts add column if not exists expiry_alert_sent_at timestamptz;
+alter table youtube_accounts add column if not exists urgent_alert_sent_at timestamptz;
 
 alter table youtube_accounts enable row level security;
 

@@ -74,7 +74,7 @@ export default function DriveBackupAdmin() {
   }
 
   async function handleDisconnect() {
-    if (!window.confirm("Ngắt kết nối Google Drive? Lịch sao lưu tự động hàng ngày sẽ dừng cho tới khi kết nối lại.")) return;
+    if (!window.confirm("Ngắt kết nối Google Drive? Lịch sao lưu tự động hàng tuần sẽ dừng cho tới khi kết nối lại.")) return;
     try {
       const result = await safeFetchJson("/api/backup/drive/disconnect", { method: "DELETE" });
       if (result.success) await loadStatus();
@@ -135,8 +135,8 @@ export default function DriveBackupAdmin() {
         <div>
           <h3 className="font-bold text-slate-900 text-sm">Sao Lưu Database Đầy Đủ Lên Google Drive</h3>
           <p className="text-[11px] text-slate-500">
-            Tự động sao lưu <strong>toàn bộ</strong> database (mọi bảng, không chỉ dữ liệu báo cáo như email backup ở trên) mỗi ngày lên Google Drive dưới
-            dạng file JSON. Kết nối bằng đăng nhập Google thật (OAuth) — không dán token tay. File cũ hơn số ngày lưu trữ dưới đây sẽ tự bị xóa.
+            Tự động sao lưu <strong>toàn bộ</strong> database (mọi bảng, không chỉ dữ liệu báo cáo như email backup ở trên) vào <strong>9h sáng thứ Ba hàng tuần</strong> lên
+            Google Drive dưới dạng file JSON. Kết nối bằng đăng nhập Google thật (OAuth) — không dán token tay. File cũ hơn số ngày lưu trữ dưới đây sẽ tự bị xóa.
           </p>
         </div>
       </div>

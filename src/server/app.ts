@@ -636,17 +636,16 @@ function isValidCronRequest(req: express.Request): boolean {
   return crypto.timingSafeEqual(expectedDigest, providedDigest);
 }
 
-// GET /api/cron/weekly-backup — route name is legacy (kept so existing
-// docs/muscle-memory referencing it still work, even though the schedule is
-// now daily, not weekly, and the email step this was originally named after
-// was removed 2026-08-26 in favor of the Google Drive backup below). Hit by
-// Vercel Cron once daily (10:00 UTC = 17:00 ICT, see vercel.json). Not
-// session-authenticated (Vercel Cron has no user to log in as) — instead
-// requires the CRON_SECRET env var to match, which Vercel automatically
-// sends as `Authorization: Bearer <CRON_SECRET>` when that env var is
-// configured on the project. Never runs in local dev: there's no real
-// Drive connection there anyway (see supabaseClient.ts), and this route
-// only matters for the deployed schedule.
+// GET /api/cron/weekly-backup — the email step this route was originally
+// named after was removed 2026-08-26 in favor of the Google Drive backup
+// below, and it briefly ran daily during that transition; now back to
+// genuinely weekly, every Tuesday 02:00 UTC = 09:00 ICT (see vercel.json).
+// Not session-authenticated (Vercel Cron has no user to log in as) —
+// instead requires the CRON_SECRET env var to match, which Vercel
+// automatically sends as `Authorization: Bearer <CRON_SECRET>` when that
+// env var is configured on the project. Never runs in local dev: there's
+// no real Drive connection there anyway (see supabaseClient.ts), and this
+// route only matters for the deployed schedule.
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
@@ -1516,6 +1515,7 @@ app.get("/api/tiktok/oauth/callback", async (req, res) => {
       last_sync_error: null,
       token_expired: false,
       expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
       created_at: new Date().toISOString(),
     });
 
@@ -1705,6 +1705,7 @@ app.get("/api/youtube/oauth/callback", async (req, res) => {
       last_sync_error: null,
       token_expired: false,
       expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
       created_at: new Date().toISOString(),
     });
 
