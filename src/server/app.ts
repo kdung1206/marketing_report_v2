@@ -45,7 +45,6 @@ import {
   YOUTUBE_AUTHORIZE_URL,
   YOUTUBE_SCOPES,
 } from "./youtubeSync";
-import { checkExpiringConnectionsAndNotify } from "./expiryNotifier";
 import {
   exchangeDriveCode,
   fetchGoogleEmail,
@@ -1210,17 +1209,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
         : Promise.resolve([]),
     ]);
 
-    // Runs after the syncs above (not inside the same Promise.all) so it
-    // reads each platform's freshest token_checked_at/expires_at — Facebook's
-    // debug_token probe in particular only just ran as part of runFacebookSync.
-    // Never lets an expiry-check failure fail the whole cron response; the
-    // syncs above are the part that actually keeps data fresh.
-    const expiryCheck = await checkExpiringConnectionsAndNotify().catch((err) => {
-      console.error("GET /api/cron/facebook-sync (expiry check) error:", err);
-      return { checked: false, expiringCount: 0, notified: false, error: err.message };
-    });
-
-    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults, expiryCheck });
+    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
