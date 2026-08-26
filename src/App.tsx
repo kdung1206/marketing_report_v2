@@ -560,7 +560,7 @@ export default function App() {
   // user request — same "section + sub-tab" shape as "Log hệ thống" below.
   // Editors never see "facebook" (credentials are Admin-only) so they default
   // straight to "google" instead of landing on a sub-tab they can't use.
-  const [platformSubTab, setPlatformSubTab] = useState<"facebook" | "google" | "tiktok" | "youtube">(() =>
+  const [platformSubTab, setPlatformSubTab] = useState<"facebook" | "google" | "tiktok">(() =>
     currentUser?.role === "Admin" ? "facebook" : "google"
   );
 
@@ -579,10 +579,11 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("youtubeConnected") === "1") {
       // Same full-page-redirect problem as TikTok's OAuth callback above,
-      // Google's flavor of it.
+      // Google's flavor of it. YouTube's connection UI now lives inside the
+      // merged "google" sub-tab (see platform-connections render block).
       setActiveTab("control-panel");
       setControlPanelSection("platform-connections");
-      setPlatformSubTab("youtube");
+      setPlatformSubTab("google");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("driveBackupConnected") === "1") {
       // Same OAuth-redirect problem, this time for the Drive backup
@@ -3029,7 +3030,7 @@ export default function App() {
                           isActive && platformSubTab === "google" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
                         }`}
                       >
-                        Google Ads
+                        Google
                       </button>
                       <button
                         id="control_section_btn_platform_tiktok"
@@ -3041,22 +3042,8 @@ export default function App() {
                           isActive && platformSubTab === "tiktok" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
                         }`}
                       >
-                        TikTok Ads
+                        TikTok
                       </button>
-                      {currentUser.role === "Admin" && (
-                        <button
-                          id="control_section_btn_platform_youtube"
-                          onClick={() => {
-                            setControlPanelSection("platform-connections");
-                            setPlatformSubTab("youtube");
-                          }}
-                          className={`block w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-xs font-medium transition-all ${
-                            isActive && platformSubTab === "youtube" ? "bg-indigo-50 text-indigo-700" : "text-slate-500 hover:bg-slate-50"
-                          }`}
-                        >
-                          YouTube
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -6130,16 +6117,16 @@ export default function App() {
               </div>
             )}
             {controlPanelSection === "platform-connections" && platformSubTab === "google" && (
-              <AdsUploadAdmin channel="google" />
+              <div className="space-y-6">
+                {currentUser && currentUser.role === "Admin" && <YoutubeAccountsAdmin />}
+                <AdsUploadAdmin channel="google" />
+              </div>
             )}
             {controlPanelSection === "platform-connections" && platformSubTab === "tiktok" && (
               <div className="space-y-6">
                 {currentUser && currentUser.role === "Admin" && <TiktokAccountsAdmin />}
                 <AdsUploadAdmin channel="tiktok" />
               </div>
-            )}
-            {controlPanelSection === "platform-connections" && platformSubTab === "youtube" && currentUser && currentUser.role === "Admin" && (
-              <YoutubeAccountsAdmin />
             )}
 
             {/* ------------------------------------------------------------

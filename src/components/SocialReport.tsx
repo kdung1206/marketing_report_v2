@@ -605,7 +605,7 @@ function YoutubeSection({
       <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
         <h2 className="mt-3 text-sm font-bold text-slate-800">Chưa có kênh YouTube nào gán cho thương hiệu này</h2>
-        <p className="mt-1 text-xs text-slate-500">Vào Control Panel → "Kết nối nền tảng" → YouTube (Admin) để kết nối kênh YouTube qua OAuth.</p>
+        <p className="mt-1 text-xs text-slate-500">Vào Control Panel → "Kết nối nền tảng" → Google (Admin) để kết nối kênh YouTube qua OAuth.</p>
       </div>
     );
   }

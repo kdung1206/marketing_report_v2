@@ -42,6 +42,12 @@ export interface FbPageConfig {
   token_expires_at: string | null;
   token_data_access_expires_at: string | null;
   token_checked_at: string | null;
+  // Set by expiryNotifier.ts the first time this Page's expiry crosses its
+  // warning window and a Telegram alert actually goes out — prevents
+  // re-alerting every single day the deadline stays inside that window.
+  // Reset to null by upsertFbPage whenever the Admin saves a fresh token
+  // (new token = new deadline = worth re-arming the alert).
+  expiry_alert_sent_at: string | null;
   created_at: string;
 }
 
@@ -145,6 +151,7 @@ export async function upsertFbPage(input: {
       token_expires_at: null,
       token_data_access_expires_at: null,
       token_checked_at: null,
+      expiry_alert_sent_at: null,
       created_at: existing?.created_at || new Date().toISOString(),
     };
     const rest = fb_pages.filter((p) => p.page_id !== input.page_id);
@@ -163,6 +170,7 @@ export async function upsertFbPage(input: {
       token_expires_at: null,
       token_data_access_expires_at: null,
       token_checked_at: null,
+      expiry_alert_sent_at: null,
     },
     { onConflict: "page_id" }
   );
@@ -194,6 +202,7 @@ export async function setFbPageSyncStatus(
     token_expires_at?: string | null;
     token_data_access_expires_at?: string | null;
     token_checked_at?: string | null;
+    expiry_alert_sent_at?: string | null;
   }
 ): Promise<void> {
   if (!isSupabaseConfigured) {

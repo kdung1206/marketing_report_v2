@@ -178,6 +178,10 @@ create table if not exists fb_pages (
 alter table fb_pages add column if not exists token_expires_at timestamptz;
 alter table fb_pages add column if not exists token_data_access_expires_at timestamptz;
 alter table fb_pages add column if not exists token_checked_at timestamptz;
+-- Existing projects created before the Telegram expiry-alert push shipped
+-- (see src/server/expiryNotifier.ts) — set once an alert actually goes out
+-- for the current token, cleared on reconnect so a new token re-arms it.
+alter table fb_pages add column if not exists expiry_alert_sent_at timestamptz;
 
 alter table fb_pages enable row level security;
 
@@ -309,6 +313,10 @@ create table if not exists tiktok_accounts (
   created_at timestamptz not null default now()
 );
 
+-- Existing projects created before the Telegram expiry-alert push shipped
+-- (see src/server/expiryNotifier.ts) — same purpose as fb_pages' column.
+alter table tiktok_accounts add column if not exists expiry_alert_sent_at timestamptz;
+
 alter table tiktok_accounts enable row level security;
 
 -- TikTok's public API has no historical follower series (unlike video
@@ -373,6 +381,9 @@ create table if not exists youtube_accounts (
 
 -- Existing projects created before the token-expiry warning shipped.
 alter table youtube_accounts add column if not exists refresh_token_expires_at timestamptz;
+-- Existing projects created before the Telegram expiry-alert push shipped
+-- (see src/server/expiryNotifier.ts) — same purpose as fb_pages' column.
+alter table youtube_accounts add column if not exists expiry_alert_sent_at timestamptz;
 
 alter table youtube_accounts enable row level security;
 

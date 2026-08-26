@@ -26,6 +26,12 @@ export interface TiktokAccountConfig {
   last_synced_at: string | null;
   last_sync_error: string | null;
   token_expired: boolean;
+  // Set by expiryNotifier.ts the first time this account's refresh_token
+  // deadline crosses its warning window and a Telegram alert goes out —
+  // avoids re-alerting daily. Every caller of upsertTiktokAccount (a fresh
+  // OAuth exchange, full-row replace) passes null here so a reconnect
+  // re-arms it — see tiktokSync.ts's OAuth callback.
+  expiry_alert_sent_at: string | null;
   created_at: string;
 }
 
@@ -126,7 +132,7 @@ export async function deleteTiktokAccount(openId: string): Promise<void> {
 
 export async function setTiktokAccountSyncStatus(
   openId: string,
-  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean }
+  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean; expiry_alert_sent_at?: string | null }
 ): Promise<void> {
   if (!isSupabaseConfigured) {
     const { store, tiktok_accounts } = await readLocalCollections();

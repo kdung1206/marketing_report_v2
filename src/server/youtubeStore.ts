@@ -36,6 +36,12 @@ export interface YoutubeAccountConfig {
   last_synced_at: string | null;
   last_sync_error: string | null;
   token_expired: boolean;
+  // Set by expiryNotifier.ts the first time this channel's refresh_token
+  // deadline crosses its warning window and a Telegram alert goes out —
+  // avoids re-alerting daily. Every caller of upsertYoutubeAccount (a fresh
+  // OAuth exchange, full-row replace) passes null here so a reconnect
+  // re-arms it.
+  expiry_alert_sent_at: string | null;
   created_at: string;
 }
 
@@ -133,7 +139,7 @@ export async function deleteYoutubeAccount(channelId: string): Promise<void> {
 
 export async function setYoutubeAccountSyncStatus(
   channelId: string,
-  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean }
+  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean; expiry_alert_sent_at?: string | null }
 ): Promise<void> {
   if (!isSupabaseConfigured) {
     const { store, youtube_accounts } = await readLocalCollections();
