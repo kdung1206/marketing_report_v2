@@ -71,13 +71,23 @@ interface GoogleTokenResponse {
   token_type: string;
 }
 
+async function readResponseBody(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.slice(0, 500) };
+  }
+}
+
 async function postGoogleToken(params: Record<string, string>): Promise<GoogleTokenResponse> {
   const res = await fetch(GOOGLE_ADS_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString(),
   });
-  const body = await res.json();
+  const body = await readResponseBody(res);
   if (!res.ok || body?.error) {
     throw new Error(body?.error_description || body?.error || `Google OAuth trả về lỗi HTTP ${res.status}`);
   }
@@ -143,7 +153,7 @@ async function fetchGoogleAdsRows(
     headers,
     body: JSON.stringify({ query }),
   });
-  const body = await res.json();
+  const body = await readResponseBody(res);
   if (!res.ok || body?.error) {
     throw new Error(extractGoogleAdsApiError(body, `Google Ads API trả về lỗi HTTP ${res.status}`));
   }
