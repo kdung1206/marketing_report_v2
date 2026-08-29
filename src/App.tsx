@@ -146,6 +146,17 @@ export async function safeFetchJson(url: string, options?: RequestInit) {
     // the user out client-side too, instead of silently failing forever.
     window.dispatchEvent(new Event("auth:expired"));
   }
+  if (!response.ok && !trimmed.startsWith("<")) {
+    try {
+      const parsed = JSON.parse(text);
+      const err: any = new Error(parsed?.error || parsed?.message || `API request failed (status: ${response.status})`);
+      err.status = response.status;
+      err.payload = parsed;
+      throw err;
+    } catch (parseErr: any) {
+      if (parseErr?.payload) throw parseErr;
+    }
+  }
   if (trimmed.startsWith("<") || !response.ok) {
     // Attach the HTTP status so callers can tell "not logged in / no
     // permission" (401/403) apart from a genuine network/offline failure —

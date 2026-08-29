@@ -1463,35 +1463,51 @@ function getAdsSyncOverrides(body: any): { since?: string; until?: string } | un
 
 // GET /api/google-ads/oauth/start — Admin-only OAuth start for paid Google Ads.
 app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
-  if (!isGoogleAdsConfigured) {
-    return res.status(400).json({
+  try {
+    if (!isGoogleAdsConfigured) {
+      return res.status(400).json({
+        success: false,
+        error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN chưa được cấu hình đầy đủ.",
+      });
+    }
+    const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.trim() : "";
+    const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
+    if (!customerId || !accountName) {
+      return res.status(400).json({ success: false, error: "Thiếu Customer ID hoặc tên Google Ads Account." });
+    }
+
+    const payload = {
+      customerId,
+      accountName,
+      brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
+      loginCustomerId: typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim() ? req.query.login_customer_id.trim() : null,
+      username: (req as any).session.username,
+    };
+    const params = new URLSearchParams({
+      client_id: GOOGLE_ADS_CLIENT_ID,
+      redirect_uri: GOOGLE_ADS_REDIRECT_URI,
+      response_type: "code",
+      scope: GOOGLE_ADS_SCOPES.join(" "),
+      state: signOAuthState(payload),
+      access_type: "offline",
+      prompt: "select_account consent",
+    });
+
+    console.info("Google Ads OAuth start", {
+      clientId: GOOGLE_ADS_CLIENT_ID,
+      redirectUri: GOOGLE_ADS_REDIRECT_URI,
+      customerId,
+      loginCustomerId: payload.loginCustomerId,
+    });
+
+    res.json({ success: true, authorizeUrl: `${GOOGLE_ADS_AUTHORIZE_URL}?${params.toString()}` });
+  } catch (err: any) {
+    console.error("GET /api/google-ads/oauth/start error:", err);
+    res.status(500).json({
       success: false,
-      error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN chưa được cấu hình đầy đủ.",
+      error: err?.message || "Không tạo được liên kết Google Ads OAuth.",
     });
   }
-  const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.trim() : "";
-  const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
-  if (!customerId || !accountName) {
-    return res.status(400).json({ success: false, error: "Thiếu Customer ID hoặc tên Google Ads Account." });
-  }
-
-  const payload = {
-    customerId,
-    accountName,
-    brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
-    loginCustomerId: typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim() ? req.query.login_customer_id.trim() : null,
-    username: (req as any).session.username,
-  };
-  const params = new URLSearchParams({
-    client_id: GOOGLE_ADS_CLIENT_ID,
-    redirect_uri: GOOGLE_ADS_REDIRECT_URI,
-    response_type: "code",
-    scope: GOOGLE_ADS_SCOPES.join(" "),
-    state: signOAuthState(payload),
-    access_type: "offline",
-    prompt: "select_account consent",
-  });
-  res.json({ success: true, authorizeUrl: `${GOOGLE_ADS_AUTHORIZE_URL}?${params.toString()}` });
 });
 
 // GET /api/google-ads/oauth/callback — Google redirects here after consent.
