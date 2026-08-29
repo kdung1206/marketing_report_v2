@@ -14,3 +14,4 @@ src/db_store.json
 # One-off local exports from scripts/export-db.ts — a snapshot of live data,
 # not something that belongs in version control.
 db_export.json
+.vercel
