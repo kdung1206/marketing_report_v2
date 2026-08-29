@@ -26,6 +26,7 @@ import AdsUploadAdmin from "./components/AdsUploadAdmin";
 import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
 import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
 import DriveBackupAdmin from "./components/DriveBackupAdmin";
+import PaidAdsApiAccountsAdmin from "./components/PaidAdsApiAccountsAdmin";
 import {
   TrendingUp,
   Award,
@@ -418,6 +419,12 @@ const ACTION_LABELS: Record<string, string> = {
   "sync-data": "Đồng bộ tệp ngoại tuyến",
   "reset-data": "Khôi phục mặc định",
   "send-backup-now": "Gửi thử email backup",
+  "connect-google-ads-account": "Kết nối Google Ads",
+  "delete-google-ads-account": "Xóa Google Ads",
+  "sync-google-ads": "Đồng bộ Google Ads",
+  "save-tiktok-ads-account": "Sửa TikTok Ads",
+  "delete-tiktok-ads-account": "Xóa TikTok Ads",
+  "sync-tiktok-ads": "Đồng bộ TikTok Ads",
 };
 
 export default function App() {
@@ -576,6 +583,11 @@ export default function App() {
       setActiveTab("control-panel");
       setControlPanelSection("platform-connections");
       setPlatformSubTab("tiktok");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("googleAdsConnected") === "1") {
+      setActiveTab("control-panel");
+      setControlPanelSection("platform-connections");
+      setPlatformSubTab("google");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("youtubeConnected") === "1") {
       // Same full-page-redirect problem as TikTok's OAuth callback above,
@@ -6119,12 +6131,14 @@ export default function App() {
             {controlPanelSection === "platform-connections" && platformSubTab === "google" && (
               <div className="space-y-6">
                 {currentUser && currentUser.role === "Admin" && <YoutubeAccountsAdmin />}
+                {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="google" />}
                 <AdsUploadAdmin channel="google" />
               </div>
             )}
             {controlPanelSection === "platform-connections" && platformSubTab === "tiktok" && (
               <div className="space-y-6">
                 {currentUser && currentUser.role === "Admin" && <TiktokAccountsAdmin />}
+                {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="tiktok" />}
                 <AdsUploadAdmin channel="tiktok" />
               </div>
             )}

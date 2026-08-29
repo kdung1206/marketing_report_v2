@@ -19,10 +19,26 @@ import {
   getFbAdAccounts,
   upsertFbAdAccount,
   deleteFbAdAccount,
+  getGoogleAdsAccounts,
+  upsertGoogleAdsAccount,
+  deleteGoogleAdsAccount,
+  getTiktokAdsAccounts,
+  upsertTiktokAdsAccount,
+  deleteTiktokAdsAccount,
   AdsChannel,
   AdsPerformanceRow,
 } from "./adsPerformanceStore";
 import { runFacebookAdsSync } from "./facebookAdsSync";
+import {
+  exchangeGoogleAdsCode,
+  GOOGLE_ADS_AUTHORIZE_URL,
+  GOOGLE_ADS_CLIENT_ID,
+  GOOGLE_ADS_REDIRECT_URI,
+  GOOGLE_ADS_SCOPES,
+  isGoogleAdsConfigured,
+  runGoogleAdsSync,
+  runTiktokAdsSync,
+} from "./paidAdsApiSync";
 import { getTiktokAccounts, deleteTiktokAccount, upsertTiktokAccount, getTiktokInsightsDaily, getTiktokPosts } from "./tiktokStore";
 import {
   exchangeTiktokCode,
@@ -1183,13 +1199,23 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const [pageResults, adsResults, tiktokResults, youtubeResults] = await Promise.all([
+    const [pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults] = await Promise.all([
       runFacebookSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (page insights) error:", err);
         return [];
       }),
       runFacebookAdsSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (ads) error:", err);
+        return [];
+      }),
+      isGoogleAdsConfigured
+        ? runGoogleAdsSync().catch((err) => {
+            console.error("GET /api/cron/facebook-sync (google ads) error:", err);
+            return [];
+          })
+        : Promise.resolve([]),
+      runTiktokAdsSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (tiktok ads) error:", err);
         return [];
       }),
       // TikTok organic insights piggybacks on this same cron for the same
@@ -1219,7 +1245,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       return { checked: false, expiringCount: 0, notified: false, error: err.message };
     });
 
-    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults, expiryCheck });
+    res.json({ success: true, results: pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, expiryCheck });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -1422,6 +1448,196 @@ app.post("/api/fb-ads/sync-now", requireAuth("Admin"), async (req, res) => {
       "sync-facebook-ads",
       overrides ? `Đồng bộ thủ công ${results.length} Ad Account (từ ${overrides.since})` : `Đồng bộ thủ công ${results.length} Ad Account`
     );
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+function getAdsSyncOverrides(body: any): { since?: string; until?: string } | undefined {
+  const { since, until } = body || {};
+  return typeof since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(since)
+    ? { since, until: typeof until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(until) ? until : undefined }
+    : undefined;
+}
+
+// GET /api/google-ads/oauth/start — Admin-only OAuth start for paid Google Ads.
+app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isGoogleAdsConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN chưa được cấu hình đầy đủ.",
+    });
+  }
+  const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.trim() : "";
+  const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
+  if (!customerId || !accountName) {
+    return res.status(400).json({ success: false, error: "Thiếu Customer ID hoặc tên Google Ads Account." });
+  }
+
+  const payload = {
+    customerId,
+    accountName,
+    brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
+    loginCustomerId: typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim() ? req.query.login_customer_id.trim() : null,
+    username: (req as any).session.username,
+  };
+  const params = new URLSearchParams({
+    client_id: GOOGLE_ADS_CLIENT_ID,
+    redirect_uri: GOOGLE_ADS_REDIRECT_URI,
+    response_type: "code",
+    scope: GOOGLE_ADS_SCOPES.join(" "),
+    state: signOAuthState(payload),
+    access_type: "offline",
+    prompt: "select_account consent",
+  });
+  res.json({ success: true, authorizeUrl: `${GOOGLE_ADS_AUTHORIZE_URL}?${params.toString()}` });
+});
+
+// GET /api/google-ads/oauth/callback — Google redirects here after consent.
+app.get("/api/google-ads/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+  if (oauthError) return res.status(400).send(`Kết nối Google Ads bị hủy hoặc lỗi: ${oauthError}`);
+
+  const payload = verifyOAuthState<{
+    customerId: string;
+    accountName: string;
+    brand: string | null;
+    loginCustomerId: string | null;
+    username: string;
+  }>(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Liên kết xác thực Google Ads không hợp lệ hoặc đã hết hạn — vui lòng thử lại từ Control Panel.");
+  }
+
+  try {
+    const tokens = await exchangeGoogleAdsCode(code, GOOGLE_ADS_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google không trả về refresh_token — vui lòng thử kết nối lại và duyệt đầy đủ màn hình xin quyền.");
+    }
+    await upsertGoogleAdsAccount({
+      customer_id: payload.customerId,
+      account_name: payload.accountName,
+      brand: payload.brand,
+      login_customer_id: payload.loginCustomerId,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      is_active: true,
+    });
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-google-ads-account", `Kết nối Google Ads ${payload.accountName}`);
+    res.redirect(302, "/?googleAdsConnected=1");
+  } catch (err: any) {
+    console.error("GET /api/google-ads/oauth/callback error:", err);
+    res.status(500).send(`Kết nối Google Ads thất bại: ${err.message}`);
+  }
+});
+
+// GET /api/google-ads/accounts — list connected Google Ads accounts.
+app.get("/api/google-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getGoogleAdsAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        account_id: a.customer_id,
+        account_name: a.account_name,
+        brand: a.brand,
+        login_customer_id: a.login_customer_id,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+      })),
+      googleAdsConfigured: isGoogleAdsConfigured,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/google-ads/accounts/:customer_id
+app.delete("/api/google-ads/accounts/:customer_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteGoogleAdsAccount(req.params.customer_id);
+    await logAction((req as any).session, req, "delete-google-ads-account", `Xóa Google Ads Account ${req.params.customer_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/google-ads/sync-now — Admin-only manual trigger.
+app.post("/api/google-ads/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const overrides = getAdsSyncOverrides(req.body);
+    const results = await runGoogleAdsSync(overrides);
+    await logAction((req as any).session, req, "sync-google-ads", `Đồng bộ thủ công ${results.length} Google Ads Account`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/tiktok-ads/accounts — list configured TikTok Ads advertisers.
+app.get("/api/tiktok-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getTiktokAdsAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        account_id: a.advertiser_id,
+        account_name: a.account_name,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/tiktok-ads/accounts — add/update TikTok Business API credentials.
+app.post("/api/tiktok-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { advertiser_id, account_name, brand, access_token, is_active } = req.body;
+    if (!advertiser_id || !account_name || !access_token) {
+      return res.status(400).json({ success: false, error: "Thiếu advertiser_id, account_name hoặc access_token." });
+    }
+    await upsertTiktokAdsAccount({
+      advertiser_id: String(advertiser_id).trim(),
+      account_name: String(account_name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      access_token_encrypted: encrypt(String(access_token).trim()),
+      is_active: is_active !== undefined ? Boolean(is_active) : undefined,
+    });
+    await logAction((req as any).session, req, "save-tiktok-ads-account", `Cập nhật TikTok Ads Advertiser ${advertiser_id}`);
+    res.json({ success: true, message: "Đã lưu cấu hình TikTok Ads." });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/tiktok-ads/accounts/:advertiser_id
+app.delete("/api/tiktok-ads/accounts/:advertiser_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteTiktokAdsAccount(req.params.advertiser_id);
+    await logAction((req as any).session, req, "delete-tiktok-ads-account", `Xóa TikTok Ads Advertiser ${req.params.advertiser_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/tiktok-ads/sync-now — Admin-only manual trigger.
+app.post("/api/tiktok-ads/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const overrides = getAdsSyncOverrides(req.body);
+    const results = await runTiktokAdsSync(overrides);
+    await logAction((req as any).session, req, "sync-tiktok-ads", `Đồng bộ thủ công ${results.length} TikTok Ads Advertiser`);
     res.json({ success: true, results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

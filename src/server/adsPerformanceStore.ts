@@ -47,24 +47,60 @@ export interface FbAdAccountConfig {
   created_at: string;
 }
 
+export interface GoogleAdsAccountConfig {
+  customer_id: string;
+  account_name: string;
+  brand: string | null;
+  login_customer_id: string | null;
+  access_token_encrypted: string;
+  refresh_token_encrypted: string;
+  access_token_expires_at: string | null;
+  is_active: boolean;
+  last_synced_at: string | null;
+  last_sync_error: string | null;
+  token_expired: boolean;
+  created_at: string;
+}
+
+export interface TiktokAdsAccountConfig {
+  advertiser_id: string;
+  account_name: string;
+  brand: string | null;
+  access_token_encrypted: string;
+  is_active: boolean;
+  last_synced_at: string | null;
+  last_sync_error: string | null;
+  token_expired: boolean;
+  created_at: string;
+}
+
 // -- Local (src/db_store.json) helpers ---------------------------------------
 
 async function readLocalCollections(): Promise<{
   store: any;
   ads_performance: AdsPerformanceRow[];
   fb_ad_accounts: FbAdAccountConfig[];
+  google_ads_accounts: GoogleAdsAccountConfig[];
+  tiktok_ads_accounts: TiktokAdsAccountConfig[];
 }> {
   const store = await getDatabaseData();
   return {
     store,
     ads_performance: Array.isArray(store.ads_performance) ? store.ads_performance : [],
     fb_ad_accounts: Array.isArray(store.fb_ad_accounts) ? store.fb_ad_accounts : [],
+    google_ads_accounts: Array.isArray(store.google_ads_accounts) ? store.google_ads_accounts : [],
+    tiktok_ads_accounts: Array.isArray(store.tiktok_ads_accounts) ? store.tiktok_ads_accounts : [],
   };
 }
 
 async function writeLocalCollections(
   store: any,
-  updates: Partial<{ ads_performance: AdsPerformanceRow[]; fb_ad_accounts: FbAdAccountConfig[] }>
+  updates: Partial<{
+    ads_performance: AdsPerformanceRow[];
+    fb_ad_accounts: FbAdAccountConfig[];
+    google_ads_accounts: GoogleAdsAccountConfig[];
+    tiktok_ads_accounts: TiktokAdsAccountConfig[];
+  }>
 ): Promise<void> {
   await saveDatabaseData({ ...store, ...updates });
 }
@@ -208,4 +244,186 @@ export async function setFbAdAccountSyncStatus(
 
   const { error } = await supabase.from("fb_ad_accounts").update(status).eq("ad_account_id", adAccountId);
   if (error) throw new Error(`Lỗi cập nhật trạng thái đồng bộ Ad Account: ${error.message}`);
+}
+
+// -- Google Ads Accounts ------------------------------------------------------
+
+export async function getGoogleAdsAccounts(): Promise<GoogleAdsAccountConfig[]> {
+  if (!isSupabaseConfigured) {
+    const { google_ads_accounts } = await readLocalCollections();
+    return google_ads_accounts;
+  }
+
+  const { data, error } = await supabase.from("google_ads_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`Lỗi đọc danh sách Google Ads Account: ${error.message}`);
+  return data || [];
+}
+
+export async function upsertGoogleAdsAccount(input: {
+  customer_id: string;
+  account_name: string;
+  brand?: string | null;
+  login_customer_id?: string | null;
+  access_token_encrypted: string;
+  refresh_token_encrypted: string;
+  access_token_expires_at?: string | null;
+  is_active?: boolean;
+}): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections();
+    const existing = google_ads_accounts.find((a) => a.customer_id === input.customer_id);
+    const next: GoogleAdsAccountConfig = {
+      customer_id: input.customer_id,
+      account_name: input.account_name,
+      brand: input.brand !== undefined ? input.brand : existing?.brand ?? null,
+      login_customer_id: input.login_customer_id !== undefined ? input.login_customer_id : existing?.login_customer_id ?? null,
+      access_token_encrypted: input.access_token_encrypted,
+      refresh_token_encrypted: input.refresh_token_encrypted,
+      access_token_expires_at: input.access_token_expires_at ?? existing?.access_token_expires_at ?? null,
+      is_active: input.is_active !== undefined ? input.is_active : existing?.is_active !== false,
+      last_synced_at: existing?.last_synced_at || null,
+      last_sync_error: existing?.last_sync_error || null,
+      token_expired: existing?.token_expired || false,
+      created_at: existing?.created_at || new Date().toISOString(),
+    };
+    await writeLocalCollections(store, {
+      google_ads_accounts: [...google_ads_accounts.filter((a) => a.customer_id !== input.customer_id), next],
+    });
+    return;
+  }
+
+  const { error } = await supabase.from("google_ads_accounts").upsert(
+    {
+      customer_id: input.customer_id,
+      account_name: input.account_name,
+      brand: input.brand !== undefined ? input.brand : null,
+      login_customer_id: input.login_customer_id !== undefined ? input.login_customer_id : null,
+      access_token_encrypted: input.access_token_encrypted,
+      refresh_token_encrypted: input.refresh_token_encrypted,
+      access_token_expires_at: input.access_token_expires_at ?? null,
+      is_active: input.is_active !== undefined ? input.is_active : true,
+    },
+    { onConflict: "customer_id" }
+  );
+  if (error) throw new Error(`Lỗi lưu cấu hình Google Ads Account: ${error.message}`);
+}
+
+export async function deleteGoogleAdsAccount(customerId: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections();
+    await writeLocalCollections(store, { google_ads_accounts: google_ads_accounts.filter((a) => a.customer_id !== customerId) });
+    return;
+  }
+
+  const { error } = await supabase.from("google_ads_accounts").delete().eq("customer_id", customerId);
+  if (error) throw new Error(`Lỗi xóa cấu hình Google Ads Account: ${error.message}`);
+}
+
+export async function updateGoogleAdsAccountTokens(
+  customerId: string,
+  tokens: { access_token_encrypted: string; refresh_token_encrypted?: string; access_token_expires_at?: string | null }
+): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections();
+    const next = google_ads_accounts.map((a) => (a.customer_id === customerId ? { ...a, ...tokens } : a));
+    await writeLocalCollections(store, { google_ads_accounts: next });
+    return;
+  }
+
+  const { error } = await supabase.from("google_ads_accounts").update(tokens).eq("customer_id", customerId);
+  if (error) throw new Error(`Lỗi cập nhật token Google Ads: ${error.message}`);
+}
+
+export async function setGoogleAdsAccountSyncStatus(
+  customerId: string,
+  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean }
+): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections();
+    const next = google_ads_accounts.map((a) => (a.customer_id === customerId ? { ...a, ...status } : a));
+    await writeLocalCollections(store, { google_ads_accounts: next });
+    return;
+  }
+
+  const { error } = await supabase.from("google_ads_accounts").update(status).eq("customer_id", customerId);
+  if (error) throw new Error(`Lỗi cập nhật trạng thái đồng bộ Google Ads: ${error.message}`);
+}
+
+// -- TikTok Ads Accounts ------------------------------------------------------
+
+export async function getTiktokAdsAccounts(): Promise<TiktokAdsAccountConfig[]> {
+  if (!isSupabaseConfigured) {
+    const { tiktok_ads_accounts } = await readLocalCollections();
+    return tiktok_ads_accounts;
+  }
+
+  const { data, error } = await supabase.from("tiktok_ads_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`Lỗi đọc danh sách TikTok Ads Account: ${error.message}`);
+  return data || [];
+}
+
+export async function upsertTiktokAdsAccount(input: {
+  advertiser_id: string;
+  account_name: string;
+  brand?: string | null;
+  access_token_encrypted: string;
+  is_active?: boolean;
+}): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections();
+    const existing = tiktok_ads_accounts.find((a) => a.advertiser_id === input.advertiser_id);
+    const next: TiktokAdsAccountConfig = {
+      advertiser_id: input.advertiser_id,
+      account_name: input.account_name,
+      brand: input.brand !== undefined ? input.brand : existing?.brand ?? null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== undefined ? input.is_active : existing?.is_active !== false,
+      last_synced_at: existing?.last_synced_at || null,
+      last_sync_error: existing?.last_sync_error || null,
+      token_expired: existing?.token_expired || false,
+      created_at: existing?.created_at || new Date().toISOString(),
+    };
+    await writeLocalCollections(store, {
+      tiktok_ads_accounts: [...tiktok_ads_accounts.filter((a) => a.advertiser_id !== input.advertiser_id), next],
+    });
+    return;
+  }
+
+  const { error } = await supabase.from("tiktok_ads_accounts").upsert(
+    {
+      advertiser_id: input.advertiser_id,
+      account_name: input.account_name,
+      brand: input.brand !== undefined ? input.brand : null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== undefined ? input.is_active : true,
+    },
+    { onConflict: "advertiser_id" }
+  );
+  if (error) throw new Error(`Lỗi lưu cấu hình TikTok Ads Account: ${error.message}`);
+}
+
+export async function deleteTiktokAdsAccount(advertiserId: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections();
+    await writeLocalCollections(store, { tiktok_ads_accounts: tiktok_ads_accounts.filter((a) => a.advertiser_id !== advertiserId) });
+    return;
+  }
+
+  const { error } = await supabase.from("tiktok_ads_accounts").delete().eq("advertiser_id", advertiserId);
+  if (error) throw new Error(`Lỗi xóa cấu hình TikTok Ads Account: ${error.message}`);
+}
+
+export async function setTiktokAdsAccountSyncStatus(
+  advertiserId: string,
+  status: { last_synced_at?: string | null; last_sync_error?: string | null; token_expired?: boolean }
+): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections();
+    const next = tiktok_ads_accounts.map((a) => (a.advertiser_id === advertiserId ? { ...a, ...status } : a));
+    await writeLocalCollections(store, { tiktok_ads_accounts: next });
+    return;
+  }
+
+  const { error } = await supabase.from("tiktok_ads_accounts").update(status).eq("advertiser_id", advertiserId);
+  if (error) throw new Error(`Lỗi cập nhật trạng thái đồng bộ TikTok Ads: ${error.message}`);
 }

@@ -261,6 +261,37 @@ create table if not exists fb_ad_accounts (
 
 alter table fb_ad_accounts enable row level security;
 
+create table if not exists google_ads_accounts (
+  customer_id text primary key, -- Google Ads customer ID, with or without hyphens
+  account_name text not null,
+  brand text,
+  login_customer_id text, -- optional MCC / manager customer ID
+  access_token_encrypted text not null,
+  refresh_token_encrypted text not null,
+  access_token_expires_at timestamptz,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  token_expired boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table google_ads_accounts enable row level security;
+
+create table if not exists tiktok_ads_accounts (
+  advertiser_id text primary key,
+  account_name text not null,
+  brand text,
+  access_token_encrypted text not null,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  token_expired boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table tiktok_ads_accounts enable row level security;
+
 -- One row per channel/campaign/ad group/ad/day. Upserted on the composite key
 -- below so a re-upload (Google/TikTok) or a re-sync (Facebook) safely
 -- overwrites just the matching rows instead of duplicating or requiring a

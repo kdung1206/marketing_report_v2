@@ -224,6 +224,8 @@ const RELATIONAL_TABLES = [
   "fb_insights_daily",
   "fb_posts",
   "fb_ad_accounts",
+  "google_ads_accounts",
+  "tiktok_ads_accounts",
   "ads_performance",
   "tiktok_accounts",
   "tiktok_insights_daily",
