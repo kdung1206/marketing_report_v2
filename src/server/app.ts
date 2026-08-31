@@ -1470,17 +1470,27 @@ app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
         error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN chưa được cấu hình đầy đủ.",
       });
     }
-    const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.trim() : "";
+    const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.replace(/\D/g, "") : "";
     const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
     if (!customerId || !accountName) {
       return res.status(400).json({ success: false, error: "Thiếu Customer ID hoặc tên Google Ads Account." });
+    }
+    if (customerId.length !== 10) {
+      return res.status(400).json({ success: false, error: "Customer ID Google Ads phải gồm 10 chữ số." });
+    }
+    const loginCustomerId =
+      typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim()
+        ? req.query.login_customer_id.replace(/\D/g, "")
+        : null;
+    if (loginCustomerId && loginCustomerId.length !== 10) {
+      return res.status(400).json({ success: false, error: "Manager ID phải gồm 10 chữ số, không tính dấu gạch ngang." });
     }
 
     const payload = {
       customerId,
       accountName,
       brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
-      loginCustomerId: typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim() ? req.query.login_customer_id.trim() : null,
+      loginCustomerId,
       username: (req as any).session.username,
     };
     const params = new URLSearchParams({

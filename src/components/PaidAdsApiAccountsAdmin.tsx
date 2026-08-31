@@ -63,7 +63,7 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
   const [accountId, setAccountId] = useState("");
   const [accountName, setAccountName] = useState("");
   const [brand, setBrand] = useState<"Livotec" | "Karofi">("Livotec");
-  const [loginCustomerId, setLoginCustomerId] = useState("");
+  const [loginCustomerId, setLoginCustomerId] = useState("590-131-4360");
   const [accessToken, setAccessToken] = useState("");
   const [backfillSince, setBackfillSince] = useState("");
 
@@ -98,12 +98,22 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
     setIsSaving(true);
     setMessage(null);
     try {
+      const cleanCustomerId = accountId.replace(/\D/g, "");
+      const cleanLoginCustomerId = loginCustomerId.replace(/\D/g, "");
+      if (cleanCustomerId.length !== 10) {
+        setMessage({ type: "error", text: "Customer ID Google Ads phải gồm 10 chữ số, ví dụ 504-274-2203." });
+        return;
+      }
+      if (cleanLoginCustomerId && cleanLoginCustomerId.length !== 10) {
+        setMessage({ type: "error", text: "Manager ID phải gồm 10 chữ số, ví dụ 590-131-4360." });
+        return;
+      }
       const params = new URLSearchParams({
-        customer_id: accountId.trim(),
+        customer_id: cleanCustomerId,
         account_name: accountName.trim(),
         brand,
       });
-      if (loginCustomerId.trim()) params.set("login_customer_id", loginCustomerId.trim());
+      if (cleanLoginCustomerId) params.set("login_customer_id", cleanLoginCustomerId);
       const result = await safeFetchJson(`/api/google-ads/oauth/start?${params.toString()}`);
       if (result.success && result.authorizeUrl) {
         window.location.href = result.authorizeUrl;
@@ -260,9 +270,10 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
               type="text"
               value={loginCustomerId}
               onChange={(e) => setLoginCustomerId(e.target.value)}
-              placeholder="Tùy chọn"
+              placeholder="590-131-4360"
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
             />
+            <p className="text-[11px] text-slate-500">Bắt buộc khi truy cập client qua MCC.</p>
           </div>
         ) : (
           <div className="space-y-1.5">
