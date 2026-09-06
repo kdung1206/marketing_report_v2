@@ -61,6 +61,25 @@ import {
   YOUTUBE_AUTHORIZE_URL,
   YOUTUBE_SCOPES,
 } from "./youtubeSync";
+import {
+  getGoogleWebsiteAccounts,
+  upsertGoogleWebsiteAccount,
+  patchGoogleWebsiteAccount,
+  deleteGoogleWebsiteAccount,
+  getGa4InsightsDaily,
+  getSearchConsoleInsightsDaily,
+} from "./googleWebsiteStore";
+import {
+  exchangeGoogleWebsiteCode,
+  decodeIdToken,
+  listGa4Properties,
+  listSearchConsoleSites,
+  runGoogleWebsiteSync,
+  isGoogleWebsiteConfigured,
+  GOOGLE_WEBSITE_AUTHORIZE_URL,
+  GOOGLE_WEBSITE_REDIRECT_URI,
+  GOOGLE_WEBSITE_SCOPES,
+} from "./googleWebsiteSync";
 import { checkExpiringConnectionsAndNotify } from "./expiryNotifier";
 import {
   exchangeDriveCode,
@@ -1199,7 +1218,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const [pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults] = await Promise.all([
+    const [pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, googleWebsiteResults] = await Promise.all([
       runFacebookSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (page insights) error:", err);
         return [];
@@ -1233,6 +1252,15 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
             return [];
           })
         : Promise.resolve([]),
+      // Website Report (GA4 + Search Console) piggybacks on this same cron
+      // for the same reason TikTok/YouTube organic insights do — same daily
+      // cadence, see this route's header comment.
+      isGoogleWebsiteConfigured
+        ? runGoogleWebsiteSync().catch((err) => {
+            console.error("GET /api/cron/facebook-sync (google website) error:", err);
+            return [];
+          })
+        : Promise.resolve([]),
     ]);
 
     // Runs after the syncs above (not inside the same Promise.all) so it
@@ -1245,7 +1273,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       return { checked: false, expiringCount: 0, notified: false, error: err.message };
     });
 
-    res.json({ success: true, results: pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, expiryCheck });
+    res.json({ success: true, results: pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, googleWebsiteResults, expiryCheck });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -2037,6 +2065,224 @@ app.get("/api/youtube/insights", requireAuth(), async (req, res) => {
       accounts: allAccounts.map((a) => ({ channel_id: a.channel_id, channel_title: a.channel_title, brand: a.brand, is_active: a.is_active })),
       daily,
       videos,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Website Report (GA4 + Search Console) — see googleWebsiteSync.ts's header
+// comment for why this reuses the YouTube OAuth Client. Route shapes mirror
+// the YouTube block above.
+// ---------------------------------------------------------------------------
+
+app.get("/api/google-website/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isGoogleWebsiteConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "GOOGLE_WEBSITE_REDIRECT_URI (hoặc YOUTUBE_CLIENT_ID/SECRET) chưa được cấu hình đầy đủ.",
+    });
+  }
+  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
+  const state = signOAuthState({ brand, username: (req as any).session.username });
+  const params = new URLSearchParams({
+    client_id: YOUTUBE_CLIENT_ID,
+    redirect_uri: GOOGLE_WEBSITE_REDIRECT_URI,
+    response_type: "code",
+    scope: GOOGLE_WEBSITE_SCOPES.join(" "),
+    state,
+    access_type: "offline",
+    // Same reasoning as the YouTube oauth/start route above — let Google
+    // surface an account chooser rather than silently reusing whatever
+    // Google Account is already active in the browser.
+    prompt: "select_account consent",
+  });
+  res.json({ success: true, authorizeUrl: `${GOOGLE_WEBSITE_AUTHORIZE_URL}?${params.toString()}` });
+});
+
+// GET /api/google-website/oauth/callback — hit by a real browser navigation
+// (Google redirecting the user back), never by fetch(). Same signed-state
+// verification contract as GET /api/youtube/oauth/callback.
+app.get("/api/google-website/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
+  if (oauthError) {
+    return res.status(400).send(`Kết nối Website (GA4/Search Console) bị hủy hoặc lỗi: ${oauthError}`);
+  }
+  const payload = verifyOAuthState<{ brand: string | null; username: string }>(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Liên kết xác thực Google không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
+  }
+
+  try {
+    const tokens = await exchangeGoogleWebsiteCode(code, GOOGLE_WEBSITE_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google không trả về refresh_token — vui lòng thử kết nối lại (đảm bảo màn hình xin quyền hiện ra đầy đủ, không bị bỏ qua).");
+    }
+    if (!tokens.id_token) {
+      throw new Error("Google không trả về id_token — không xác định được tài khoản Google để lưu kết nối.");
+    }
+    const { sub, email } = decodeIdToken(tokens.id_token);
+
+    const [properties, sites] = await Promise.all([
+      listGa4Properties(tokens.access_token),
+      listSearchConsoleSites(tokens.access_token),
+    ]);
+    const needsSelection = properties.length !== 1 || sites.length !== 1;
+
+    await upsertGoogleWebsiteAccount({
+      id: sub,
+      google_account_email: email,
+      brand: payload.brand,
+      ga4_property_id: needsSelection ? null : properties[0].id,
+      ga4_property_name: needsSelection ? null : properties[0].name,
+      ga4_available_properties: needsSelection ? properties : null,
+      gsc_site_url: needsSelection ? null : sites[0],
+      gsc_available_sites: needsSelection ? sites : null,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+      // Conservative estimate, not a real Google-reported deadline — see
+      // GoogleWebsiteAccountConfig's comment in googleWebsiteStore.ts.
+      refresh_token_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      is_active: !needsSelection,
+      last_synced_at: null,
+      last_sync_error: null,
+      token_expired: false,
+      expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
+      created_at: new Date().toISOString(),
+    });
+
+    await logAction(
+      { username: payload.username, role: "Admin" },
+      req,
+      "connect-google-website-account",
+      `Kết nối Website (GA4/Search Console) ${email || sub}`
+    );
+
+    res.redirect(302, needsSelection ? "/?googleWebsiteConnected=pending" : "/?googleWebsiteConnected=1");
+  } catch (err: any) {
+    console.error("GET /api/google-website/oauth/callback error:", err);
+    res.status(500).send(`Kết nối Website thất bại: ${err.message}`);
+  }
+});
+
+// GET /api/google-website/accounts — list connected accounts (never returns tokens).
+app.get("/api/google-website/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getGoogleWebsiteAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        id: a.id,
+        google_account_email: a.google_account_email,
+        brand: a.brand,
+        ga4_property_id: a.ga4_property_id,
+        ga4_property_name: a.ga4_property_name,
+        ga4_available_properties: a.ga4_available_properties,
+        gsc_site_url: a.gsc_site_url,
+        gsc_available_sites: a.gsc_available_sites,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+        refresh_token_expires_at: a.refresh_token_expires_at ?? null,
+      })),
+      googleWebsiteConfigured: isGoogleWebsiteConfigured,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/google-website/accounts/:id/complete — admin picks a GA4
+// property / Search Console site out of the pending lists stored at OAuth
+// callback time, finalizing a connection that had more than one of either.
+app.post("/api/google-website/accounts/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { ga4_property_id, gsc_site_url } = req.body || {};
+    const accounts = await getGoogleWebsiteAccounts();
+    const account = accounts.find((a) => a.id === req.params.id);
+    if (!account) return res.status(404).json({ success: false, error: "Không tìm thấy kết nối." });
+
+    const chosenProperty = (account.ga4_available_properties || []).find((p) => p.id === ga4_property_id);
+    const chosenSite = (account.gsc_available_sites || []).includes(gsc_site_url) ? gsc_site_url : null;
+    if (account.ga4_available_properties && account.ga4_available_properties.length > 0 && !chosenProperty) {
+      return res.status(400).json({ success: false, error: "GA4 property không hợp lệ." });
+    }
+    if (account.gsc_available_sites && account.gsc_available_sites.length > 0 && !chosenSite) {
+      return res.status(400).json({ success: false, error: "Search Console site không hợp lệ." });
+    }
+
+    await patchGoogleWebsiteAccount(account.id, {
+      ga4_property_id: chosenProperty ? chosenProperty.id : account.ga4_property_id,
+      ga4_property_name: chosenProperty ? chosenProperty.name : account.ga4_property_name,
+      ga4_available_properties: null,
+      gsc_site_url: chosenSite || account.gsc_site_url,
+      gsc_available_sites: null,
+      is_active: true,
+    });
+    await logAction((req as any).session, req, "complete-google-website-setup", `Hoàn tất thiết lập Website ${account.google_account_email || account.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/google-website/accounts/:id
+app.delete("/api/google-website/accounts/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteGoogleWebsiteAccount(req.params.id);
+    await logAction((req as any).session, req, "delete-google-website-account", `Xóa kết nối Website ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/google-website/sync-now — Admin-only manual trigger.
+app.post("/api/google-website/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runGoogleWebsiteSync();
+    await logAction((req as any).session, req, "sync-google-website", `Đồng bộ thủ công ${results.length} kết nối Website`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/google-website/insights?accounts=<id1,id2>&since=&until= — same
+// shape/visibility as GET /api/youtube/insights (any logged-in role).
+app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getGoogleWebsiteAccounts();
+    const requestedIds =
+      typeof req.query.accounts === "string" && req.query.accounts.length > 0
+        ? req.query.accounts.split(",").map((s) => s.trim())
+        : allAccounts.map((a) => a.id);
+
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date().toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const [ga4Daily, gscDaily] = await Promise.all([
+      getGa4InsightsDaily(requestedIds, since, until),
+      getSearchConsoleInsightsDaily(requestedIds, since, until),
+    ]);
+
+    res.json({
+      success: true,
+      accounts: allAccounts.map((a) => ({
+        id: a.id,
+        brand: a.brand,
+        ga4_property_name: a.ga4_property_name,
+        gsc_site_url: a.gsc_site_url,
+        is_active: a.is_active,
+      })),
+      ga4Daily,
+      gscDaily,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

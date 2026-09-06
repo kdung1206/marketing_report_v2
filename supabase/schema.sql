@@ -455,3 +455,75 @@ create table if not exists youtube_videos (
 create index if not exists youtube_videos_channel_id_published_at_idx on youtube_videos (channel_id, published_at desc);
 
 alter table youtube_videos enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Website Report (src/server/googleWebsiteSync.ts) — GA4 (Data + Admin API)
+-- + Search Console (Search Analytics API), explicitly NOT Google Ads (see
+-- google_ads_accounts above for that). Shares its OAuth Client with
+-- youtube_accounts (same Google Cloud project, extra scopes/redirect URI —
+-- see googleWebsiteSync.ts's header comment), but is otherwise a fully
+-- independent module/table set, same "self-contained per product" shape.
+--
+-- id is null-property/site until the admin picks one via the "complete
+-- setup" step (see POST /api/google-website/accounts/:id/complete) when the
+-- OAuth grant covers more than one GA4 property or Search Console site —
+-- ga4_available_properties/gsc_available_sites hold the pending choices in
+-- that case and are cleared once confirmed.
+-- ---------------------------------------------------------------------------
+create table if not exists google_website_accounts (
+  id text primary key,
+  google_account_email text,
+  brand text,
+  ga4_property_id text,
+  ga4_property_name text,
+  ga4_available_properties jsonb,
+  gsc_site_url text,
+  gsc_available_sites jsonb,
+  access_token_encrypted text not null,
+  refresh_token_encrypted text not null,
+  access_token_expires_at timestamptz not null,
+  -- Conservative estimate (connected_at + 7 days) if the shared OAuth Client
+  -- is ever in Testing publish status — same caveat as youtube_accounts'
+  -- column of the same name; null if not applicable.
+  refresh_token_expires_at timestamptz,
+  is_active boolean not null default true,
+  last_synced_at timestamptz,
+  last_sync_error text,
+  token_expired boolean not null default false,
+  expiry_alert_sent_at timestamptz,
+  urgent_alert_sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table google_website_accounts enable row level security;
+
+-- One row per account per day, same "snapshot today's value" convention as
+-- youtube_insights_daily/tiktok_insights_daily.
+create table if not exists ga4_insights_daily (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  date date not null,
+  sessions int,
+  active_users int,
+  new_users int,
+  engaged_sessions int,
+  avg_engagement_time_seconds numeric,
+  conversions int,
+  bounce_rate numeric,
+  primary key (account_id, date)
+);
+
+alter table ga4_insights_daily enable row level security;
+
+-- Search Console's Search Analytics API has a ~2-3 day reporting lag — see
+-- googleWebsiteSync.ts's fetchSearchConsoleDailyMetrics comment.
+create table if not exists search_console_insights_daily (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  date date not null,
+  clicks int,
+  impressions int,
+  ctr numeric,
+  position numeric,
+  primary key (account_id, date)
+);
+
+alter table search_console_insights_daily enable row level security;

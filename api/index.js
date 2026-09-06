@@ -17781,8 +17781,8 @@ var require_escape_html = __commonJS({
   "node_modules/escape-html/index.js"(exports2, module2) {
     "use strict";
     var matchHtmlRegExp = /["'&<>]/;
-    module2.exports = escapeHtml;
-    function escapeHtml(string) {
+    module2.exports = escapeHtml2;
+    function escapeHtml2(string) {
       var str = "" + string;
       var match2 = matchHtmlRegExp.exec(str);
       if (!match2) {
@@ -17913,7 +17913,7 @@ var require_finalhandler = __commonJS({
     "use strict";
     var debug = require_src2()("finalhandler");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var onFinished = require_on_finished();
     var parseUrl = require_parseurl();
     var statuses = require_statuses();
@@ -17925,7 +17925,7 @@ var require_finalhandler = __commonJS({
     };
     var isFinished = onFinished.isFinished;
     function createHtmlDocument(message) {
-      var body = escapeHtml(message).replace(NEWLINE_REGEXP, "<br>").replace(DOUBLE_SPACE_REGEXP, " &nbsp;");
+      var body = escapeHtml2(message).replace(NEWLINE_REGEXP, "<br>").replace(DOUBLE_SPACE_REGEXP, " &nbsp;");
       return '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>Error</title>\n</head>\n<body>\n<pre>' + body + "</pre>\n</body>\n</html>\n";
     }
     module2.exports = finalhandler;
@@ -20429,7 +20429,7 @@ var require_send = __commonJS({
     var deprecate3 = require_depd()("send");
     var destroy = require_destroy();
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var etag = require_etag();
     var fresh = require_fresh();
     var fs4 = require("fs");
@@ -20529,7 +20529,7 @@ var require_send = __commonJS({
       }
       var res = this.res;
       var msg = statuses.message[status] || String(status);
-      var doc = createHtmlDocument("Error", escapeHtml(msg));
+      var doc = createHtmlDocument("Error", escapeHtml2(msg));
       clearHeaders(res);
       if (err && err.headers) {
         setHeaders(res, err.headers);
@@ -20629,7 +20629,7 @@ var require_send = __commonJS({
         return;
       }
       var loc = encodeUrl(collapseLeadingSlashes(this.path + "/"));
-      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+      var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
       res.statusCode = 301;
       res.setHeader("Content-Type", "text/html; charset=UTF-8");
       res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -23218,7 +23218,7 @@ var require_response = __commonJS({
     var createError = require_http_errors();
     var deprecate3 = require_depd()("express");
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var http3 = require("http");
     var isAbsolute = require_utils2().isAbsolute;
     var onFinished = require_on_finished();
@@ -23624,7 +23624,7 @@ var require_response = __commonJS({
           body = statuses.message[status] + ". Redirecting to " + address;
         },
         html: function() {
-          var u = escapeHtml(address);
+          var u = escapeHtml2(address);
           body = "<p>" + statuses.message[status] + ". Redirecting to " + u + "</p>";
         },
         default: function() {
@@ -23756,7 +23756,7 @@ var require_serve_static = __commonJS({
   "node_modules/serve-static/index.js"(exports2, module2) {
     "use strict";
     var encodeUrl = require_encodeurl();
-    var escapeHtml = require_escape_html();
+    var escapeHtml2 = require_escape_html();
     var parseUrl = require_parseurl();
     var resolve = require("path").resolve;
     var send = require_send();
@@ -23843,7 +23843,7 @@ var require_serve_static = __commonJS({
         originalUrl.path = null;
         originalUrl.pathname = collapseLeadingSlashes(originalUrl.pathname + "/");
         var loc = encodeUrl(url.format(originalUrl));
-        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml(loc));
+        var doc = createHtmlDocument("Redirecting", "Redirecting to " + escapeHtml2(loc));
         res.statusCode = 301;
         res.setHeader("Content-Type", "text/html; charset=UTF-8");
         res.setHeader("Content-Length", Buffer.byteLength(doc));
@@ -37704,13 +37704,13 @@ var require_jwsSign = __commonJS({
     exports2.getJwsSign = getJwsSign;
     var jws_1 = require_jws();
     var ALG_RS256 = "RS256";
-    var GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+    var GOOGLE_TOKEN_URL2 = "https://oauth2.googleapis.com/token";
     function buildPayloadForJwsSign(tokenOptions) {
       const iat = Math.floor((/* @__PURE__ */ new Date()).getTime() / 1e3);
       const payload = {
         iss: tokenOptions.iss,
         scope: tokenOptions.scope,
-        aud: GOOGLE_TOKEN_URL,
+        aud: GOOGLE_TOKEN_URL2,
         exp: iat + 3600,
         iat,
         sub: tokenOptions.sub,
@@ -37736,12 +37736,12 @@ var require_getToken = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getToken = getToken;
     var jwsSign_1 = require_jwsSign();
-    var GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+    var GOOGLE_TOKEN_URL2 = "https://oauth2.googleapis.com/token";
     var GOOGLE_GRANT_TYPE = "urn:ietf:params:oauth:grant-type:jwt-bearer";
     var generateRequestOptions = (tokenOptions) => {
       return {
         method: "POST",
-        url: GOOGLE_TOKEN_URL,
+        url: GOOGLE_TOKEN_URL2,
         data: new URLSearchParams({
           grant_type: GOOGLE_GRANT_TYPE,
           // Grant type for JWT
@@ -46356,7 +46356,7 @@ var require_main = __commonJS({
       }
       return DotenvModule._configVault(options);
     }
-    function decrypt2(encrypted, keyStr) {
+    function decrypt3(encrypted, keyStr) {
       const key = Buffer.from(keyStr.slice(-64), "hex");
       let ciphertext = Buffer.from(encrypted, "base64");
       const nonce = ciphertext.subarray(0, 12);
@@ -46417,7 +46417,7 @@ var require_main = __commonJS({
       _configVault,
       _parseVault,
       config,
-      decrypt: decrypt2,
+      decrypt: decrypt3,
       parse,
       populate
     };
@@ -59887,11828 +59887,6 @@ var require_main4 = __commonJS({
   }
 });
 
-// node_modules/nodemailer/lib/punycode/index.js
-var require_punycode = __commonJS({
-  "node_modules/nodemailer/lib/punycode/index.js"(exports2, module2) {
-    "use strict";
-    var maxInt = 2147483647;
-    var base = 36;
-    var tMin = 1;
-    var tMax = 26;
-    var skew = 38;
-    var damp = 700;
-    var initialBias = 72;
-    var initialN = 128;
-    var delimiter = "-";
-    var regexPunycode = /^xn--/;
-    var regexNonASCII = /[^\0-\x7F]/;
-    var regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g;
-    var errors = {
-      overflow: "Overflow: input needs wider integers to process",
-      "not-basic": "Illegal input >= 0x80 (not a basic code point)",
-      "invalid-input": "Invalid input"
-    };
-    var baseMinusTMin = base - tMin;
-    var floor = Math.floor;
-    var stringFromCharCode = String.fromCharCode;
-    function error(type) {
-      throw new RangeError(errors[type]);
-    }
-    function map(array, callback) {
-      const result = [];
-      let length = array.length;
-      while (length--) {
-        result[length] = callback(array[length]);
-      }
-      return result;
-    }
-    function mapDomain(domain, callback) {
-      const parts = domain.split("@");
-      let result = "";
-      if (parts.length > 1) {
-        result = parts[0] + "@";
-        domain = parts[1];
-      }
-      domain = domain.replace(regexSeparators, ".");
-      const labels = domain.split(".");
-      const encoded = map(labels, callback).join(".");
-      return result + encoded;
-    }
-    function ucs2decode(string) {
-      const output = [];
-      let counter = 0;
-      const length = string.length;
-      while (counter < length) {
-        const value = string.charCodeAt(counter++);
-        if (value >= 55296 && value <= 56319 && counter < length) {
-          const extra = string.charCodeAt(counter++);
-          if ((extra & 64512) == 56320) {
-            output.push(((value & 1023) << 10) + (extra & 1023) + 65536);
-          } else {
-            output.push(value);
-            counter--;
-          }
-        } else {
-          output.push(value);
-        }
-      }
-      return output;
-    }
-    var ucs2encode = (codePoints) => String.fromCodePoint(...codePoints);
-    var basicToDigit = function(codePoint) {
-      if (codePoint >= 48 && codePoint < 58) {
-        return 26 + (codePoint - 48);
-      }
-      if (codePoint >= 65 && codePoint < 91) {
-        return codePoint - 65;
-      }
-      if (codePoint >= 97 && codePoint < 123) {
-        return codePoint - 97;
-      }
-      return base;
-    };
-    var digitToBasic = function(digit, flag) {
-      return digit + 22 + 75 * (digit < 26) - ((flag != 0) << 5);
-    };
-    var adapt = function(delta, numPoints, firstTime) {
-      let k = 0;
-      delta = firstTime ? floor(delta / damp) : delta >> 1;
-      delta += floor(delta / numPoints);
-      for (
-        ;
-        /* no initialization */
-        delta > baseMinusTMin * tMax >> 1;
-        k += base
-      ) {
-        delta = floor(delta / baseMinusTMin);
-      }
-      return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
-    };
-    var decode = function(input) {
-      const output = [];
-      const inputLength = input.length;
-      let i2 = 0;
-      let n = initialN;
-      let bias = initialBias;
-      let basic = input.lastIndexOf(delimiter);
-      if (basic < 0) {
-        basic = 0;
-      }
-      for (let j = 0; j < basic; ++j) {
-        if (input.charCodeAt(j) >= 128) {
-          error("not-basic");
-        }
-        output.push(input.charCodeAt(j));
-      }
-      for (let index = basic > 0 ? basic + 1 : 0; index < inputLength; ) {
-        const oldi = i2;
-        for (let w = 1, k = base; ; k += base) {
-          if (index >= inputLength) {
-            error("invalid-input");
-          }
-          const digit = basicToDigit(input.charCodeAt(index++));
-          if (digit >= base) {
-            error("invalid-input");
-          }
-          if (digit > floor((maxInt - i2) / w)) {
-            error("overflow");
-          }
-          i2 += digit * w;
-          const t2 = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
-          if (digit < t2) {
-            break;
-          }
-          const baseMinusT = base - t2;
-          if (w > floor(maxInt / baseMinusT)) {
-            error("overflow");
-          }
-          w *= baseMinusT;
-        }
-        const out = output.length + 1;
-        bias = adapt(i2 - oldi, out, oldi == 0);
-        if (floor(i2 / out) > maxInt - n) {
-          error("overflow");
-        }
-        n += floor(i2 / out);
-        i2 %= out;
-        output.splice(i2++, 0, n);
-      }
-      return String.fromCodePoint(...output);
-    };
-    var encode = function(input) {
-      const output = [];
-      input = ucs2decode(input);
-      const inputLength = input.length;
-      let n = initialN;
-      let delta = 0;
-      let bias = initialBias;
-      for (const currentValue of input) {
-        if (currentValue < 128) {
-          output.push(stringFromCharCode(currentValue));
-        }
-      }
-      const basicLength = output.length;
-      let handledCPCount = basicLength;
-      if (basicLength) {
-        output.push(delimiter);
-      }
-      while (handledCPCount < inputLength) {
-        let m2 = maxInt;
-        for (const currentValue of input) {
-          if (currentValue >= n && currentValue < m2) {
-            m2 = currentValue;
-          }
-        }
-        const handledCPCountPlusOne = handledCPCount + 1;
-        if (m2 - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
-          error("overflow");
-        }
-        delta += (m2 - n) * handledCPCountPlusOne;
-        n = m2;
-        for (const currentValue of input) {
-          if (currentValue < n && ++delta > maxInt) {
-            error("overflow");
-          }
-          if (currentValue === n) {
-            let q = delta;
-            for (let k = base; ; k += base) {
-              const t2 = k <= bias ? tMin : k >= bias + tMax ? tMax : k - bias;
-              if (q < t2) {
-                break;
-              }
-              const qMinusT = q - t2;
-              const baseMinusT = base - t2;
-              output.push(stringFromCharCode(digitToBasic(t2 + qMinusT % baseMinusT, 0)));
-              q = floor(qMinusT / baseMinusT);
-            }
-            output.push(stringFromCharCode(digitToBasic(q, 0)));
-            bias = adapt(delta, handledCPCountPlusOne, handledCPCount === basicLength);
-            delta = 0;
-            ++handledCPCount;
-          }
-        }
-        ++delta;
-        ++n;
-      }
-      return output.join("");
-    };
-    var toUnicode = function(input) {
-      return mapDomain(input, function(string) {
-        return regexPunycode.test(string) ? decode(string.slice(4).toLowerCase()) : string;
-      });
-    };
-    var toASCII = function(input) {
-      return mapDomain(input, function(string) {
-        return regexNonASCII.test(string) ? "xn--" + encode(string) : string;
-      });
-    };
-    var punycode = {
-      /**
-       * A string representing the current Punycode.js version number.
-       * @memberOf punycode
-       * @type String
-       */
-      version: "2.3.1",
-      /**
-       * An object of methods to convert from JavaScript's internal character
-       * representation (UCS-2) to Unicode code points, and back.
-       * @see <https://mathiasbynens.be/notes/javascript-encoding>
-       * @memberOf punycode
-       * @type Object
-       */
-      ucs2: {
-        decode: ucs2decode,
-        encode: ucs2encode
-      },
-      decode,
-      encode,
-      toASCII,
-      toUnicode
-    };
-    module2.exports = punycode;
-  }
-});
-
-// node_modules/nodemailer/lib/shared/url.js
-var require_url = __commonJS({
-  "node_modules/nodemailer/lib/shared/url.js"(exports2, module2) {
-    "use strict";
-    var urllib = require("url");
-    var punycode = require_punycode();
-    var URLImpl = typeof URL !== "undefined" && URL || urllib.URL;
-    var SLASHLESS_AUTHORITY = /^([a-zA-Z][a-zA-Z0-9+.-]*:)(?!\/\/)(.+)$/;
-    function safeDecode(str) {
-      try {
-        return decodeURIComponent(str);
-      } catch (_err) {
-        return str;
-      }
-    }
-    function normalizeHostname(raw) {
-      let hostname = raw || "";
-      if (!hostname) {
-        return "";
-      }
-      if (hostname.charAt(0) === "[" && hostname.charAt(hostname.length - 1) === "]") {
-        return hostname.slice(1, -1);
-      }
-      return punycode.toASCII(safeDecode(hostname));
-    }
-    module2.exports.parse = (input, parseQueryString) => {
-      input = input || "";
-      if (!URLImpl) {
-        return urllib.parse(input, parseQueryString);
-      }
-      const slashless = SLASHLESS_AUTHORITY.exec(input);
-      const normalized = slashless ? slashless[1] + "//" + slashless[2] : input;
-      let u;
-      try {
-        u = new URLImpl(normalized);
-      } catch (_err) {
-        return urllib.parse(input, parseQueryString);
-      }
-      const hostname = normalizeHostname(u.hostname);
-      const port = u.port || null;
-      const pathname = u.pathname || null;
-      const search = u.search || null;
-      let auth = null;
-      if (u.username || u.password) {
-        auth = safeDecode(u.username) + (u.password ? ":" + safeDecode(u.password) : "");
-      }
-      let query;
-      if (parseQueryString) {
-        query = /* @__PURE__ */ Object.create(null);
-        u.searchParams.forEach((value, key) => {
-          if (Object.prototype.hasOwnProperty.call(query, key)) {
-            if (Array.isArray(query[key])) {
-              query[key].push(value);
-            } else {
-              query[key] = [query[key], value];
-            }
-          } else {
-            query[key] = value;
-          }
-        });
-      } else {
-        query = search ? search.slice(1) : null;
-      }
-      return {
-        protocol: u.protocol || null,
-        host: u.host || null,
-        hostname,
-        port,
-        pathname,
-        search,
-        path: (pathname || "") + (search || "") || null,
-        href: u.href,
-        auth,
-        query
-      };
-    };
-    module2.exports.resolve = (from, to) => {
-      if (!URLImpl) {
-        return urllib.resolve(from, to);
-      }
-      try {
-        return new URLImpl(to, from).href;
-      } catch (_err) {
-        return urllib.resolve(from, to);
-      }
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/fetch/cookies.js
-var require_cookies = __commonJS({
-  "node_modules/nodemailer/lib/fetch/cookies.js"(exports2, module2) {
-    "use strict";
-    var urllib = require_url();
-    var SESSION_TIMEOUT = 1800;
-    var Cookies = class {
-      constructor(options) {
-        this.options = options || {};
-        this.cookies = [];
-      }
-      /**
-       * Stores a cookie string to the cookie storage
-       *
-       * @param {String} cookieStr Value from the 'Set-Cookie:' header
-       * @param {String} url Current URL
-       */
-      set(cookieStr, url) {
-        const urlparts = urllib.parse(url || "");
-        const cookie = this.parse(cookieStr);
-        let domain;
-        if (cookie.domain) {
-          domain = cookie.domain.replace(/^\./, "");
-          if (
-            // can't be valid if the requested domain is shorter than current hostname
-            urlparts.hostname.length < domain.length || // prefix domains with dot to be sure that partial matches are not used
-            ("." + urlparts.hostname).substr(-domain.length + 1) !== "." + domain
-          ) {
-            cookie.domain = urlparts.hostname;
-          }
-        } else {
-          cookie.domain = urlparts.hostname;
-        }
-        if (!cookie.path) {
-          cookie.path = this.getPath(urlparts.pathname);
-        }
-        if (!cookie.expires) {
-          cookie.expires = new Date(Date.now() + (Number(this.options.sessionTimeout || SESSION_TIMEOUT) || SESSION_TIMEOUT) * 1e3);
-        }
-        return this.add(cookie);
-      }
-      /**
-       * Returns cookie string for the 'Cookie:' header.
-       *
-       * @param {String} url URL to check for
-       * @returns {String} Cookie header or empty string if no matches were found
-       */
-      get(url) {
-        return this.list(url).map((cookie) => cookie.name + "=" + cookie.value).join("; ");
-      }
-      /**
-       * Lists all valied cookie objects for the specified URL
-       *
-       * @param {String} url URL to check for
-       * @returns {Array} An array of cookie objects
-       */
-      list(url) {
-        const result = [];
-        for (let i2 = this.cookies.length - 1; i2 >= 0; i2--) {
-          const cookie = this.cookies[i2];
-          if (this.isExpired(cookie)) {
-            this.cookies.splice(i2, 1);
-            continue;
-          }
-          if (this.match(cookie, url)) {
-            result.unshift(cookie);
-          }
-        }
-        return result;
-      }
-      /**
-       * Parses cookie string from the 'Set-Cookie:' header
-       *
-       * @param {String} cookieStr String from the 'Set-Cookie:' header
-       * @returns {Object} Cookie object
-       */
-      parse(cookieStr) {
-        const cookie = {};
-        (cookieStr || "").toString().split(";").forEach((cookiePart) => {
-          const valueParts = cookiePart.split("=");
-          const key = valueParts.shift().trim().toLowerCase();
-          let value = valueParts.join("=").trim();
-          let domain;
-          if (!key) {
-            return;
-          }
-          switch (key) {
-            case "expires":
-              value = new Date(value);
-              if (value.toString() !== "Invalid Date") {
-                cookie.expires = value;
-              }
-              break;
-            case "path":
-              cookie.path = value;
-              break;
-            case "domain":
-              domain = value.toLowerCase();
-              if (domain.length && domain.charAt(0) !== ".") {
-                domain = "." + domain;
-              }
-              cookie.domain = domain;
-              break;
-            case "max-age":
-              cookie.expires = new Date(Date.now() + (Number(value) || 0) * 1e3);
-              break;
-            case "secure":
-              cookie.secure = true;
-              break;
-            case "httponly":
-              cookie.httponly = true;
-              break;
-            default:
-              if (!cookie.name) {
-                cookie.name = key;
-                cookie.value = value;
-              }
-          }
-        });
-        return cookie;
-      }
-      /**
-       * Checks if a cookie object is valid for a specified URL
-       *
-       * @param {Object} cookie Cookie object
-       * @param {String} url URL to check for
-       * @returns {Boolean} true if cookie is valid for specifiec URL
-       */
-      match(cookie, url) {
-        const urlparts = urllib.parse(url || "");
-        if (urlparts.hostname !== cookie.domain && (cookie.domain.charAt(0) !== "." || ("." + urlparts.hostname).substr(-cookie.domain.length) !== cookie.domain)) {
-          return false;
-        }
-        const path3 = this.getPath(urlparts.pathname);
-        if (path3.substr(0, cookie.path.length) !== cookie.path) {
-          return false;
-        }
-        if (cookie.secure && urlparts.protocol !== "https:") {
-          return false;
-        }
-        return true;
-      }
-      /**
-       * Adds (or updates/removes if needed) a cookie object to the cookie storage
-       *
-       * @param {Object} cookie Cookie value to be stored
-       */
-      add(cookie) {
-        if (!cookie || !cookie.name) {
-          return false;
-        }
-        for (let i2 = 0, len = this.cookies.length; i2 < len; i2++) {
-          if (this.compare(this.cookies[i2], cookie)) {
-            if (this.isExpired(cookie)) {
-              this.cookies.splice(i2, 1);
-              return false;
-            }
-            this.cookies[i2] = cookie;
-            return true;
-          }
-        }
-        if (!this.isExpired(cookie)) {
-          this.cookies.push(cookie);
-        }
-        return true;
-      }
-      /**
-       * Checks if two cookie objects are the same
-       *
-       * @param {Object} a Cookie to check against
-       * @param {Object} b Cookie to check against
-       * @returns {Boolean} True, if the cookies are the same
-       */
-      compare(a, b) {
-        return a.name === b.name && a.path === b.path && a.domain === b.domain && a.secure === b.secure && a.httponly === b.httponly;
-      }
-      /**
-       * Checks if a cookie is expired
-       *
-       * @param {Object} cookie Cookie object to check against
-       * @returns {Boolean} True, if the cookie is expired
-       */
-      isExpired(cookie) {
-        return cookie.expires && cookie.expires < /* @__PURE__ */ new Date() || !cookie.value;
-      }
-      /**
-       * Returns normalized cookie path for an URL path argument
-       *
-       * @param {String} pathname
-       * @returns {String} Normalized path
-       */
-      getPath(pathname) {
-        let path3 = (pathname || "/").split("/");
-        path3.pop();
-        path3 = path3.join("/").trim();
-        if (path3.charAt(0) !== "/") {
-          path3 = "/" + path3;
-        }
-        if (path3.substr(-1) !== "/") {
-          path3 += "/";
-        }
-        return path3;
-      }
-    };
-    module2.exports = Cookies;
-  }
-});
-
-// node_modules/nodemailer/package.json
-var require_package3 = __commonJS({
-  "node_modules/nodemailer/package.json"(exports2, module2) {
-    module2.exports = {
-      name: "nodemailer",
-      version: "9.0.3",
-      description: "Easy as cake e-mail sending from your Node.js applications",
-      main: "lib/nodemailer.js",
-      scripts: {
-        test: "node --test --test-concurrency=1 $(find test \\( -name '*-test.js' -o -name '*.test.js' \\))",
-        "test:coverage": "c8 node --test --test-concurrency=1 $(find test \\( -name '*-test.js' -o -name '*.test.js' \\))",
-        format: 'prettier --write "**/*.{js,json,md}"',
-        "format:check": 'prettier --check "**/*.{js,json,md}"',
-        lint: "eslint .",
-        "lint:fix": "eslint . --fix",
-        update: "rm -rf node_modules/ package-lock.json && ncu -u && npm install",
-        "test:syntax": 'docker run --rm -v "$PWD:/app:ro" -w /app node:6-alpine node test/syntax-compat.js'
-      },
-      repository: {
-        type: "git",
-        url: "https://github.com/nodemailer/nodemailer.git"
-      },
-      keywords: [
-        "Nodemailer"
-      ],
-      author: "Andris Reinman",
-      license: "MIT-0",
-      bugs: {
-        url: "https://github.com/nodemailer/nodemailer/issues"
-      },
-      homepage: "https://nodemailer.com/",
-      devDependencies: {
-        "@aws-sdk/client-sesv2": "3.1068.0",
-        bunyan: "1.8.15",
-        c8: "11.0.0",
-        eslint: "10.5.0",
-        "eslint-config-prettier": "10.1.8",
-        globals: "17.6.0",
-        libbase64: "1.3.0",
-        libmime: "5.3.8",
-        libqp: "2.1.1",
-        prettier: "3.8.4",
-        proxy: "1.0.2",
-        "proxy-test-server": "1.0.0",
-        "smtp-server": "3.19.0"
-      },
-      engines: {
-        node: ">=6.0.0"
-      }
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/errors.js
-var require_errors2 = __commonJS({
-  "node_modules/nodemailer/lib/errors.js"(exports2, module2) {
-    "use strict";
-    var ERROR_CODES = {
-      // Connection errors
-      ECONNECTION: "Connection closed unexpectedly",
-      ETIMEDOUT: "Connection or operation timed out",
-      ESOCKET: "Socket-level error",
-      EDNS: "DNS resolution failed",
-      // TLS/Security errors
-      ETLS: "TLS handshake or STARTTLS failed",
-      EREQUIRETLS: "REQUIRETLS not supported by server (RFC 8689)",
-      // Protocol errors
-      EPROTOCOL: "Invalid SMTP server response",
-      EENVELOPE: "Invalid mail envelope (sender or recipients)",
-      EMESSAGE: "Message delivery error",
-      ESTREAM: "Stream processing error",
-      // Authentication errors
-      EAUTH: "Authentication failed",
-      ENOAUTH: "Authentication credentials not provided",
-      EOAUTH2: "OAuth2 token generation or refresh error",
-      // Resource errors
-      EMAXLIMIT: "Pool resource limit reached (max messages per connection)",
-      // Transport-specific errors
-      ESENDMAIL: "Sendmail command error",
-      ESES: "AWS SES transport error",
-      // Configuration and access errors
-      ECONFIG: "Invalid configuration",
-      EPROXY: "Proxy connection error",
-      EFILEACCESS: "File access rejected (disableFileAccess is set)",
-      EURLACCESS: "URL access rejected (disableUrlAccess is set)",
-      EFETCH: "HTTP fetch error"
-    };
-    module2.exports = { ERROR_CODES };
-    for (const code of Object.keys(ERROR_CODES)) {
-      module2.exports[code] = code;
-    }
-  }
-});
-
-// node_modules/nodemailer/lib/fetch/index.js
-var require_fetch2 = __commonJS({
-  "node_modules/nodemailer/lib/fetch/index.js"(exports2, module2) {
-    "use strict";
-    var http3 = require("http");
-    var https2 = require("https");
-    var urllib = require_url();
-    var zlib2 = require("zlib");
-    var { PassThrough: PassThrough3 } = require("stream");
-    var Cookies = require_cookies();
-    var packageData = require_package3();
-    var net = require("net");
-    var errors = require_errors2();
-    var MAX_REDIRECTS = 5;
-    module2.exports = function(url, options) {
-      return nmfetch(url, options);
-    };
-    module2.exports.Cookies = Cookies;
-    function nmfetch(url, options) {
-      options = options || {};
-      options.fetchRes = options.fetchRes || new PassThrough3();
-      options.cookies = options.cookies || new Cookies();
-      options.redirects = options.redirects || 0;
-      options.maxRedirects = isNaN(options.maxRedirects) ? MAX_REDIRECTS : options.maxRedirects;
-      if (options.cookie) {
-        [].concat(options.cookie || []).forEach((cookie) => {
-          options.cookies.set(cookie, url);
-        });
-        options.cookie = false;
-      }
-      const fetchRes = options.fetchRes;
-      const parsed = urllib.parse(url);
-      let method = (options.method || "").toString().trim().toUpperCase() || "GET";
-      let finished2 = false;
-      let cookies;
-      let body;
-      const handler = parsed.protocol === "https:" ? https2 : http3;
-      const headers = {
-        "accept-encoding": "gzip,deflate",
-        "user-agent": "nodemailer/" + packageData.version
-      };
-      Object.keys(options.headers || {}).forEach((key) => {
-        headers[key.toLowerCase().trim()] = options.headers[key];
-      });
-      if (options.userAgent) {
-        headers["user-agent"] = options.userAgent;
-      }
-      if (parsed.auth) {
-        headers.Authorization = "Basic " + Buffer.from(parsed.auth).toString("base64");
-      }
-      if (cookies = options.cookies.get(url)) {
-        headers.cookie = cookies;
-      }
-      if (options.body) {
-        if (options.contentType !== false) {
-          headers["Content-Type"] = options.contentType || "application/x-www-form-urlencoded";
-        }
-        if (typeof options.body.pipe === "function") {
-          headers["Transfer-Encoding"] = "chunked";
-          body = options.body;
-          body.on("error", (err) => {
-            if (finished2) {
-              return;
-            }
-            finished2 = true;
-            err.code = errors.EFETCH;
-            err.sourceUrl = url;
-            fetchRes.emit("error", err);
-          });
-        } else {
-          if (options.body instanceof Buffer) {
-            body = options.body;
-          } else if (typeof options.body === "object") {
-            try {
-              body = Buffer.from(
-                Object.keys(options.body).map((key) => {
-                  const value = options.body[key].toString().trim();
-                  return encodeURIComponent(key) + "=" + encodeURIComponent(value);
-                }).join("&")
-              );
-            } catch (E) {
-              if (finished2) {
-                return;
-              }
-              finished2 = true;
-              E.code = errors.EFETCH;
-              E.sourceUrl = url;
-              fetchRes.emit("error", E);
-              return;
-            }
-          } else {
-            body = Buffer.from(options.body.toString().trim());
-          }
-          headers["Content-Type"] = options.contentType || "application/x-www-form-urlencoded";
-          headers["Content-Length"] = body.length;
-        }
-        method = (options.method || "").toString().trim().toUpperCase() || "POST";
-      }
-      let req;
-      const reqOptions = {
-        method,
-        host: parsed.hostname,
-        path: parsed.path,
-        port: parsed.port ? parsed.port : parsed.protocol === "https:" ? 443 : 80,
-        headers,
-        // Validate TLS certificates by default. Callers that genuinely need to
-        // reach a self-signed/internal host opt out explicitly with
-        // options.tls = { rejectUnauthorized: false }.
-        rejectUnauthorized: true,
-        agent: false
-      };
-      if (options.tls) {
-        Object.assign(reqOptions, options.tls);
-      }
-      if (parsed.protocol === "https:" && parsed.hostname && parsed.hostname !== reqOptions.host && !net.isIP(parsed.hostname) && !reqOptions.servername) {
-        reqOptions.servername = parsed.hostname;
-      }
-      try {
-        req = handler.request(reqOptions);
-      } catch (E) {
-        finished2 = true;
-        setImmediate(() => {
-          E.code = errors.EFETCH;
-          E.sourceUrl = url;
-          fetchRes.emit("error", E);
-        });
-        return fetchRes;
-      }
-      if (options.timeout) {
-        req.setTimeout(options.timeout, () => {
-          if (finished2) {
-            return;
-          }
-          finished2 = true;
-          req.abort();
-          const err = new Error("Request Timeout");
-          err.code = errors.EFETCH;
-          err.sourceUrl = url;
-          fetchRes.emit("error", err);
-        });
-      }
-      req.on("error", (err) => {
-        if (finished2) {
-          return;
-        }
-        finished2 = true;
-        err.code = errors.EFETCH;
-        err.sourceUrl = url;
-        fetchRes.emit("error", err);
-      });
-      req.on("response", (res) => {
-        let inflate;
-        if (finished2) {
-          return;
-        }
-        switch (res.headers["content-encoding"]) {
-          case "gzip":
-          case "deflate":
-            inflate = zlib2.createUnzip();
-            break;
-        }
-        if (res.headers["set-cookie"]) {
-          [].concat(res.headers["set-cookie"] || []).forEach((cookie) => {
-            options.cookies.set(cookie, url);
-          });
-        }
-        if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
-          options.redirects++;
-          if (options.redirects > options.maxRedirects) {
-            finished2 = true;
-            const err = new Error("Maximum redirect count exceeded");
-            err.code = errors.EFETCH;
-            err.sourceUrl = url;
-            fetchRes.emit("error", err);
-            req.abort();
-            return;
-          }
-          options.method = "GET";
-          options.body = false;
-          const redirectUrl = urllib.resolve(url, res.headers.location);
-          const redirectParsed = urllib.parse(redirectUrl);
-          const crossHost = redirectParsed.hostname !== parsed.hostname;
-          const downgrade = parsed.protocol === "https:" && redirectParsed.protocol === "http:";
-          if (options.headers && (crossHost || downgrade)) {
-            const sensitive = ["authorization", "cookie", "proxy-authorization"];
-            Object.keys(options.headers).forEach((key) => {
-              if (sensitive.includes(key.toLowerCase())) {
-                delete options.headers[key];
-              }
-            });
-          }
-          return nmfetch(redirectUrl, options);
-        }
-        fetchRes.statusCode = res.statusCode;
-        fetchRes.headers = res.headers;
-        if (res.statusCode >= 300 && !options.allowErrorResponse) {
-          finished2 = true;
-          const err = new Error("Invalid status code " + res.statusCode);
-          err.code = errors.EFETCH;
-          err.sourceUrl = url;
-          fetchRes.emit("error", err);
-          req.abort();
-          return;
-        }
-        res.on("error", (err) => {
-          if (finished2) {
-            return;
-          }
-          finished2 = true;
-          err.code = errors.EFETCH;
-          err.sourceUrl = url;
-          fetchRes.emit("error", err);
-          req.abort();
-        });
-        if (inflate) {
-          res.pipe(inflate).pipe(fetchRes);
-          inflate.on("error", (err) => {
-            if (finished2) {
-              return;
-            }
-            finished2 = true;
-            err.code = errors.EFETCH;
-            err.sourceUrl = url;
-            fetchRes.emit("error", err);
-            req.abort();
-          });
-        } else {
-          res.pipe(fetchRes);
-        }
-      });
-      setImmediate(() => {
-        if (body) {
-          try {
-            if (typeof body.pipe === "function") {
-              return body.pipe(req);
-            }
-            req.write(body);
-          } catch (err) {
-            finished2 = true;
-            err.code = errors.EFETCH;
-            err.sourceUrl = url;
-            fetchRes.emit("error", err);
-            return;
-          }
-        }
-        req.end();
-      });
-      return fetchRes;
-    }
-  }
-});
-
-// node_modules/nodemailer/lib/shared/index.js
-var require_shared3 = __commonJS({
-  "node_modules/nodemailer/lib/shared/index.js"(exports2, module2) {
-    "use strict";
-    var urllib = require_url();
-    var util = require("util");
-    var fs4 = require("fs");
-    var nmfetch = require_fetch2();
-    var errors = require_errors2();
-    var dns = require("dns");
-    var net = require("net");
-    var os = require("os");
-    var DNS_TTL = 5 * 60 * 1e3;
-    var CACHE_CLEANUP_INTERVAL = 30 * 1e3;
-    var MAX_CACHE_SIZE = 1e3;
-    var lastCacheCleanup = 0;
-    module2.exports._lastCacheCleanup = () => lastCacheCleanup;
-    module2.exports._resetCacheCleanup = () => {
-      lastCacheCleanup = 0;
-    };
-    var networkInterfaces;
-    try {
-      networkInterfaces = os.networkInterfaces();
-    } catch (_err) {
-    }
-    module2.exports.networkInterfaces = networkInterfaces;
-    var isFamilySupported = (family, allowInternal) => {
-      const ifaces = module2.exports.networkInterfaces;
-      if (!ifaces) {
-        return true;
-      }
-      return Object.keys(ifaces).map((key) => ifaces[key]).reduce((acc, val2) => acc.concat(val2), []).filter((i2) => !i2.internal || allowInternal).some((i2) => i2.family === "IPv" + family || i2.family === family);
-    };
-    var resolve = (family, hostname, options, callback) => {
-      options = options || {};
-      if (!isFamilySupported(family, options.allowInternalNetworkInterfaces)) {
-        return callback(null, []);
-      }
-      const dnsResolver = dns.Resolver ? new dns.Resolver(options) : dns;
-      dnsResolver["resolve" + family](hostname, (err, addresses) => {
-        if (err) {
-          switch (err.code) {
-            case dns.NODATA:
-            case dns.NOTFOUND:
-            case dns.NOTIMP:
-            case dns.SERVFAIL:
-            case dns.CONNREFUSED:
-            case dns.REFUSED:
-            case "EAI_AGAIN":
-              return callback(null, []);
-          }
-          return callback(err);
-        }
-        return callback(null, Array.isArray(addresses) ? addresses : [].concat(addresses || []));
-      });
-    };
-    var dnsCache = module2.exports.dnsCache = /* @__PURE__ */ new Map();
-    var formatDNSValue = (value, extra) => {
-      if (!value) {
-        return Object.assign({}, extra || {});
-      }
-      const addresses = value.addresses || [];
-      const host = addresses.length > 0 ? addresses[Math.floor(Math.random() * addresses.length)] : null;
-      return Object.assign(
-        {
-          servername: value.servername,
-          host,
-          // Include all addresses for connection fallback support
-          _addresses: addresses
-        },
-        extra || {}
-      );
-    };
-    module2.exports.resolveHostname = (options, callback) => {
-      options = options || {};
-      if (!options.host && options.servername) {
-        options.host = options.servername;
-      }
-      if (!options.host || net.isIP(options.host)) {
-        const value = {
-          addresses: [options.host],
-          servername: options.servername || false
-        };
-        return callback(
-          null,
-          formatDNSValue(value, {
-            cached: false
-          })
-        );
-      }
-      let cached;
-      if (dnsCache.has(options.host)) {
-        cached = dnsCache.get(options.host);
-        const now = Date.now();
-        if (now - lastCacheCleanup > CACHE_CLEANUP_INTERVAL) {
-          lastCacheCleanup = now;
-          for (const [host, entry] of dnsCache.entries()) {
-            if (entry.expires && entry.expires < now) {
-              dnsCache.delete(host);
-            }
-          }
-          if (dnsCache.size > MAX_CACHE_SIZE) {
-            const toDelete = Math.floor(MAX_CACHE_SIZE * 0.1);
-            const keys2 = Array.from(dnsCache.keys()).slice(0, toDelete);
-            keys2.forEach((key) => dnsCache.delete(key));
-          }
-        }
-        if (!cached.expires || cached.expires >= now) {
-          return callback(
-            null,
-            formatDNSValue(cached.value, {
-              cached: true
-            })
-          );
-        }
-      }
-      let ipv4Addresses = [];
-      let ipv6Addresses = [];
-      let ipv4Error = null;
-      let ipv6Error = null;
-      resolve(4, options.host, options, (err, addresses) => {
-        if (err) {
-          ipv4Error = err;
-        } else {
-          ipv4Addresses = addresses || [];
-        }
-        resolve(6, options.host, options, (err2, addresses2) => {
-          if (err2) {
-            ipv6Error = err2;
-          } else {
-            ipv6Addresses = addresses2 || [];
-          }
-          const allAddresses = ipv4Addresses.concat(ipv6Addresses);
-          if (allAddresses.length) {
-            const value = {
-              addresses: allAddresses,
-              servername: options.servername || options.host
-            };
-            dnsCache.set(options.host, {
-              value,
-              expires: Date.now() + (options.dnsTtl || DNS_TTL)
-            });
-            return callback(
-              null,
-              formatDNSValue(value, {
-                cached: false
-              })
-            );
-          }
-          if (ipv4Error && ipv6Error) {
-            if (cached) {
-              dnsCache.set(options.host, {
-                value: cached.value,
-                expires: Date.now() + (options.dnsTtl || DNS_TTL)
-              });
-              return callback(
-                null,
-                formatDNSValue(cached.value, {
-                  cached: true,
-                  error: ipv4Error
-                })
-              );
-            }
-          }
-          try {
-            dns.lookup(options.host, { all: true }, (err3, addresses3) => {
-              if (err3) {
-                if (cached) {
-                  dnsCache.set(options.host, {
-                    value: cached.value,
-                    expires: Date.now() + (options.dnsTtl || DNS_TTL)
-                  });
-                  return callback(
-                    null,
-                    formatDNSValue(cached.value, {
-                      cached: true,
-                      error: err3
-                    })
-                  );
-                }
-                return callback(err3);
-              }
-              const supportedAddresses = addresses3 ? addresses3.filter((addr) => isFamilySupported(addr.family)).map((addr) => addr.address) : [];
-              if (addresses3 && addresses3.length && !supportedAddresses.length) {
-                console.warn(`Failed to resolve IPv${addresses3[0].family} addresses with current network`);
-              }
-              if (!supportedAddresses.length && cached) {
-                return callback(
-                  null,
-                  formatDNSValue(cached.value, {
-                    cached: true
-                  })
-                );
-              }
-              const value = {
-                addresses: supportedAddresses.length ? supportedAddresses : [options.host],
-                servername: options.servername || options.host
-              };
-              dnsCache.set(options.host, {
-                value,
-                expires: Date.now() + (options.dnsTtl || DNS_TTL)
-              });
-              return callback(
-                null,
-                formatDNSValue(value, {
-                  cached: false
-                })
-              );
-            });
-          } catch (lookupErr) {
-            if (cached) {
-              dnsCache.set(options.host, {
-                value: cached.value,
-                expires: Date.now() + (options.dnsTtl || DNS_TTL)
-              });
-              return callback(
-                null,
-                formatDNSValue(cached.value, {
-                  cached: true,
-                  error: lookupErr
-                })
-              );
-            }
-            return callback(ipv4Error || ipv6Error || lookupErr);
-          }
-        });
-      });
-    };
-    module2.exports.parseConnectionUrl = (str) => {
-      str = str || "";
-      const options = {};
-      const url = urllib.parse(str, true);
-      switch (url.protocol) {
-        case "smtp:":
-          options.secure = false;
-          break;
-        case "smtps:":
-          options.secure = true;
-          break;
-        case "direct:":
-          options.direct = true;
-          break;
-      }
-      if (!isNaN(url.port) && Number(url.port)) {
-        options.port = Number(url.port);
-      }
-      if (url.hostname) {
-        options.host = url.hostname;
-      }
-      if (url.auth) {
-        const auth = url.auth.split(":");
-        options.auth = {
-          user: auth.shift(),
-          pass: auth.join(":")
-        };
-      }
-      Object.keys(url.query || {}).forEach((key) => {
-        let obj = options;
-        let lKey = key;
-        let value = url.query[key];
-        if (!isNaN(value)) {
-          value = Number(value);
-        }
-        switch (value) {
-          case "true":
-            value = true;
-            break;
-          case "false":
-            value = false;
-            break;
-        }
-        if (key.indexOf("tls.") === 0) {
-          lKey = key.substr(4);
-          if (!options.tls) {
-            options.tls = {};
-          }
-          obj = options.tls;
-        } else if (key.indexOf(".") >= 0) {
-          return;
-        }
-        if (!(lKey in obj)) {
-          obj[lKey] = value;
-        }
-      });
-      return options;
-    };
-    module2.exports._logFunc = (logger, level, defaults, data, message, ...args) => {
-      const entry = Object.assign({}, defaults || {}, data || {});
-      delete entry.level;
-      let logLevel = level;
-      if (typeof logger[logLevel] !== "function") {
-        logLevel = ["info", "debug", "log", "trace", "warn", "error"].find((name) => typeof logger[name] === "function");
-      }
-      if (logLevel) {
-        logger[logLevel](entry, message, ...args);
-      }
-    };
-    module2.exports.getLogger = (options, defaults) => {
-      options = options || {};
-      const response = {};
-      const levels = ["trace", "debug", "info", "warn", "error", "fatal"];
-      if (!options.logger) {
-        levels.forEach((level) => {
-          response[level] = () => false;
-        });
-        return response;
-      }
-      const logger = options.logger === true ? createDefaultLogger(levels) : options.logger;
-      levels.forEach((level) => {
-        response[level] = (data, message, ...args) => {
-          module2.exports._logFunc(logger, level, defaults, data, message, ...args);
-        };
-      });
-      return response;
-    };
-    module2.exports.callbackPromise = (resolve2, reject) => function() {
-      const args = Array.from(arguments);
-      const err = args.shift();
-      if (err) {
-        reject(err);
-      } else {
-        resolve2(...args);
-      }
-    };
-    module2.exports.parseDataURI = (uri) => {
-      if (typeof uri !== "string") {
-        return null;
-      }
-      if (!uri.startsWith("data:")) {
-        return null;
-      }
-      const commaPos = uri.indexOf(",");
-      if (commaPos === -1) {
-        return null;
-      }
-      const data = uri.substring(commaPos + 1);
-      const metaStr = uri.substring("data:".length, commaPos);
-      let encoding;
-      const metaEntries = metaStr.split(";");
-      if (metaEntries.length > 0) {
-        const lastEntry = metaEntries[metaEntries.length - 1].toLowerCase().trim();
-        if (["base64", "utf8", "utf-8"].includes(lastEntry) && lastEntry.indexOf("=") === -1) {
-          encoding = lastEntry;
-          metaEntries.pop();
-        }
-      }
-      const contentType = metaEntries.length > 0 ? metaEntries.shift() : "application/octet-stream";
-      const params = {};
-      for (let i2 = 0; i2 < metaEntries.length; i2++) {
-        const entry = metaEntries[i2];
-        const sepPos = entry.indexOf("=");
-        if (sepPos > 0) {
-          const key = entry.substring(0, sepPos).trim();
-          const value = entry.substring(sepPos + 1).trim();
-          if (key) {
-            params[key] = value;
-          }
-        }
-      }
-      let bufferData;
-      try {
-        if (encoding === "base64") {
-          bufferData = Buffer.from(data, "base64");
-        } else {
-          try {
-            bufferData = Buffer.from(decodeURIComponent(data));
-          } catch (_decodeError) {
-            bufferData = Buffer.from(data);
-          }
-        }
-      } catch (_bufferError) {
-        bufferData = Buffer.alloc(0);
-      }
-      return {
-        data: bufferData,
-        encoding: encoding || null,
-        contentType: contentType || "application/octet-stream",
-        params
-      };
-    };
-    module2.exports.resolveContent = (data, key, options, callback) => {
-      if (!callback && typeof options === "function") {
-        callback = options;
-        options = false;
-      }
-      options = options || {};
-      let promise;
-      if (!callback) {
-        promise = new Promise((resolve2, reject) => {
-          callback = module2.exports.callbackPromise(resolve2, reject);
-        });
-      }
-      resolveContentValue(data, key, options, callback);
-      return promise;
-    };
-    function resolveContentValue(data, key, options, callback) {
-      let content = data && data[key] && data[key].content || data[key];
-      const encoding = (typeof data[key] === "object" && data[key].encoding || "utf8").toString().toLowerCase().replace(/[-_\s]/g, "");
-      if (!content) {
-        return callback(null, content);
-      }
-      if (typeof content === "object") {
-        if (typeof content.pipe === "function") {
-          return resolveStream(content, (err, value) => {
-            if (err) {
-              return callback(err);
-            }
-            if (data[key].content) {
-              data[key].content = value;
-            } else {
-              data[key] = value;
-            }
-            callback(null, value);
-          });
-        } else if (/^https?:\/\//i.test(content.path || content.href)) {
-          if (options.disableUrlAccess) {
-            return setImmediate(() => {
-              const err = new Error("Url access rejected for " + (content.path || content.href));
-              err.code = errors.EURLACCESS;
-              callback(err);
-            });
-          }
-          return resolveStream(nmfetch(content.path || content.href, { headers: content.httpHeaders, tls: content.tls }), callback);
-        } else if (/^data:/i.test(content.path || content.href)) {
-          const parsedDataUri = module2.exports.parseDataURI(content.path || content.href);
-          return callback(null, parsedDataUri && parsedDataUri.data ? parsedDataUri.data : Buffer.alloc(0));
-        } else if (content.path) {
-          if (options.disableFileAccess) {
-            return setImmediate(() => {
-              const err = new Error("File access rejected for " + content.path);
-              err.code = errors.EFILEACCESS;
-              callback(err);
-            });
-          }
-          return resolveStream(fs4.createReadStream(content.path), callback);
-        }
-      }
-      if (typeof data[key].content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
-        content = Buffer.from(data[key].content, encoding);
-      }
-      setImmediate(() => callback(null, content));
-    }
-    module2.exports.assign = function() {
-      const args = Array.from(arguments);
-      const target = args.shift() || {};
-      args.forEach((source) => {
-        Object.keys(source || {}).forEach((key) => {
-          if (["tls", "auth"].includes(key) && source[key] && typeof source[key] === "object") {
-            target[key] = Object.assign(target[key] || {}, source[key]);
-          } else {
-            target[key] = source[key];
-          }
-        });
-      });
-      return target;
-    };
-    module2.exports.encodeXText = (str) => {
-      if (!/[^\x21-\x2A\x2C-\x3C\x3E-\x7E]/.test(str)) {
-        return str;
-      }
-      const buf = Buffer.from(str);
-      let result = "";
-      for (let i2 = 0, len = buf.length; i2 < len; i2++) {
-        const c = buf[i2];
-        if (c < 33 || c > 126 || c === 43 || c === 61) {
-          result += "+" + (c < 16 ? "0" : "") + c.toString(16).toUpperCase();
-        } else {
-          result += String.fromCharCode(c);
-        }
-      }
-      return result;
-    };
-    function resolveStream(stream, callback) {
-      let responded = false;
-      const chunks = [];
-      let chunklen = 0;
-      stream.on("error", (err) => {
-        if (responded) {
-          return;
-        }
-        responded = true;
-        callback(err);
-      });
-      stream.on("readable", () => {
-        let chunk;
-        while ((chunk = stream.read()) !== null) {
-          chunks.push(chunk);
-          chunklen += chunk.length;
-        }
-      });
-      stream.on("end", () => {
-        if (responded) {
-          return;
-        }
-        responded = true;
-        let value;
-        try {
-          value = Buffer.concat(chunks, chunklen);
-        } catch (E) {
-          return callback(E);
-        }
-        callback(null, value);
-      });
-    }
-    function createDefaultLogger(levels) {
-      const levelMaxLen = levels.reduce((max, level) => Math.max(max, level.length), 0);
-      const levelNames = /* @__PURE__ */ new Map();
-      levels.forEach((level) => {
-        let levelName = level.toUpperCase();
-        if (levelName.length < levelMaxLen) {
-          levelName += " ".repeat(levelMaxLen - levelName.length);
-        }
-        levelNames.set(level, levelName);
-      });
-      const print = (level, entry, message, ...args) => {
-        let prefix = "";
-        if (entry) {
-          if (entry.tnx === "server") {
-            prefix = "S: ";
-          } else if (entry.tnx === "client") {
-            prefix = "C: ";
-          }
-          if (entry.sid) {
-            prefix = "[" + entry.sid + "] " + prefix;
-          }
-          if (entry.cid) {
-            prefix = "[#" + entry.cid + "] " + prefix;
-          }
-        }
-        message = util.format(message, ...args);
-        message.split(/\r?\n/).forEach((line) => {
-          console.log("[%s] %s %s", (/* @__PURE__ */ new Date()).toISOString().substr(0, 19).replace(/T/, " "), levelNames.get(level), prefix + line);
-        });
-      };
-      const logger = {};
-      levels.forEach((level) => {
-        logger[level] = print.bind(null, level);
-      });
-      return logger;
-    }
-  }
-});
-
-// node_modules/nodemailer/lib/mime-funcs/mime-types.js
-var require_mime_types2 = __commonJS({
-  "node_modules/nodemailer/lib/mime-funcs/mime-types.js"(exports2, module2) {
-    "use strict";
-    var path3 = require("path");
-    var defaultMimeType = "application/octet-stream";
-    var defaultExtension = "bin";
-    var mimeTypes = /* @__PURE__ */ new Map([
-      ["application/acad", "dwg"],
-      ["application/applixware", "aw"],
-      ["application/arj", "arj"],
-      ["application/atom+xml", "xml"],
-      ["application/atomcat+xml", "atomcat"],
-      ["application/atomsvc+xml", "atomsvc"],
-      ["application/base64", ["mm", "mme"]],
-      ["application/binhex", "hqx"],
-      ["application/binhex4", "hqx"],
-      ["application/book", ["book", "boo"]],
-      ["application/ccxml+xml,", "ccxml"],
-      ["application/cdf", "cdf"],
-      ["application/cdmi-capability", "cdmia"],
-      ["application/cdmi-container", "cdmic"],
-      ["application/cdmi-domain", "cdmid"],
-      ["application/cdmi-object", "cdmio"],
-      ["application/cdmi-queue", "cdmiq"],
-      ["application/clariscad", "ccad"],
-      ["application/commonground", "dp"],
-      ["application/cu-seeme", "cu"],
-      ["application/davmount+xml", "davmount"],
-      ["application/drafting", "drw"],
-      ["application/dsptype", "tsp"],
-      ["application/dssc+der", "dssc"],
-      ["application/dssc+xml", "xdssc"],
-      ["application/dxf", "dxf"],
-      ["application/ecmascript", ["js", "es"]],
-      ["application/emma+xml", "emma"],
-      ["application/envoy", "evy"],
-      ["application/epub+zip", "epub"],
-      ["application/excel", ["xls", "xl", "xla", "xlb", "xlc", "xld", "xlk", "xll", "xlm", "xlt", "xlv", "xlw"]],
-      ["application/exi", "exi"],
-      ["application/font-tdpfr", "pfr"],
-      ["application/fractals", "fif"],
-      ["application/freeloader", "frl"],
-      ["application/futuresplash", "spl"],
-      ["application/geo+json", "geojson"],
-      ["application/gnutar", "tgz"],
-      ["application/groupwise", "vew"],
-      ["application/hlp", "hlp"],
-      ["application/hta", "hta"],
-      ["application/hyperstudio", "stk"],
-      ["application/i-deas", "unv"],
-      ["application/iges", ["iges", "igs"]],
-      ["application/inf", "inf"],
-      ["application/internet-property-stream", "acx"],
-      ["application/ipfix", "ipfix"],
-      ["application/java", "class"],
-      ["application/java-archive", "jar"],
-      ["application/java-byte-code", "class"],
-      ["application/java-serialized-object", "ser"],
-      ["application/java-vm", "class"],
-      ["application/javascript", "js"],
-      ["application/json", "json"],
-      ["application/lha", "lha"],
-      ["application/lzx", "lzx"],
-      ["application/mac-binary", "bin"],
-      ["application/mac-binhex", "hqx"],
-      ["application/mac-binhex40", "hqx"],
-      ["application/mac-compactpro", "cpt"],
-      ["application/macbinary", "bin"],
-      ["application/mads+xml", "mads"],
-      ["application/marc", "mrc"],
-      ["application/marcxml+xml", "mrcx"],
-      ["application/mathematica", "ma"],
-      ["application/mathml+xml", "mathml"],
-      ["application/mbedlet", "mbd"],
-      ["application/mbox", "mbox"],
-      ["application/mcad", "mcd"],
-      ["application/mediaservercontrol+xml", "mscml"],
-      ["application/metalink4+xml", "meta4"],
-      ["application/mets+xml", "mets"],
-      ["application/mime", "aps"],
-      ["application/mods+xml", "mods"],
-      ["application/mp21", "m21"],
-      ["application/mp4", "mp4"],
-      ["application/mspowerpoint", ["ppt", "pot", "pps", "ppz"]],
-      ["application/msword", ["doc", "dot", "w6w", "wiz", "word"]],
-      ["application/mswrite", "wri"],
-      ["application/mxf", "mxf"],
-      ["application/netmc", "mcp"],
-      ["application/octet-stream", ["*"]],
-      ["application/oda", "oda"],
-      ["application/oebps-package+xml", "opf"],
-      ["application/ogg", "ogx"],
-      ["application/olescript", "axs"],
-      ["application/onenote", "onetoc"],
-      ["application/patch-ops-error+xml", "xer"],
-      ["application/pdf", "pdf"],
-      ["application/pgp-encrypted", "asc"],
-      ["application/pgp-signature", "pgp"],
-      ["application/pics-rules", "prf"],
-      ["application/pkcs-12", "p12"],
-      ["application/pkcs-crl", "crl"],
-      ["application/pkcs10", "p10"],
-      ["application/pkcs7-mime", ["p7c", "p7m"]],
-      ["application/pkcs7-signature", "p7s"],
-      ["application/pkcs8", "p8"],
-      ["application/pkix-attr-cert", "ac"],
-      ["application/pkix-cert", ["cer", "crt"]],
-      ["application/pkix-crl", "crl"],
-      ["application/pkix-pkipath", "pkipath"],
-      ["application/pkixcmp", "pki"],
-      ["application/plain", "text"],
-      ["application/pls+xml", "pls"],
-      ["application/postscript", ["ps", "ai", "eps"]],
-      ["application/powerpoint", "ppt"],
-      ["application/pro_eng", ["part", "prt"]],
-      ["application/prs.cww", "cww"],
-      ["application/pskc+xml", "pskcxml"],
-      ["application/rdf+xml", "rdf"],
-      ["application/reginfo+xml", "rif"],
-      ["application/relax-ng-compact-syntax", "rnc"],
-      ["application/resource-lists+xml", "rl"],
-      ["application/resource-lists-diff+xml", "rld"],
-      ["application/ringing-tones", "rng"],
-      ["application/rls-services+xml", "rs"],
-      ["application/rsd+xml", "rsd"],
-      ["application/rss+xml", "xml"],
-      ["application/rtf", ["rtf", "rtx"]],
-      ["application/sbml+xml", "sbml"],
-      ["application/scvp-cv-request", "scq"],
-      ["application/scvp-cv-response", "scs"],
-      ["application/scvp-vp-request", "spq"],
-      ["application/scvp-vp-response", "spp"],
-      ["application/sdp", "sdp"],
-      ["application/sea", "sea"],
-      ["application/set", "set"],
-      ["application/set-payment-initiation", "setpay"],
-      ["application/set-registration-initiation", "setreg"],
-      ["application/shf+xml", "shf"],
-      ["application/sla", "stl"],
-      ["application/smil", ["smi", "smil"]],
-      ["application/smil+xml", "smi"],
-      ["application/solids", "sol"],
-      ["application/sounder", "sdr"],
-      ["application/sparql-query", "rq"],
-      ["application/sparql-results+xml", "srx"],
-      ["application/srgs", "gram"],
-      ["application/srgs+xml", "grxml"],
-      ["application/sru+xml", "sru"],
-      ["application/ssml+xml", "ssml"],
-      ["application/step", ["step", "stp"]],
-      ["application/streamingmedia", "ssm"],
-      ["application/tei+xml", "tei"],
-      ["application/thraud+xml", "tfi"],
-      ["application/timestamped-data", "tsd"],
-      ["application/toolbook", "tbk"],
-      ["application/vda", "vda"],
-      ["application/vnd.3gpp.pic-bw-large", "plb"],
-      ["application/vnd.3gpp.pic-bw-small", "psb"],
-      ["application/vnd.3gpp.pic-bw-var", "pvb"],
-      ["application/vnd.3gpp2.tcap", "tcap"],
-      ["application/vnd.3m.post-it-notes", "pwn"],
-      ["application/vnd.accpac.simply.aso", "aso"],
-      ["application/vnd.accpac.simply.imp", "imp"],
-      ["application/vnd.acucobol", "acu"],
-      ["application/vnd.acucorp", "atc"],
-      ["application/vnd.adobe.air-application-installer-package+zip", "air"],
-      ["application/vnd.adobe.fxp", "fxp"],
-      ["application/vnd.adobe.xdp+xml", "xdp"],
-      ["application/vnd.adobe.xfdf", "xfdf"],
-      ["application/vnd.ahead.space", "ahead"],
-      ["application/vnd.airzip.filesecure.azf", "azf"],
-      ["application/vnd.airzip.filesecure.azs", "azs"],
-      ["application/vnd.amazon.ebook", "azw"],
-      ["application/vnd.americandynamics.acc", "acc"],
-      ["application/vnd.amiga.ami", "ami"],
-      ["application/vnd.android.package-archive", "apk"],
-      ["application/vnd.anser-web-certificate-issue-initiation", "cii"],
-      ["application/vnd.anser-web-funds-transfer-initiation", "fti"],
-      ["application/vnd.antix.game-component", "atx"],
-      ["application/vnd.apple.installer+xml", "mpkg"],
-      ["application/vnd.apple.mpegurl", "m3u8"],
-      ["application/vnd.aristanetworks.swi", "swi"],
-      ["application/vnd.audiograph", "aep"],
-      ["application/vnd.blueice.multipass", "mpm"],
-      ["application/vnd.bmi", "bmi"],
-      ["application/vnd.businessobjects", "rep"],
-      ["application/vnd.chemdraw+xml", "cdxml"],
-      ["application/vnd.chipnuts.karaoke-mmd", "mmd"],
-      ["application/vnd.cinderella", "cdy"],
-      ["application/vnd.claymore", "cla"],
-      ["application/vnd.cloanto.rp9", "rp9"],
-      ["application/vnd.clonk.c4group", "c4g"],
-      ["application/vnd.cluetrust.cartomobile-config", "c11amc"],
-      ["application/vnd.cluetrust.cartomobile-config-pkg", "c11amz"],
-      ["application/vnd.commonspace", "csp"],
-      ["application/vnd.contact.cmsg", "cdbcmsg"],
-      ["application/vnd.cosmocaller", "cmc"],
-      ["application/vnd.crick.clicker", "clkx"],
-      ["application/vnd.crick.clicker.keyboard", "clkk"],
-      ["application/vnd.crick.clicker.palette", "clkp"],
-      ["application/vnd.crick.clicker.template", "clkt"],
-      ["application/vnd.crick.clicker.wordbank", "clkw"],
-      ["application/vnd.criticaltools.wbs+xml", "wbs"],
-      ["application/vnd.ctc-posml", "pml"],
-      ["application/vnd.cups-ppd", "ppd"],
-      ["application/vnd.curl.car", "car"],
-      ["application/vnd.curl.pcurl", "pcurl"],
-      ["application/vnd.data-vision.rdz", "rdz"],
-      ["application/vnd.denovo.fcselayout-link", "fe_launch"],
-      ["application/vnd.dna", "dna"],
-      ["application/vnd.dolby.mlp", "mlp"],
-      ["application/vnd.dpgraph", "dpg"],
-      ["application/vnd.dreamfactory", "dfac"],
-      ["application/vnd.dvb.ait", "ait"],
-      ["application/vnd.dvb.service", "svc"],
-      ["application/vnd.dynageo", "geo"],
-      ["application/vnd.ecowin.chart", "mag"],
-      ["application/vnd.enliven", "nml"],
-      ["application/vnd.epson.esf", "esf"],
-      ["application/vnd.epson.msf", "msf"],
-      ["application/vnd.epson.quickanime", "qam"],
-      ["application/vnd.epson.salt", "slt"],
-      ["application/vnd.epson.ssf", "ssf"],
-      ["application/vnd.eszigno3+xml", "es3"],
-      ["application/vnd.ezpix-album", "ez2"],
-      ["application/vnd.ezpix-package", "ez3"],
-      ["application/vnd.fdf", "fdf"],
-      ["application/vnd.fdsn.seed", "seed"],
-      ["application/vnd.flographit", "gph"],
-      ["application/vnd.fluxtime.clip", "ftc"],
-      ["application/vnd.framemaker", "fm"],
-      ["application/vnd.frogans.fnc", "fnc"],
-      ["application/vnd.frogans.ltf", "ltf"],
-      ["application/vnd.fsc.weblaunch", "fsc"],
-      ["application/vnd.fujitsu.oasys", "oas"],
-      ["application/vnd.fujitsu.oasys2", "oa2"],
-      ["application/vnd.fujitsu.oasys3", "oa3"],
-      ["application/vnd.fujitsu.oasysgp", "fg5"],
-      ["application/vnd.fujitsu.oasysprs", "bh2"],
-      ["application/vnd.fujixerox.ddd", "ddd"],
-      ["application/vnd.fujixerox.docuworks", "xdw"],
-      ["application/vnd.fujixerox.docuworks.binder", "xbd"],
-      ["application/vnd.fuzzysheet", "fzs"],
-      ["application/vnd.genomatix.tuxedo", "txd"],
-      ["application/vnd.geogebra.file", "ggb"],
-      ["application/vnd.geogebra.tool", "ggt"],
-      ["application/vnd.geometry-explorer", "gex"],
-      ["application/vnd.geonext", "gxt"],
-      ["application/vnd.geoplan", "g2w"],
-      ["application/vnd.geospace", "g3w"],
-      ["application/vnd.gmx", "gmx"],
-      ["application/vnd.google-earth.kml+xml", "kml"],
-      ["application/vnd.google-earth.kmz", "kmz"],
-      ["application/vnd.grafeq", "gqf"],
-      ["application/vnd.groove-account", "gac"],
-      ["application/vnd.groove-help", "ghf"],
-      ["application/vnd.groove-identity-message", "gim"],
-      ["application/vnd.groove-injector", "grv"],
-      ["application/vnd.groove-tool-message", "gtm"],
-      ["application/vnd.groove-tool-template", "tpl"],
-      ["application/vnd.groove-vcard", "vcg"],
-      ["application/vnd.hal+xml", "hal"],
-      ["application/vnd.handheld-entertainment+xml", "zmm"],
-      ["application/vnd.hbci", "hbci"],
-      ["application/vnd.hhe.lesson-player", "les"],
-      ["application/vnd.hp-hpgl", ["hgl", "hpg", "hpgl"]],
-      ["application/vnd.hp-hpid", "hpid"],
-      ["application/vnd.hp-hps", "hps"],
-      ["application/vnd.hp-jlyt", "jlt"],
-      ["application/vnd.hp-pcl", "pcl"],
-      ["application/vnd.hp-pclxl", "pclxl"],
-      ["application/vnd.hydrostatix.sof-data", "sfd-hdstx"],
-      ["application/vnd.hzn-3d-crossword", "x3d"],
-      ["application/vnd.ibm.minipay", "mpy"],
-      ["application/vnd.ibm.modcap", "afp"],
-      ["application/vnd.ibm.rights-management", "irm"],
-      ["application/vnd.ibm.secure-container", "sc"],
-      ["application/vnd.iccprofile", "icc"],
-      ["application/vnd.igloader", "igl"],
-      ["application/vnd.immervision-ivp", "ivp"],
-      ["application/vnd.immervision-ivu", "ivu"],
-      ["application/vnd.insors.igm", "igm"],
-      ["application/vnd.intercon.formnet", "xpw"],
-      ["application/vnd.intergeo", "i2g"],
-      ["application/vnd.intu.qbo", "qbo"],
-      ["application/vnd.intu.qfx", "qfx"],
-      ["application/vnd.ipunplugged.rcprofile", "rcprofile"],
-      ["application/vnd.irepository.package+xml", "irp"],
-      ["application/vnd.is-xpr", "xpr"],
-      ["application/vnd.isac.fcs", "fcs"],
-      ["application/vnd.jam", "jam"],
-      ["application/vnd.jcp.javame.midlet-rms", "rms"],
-      ["application/vnd.jisp", "jisp"],
-      ["application/vnd.joost.joda-archive", "joda"],
-      ["application/vnd.kahootz", "ktz"],
-      ["application/vnd.kde.karbon", "karbon"],
-      ["application/vnd.kde.kchart", "chrt"],
-      ["application/vnd.kde.kformula", "kfo"],
-      ["application/vnd.kde.kivio", "flw"],
-      ["application/vnd.kde.kontour", "kon"],
-      ["application/vnd.kde.kpresenter", "kpr"],
-      ["application/vnd.kde.kspread", "ksp"],
-      ["application/vnd.kde.kword", "kwd"],
-      ["application/vnd.kenameaapp", "htke"],
-      ["application/vnd.kidspiration", "kia"],
-      ["application/vnd.kinar", "kne"],
-      ["application/vnd.koan", "skp"],
-      ["application/vnd.kodak-descriptor", "sse"],
-      ["application/vnd.las.las+xml", "lasxml"],
-      ["application/vnd.llamagraphics.life-balance.desktop", "lbd"],
-      ["application/vnd.llamagraphics.life-balance.exchange+xml", "lbe"],
-      ["application/vnd.lotus-1-2-3", "123"],
-      ["application/vnd.lotus-approach", "apr"],
-      ["application/vnd.lotus-freelance", "pre"],
-      ["application/vnd.lotus-notes", "nsf"],
-      ["application/vnd.lotus-organizer", "org"],
-      ["application/vnd.lotus-screencam", "scm"],
-      ["application/vnd.lotus-wordpro", "lwp"],
-      ["application/vnd.macports.portpkg", "portpkg"],
-      ["application/vnd.mcd", "mcd"],
-      ["application/vnd.medcalcdata", "mc1"],
-      ["application/vnd.mediastation.cdkey", "cdkey"],
-      ["application/vnd.mfer", "mwf"],
-      ["application/vnd.mfmp", "mfm"],
-      ["application/vnd.micrografx.flo", "flo"],
-      ["application/vnd.micrografx.igx", "igx"],
-      ["application/vnd.mif", "mif"],
-      ["application/vnd.mobius.daf", "daf"],
-      ["application/vnd.mobius.dis", "dis"],
-      ["application/vnd.mobius.mbk", "mbk"],
-      ["application/vnd.mobius.mqy", "mqy"],
-      ["application/vnd.mobius.msl", "msl"],
-      ["application/vnd.mobius.plc", "plc"],
-      ["application/vnd.mobius.txf", "txf"],
-      ["application/vnd.mophun.application", "mpn"],
-      ["application/vnd.mophun.certificate", "mpc"],
-      ["application/vnd.mozilla.xul+xml", "xul"],
-      ["application/vnd.ms-artgalry", "cil"],
-      ["application/vnd.ms-cab-compressed", "cab"],
-      ["application/vnd.ms-excel", ["xls", "xla", "xlc", "xlm", "xlt", "xlw", "xlb", "xll"]],
-      ["application/vnd.ms-excel.addin.macroenabled.12", "xlam"],
-      ["application/vnd.ms-excel.sheet.binary.macroenabled.12", "xlsb"],
-      ["application/vnd.ms-excel.sheet.macroenabled.12", "xlsm"],
-      ["application/vnd.ms-excel.template.macroenabled.12", "xltm"],
-      ["application/vnd.ms-fontobject", "eot"],
-      ["application/vnd.ms-htmlhelp", "chm"],
-      ["application/vnd.ms-ims", "ims"],
-      ["application/vnd.ms-lrm", "lrm"],
-      ["application/vnd.ms-officetheme", "thmx"],
-      ["application/vnd.ms-outlook", "msg"],
-      ["application/vnd.ms-pki.certstore", "sst"],
-      ["application/vnd.ms-pki.pko", "pko"],
-      ["application/vnd.ms-pki.seccat", "cat"],
-      ["application/vnd.ms-pki.stl", "stl"],
-      ["application/vnd.ms-pkicertstore", "sst"],
-      ["application/vnd.ms-pkiseccat", "cat"],
-      ["application/vnd.ms-pkistl", "stl"],
-      ["application/vnd.ms-powerpoint", ["ppt", "pot", "pps", "ppa", "pwz"]],
-      ["application/vnd.ms-powerpoint.addin.macroenabled.12", "ppam"],
-      ["application/vnd.ms-powerpoint.presentation.macroenabled.12", "pptm"],
-      ["application/vnd.ms-powerpoint.slide.macroenabled.12", "sldm"],
-      ["application/vnd.ms-powerpoint.slideshow.macroenabled.12", "ppsm"],
-      ["application/vnd.ms-powerpoint.template.macroenabled.12", "potm"],
-      ["application/vnd.ms-project", "mpp"],
-      ["application/vnd.ms-word.document.macroenabled.12", "docm"],
-      ["application/vnd.ms-word.template.macroenabled.12", "dotm"],
-      ["application/vnd.ms-works", ["wks", "wcm", "wdb", "wps"]],
-      ["application/vnd.ms-wpl", "wpl"],
-      ["application/vnd.ms-xpsdocument", "xps"],
-      ["application/vnd.mseq", "mseq"],
-      ["application/vnd.musician", "mus"],
-      ["application/vnd.muvee.style", "msty"],
-      ["application/vnd.neurolanguage.nlu", "nlu"],
-      ["application/vnd.noblenet-directory", "nnd"],
-      ["application/vnd.noblenet-sealer", "nns"],
-      ["application/vnd.noblenet-web", "nnw"],
-      ["application/vnd.nokia.configuration-message", "ncm"],
-      ["application/vnd.nokia.n-gage.data", "ngdat"],
-      ["application/vnd.nokia.n-gage.symbian.install", "n-gage"],
-      ["application/vnd.nokia.radio-preset", "rpst"],
-      ["application/vnd.nokia.radio-presets", "rpss"],
-      ["application/vnd.nokia.ringing-tone", "rng"],
-      ["application/vnd.novadigm.edm", "edm"],
-      ["application/vnd.novadigm.edx", "edx"],
-      ["application/vnd.novadigm.ext", "ext"],
-      ["application/vnd.oasis.opendocument.chart", "odc"],
-      ["application/vnd.oasis.opendocument.chart-template", "otc"],
-      ["application/vnd.oasis.opendocument.database", "odb"],
-      ["application/vnd.oasis.opendocument.formula", "odf"],
-      ["application/vnd.oasis.opendocument.formula-template", "odft"],
-      ["application/vnd.oasis.opendocument.graphics", "odg"],
-      ["application/vnd.oasis.opendocument.graphics-template", "otg"],
-      ["application/vnd.oasis.opendocument.image", "odi"],
-      ["application/vnd.oasis.opendocument.image-template", "oti"],
-      ["application/vnd.oasis.opendocument.presentation", "odp"],
-      ["application/vnd.oasis.opendocument.presentation-template", "otp"],
-      ["application/vnd.oasis.opendocument.spreadsheet", "ods"],
-      ["application/vnd.oasis.opendocument.spreadsheet-template", "ots"],
-      ["application/vnd.oasis.opendocument.text", "odt"],
-      ["application/vnd.oasis.opendocument.text-master", "odm"],
-      ["application/vnd.oasis.opendocument.text-template", "ott"],
-      ["application/vnd.oasis.opendocument.text-web", "oth"],
-      ["application/vnd.olpc-sugar", "xo"],
-      ["application/vnd.oma.dd2+xml", "dd2"],
-      ["application/vnd.openofficeorg.extension", "oxt"],
-      ["application/vnd.openxmlformats-officedocument.presentationml.presentation", "pptx"],
-      ["application/vnd.openxmlformats-officedocument.presentationml.slide", "sldx"],
-      ["application/vnd.openxmlformats-officedocument.presentationml.slideshow", "ppsx"],
-      ["application/vnd.openxmlformats-officedocument.presentationml.template", "potx"],
-      ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"],
-      ["application/vnd.openxmlformats-officedocument.spreadsheetml.template", "xltx"],
-      ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"],
-      ["application/vnd.openxmlformats-officedocument.wordprocessingml.template", "dotx"],
-      ["application/vnd.osgeo.mapguide.package", "mgp"],
-      ["application/vnd.osgi.dp", "dp"],
-      ["application/vnd.palm", "pdb"],
-      ["application/vnd.pawaafile", "paw"],
-      ["application/vnd.pg.format", "str"],
-      ["application/vnd.pg.osasli", "ei6"],
-      ["application/vnd.picsel", "efif"],
-      ["application/vnd.pmi.widget", "wg"],
-      ["application/vnd.pocketlearn", "plf"],
-      ["application/vnd.powerbuilder6", "pbd"],
-      ["application/vnd.previewsystems.box", "box"],
-      ["application/vnd.proteus.magazine", "mgz"],
-      ["application/vnd.publishare-delta-tree", "qps"],
-      ["application/vnd.pvi.ptid1", "ptid"],
-      ["application/vnd.quark.quarkxpress", "qxd"],
-      ["application/vnd.realvnc.bed", "bed"],
-      ["application/vnd.recordare.musicxml", "mxl"],
-      ["application/vnd.recordare.musicxml+xml", "musicxml"],
-      ["application/vnd.rig.cryptonote", "cryptonote"],
-      ["application/vnd.rim.cod", "cod"],
-      ["application/vnd.rn-realmedia", "rm"],
-      ["application/vnd.rn-realplayer", "rnx"],
-      ["application/vnd.route66.link66+xml", "link66"],
-      ["application/vnd.sailingtracker.track", "st"],
-      ["application/vnd.seemail", "see"],
-      ["application/vnd.sema", "sema"],
-      ["application/vnd.semd", "semd"],
-      ["application/vnd.semf", "semf"],
-      ["application/vnd.shana.informed.formdata", "ifm"],
-      ["application/vnd.shana.informed.formtemplate", "itp"],
-      ["application/vnd.shana.informed.interchange", "iif"],
-      ["application/vnd.shana.informed.package", "ipk"],
-      ["application/vnd.simtech-mindmapper", "twd"],
-      ["application/vnd.smaf", "mmf"],
-      ["application/vnd.smart.teacher", "teacher"],
-      ["application/vnd.solent.sdkm+xml", "sdkm"],
-      ["application/vnd.spotfire.dxp", "dxp"],
-      ["application/vnd.spotfire.sfs", "sfs"],
-      ["application/vnd.stardivision.calc", "sdc"],
-      ["application/vnd.stardivision.draw", "sda"],
-      ["application/vnd.stardivision.impress", "sdd"],
-      ["application/vnd.stardivision.math", "smf"],
-      ["application/vnd.stardivision.writer", "sdw"],
-      ["application/vnd.stardivision.writer-global", "sgl"],
-      ["application/vnd.stepmania.stepchart", "sm"],
-      ["application/vnd.sun.xml.calc", "sxc"],
-      ["application/vnd.sun.xml.calc.template", "stc"],
-      ["application/vnd.sun.xml.draw", "sxd"],
-      ["application/vnd.sun.xml.draw.template", "std"],
-      ["application/vnd.sun.xml.impress", "sxi"],
-      ["application/vnd.sun.xml.impress.template", "sti"],
-      ["application/vnd.sun.xml.math", "sxm"],
-      ["application/vnd.sun.xml.writer", "sxw"],
-      ["application/vnd.sun.xml.writer.global", "sxg"],
-      ["application/vnd.sun.xml.writer.template", "stw"],
-      ["application/vnd.sus-calendar", "sus"],
-      ["application/vnd.svd", "svd"],
-      ["application/vnd.symbian.install", "sis"],
-      ["application/vnd.syncml+xml", "xsm"],
-      ["application/vnd.syncml.dm+wbxml", "bdm"],
-      ["application/vnd.syncml.dm+xml", "xdm"],
-      ["application/vnd.tao.intent-module-archive", "tao"],
-      ["application/vnd.tmobile-livetv", "tmo"],
-      ["application/vnd.trid.tpt", "tpt"],
-      ["application/vnd.triscape.mxs", "mxs"],
-      ["application/vnd.trueapp", "tra"],
-      ["application/vnd.ufdl", "ufd"],
-      ["application/vnd.uiq.theme", "utz"],
-      ["application/vnd.umajin", "umj"],
-      ["application/vnd.unity", "unityweb"],
-      ["application/vnd.uoml+xml", "uoml"],
-      ["application/vnd.vcx", "vcx"],
-      ["application/vnd.visio", "vsd"],
-      ["application/vnd.visionary", "vis"],
-      ["application/vnd.vsf", "vsf"],
-      ["application/vnd.wap.wbxml", "wbxml"],
-      ["application/vnd.wap.wmlc", "wmlc"],
-      ["application/vnd.wap.wmlscriptc", "wmlsc"],
-      ["application/vnd.webturbo", "wtb"],
-      ["application/vnd.wolfram.player", "nbp"],
-      ["application/vnd.wordperfect", "wpd"],
-      ["application/vnd.wqd", "wqd"],
-      ["application/vnd.wt.stf", "stf"],
-      ["application/vnd.xara", ["web", "xar"]],
-      ["application/vnd.xfdl", "xfdl"],
-      ["application/vnd.yamaha.hv-dic", "hvd"],
-      ["application/vnd.yamaha.hv-script", "hvs"],
-      ["application/vnd.yamaha.hv-voice", "hvp"],
-      ["application/vnd.yamaha.openscoreformat", "osf"],
-      ["application/vnd.yamaha.openscoreformat.osfpvg+xml", "osfpvg"],
-      ["application/vnd.yamaha.smaf-audio", "saf"],
-      ["application/vnd.yamaha.smaf-phrase", "spf"],
-      ["application/vnd.yellowriver-custom-menu", "cmp"],
-      ["application/vnd.zul", "zir"],
-      ["application/vnd.zzazz.deck+xml", "zaz"],
-      ["application/vocaltec-media-desc", "vmd"],
-      ["application/vocaltec-media-file", "vmf"],
-      ["application/voicexml+xml", "vxml"],
-      ["application/widget", "wgt"],
-      ["application/winhlp", "hlp"],
-      ["application/wordperfect", ["wp", "wp5", "wp6", "wpd"]],
-      ["application/wordperfect6.0", ["w60", "wp5"]],
-      ["application/wordperfect6.1", "w61"],
-      ["application/wsdl+xml", "wsdl"],
-      ["application/wspolicy+xml", "wspolicy"],
-      ["application/x-123", "wk1"],
-      ["application/x-7z-compressed", "7z"],
-      ["application/x-abiword", "abw"],
-      ["application/x-ace-compressed", "ace"],
-      ["application/x-aim", "aim"],
-      ["application/x-authorware-bin", "aab"],
-      ["application/x-authorware-map", "aam"],
-      ["application/x-authorware-seg", "aas"],
-      ["application/x-bcpio", "bcpio"],
-      ["application/x-binary", "bin"],
-      ["application/x-binhex40", "hqx"],
-      ["application/x-bittorrent", "torrent"],
-      ["application/x-bsh", ["bsh", "sh", "shar"]],
-      ["application/x-bytecode.elisp", "elc"],
-      ["application/x-bytecode.python", "pyc"],
-      ["application/x-bzip", "bz"],
-      ["application/x-bzip2", ["boz", "bz2"]],
-      ["application/x-cdf", "cdf"],
-      ["application/x-cdlink", "vcd"],
-      ["application/x-chat", ["cha", "chat"]],
-      ["application/x-chess-pgn", "pgn"],
-      ["application/x-cmu-raster", "ras"],
-      ["application/x-cocoa", "cco"],
-      ["application/x-compactpro", "cpt"],
-      ["application/x-compress", "z"],
-      ["application/x-compressed", ["tgz", "gz", "z", "zip"]],
-      ["application/x-conference", "nsc"],
-      ["application/x-cpio", "cpio"],
-      ["application/x-cpt", "cpt"],
-      ["application/x-csh", "csh"],
-      ["application/x-debian-package", "deb"],
-      ["application/x-deepv", "deepv"],
-      ["application/x-director", ["dir", "dcr", "dxr"]],
-      ["application/x-doom", "wad"],
-      ["application/x-dtbncx+xml", "ncx"],
-      ["application/x-dtbook+xml", "dtb"],
-      ["application/x-dtbresource+xml", "res"],
-      ["application/x-dvi", "dvi"],
-      ["application/x-elc", "elc"],
-      ["application/x-envoy", ["env", "evy"]],
-      ["application/x-esrehber", "es"],
-      ["application/x-excel", ["xls", "xla", "xlb", "xlc", "xld", "xlk", "xll", "xlm", "xlt", "xlv", "xlw"]],
-      ["application/x-font-bdf", "bdf"],
-      ["application/x-font-ghostscript", "gsf"],
-      ["application/x-font-linux-psf", "psf"],
-      ["application/x-font-otf", "otf"],
-      ["application/x-font-pcf", "pcf"],
-      ["application/x-font-snf", "snf"],
-      ["application/x-font-ttf", "ttf"],
-      ["application/x-font-type1", "pfa"],
-      ["application/x-font-woff", "woff"],
-      ["application/x-frame", "mif"],
-      ["application/x-freelance", "pre"],
-      ["application/x-futuresplash", "spl"],
-      ["application/x-gnumeric", "gnumeric"],
-      ["application/x-gsp", "gsp"],
-      ["application/x-gss", "gss"],
-      ["application/x-gtar", "gtar"],
-      ["application/x-gzip", ["gz", "gzip"]],
-      ["application/x-hdf", "hdf"],
-      ["application/x-helpfile", ["help", "hlp"]],
-      ["application/x-httpd-imap", "imap"],
-      ["application/x-ima", "ima"],
-      ["application/x-internet-signup", ["ins", "isp"]],
-      ["application/x-internett-signup", "ins"],
-      ["application/x-inventor", "iv"],
-      ["application/x-ip2", "ip"],
-      ["application/x-iphone", "iii"],
-      ["application/x-java-class", "class"],
-      ["application/x-java-commerce", "jcm"],
-      ["application/x-java-jnlp-file", "jnlp"],
-      ["application/x-javascript", "js"],
-      ["application/x-koan", ["skd", "skm", "skp", "skt"]],
-      ["application/x-ksh", "ksh"],
-      ["application/x-latex", ["latex", "ltx"]],
-      ["application/x-lha", "lha"],
-      ["application/x-lisp", "lsp"],
-      ["application/x-livescreen", "ivy"],
-      ["application/x-lotus", "wq1"],
-      ["application/x-lotusscreencam", "scm"],
-      ["application/x-lzh", "lzh"],
-      ["application/x-lzx", "lzx"],
-      ["application/x-mac-binhex40", "hqx"],
-      ["application/x-macbinary", "bin"],
-      ["application/x-magic-cap-package-1.0", "mc$"],
-      ["application/x-mathcad", "mcd"],
-      ["application/x-meme", "mm"],
-      ["application/x-midi", ["mid", "midi"]],
-      ["application/x-mif", "mif"],
-      ["application/x-mix-transfer", "nix"],
-      ["application/x-mobipocket-ebook", "prc"],
-      ["application/x-mplayer2", "asx"],
-      ["application/x-ms-application", "application"],
-      ["application/x-ms-wmd", "wmd"],
-      ["application/x-ms-wmz", "wmz"],
-      ["application/x-ms-xbap", "xbap"],
-      ["application/x-msaccess", "mdb"],
-      ["application/x-msbinder", "obd"],
-      ["application/x-mscardfile", "crd"],
-      ["application/x-msclip", "clp"],
-      ["application/x-msdownload", ["exe", "dll"]],
-      ["application/x-msexcel", ["xls", "xla", "xlw"]],
-      ["application/x-msmediaview", ["mvb", "m13", "m14"]],
-      ["application/x-msmetafile", "wmf"],
-      ["application/x-msmoney", "mny"],
-      ["application/x-mspowerpoint", "ppt"],
-      ["application/x-mspublisher", "pub"],
-      ["application/x-msschedule", "scd"],
-      ["application/x-msterminal", "trm"],
-      ["application/x-mswrite", "wri"],
-      ["application/x-navi-animation", "ani"],
-      ["application/x-navidoc", "nvd"],
-      ["application/x-navimap", "map"],
-      ["application/x-navistyle", "stl"],
-      ["application/x-netcdf", ["cdf", "nc"]],
-      ["application/x-newton-compatible-pkg", "pkg"],
-      ["application/x-nokia-9000-communicator-add-on-software", "aos"],
-      ["application/x-omc", "omc"],
-      ["application/x-omcdatamaker", "omcd"],
-      ["application/x-omcregerator", "omcr"],
-      ["application/x-pagemaker", ["pm4", "pm5"]],
-      ["application/x-pcl", "pcl"],
-      ["application/x-perfmon", ["pma", "pmc", "pml", "pmr", "pmw"]],
-      ["application/x-pixclscript", "plx"],
-      ["application/x-pkcs10", "p10"],
-      ["application/x-pkcs12", ["p12", "pfx"]],
-      ["application/x-pkcs7-certificates", ["p7b", "spc"]],
-      ["application/x-pkcs7-certreqresp", "p7r"],
-      ["application/x-pkcs7-mime", ["p7m", "p7c"]],
-      ["application/x-pkcs7-signature", ["p7s", "p7a"]],
-      ["application/x-pointplus", "css"],
-      ["application/x-portable-anymap", "pnm"],
-      ["application/x-project", ["mpc", "mpt", "mpv", "mpx"]],
-      ["application/x-qpro", "wb1"],
-      ["application/x-rar-compressed", "rar"],
-      ["application/x-rtf", "rtf"],
-      ["application/x-sdp", "sdp"],
-      ["application/x-sea", "sea"],
-      ["application/x-seelogo", "sl"],
-      ["application/x-sh", "sh"],
-      ["application/x-shar", ["shar", "sh"]],
-      ["application/x-shockwave-flash", "swf"],
-      ["application/x-silverlight-app", "xap"],
-      ["application/x-sit", "sit"],
-      ["application/x-sprite", ["spr", "sprite"]],
-      ["application/x-stuffit", "sit"],
-      ["application/x-stuffitx", "sitx"],
-      ["application/x-sv4cpio", "sv4cpio"],
-      ["application/x-sv4crc", "sv4crc"],
-      ["application/x-tar", "tar"],
-      ["application/x-tbook", ["sbk", "tbk"]],
-      ["application/x-tcl", "tcl"],
-      ["application/x-tex", "tex"],
-      ["application/x-tex-tfm", "tfm"],
-      ["application/x-texinfo", ["texi", "texinfo"]],
-      ["application/x-troff", ["roff", "t", "tr"]],
-      ["application/x-troff-man", "man"],
-      ["application/x-troff-me", "me"],
-      ["application/x-troff-ms", "ms"],
-      ["application/x-troff-msvideo", "avi"],
-      ["application/x-ustar", "ustar"],
-      ["application/x-visio", ["vsd", "vst", "vsw"]],
-      ["application/x-vnd.audioexplosion.mzz", "mzz"],
-      ["application/x-vnd.ls-xpix", "xpix"],
-      ["application/x-vrml", "vrml"],
-      ["application/x-wais-source", ["src", "wsrc"]],
-      ["application/x-winhelp", "hlp"],
-      ["application/x-wintalk", "wtk"],
-      ["application/x-world", ["wrl", "svr"]],
-      ["application/x-wpwin", "wpd"],
-      ["application/x-wri", "wri"],
-      ["application/x-x509-ca-cert", ["cer", "crt", "der"]],
-      ["application/x-x509-user-cert", "crt"],
-      ["application/x-xfig", "fig"],
-      ["application/x-xpinstall", "xpi"],
-      ["application/x-zip-compressed", "zip"],
-      ["application/xcap-diff+xml", "xdf"],
-      ["application/xenc+xml", "xenc"],
-      ["application/xhtml+xml", "xhtml"],
-      ["application/xml", "xml"],
-      ["application/xml-dtd", "dtd"],
-      ["application/xop+xml", "xop"],
-      ["application/xslt+xml", "xslt"],
-      ["application/xspf+xml", "xspf"],
-      ["application/xv+xml", "mxml"],
-      ["application/yang", "yang"],
-      ["application/yin+xml", "yin"],
-      ["application/ynd.ms-pkipko", "pko"],
-      ["application/zip", "zip"],
-      ["audio/adpcm", "adp"],
-      ["audio/aiff", ["aiff", "aif", "aifc"]],
-      ["audio/basic", ["snd", "au"]],
-      ["audio/it", "it"],
-      ["audio/make", ["funk", "my", "pfunk"]],
-      ["audio/make.my.funk", "pfunk"],
-      ["audio/mid", ["mid", "rmi"]],
-      ["audio/midi", ["midi", "kar", "mid"]],
-      ["audio/mod", "mod"],
-      ["audio/mp4", "mp4a"],
-      ["audio/mpeg", ["mpga", "mp3", "m2a", "mp2", "mpa", "mpg"]],
-      ["audio/mpeg3", "mp3"],
-      ["audio/nspaudio", ["la", "lma"]],
-      ["audio/ogg", "oga"],
-      ["audio/s3m", "s3m"],
-      ["audio/tsp-audio", "tsi"],
-      ["audio/tsplayer", "tsp"],
-      ["audio/vnd.dece.audio", "uva"],
-      ["audio/vnd.digital-winds", "eol"],
-      ["audio/vnd.dra", "dra"],
-      ["audio/vnd.dts", "dts"],
-      ["audio/vnd.dts.hd", "dtshd"],
-      ["audio/vnd.lucent.voice", "lvp"],
-      ["audio/vnd.ms-playready.media.pya", "pya"],
-      ["audio/vnd.nuera.ecelp4800", "ecelp4800"],
-      ["audio/vnd.nuera.ecelp7470", "ecelp7470"],
-      ["audio/vnd.nuera.ecelp9600", "ecelp9600"],
-      ["audio/vnd.qcelp", "qcp"],
-      ["audio/vnd.rip", "rip"],
-      ["audio/voc", "voc"],
-      ["audio/voxware", "vox"],
-      ["audio/wav", "wav"],
-      ["audio/webm", "weba"],
-      ["audio/x-aac", "aac"],
-      ["audio/x-adpcm", "snd"],
-      ["audio/x-aiff", ["aiff", "aif", "aifc"]],
-      ["audio/x-au", "au"],
-      ["audio/x-gsm", ["gsd", "gsm"]],
-      ["audio/x-jam", "jam"],
-      ["audio/x-liveaudio", "lam"],
-      ["audio/x-mid", ["mid", "midi"]],
-      ["audio/x-midi", ["midi", "mid"]],
-      ["audio/x-mod", "mod"],
-      ["audio/x-mpeg", "mp2"],
-      ["audio/x-mpeg-3", "mp3"],
-      ["audio/x-mpegurl", "m3u"],
-      ["audio/x-mpequrl", "m3u"],
-      ["audio/x-ms-wax", "wax"],
-      ["audio/x-ms-wma", "wma"],
-      ["audio/x-nspaudio", ["la", "lma"]],
-      ["audio/x-pn-realaudio", ["ra", "ram", "rm", "rmm", "rmp"]],
-      ["audio/x-pn-realaudio-plugin", ["ra", "rmp", "rpm"]],
-      ["audio/x-psid", "sid"],
-      ["audio/x-realaudio", "ra"],
-      ["audio/x-twinvq", "vqf"],
-      ["audio/x-twinvq-plugin", ["vqe", "vql"]],
-      ["audio/x-vnd.audioexplosion.mjuicemediafile", "mjf"],
-      ["audio/x-voc", "voc"],
-      ["audio/x-wav", "wav"],
-      ["audio/xm", "xm"],
-      ["chemical/x-cdx", "cdx"],
-      ["chemical/x-cif", "cif"],
-      ["chemical/x-cmdf", "cmdf"],
-      ["chemical/x-cml", "cml"],
-      ["chemical/x-csml", "csml"],
-      ["chemical/x-pdb", ["pdb", "xyz"]],
-      ["chemical/x-xyz", "xyz"],
-      ["drawing/x-dwf", "dwf"],
-      ["i-world/i-vrml", "ivr"],
-      ["image/bmp", ["bmp", "bm"]],
-      ["image/cgm", "cgm"],
-      ["image/cis-cod", "cod"],
-      ["image/cmu-raster", ["ras", "rast"]],
-      ["image/fif", "fif"],
-      ["image/florian", ["flo", "turbot"]],
-      ["image/g3fax", "g3"],
-      ["image/gif", "gif"],
-      ["image/ief", ["ief", "iefs"]],
-      ["image/jpeg", ["jpeg", "jpe", "jpg", "jfif", "jfif-tbnl"]],
-      ["image/jutvision", "jut"],
-      ["image/ktx", "ktx"],
-      ["image/naplps", ["nap", "naplps"]],
-      ["image/pict", ["pic", "pict"]],
-      ["image/pipeg", "jfif"],
-      ["image/pjpeg", ["jfif", "jpe", "jpeg", "jpg"]],
-      ["image/png", ["png", "x-png"]],
-      ["image/prs.btif", "btif"],
-      ["image/svg+xml", "svg"],
-      ["image/tiff", ["tif", "tiff"]],
-      ["image/vasa", "mcf"],
-      ["image/vnd.adobe.photoshop", "psd"],
-      ["image/vnd.dece.graphic", "uvi"],
-      ["image/vnd.djvu", "djvu"],
-      ["image/vnd.dvb.subtitle", "sub"],
-      ["image/vnd.dwg", ["dwg", "dxf", "svf"]],
-      ["image/vnd.dxf", "dxf"],
-      ["image/vnd.fastbidsheet", "fbs"],
-      ["image/vnd.fpx", "fpx"],
-      ["image/vnd.fst", "fst"],
-      ["image/vnd.fujixerox.edmics-mmr", "mmr"],
-      ["image/vnd.fujixerox.edmics-rlc", "rlc"],
-      ["image/vnd.ms-modi", "mdi"],
-      ["image/vnd.net-fpx", ["fpx", "npx"]],
-      ["image/vnd.rn-realflash", "rf"],
-      ["image/vnd.rn-realpix", "rp"],
-      ["image/vnd.wap.wbmp", "wbmp"],
-      ["image/vnd.xiff", "xif"],
-      ["image/webp", "webp"],
-      ["image/x-cmu-raster", "ras"],
-      ["image/x-cmx", "cmx"],
-      ["image/x-dwg", ["dwg", "dxf", "svf"]],
-      ["image/x-freehand", "fh"],
-      ["image/x-icon", "ico"],
-      ["image/x-jg", "art"],
-      ["image/x-jps", "jps"],
-      ["image/x-niff", ["niff", "nif"]],
-      ["image/x-pcx", "pcx"],
-      ["image/x-pict", ["pct", "pic"]],
-      ["image/x-portable-anymap", "pnm"],
-      ["image/x-portable-bitmap", "pbm"],
-      ["image/x-portable-graymap", "pgm"],
-      ["image/x-portable-greymap", "pgm"],
-      ["image/x-portable-pixmap", "ppm"],
-      ["image/x-quicktime", ["qif", "qti", "qtif"]],
-      ["image/x-rgb", "rgb"],
-      ["image/x-tiff", ["tif", "tiff"]],
-      ["image/x-windows-bmp", "bmp"],
-      ["image/x-xbitmap", "xbm"],
-      ["image/x-xbm", "xbm"],
-      ["image/x-xpixmap", ["xpm", "pm"]],
-      ["image/x-xwd", "xwd"],
-      ["image/x-xwindowdump", "xwd"],
-      ["image/xbm", "xbm"],
-      ["image/xpm", "xpm"],
-      ["message/rfc822", ["eml", "mht", "mhtml", "nws", "mime"]],
-      ["model/iges", ["iges", "igs"]],
-      ["model/mesh", "msh"],
-      ["model/vnd.collada+xml", "dae"],
-      ["model/vnd.dwf", "dwf"],
-      ["model/vnd.gdl", "gdl"],
-      ["model/vnd.gtw", "gtw"],
-      ["model/vnd.mts", "mts"],
-      ["model/vnd.vtu", "vtu"],
-      ["model/vrml", ["vrml", "wrl", "wrz"]],
-      ["model/x-pov", "pov"],
-      ["multipart/x-gzip", "gzip"],
-      ["multipart/x-ustar", "ustar"],
-      ["multipart/x-zip", "zip"],
-      ["music/crescendo", ["mid", "midi"]],
-      ["music/x-karaoke", "kar"],
-      ["paleovu/x-pv", "pvu"],
-      ["text/asp", "asp"],
-      ["text/calendar", "ics"],
-      ["text/css", "css"],
-      ["text/csv", "csv"],
-      ["text/ecmascript", "js"],
-      ["text/h323", "323"],
-      ["text/html", ["html", "htm", "stm", "acgi", "htmls", "htx", "shtml"]],
-      ["text/iuls", "uls"],
-      ["text/javascript", "js"],
-      ["text/mcf", "mcf"],
-      ["text/n3", "n3"],
-      ["text/pascal", "pas"],
-      [
-        "text/plain",
-        [
-          "txt",
-          "bas",
-          "c",
-          "h",
-          "c++",
-          "cc",
-          "com",
-          "conf",
-          "cxx",
-          "def",
-          "f",
-          "f90",
-          "for",
-          "g",
-          "hh",
-          "idc",
-          "jav",
-          "java",
-          "list",
-          "log",
-          "lst",
-          "m",
-          "mar",
-          "pl",
-          "sdml",
-          "text"
-        ]
-      ],
-      ["text/plain-bas", "par"],
-      ["text/prs.lines.tag", "dsc"],
-      ["text/richtext", ["rtx", "rt", "rtf"]],
-      ["text/scriplet", "wsc"],
-      ["text/scriptlet", "sct"],
-      ["text/sgml", ["sgm", "sgml"]],
-      ["text/tab-separated-values", "tsv"],
-      ["text/troff", "t"],
-      ["text/turtle", "ttl"],
-      ["text/uri-list", ["uni", "unis", "uri", "uris"]],
-      ["text/vnd.abc", "abc"],
-      ["text/vnd.curl", "curl"],
-      ["text/vnd.curl.dcurl", "dcurl"],
-      ["text/vnd.curl.mcurl", "mcurl"],
-      ["text/vnd.curl.scurl", "scurl"],
-      ["text/vnd.fly", "fly"],
-      ["text/vnd.fmi.flexstor", "flx"],
-      ["text/vnd.graphviz", "gv"],
-      ["text/vnd.in3d.3dml", "3dml"],
-      ["text/vnd.in3d.spot", "spot"],
-      ["text/vnd.rn-realtext", "rt"],
-      ["text/vnd.sun.j2me.app-descriptor", "jad"],
-      ["text/vnd.wap.wml", "wml"],
-      ["text/vnd.wap.wmlscript", "wmls"],
-      ["text/webviewhtml", "htt"],
-      ["text/x-asm", ["asm", "s"]],
-      ["text/x-audiosoft-intra", "aip"],
-      ["text/x-c", ["c", "cc", "cpp"]],
-      ["text/x-component", "htc"],
-      ["text/x-fortran", ["for", "f", "f77", "f90"]],
-      ["text/x-h", ["h", "hh"]],
-      ["text/x-java-source", ["java", "jav"]],
-      ["text/x-java-source,java", "java"],
-      ["text/x-la-asf", "lsx"],
-      ["text/x-m", "m"],
-      ["text/x-pascal", "p"],
-      ["text/x-script", "hlb"],
-      ["text/x-script.csh", "csh"],
-      ["text/x-script.elisp", "el"],
-      ["text/x-script.guile", "scm"],
-      ["text/x-script.ksh", "ksh"],
-      ["text/x-script.lisp", "lsp"],
-      ["text/x-script.perl", "pl"],
-      ["text/x-script.perl-module", "pm"],
-      ["text/x-script.phyton", "py"],
-      ["text/x-script.rexx", "rexx"],
-      ["text/x-script.scheme", "scm"],
-      ["text/x-script.sh", "sh"],
-      ["text/x-script.tcl", "tcl"],
-      ["text/x-script.tcsh", "tcsh"],
-      ["text/x-script.zsh", "zsh"],
-      ["text/x-server-parsed-html", ["shtml", "ssi"]],
-      ["text/x-setext", "etx"],
-      ["text/x-sgml", ["sgm", "sgml"]],
-      ["text/x-speech", ["spc", "talk"]],
-      ["text/x-uil", "uil"],
-      ["text/x-uuencode", ["uu", "uue"]],
-      ["text/x-vcalendar", "vcs"],
-      ["text/x-vcard", "vcf"],
-      ["text/xml", "xml"],
-      ["video/3gpp", "3gp"],
-      ["video/3gpp2", "3g2"],
-      ["video/animaflex", "afl"],
-      ["video/avi", "avi"],
-      ["video/avs-video", "avs"],
-      ["video/dl", "dl"],
-      ["video/fli", "fli"],
-      ["video/gl", "gl"],
-      ["video/h261", "h261"],
-      ["video/h263", "h263"],
-      ["video/h264", "h264"],
-      ["video/jpeg", "jpgv"],
-      ["video/jpm", "jpm"],
-      ["video/mj2", "mj2"],
-      ["video/mp4", "mp4"],
-      ["video/mpeg", ["mpeg", "mp2", "mpa", "mpe", "mpg", "mpv2", "m1v", "m2v", "mp3"]],
-      ["video/msvideo", "avi"],
-      ["video/ogg", "ogv"],
-      ["video/quicktime", ["mov", "qt", "moov"]],
-      ["video/vdo", "vdo"],
-      ["video/vivo", ["viv", "vivo"]],
-      ["video/vnd.dece.hd", "uvh"],
-      ["video/vnd.dece.mobile", "uvm"],
-      ["video/vnd.dece.pd", "uvp"],
-      ["video/vnd.dece.sd", "uvs"],
-      ["video/vnd.dece.video", "uvv"],
-      ["video/vnd.fvt", "fvt"],
-      ["video/vnd.mpegurl", "mxu"],
-      ["video/vnd.ms-playready.media.pyv", "pyv"],
-      ["video/vnd.rn-realvideo", "rv"],
-      ["video/vnd.uvvu.mp4", "uvu"],
-      ["video/vnd.vivo", ["viv", "vivo"]],
-      ["video/vosaic", "vos"],
-      ["video/webm", "webm"],
-      ["video/x-amt-demorun", "xdr"],
-      ["video/x-amt-showrun", "xsr"],
-      ["video/x-atomic3d-feature", "fmf"],
-      ["video/x-dl", "dl"],
-      ["video/x-dv", ["dif", "dv"]],
-      ["video/x-f4v", "f4v"],
-      ["video/x-fli", "fli"],
-      ["video/x-flv", "flv"],
-      ["video/x-gl", "gl"],
-      ["video/x-isvideo", "isu"],
-      ["video/x-la-asf", ["lsf", "lsx"]],
-      ["video/x-m4v", "m4v"],
-      ["video/x-motion-jpeg", "mjpg"],
-      ["video/x-mpeg", ["mp3", "mp2"]],
-      ["video/x-mpeq2a", "mp2"],
-      ["video/x-ms-asf", ["asf", "asr", "asx"]],
-      ["video/x-ms-asf-plugin", "asx"],
-      ["video/x-ms-wm", "wm"],
-      ["video/x-ms-wmv", "wmv"],
-      ["video/x-ms-wmx", "wmx"],
-      ["video/x-ms-wvx", "wvx"],
-      ["video/x-msvideo", "avi"],
-      ["video/x-qtc", "qtc"],
-      ["video/x-scm", "scm"],
-      ["video/x-sgi-movie", ["movie", "mv"]],
-      ["windows/metafile", "wmf"],
-      ["www/mime", "mime"],
-      ["x-conference/x-cooltalk", "ice"],
-      ["x-music/x-midi", ["mid", "midi"]],
-      ["x-world/x-3dmf", ["3dm", "3dmf", "qd3", "qd3d"]],
-      ["x-world/x-svr", "svr"],
-      ["x-world/x-vrml", ["flr", "vrml", "wrl", "wrz", "xaf", "xof"]],
-      ["x-world/x-vrt", "vrt"],
-      ["xgl/drawing", "xgz"],
-      ["xgl/movie", "xmz"]
-    ]);
-    var extensions = /* @__PURE__ */ new Map([
-      ["123", "application/vnd.lotus-1-2-3"],
-      ["323", "text/h323"],
-      ["*", "application/octet-stream"],
-      ["3dm", "x-world/x-3dmf"],
-      ["3dmf", "x-world/x-3dmf"],
-      ["3dml", "text/vnd.in3d.3dml"],
-      ["3g2", "video/3gpp2"],
-      ["3gp", "video/3gpp"],
-      ["7z", "application/x-7z-compressed"],
-      ["a", "application/octet-stream"],
-      ["aab", "application/x-authorware-bin"],
-      ["aac", "audio/x-aac"],
-      ["aam", "application/x-authorware-map"],
-      ["aas", "application/x-authorware-seg"],
-      ["abc", "text/vnd.abc"],
-      ["abw", "application/x-abiword"],
-      ["ac", "application/pkix-attr-cert"],
-      ["acc", "application/vnd.americandynamics.acc"],
-      ["ace", "application/x-ace-compressed"],
-      ["acgi", "text/html"],
-      ["acu", "application/vnd.acucobol"],
-      ["acx", "application/internet-property-stream"],
-      ["adp", "audio/adpcm"],
-      ["aep", "application/vnd.audiograph"],
-      ["afl", "video/animaflex"],
-      ["afp", "application/vnd.ibm.modcap"],
-      ["ahead", "application/vnd.ahead.space"],
-      ["ai", "application/postscript"],
-      ["aif", ["audio/aiff", "audio/x-aiff"]],
-      ["aifc", ["audio/aiff", "audio/x-aiff"]],
-      ["aiff", ["audio/aiff", "audio/x-aiff"]],
-      ["aim", "application/x-aim"],
-      ["aip", "text/x-audiosoft-intra"],
-      ["air", "application/vnd.adobe.air-application-installer-package+zip"],
-      ["ait", "application/vnd.dvb.ait"],
-      ["ami", "application/vnd.amiga.ami"],
-      ["ani", "application/x-navi-animation"],
-      ["aos", "application/x-nokia-9000-communicator-add-on-software"],
-      ["apk", "application/vnd.android.package-archive"],
-      ["application", "application/x-ms-application"],
-      ["apr", "application/vnd.lotus-approach"],
-      ["aps", "application/mime"],
-      ["arc", "application/octet-stream"],
-      ["arj", ["application/arj", "application/octet-stream"]],
-      ["art", "image/x-jg"],
-      ["asf", "video/x-ms-asf"],
-      ["asm", "text/x-asm"],
-      ["aso", "application/vnd.accpac.simply.aso"],
-      ["asp", "text/asp"],
-      ["asr", "video/x-ms-asf"],
-      ["asx", ["video/x-ms-asf", "application/x-mplayer2", "video/x-ms-asf-plugin"]],
-      ["atc", "application/vnd.acucorp"],
-      ["atomcat", "application/atomcat+xml"],
-      ["atomsvc", "application/atomsvc+xml"],
-      ["atx", "application/vnd.antix.game-component"],
-      ["au", ["audio/basic", "audio/x-au"]],
-      ["avi", ["video/avi", "video/msvideo", "application/x-troff-msvideo", "video/x-msvideo"]],
-      ["avs", "video/avs-video"],
-      ["aw", "application/applixware"],
-      ["axs", "application/olescript"],
-      ["azf", "application/vnd.airzip.filesecure.azf"],
-      ["azs", "application/vnd.airzip.filesecure.azs"],
-      ["azw", "application/vnd.amazon.ebook"],
-      ["bas", "text/plain"],
-      ["bcpio", "application/x-bcpio"],
-      ["bdf", "application/x-font-bdf"],
-      ["bdm", "application/vnd.syncml.dm+wbxml"],
-      ["bed", "application/vnd.realvnc.bed"],
-      ["bh2", "application/vnd.fujitsu.oasysprs"],
-      [
-        "bin",
-        ["application/octet-stream", "application/mac-binary", "application/macbinary", "application/x-macbinary", "application/x-binary"]
-      ],
-      ["bm", "image/bmp"],
-      ["bmi", "application/vnd.bmi"],
-      ["bmp", ["image/bmp", "image/x-windows-bmp"]],
-      ["boo", "application/book"],
-      ["book", "application/book"],
-      ["box", "application/vnd.previewsystems.box"],
-      ["boz", "application/x-bzip2"],
-      ["bsh", "application/x-bsh"],
-      ["btif", "image/prs.btif"],
-      ["bz", "application/x-bzip"],
-      ["bz2", "application/x-bzip2"],
-      ["c", ["text/plain", "text/x-c"]],
-      ["c++", "text/plain"],
-      ["c11amc", "application/vnd.cluetrust.cartomobile-config"],
-      ["c11amz", "application/vnd.cluetrust.cartomobile-config-pkg"],
-      ["c4g", "application/vnd.clonk.c4group"],
-      ["cab", "application/vnd.ms-cab-compressed"],
-      ["car", "application/vnd.curl.car"],
-      ["cat", ["application/vnd.ms-pkiseccat", "application/vnd.ms-pki.seccat"]],
-      ["cc", ["text/plain", "text/x-c"]],
-      ["ccad", "application/clariscad"],
-      ["cco", "application/x-cocoa"],
-      ["ccxml", "application/ccxml+xml,"],
-      ["cdbcmsg", "application/vnd.contact.cmsg"],
-      ["cdf", ["application/cdf", "application/x-cdf", "application/x-netcdf"]],
-      ["cdkey", "application/vnd.mediastation.cdkey"],
-      ["cdmia", "application/cdmi-capability"],
-      ["cdmic", "application/cdmi-container"],
-      ["cdmid", "application/cdmi-domain"],
-      ["cdmio", "application/cdmi-object"],
-      ["cdmiq", "application/cdmi-queue"],
-      ["cdx", "chemical/x-cdx"],
-      ["cdxml", "application/vnd.chemdraw+xml"],
-      ["cdy", "application/vnd.cinderella"],
-      ["cer", ["application/pkix-cert", "application/x-x509-ca-cert"]],
-      ["cgm", "image/cgm"],
-      ["cha", "application/x-chat"],
-      ["chat", "application/x-chat"],
-      ["chm", "application/vnd.ms-htmlhelp"],
-      ["chrt", "application/vnd.kde.kchart"],
-      ["cif", "chemical/x-cif"],
-      ["cii", "application/vnd.anser-web-certificate-issue-initiation"],
-      ["cil", "application/vnd.ms-artgalry"],
-      ["cla", "application/vnd.claymore"],
-      [
-        "class",
-        ["application/octet-stream", "application/java", "application/java-byte-code", "application/java-vm", "application/x-java-class"]
-      ],
-      ["clkk", "application/vnd.crick.clicker.keyboard"],
-      ["clkp", "application/vnd.crick.clicker.palette"],
-      ["clkt", "application/vnd.crick.clicker.template"],
-      ["clkw", "application/vnd.crick.clicker.wordbank"],
-      ["clkx", "application/vnd.crick.clicker"],
-      ["clp", "application/x-msclip"],
-      ["cmc", "application/vnd.cosmocaller"],
-      ["cmdf", "chemical/x-cmdf"],
-      ["cml", "chemical/x-cml"],
-      ["cmp", "application/vnd.yellowriver-custom-menu"],
-      ["cmx", "image/x-cmx"],
-      ["cod", ["image/cis-cod", "application/vnd.rim.cod"]],
-      ["com", ["application/octet-stream", "text/plain"]],
-      ["conf", "text/plain"],
-      ["cpio", "application/x-cpio"],
-      ["cpp", "text/x-c"],
-      ["cpt", ["application/mac-compactpro", "application/x-compactpro", "application/x-cpt"]],
-      ["crd", "application/x-mscardfile"],
-      ["crl", ["application/pkix-crl", "application/pkcs-crl"]],
-      ["crt", ["application/pkix-cert", "application/x-x509-user-cert", "application/x-x509-ca-cert"]],
-      ["cryptonote", "application/vnd.rig.cryptonote"],
-      ["csh", ["text/x-script.csh", "application/x-csh"]],
-      ["csml", "chemical/x-csml"],
-      ["csp", "application/vnd.commonspace"],
-      ["css", ["text/css", "application/x-pointplus"]],
-      ["csv", "text/csv"],
-      ["cu", "application/cu-seeme"],
-      ["curl", "text/vnd.curl"],
-      ["cww", "application/prs.cww"],
-      ["cxx", "text/plain"],
-      ["dae", "model/vnd.collada+xml"],
-      ["daf", "application/vnd.mobius.daf"],
-      ["davmount", "application/davmount+xml"],
-      ["dcr", "application/x-director"],
-      ["dcurl", "text/vnd.curl.dcurl"],
-      ["dd2", "application/vnd.oma.dd2+xml"],
-      ["ddd", "application/vnd.fujixerox.ddd"],
-      ["deb", "application/x-debian-package"],
-      ["deepv", "application/x-deepv"],
-      ["def", "text/plain"],
-      ["der", "application/x-x509-ca-cert"],
-      ["dfac", "application/vnd.dreamfactory"],
-      ["dif", "video/x-dv"],
-      ["dir", "application/x-director"],
-      ["dis", "application/vnd.mobius.dis"],
-      ["djvu", "image/vnd.djvu"],
-      ["dl", ["video/dl", "video/x-dl"]],
-      ["dll", "application/x-msdownload"],
-      ["dms", "application/octet-stream"],
-      ["dna", "application/vnd.dna"],
-      ["doc", "application/msword"],
-      ["docm", "application/vnd.ms-word.document.macroenabled.12"],
-      ["docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
-      ["dot", "application/msword"],
-      ["dotm", "application/vnd.ms-word.template.macroenabled.12"],
-      ["dotx", "application/vnd.openxmlformats-officedocument.wordprocessingml.template"],
-      ["dp", ["application/commonground", "application/vnd.osgi.dp"]],
-      ["dpg", "application/vnd.dpgraph"],
-      ["dra", "audio/vnd.dra"],
-      ["drw", "application/drafting"],
-      ["dsc", "text/prs.lines.tag"],
-      ["dssc", "application/dssc+der"],
-      ["dtb", "application/x-dtbook+xml"],
-      ["dtd", "application/xml-dtd"],
-      ["dts", "audio/vnd.dts"],
-      ["dtshd", "audio/vnd.dts.hd"],
-      ["dump", "application/octet-stream"],
-      ["dv", "video/x-dv"],
-      ["dvi", "application/x-dvi"],
-      ["dwf", ["model/vnd.dwf", "drawing/x-dwf"]],
-      ["dwg", ["application/acad", "image/vnd.dwg", "image/x-dwg"]],
-      ["dxf", ["application/dxf", "image/vnd.dwg", "image/vnd.dxf", "image/x-dwg"]],
-      ["dxp", "application/vnd.spotfire.dxp"],
-      ["dxr", "application/x-director"],
-      ["ecelp4800", "audio/vnd.nuera.ecelp4800"],
-      ["ecelp7470", "audio/vnd.nuera.ecelp7470"],
-      ["ecelp9600", "audio/vnd.nuera.ecelp9600"],
-      ["edm", "application/vnd.novadigm.edm"],
-      ["edx", "application/vnd.novadigm.edx"],
-      ["efif", "application/vnd.picsel"],
-      ["ei6", "application/vnd.pg.osasli"],
-      ["el", "text/x-script.elisp"],
-      ["elc", ["application/x-elc", "application/x-bytecode.elisp"]],
-      ["eml", "message/rfc822"],
-      ["emma", "application/emma+xml"],
-      ["env", "application/x-envoy"],
-      ["eol", "audio/vnd.digital-winds"],
-      ["eot", "application/vnd.ms-fontobject"],
-      ["eps", "application/postscript"],
-      ["epub", "application/epub+zip"],
-      ["es", ["application/ecmascript", "application/x-esrehber"]],
-      ["es3", "application/vnd.eszigno3+xml"],
-      ["esf", "application/vnd.epson.esf"],
-      ["etx", "text/x-setext"],
-      ["evy", ["application/envoy", "application/x-envoy"]],
-      ["exe", ["application/octet-stream", "application/x-msdownload"]],
-      ["exi", "application/exi"],
-      ["ext", "application/vnd.novadigm.ext"],
-      ["ez2", "application/vnd.ezpix-album"],
-      ["ez3", "application/vnd.ezpix-package"],
-      ["f", ["text/plain", "text/x-fortran"]],
-      ["f4v", "video/x-f4v"],
-      ["f77", "text/x-fortran"],
-      ["f90", ["text/plain", "text/x-fortran"]],
-      ["fbs", "image/vnd.fastbidsheet"],
-      ["fcs", "application/vnd.isac.fcs"],
-      ["fdf", "application/vnd.fdf"],
-      ["fe_launch", "application/vnd.denovo.fcselayout-link"],
-      ["fg5", "application/vnd.fujitsu.oasysgp"],
-      ["fh", "image/x-freehand"],
-      ["fif", ["application/fractals", "image/fif"]],
-      ["fig", "application/x-xfig"],
-      ["fli", ["video/fli", "video/x-fli"]],
-      ["flo", ["image/florian", "application/vnd.micrografx.flo"]],
-      ["flr", "x-world/x-vrml"],
-      ["flv", "video/x-flv"],
-      ["flw", "application/vnd.kde.kivio"],
-      ["flx", "text/vnd.fmi.flexstor"],
-      ["fly", "text/vnd.fly"],
-      ["fm", "application/vnd.framemaker"],
-      ["fmf", "video/x-atomic3d-feature"],
-      ["fnc", "application/vnd.frogans.fnc"],
-      ["for", ["text/plain", "text/x-fortran"]],
-      ["fpx", ["image/vnd.fpx", "image/vnd.net-fpx"]],
-      ["frl", "application/freeloader"],
-      ["fsc", "application/vnd.fsc.weblaunch"],
-      ["fst", "image/vnd.fst"],
-      ["ftc", "application/vnd.fluxtime.clip"],
-      ["fti", "application/vnd.anser-web-funds-transfer-initiation"],
-      ["funk", "audio/make"],
-      ["fvt", "video/vnd.fvt"],
-      ["fxp", "application/vnd.adobe.fxp"],
-      ["fzs", "application/vnd.fuzzysheet"],
-      ["g", "text/plain"],
-      ["g2w", "application/vnd.geoplan"],
-      ["g3", "image/g3fax"],
-      ["g3w", "application/vnd.geospace"],
-      ["gac", "application/vnd.groove-account"],
-      ["gdl", "model/vnd.gdl"],
-      ["geo", "application/vnd.dynageo"],
-      ["geojson", "application/geo+json"],
-      ["gex", "application/vnd.geometry-explorer"],
-      ["ggb", "application/vnd.geogebra.file"],
-      ["ggt", "application/vnd.geogebra.tool"],
-      ["ghf", "application/vnd.groove-help"],
-      ["gif", "image/gif"],
-      ["gim", "application/vnd.groove-identity-message"],
-      ["gl", ["video/gl", "video/x-gl"]],
-      ["gmx", "application/vnd.gmx"],
-      ["gnumeric", "application/x-gnumeric"],
-      ["gph", "application/vnd.flographit"],
-      ["gqf", "application/vnd.grafeq"],
-      ["gram", "application/srgs"],
-      ["grv", "application/vnd.groove-injector"],
-      ["grxml", "application/srgs+xml"],
-      ["gsd", "audio/x-gsm"],
-      ["gsf", "application/x-font-ghostscript"],
-      ["gsm", "audio/x-gsm"],
-      ["gsp", "application/x-gsp"],
-      ["gss", "application/x-gss"],
-      ["gtar", "application/x-gtar"],
-      ["gtm", "application/vnd.groove-tool-message"],
-      ["gtw", "model/vnd.gtw"],
-      ["gv", "text/vnd.graphviz"],
-      ["gxt", "application/vnd.geonext"],
-      ["gz", ["application/x-gzip", "application/x-compressed"]],
-      ["gzip", ["multipart/x-gzip", "application/x-gzip"]],
-      ["h", ["text/plain", "text/x-h"]],
-      ["h261", "video/h261"],
-      ["h263", "video/h263"],
-      ["h264", "video/h264"],
-      ["hal", "application/vnd.hal+xml"],
-      ["hbci", "application/vnd.hbci"],
-      ["hdf", "application/x-hdf"],
-      ["help", "application/x-helpfile"],
-      ["hgl", "application/vnd.hp-hpgl"],
-      ["hh", ["text/plain", "text/x-h"]],
-      ["hlb", "text/x-script"],
-      ["hlp", ["application/winhlp", "application/hlp", "application/x-helpfile", "application/x-winhelp"]],
-      ["hpg", "application/vnd.hp-hpgl"],
-      ["hpgl", "application/vnd.hp-hpgl"],
-      ["hpid", "application/vnd.hp-hpid"],
-      ["hps", "application/vnd.hp-hps"],
-      [
-        "hqx",
-        [
-          "application/mac-binhex40",
-          "application/binhex",
-          "application/binhex4",
-          "application/mac-binhex",
-          "application/x-binhex40",
-          "application/x-mac-binhex40"
-        ]
-      ],
-      ["hta", "application/hta"],
-      ["htc", "text/x-component"],
-      ["htke", "application/vnd.kenameaapp"],
-      ["htm", "text/html"],
-      ["html", "text/html"],
-      ["htmls", "text/html"],
-      ["htt", "text/webviewhtml"],
-      ["htx", "text/html"],
-      ["hvd", "application/vnd.yamaha.hv-dic"],
-      ["hvp", "application/vnd.yamaha.hv-voice"],
-      ["hvs", "application/vnd.yamaha.hv-script"],
-      ["i2g", "application/vnd.intergeo"],
-      ["icc", "application/vnd.iccprofile"],
-      ["ice", "x-conference/x-cooltalk"],
-      ["ico", "image/x-icon"],
-      ["ics", "text/calendar"],
-      ["idc", "text/plain"],
-      ["ief", "image/ief"],
-      ["iefs", "image/ief"],
-      ["ifm", "application/vnd.shana.informed.formdata"],
-      ["iges", ["application/iges", "model/iges"]],
-      ["igl", "application/vnd.igloader"],
-      ["igm", "application/vnd.insors.igm"],
-      ["igs", ["application/iges", "model/iges"]],
-      ["igx", "application/vnd.micrografx.igx"],
-      ["iif", "application/vnd.shana.informed.interchange"],
-      ["iii", "application/x-iphone"],
-      ["ima", "application/x-ima"],
-      ["imap", "application/x-httpd-imap"],
-      ["imp", "application/vnd.accpac.simply.imp"],
-      ["ims", "application/vnd.ms-ims"],
-      ["inf", "application/inf"],
-      ["ins", ["application/x-internet-signup", "application/x-internett-signup"]],
-      ["ip", "application/x-ip2"],
-      ["ipfix", "application/ipfix"],
-      ["ipk", "application/vnd.shana.informed.package"],
-      ["irm", "application/vnd.ibm.rights-management"],
-      ["irp", "application/vnd.irepository.package+xml"],
-      ["isp", "application/x-internet-signup"],
-      ["isu", "video/x-isvideo"],
-      ["it", "audio/it"],
-      ["itp", "application/vnd.shana.informed.formtemplate"],
-      ["iv", "application/x-inventor"],
-      ["ivp", "application/vnd.immervision-ivp"],
-      ["ivr", "i-world/i-vrml"],
-      ["ivu", "application/vnd.immervision-ivu"],
-      ["ivy", "application/x-livescreen"],
-      ["jad", "text/vnd.sun.j2me.app-descriptor"],
-      ["jam", ["application/vnd.jam", "audio/x-jam"]],
-      ["jar", "application/java-archive"],
-      ["jav", ["text/plain", "text/x-java-source"]],
-      ["java", ["text/plain", "text/x-java-source,java", "text/x-java-source"]],
-      ["jcm", "application/x-java-commerce"],
-      ["jfif", ["image/pipeg", "image/jpeg", "image/pjpeg"]],
-      ["jfif-tbnl", "image/jpeg"],
-      ["jisp", "application/vnd.jisp"],
-      ["jlt", "application/vnd.hp-jlyt"],
-      ["jnlp", "application/x-java-jnlp-file"],
-      ["joda", "application/vnd.joost.joda-archive"],
-      ["jpe", ["image/jpeg", "image/pjpeg"]],
-      ["jpeg", ["image/jpeg", "image/pjpeg"]],
-      ["jpg", ["image/jpeg", "image/pjpeg"]],
-      ["jpgv", "video/jpeg"],
-      ["jpm", "video/jpm"],
-      ["jps", "image/x-jps"],
-      ["js", ["application/javascript", "application/ecmascript", "text/javascript", "text/ecmascript", "application/x-javascript"]],
-      ["json", "application/json"],
-      ["jut", "image/jutvision"],
-      ["kar", ["audio/midi", "music/x-karaoke"]],
-      ["karbon", "application/vnd.kde.karbon"],
-      ["kfo", "application/vnd.kde.kformula"],
-      ["kia", "application/vnd.kidspiration"],
-      ["kml", "application/vnd.google-earth.kml+xml"],
-      ["kmz", "application/vnd.google-earth.kmz"],
-      ["kne", "application/vnd.kinar"],
-      ["kon", "application/vnd.kde.kontour"],
-      ["kpr", "application/vnd.kde.kpresenter"],
-      ["ksh", ["application/x-ksh", "text/x-script.ksh"]],
-      ["ksp", "application/vnd.kde.kspread"],
-      ["ktx", "image/ktx"],
-      ["ktz", "application/vnd.kahootz"],
-      ["kwd", "application/vnd.kde.kword"],
-      ["la", ["audio/nspaudio", "audio/x-nspaudio"]],
-      ["lam", "audio/x-liveaudio"],
-      ["lasxml", "application/vnd.las.las+xml"],
-      ["latex", "application/x-latex"],
-      ["lbd", "application/vnd.llamagraphics.life-balance.desktop"],
-      ["lbe", "application/vnd.llamagraphics.life-balance.exchange+xml"],
-      ["les", "application/vnd.hhe.lesson-player"],
-      ["lha", ["application/octet-stream", "application/lha", "application/x-lha"]],
-      ["lhx", "application/octet-stream"],
-      ["link66", "application/vnd.route66.link66+xml"],
-      ["list", "text/plain"],
-      ["lma", ["audio/nspaudio", "audio/x-nspaudio"]],
-      ["log", "text/plain"],
-      ["lrm", "application/vnd.ms-lrm"],
-      ["lsf", "video/x-la-asf"],
-      ["lsp", ["application/x-lisp", "text/x-script.lisp"]],
-      ["lst", "text/plain"],
-      ["lsx", ["video/x-la-asf", "text/x-la-asf"]],
-      ["ltf", "application/vnd.frogans.ltf"],
-      ["ltx", "application/x-latex"],
-      ["lvp", "audio/vnd.lucent.voice"],
-      ["lwp", "application/vnd.lotus-wordpro"],
-      ["lzh", ["application/octet-stream", "application/x-lzh"]],
-      ["lzx", ["application/lzx", "application/octet-stream", "application/x-lzx"]],
-      ["m", ["text/plain", "text/x-m"]],
-      ["m13", "application/x-msmediaview"],
-      ["m14", "application/x-msmediaview"],
-      ["m1v", "video/mpeg"],
-      ["m21", "application/mp21"],
-      ["m2a", "audio/mpeg"],
-      ["m2v", "video/mpeg"],
-      ["m3u", ["audio/x-mpegurl", "audio/x-mpequrl"]],
-      ["m3u8", "application/vnd.apple.mpegurl"],
-      ["m4v", "video/x-m4v"],
-      ["ma", "application/mathematica"],
-      ["mads", "application/mads+xml"],
-      ["mag", "application/vnd.ecowin.chart"],
-      ["man", "application/x-troff-man"],
-      ["map", "application/x-navimap"],
-      ["mar", "text/plain"],
-      ["mathml", "application/mathml+xml"],
-      ["mbd", "application/mbedlet"],
-      ["mbk", "application/vnd.mobius.mbk"],
-      ["mbox", "application/mbox"],
-      ["mc$", "application/x-magic-cap-package-1.0"],
-      ["mc1", "application/vnd.medcalcdata"],
-      ["mcd", ["application/mcad", "application/vnd.mcd", "application/x-mathcad"]],
-      ["mcf", ["image/vasa", "text/mcf"]],
-      ["mcp", "application/netmc"],
-      ["mcurl", "text/vnd.curl.mcurl"],
-      ["mdb", "application/x-msaccess"],
-      ["mdi", "image/vnd.ms-modi"],
-      ["me", "application/x-troff-me"],
-      ["meta4", "application/metalink4+xml"],
-      ["mets", "application/mets+xml"],
-      ["mfm", "application/vnd.mfmp"],
-      ["mgp", "application/vnd.osgeo.mapguide.package"],
-      ["mgz", "application/vnd.proteus.magazine"],
-      ["mht", "message/rfc822"],
-      ["mhtml", "message/rfc822"],
-      ["mid", ["audio/mid", "audio/midi", "music/crescendo", "x-music/x-midi", "audio/x-midi", "application/x-midi", "audio/x-mid"]],
-      ["midi", ["audio/midi", "music/crescendo", "x-music/x-midi", "audio/x-midi", "application/x-midi", "audio/x-mid"]],
-      ["mif", ["application/vnd.mif", "application/x-mif", "application/x-frame"]],
-      ["mime", ["message/rfc822", "www/mime"]],
-      ["mj2", "video/mj2"],
-      ["mjf", "audio/x-vnd.audioexplosion.mjuicemediafile"],
-      ["mjpg", "video/x-motion-jpeg"],
-      ["mlp", "application/vnd.dolby.mlp"],
-      ["mm", ["application/base64", "application/x-meme"]],
-      ["mmd", "application/vnd.chipnuts.karaoke-mmd"],
-      ["mme", "application/base64"],
-      ["mmf", "application/vnd.smaf"],
-      ["mmr", "image/vnd.fujixerox.edmics-mmr"],
-      ["mny", "application/x-msmoney"],
-      ["mod", ["audio/mod", "audio/x-mod"]],
-      ["mods", "application/mods+xml"],
-      ["moov", "video/quicktime"],
-      ["mov", "video/quicktime"],
-      ["movie", "video/x-sgi-movie"],
-      ["mp2", ["video/mpeg", "audio/mpeg", "video/x-mpeg", "audio/x-mpeg", "video/x-mpeq2a"]],
-      ["mp3", ["audio/mpeg", "audio/mpeg3", "video/mpeg", "audio/x-mpeg-3", "video/x-mpeg"]],
-      ["mp4", ["video/mp4", "application/mp4"]],
-      ["mp4a", "audio/mp4"],
-      ["mpa", ["video/mpeg", "audio/mpeg"]],
-      ["mpc", ["application/vnd.mophun.certificate", "application/x-project"]],
-      ["mpe", "video/mpeg"],
-      ["mpeg", "video/mpeg"],
-      ["mpg", ["video/mpeg", "audio/mpeg"]],
-      ["mpga", "audio/mpeg"],
-      ["mpkg", "application/vnd.apple.installer+xml"],
-      ["mpm", "application/vnd.blueice.multipass"],
-      ["mpn", "application/vnd.mophun.application"],
-      ["mpp", "application/vnd.ms-project"],
-      ["mpt", "application/x-project"],
-      ["mpv", "application/x-project"],
-      ["mpv2", "video/mpeg"],
-      ["mpx", "application/x-project"],
-      ["mpy", "application/vnd.ibm.minipay"],
-      ["mqy", "application/vnd.mobius.mqy"],
-      ["mrc", "application/marc"],
-      ["mrcx", "application/marcxml+xml"],
-      ["ms", "application/x-troff-ms"],
-      ["mscml", "application/mediaservercontrol+xml"],
-      ["mseq", "application/vnd.mseq"],
-      ["msf", "application/vnd.epson.msf"],
-      ["msg", "application/vnd.ms-outlook"],
-      ["msh", "model/mesh"],
-      ["msl", "application/vnd.mobius.msl"],
-      ["msty", "application/vnd.muvee.style"],
-      ["mts", "model/vnd.mts"],
-      ["mus", "application/vnd.musician"],
-      ["musicxml", "application/vnd.recordare.musicxml+xml"],
-      ["mv", "video/x-sgi-movie"],
-      ["mvb", "application/x-msmediaview"],
-      ["mwf", "application/vnd.mfer"],
-      ["mxf", "application/mxf"],
-      ["mxl", "application/vnd.recordare.musicxml"],
-      ["mxml", "application/xv+xml"],
-      ["mxs", "application/vnd.triscape.mxs"],
-      ["mxu", "video/vnd.mpegurl"],
-      ["my", "audio/make"],
-      ["mzz", "application/x-vnd.audioexplosion.mzz"],
-      ["n-gage", "application/vnd.nokia.n-gage.symbian.install"],
-      ["n3", "text/n3"],
-      ["nap", "image/naplps"],
-      ["naplps", "image/naplps"],
-      ["nbp", "application/vnd.wolfram.player"],
-      ["nc", "application/x-netcdf"],
-      ["ncm", "application/vnd.nokia.configuration-message"],
-      ["ncx", "application/x-dtbncx+xml"],
-      ["ngdat", "application/vnd.nokia.n-gage.data"],
-      ["nif", "image/x-niff"],
-      ["niff", "image/x-niff"],
-      ["nix", "application/x-mix-transfer"],
-      ["nlu", "application/vnd.neurolanguage.nlu"],
-      ["nml", "application/vnd.enliven"],
-      ["nnd", "application/vnd.noblenet-directory"],
-      ["nns", "application/vnd.noblenet-sealer"],
-      ["nnw", "application/vnd.noblenet-web"],
-      ["npx", "image/vnd.net-fpx"],
-      ["nsc", "application/x-conference"],
-      ["nsf", "application/vnd.lotus-notes"],
-      ["nvd", "application/x-navidoc"],
-      ["nws", "message/rfc822"],
-      ["o", "application/octet-stream"],
-      ["oa2", "application/vnd.fujitsu.oasys2"],
-      ["oa3", "application/vnd.fujitsu.oasys3"],
-      ["oas", "application/vnd.fujitsu.oasys"],
-      ["obd", "application/x-msbinder"],
-      ["oda", "application/oda"],
-      ["odb", "application/vnd.oasis.opendocument.database"],
-      ["odc", "application/vnd.oasis.opendocument.chart"],
-      ["odf", "application/vnd.oasis.opendocument.formula"],
-      ["odft", "application/vnd.oasis.opendocument.formula-template"],
-      ["odg", "application/vnd.oasis.opendocument.graphics"],
-      ["odi", "application/vnd.oasis.opendocument.image"],
-      ["odm", "application/vnd.oasis.opendocument.text-master"],
-      ["odp", "application/vnd.oasis.opendocument.presentation"],
-      ["ods", "application/vnd.oasis.opendocument.spreadsheet"],
-      ["odt", "application/vnd.oasis.opendocument.text"],
-      ["oga", "audio/ogg"],
-      ["ogv", "video/ogg"],
-      ["ogx", "application/ogg"],
-      ["omc", "application/x-omc"],
-      ["omcd", "application/x-omcdatamaker"],
-      ["omcr", "application/x-omcregerator"],
-      ["onetoc", "application/onenote"],
-      ["opf", "application/oebps-package+xml"],
-      ["org", "application/vnd.lotus-organizer"],
-      ["osf", "application/vnd.yamaha.openscoreformat"],
-      ["osfpvg", "application/vnd.yamaha.openscoreformat.osfpvg+xml"],
-      ["otc", "application/vnd.oasis.opendocument.chart-template"],
-      ["otf", "application/x-font-otf"],
-      ["otg", "application/vnd.oasis.opendocument.graphics-template"],
-      ["oth", "application/vnd.oasis.opendocument.text-web"],
-      ["oti", "application/vnd.oasis.opendocument.image-template"],
-      ["otp", "application/vnd.oasis.opendocument.presentation-template"],
-      ["ots", "application/vnd.oasis.opendocument.spreadsheet-template"],
-      ["ott", "application/vnd.oasis.opendocument.text-template"],
-      ["oxt", "application/vnd.openofficeorg.extension"],
-      ["p", "text/x-pascal"],
-      ["p10", ["application/pkcs10", "application/x-pkcs10"]],
-      ["p12", ["application/pkcs-12", "application/x-pkcs12"]],
-      ["p7a", "application/x-pkcs7-signature"],
-      ["p7b", "application/x-pkcs7-certificates"],
-      ["p7c", ["application/pkcs7-mime", "application/x-pkcs7-mime"]],
-      ["p7m", ["application/pkcs7-mime", "application/x-pkcs7-mime"]],
-      ["p7r", "application/x-pkcs7-certreqresp"],
-      ["p7s", ["application/pkcs7-signature", "application/x-pkcs7-signature"]],
-      ["p8", "application/pkcs8"],
-      ["par", "text/plain-bas"],
-      ["part", "application/pro_eng"],
-      ["pas", "text/pascal"],
-      ["paw", "application/vnd.pawaafile"],
-      ["pbd", "application/vnd.powerbuilder6"],
-      ["pbm", "image/x-portable-bitmap"],
-      ["pcf", "application/x-font-pcf"],
-      ["pcl", ["application/vnd.hp-pcl", "application/x-pcl"]],
-      ["pclxl", "application/vnd.hp-pclxl"],
-      ["pct", "image/x-pict"],
-      ["pcurl", "application/vnd.curl.pcurl"],
-      ["pcx", "image/x-pcx"],
-      ["pdb", ["application/vnd.palm", "chemical/x-pdb"]],
-      ["pdf", "application/pdf"],
-      ["pfa", "application/x-font-type1"],
-      ["pfr", "application/font-tdpfr"],
-      ["pfunk", ["audio/make", "audio/make.my.funk"]],
-      ["pfx", "application/x-pkcs12"],
-      ["pgm", ["image/x-portable-graymap", "image/x-portable-greymap"]],
-      ["pgn", "application/x-chess-pgn"],
-      ["pgp", "application/pgp-signature"],
-      ["pic", ["image/pict", "image/x-pict"]],
-      ["pict", "image/pict"],
-      ["pkg", "application/x-newton-compatible-pkg"],
-      ["pki", "application/pkixcmp"],
-      ["pkipath", "application/pkix-pkipath"],
-      ["pko", ["application/ynd.ms-pkipko", "application/vnd.ms-pki.pko"]],
-      ["pl", ["text/plain", "text/x-script.perl"]],
-      ["plb", "application/vnd.3gpp.pic-bw-large"],
-      ["plc", "application/vnd.mobius.plc"],
-      ["plf", "application/vnd.pocketlearn"],
-      ["pls", "application/pls+xml"],
-      ["plx", "application/x-pixclscript"],
-      ["pm", ["text/x-script.perl-module", "image/x-xpixmap"]],
-      ["pm4", "application/x-pagemaker"],
-      ["pm5", "application/x-pagemaker"],
-      ["pma", "application/x-perfmon"],
-      ["pmc", "application/x-perfmon"],
-      ["pml", ["application/vnd.ctc-posml", "application/x-perfmon"]],
-      ["pmr", "application/x-perfmon"],
-      ["pmw", "application/x-perfmon"],
-      ["png", "image/png"],
-      ["pnm", ["application/x-portable-anymap", "image/x-portable-anymap"]],
-      ["portpkg", "application/vnd.macports.portpkg"],
-      ["pot", ["application/vnd.ms-powerpoint", "application/mspowerpoint"]],
-      ["potm", "application/vnd.ms-powerpoint.template.macroenabled.12"],
-      ["potx", "application/vnd.openxmlformats-officedocument.presentationml.template"],
-      ["pov", "model/x-pov"],
-      ["ppa", "application/vnd.ms-powerpoint"],
-      ["ppam", "application/vnd.ms-powerpoint.addin.macroenabled.12"],
-      ["ppd", "application/vnd.cups-ppd"],
-      ["ppm", "image/x-portable-pixmap"],
-      ["pps", ["application/vnd.ms-powerpoint", "application/mspowerpoint"]],
-      ["ppsm", "application/vnd.ms-powerpoint.slideshow.macroenabled.12"],
-      ["ppsx", "application/vnd.openxmlformats-officedocument.presentationml.slideshow"],
-      ["ppt", ["application/vnd.ms-powerpoint", "application/mspowerpoint", "application/powerpoint", "application/x-mspowerpoint"]],
-      ["pptm", "application/vnd.ms-powerpoint.presentation.macroenabled.12"],
-      ["pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
-      ["ppz", "application/mspowerpoint"],
-      ["prc", "application/x-mobipocket-ebook"],
-      ["pre", ["application/vnd.lotus-freelance", "application/x-freelance"]],
-      ["prf", "application/pics-rules"],
-      ["prt", "application/pro_eng"],
-      ["ps", "application/postscript"],
-      ["psb", "application/vnd.3gpp.pic-bw-small"],
-      ["psd", ["application/octet-stream", "image/vnd.adobe.photoshop"]],
-      ["psf", "application/x-font-linux-psf"],
-      ["pskcxml", "application/pskc+xml"],
-      ["ptid", "application/vnd.pvi.ptid1"],
-      ["pub", "application/x-mspublisher"],
-      ["pvb", "application/vnd.3gpp.pic-bw-var"],
-      ["pvu", "paleovu/x-pv"],
-      ["pwn", "application/vnd.3m.post-it-notes"],
-      ["pwz", "application/vnd.ms-powerpoint"],
-      ["py", "text/x-script.phyton"],
-      ["pya", "audio/vnd.ms-playready.media.pya"],
-      ["pyc", "application/x-bytecode.python"],
-      ["pyv", "video/vnd.ms-playready.media.pyv"],
-      ["qam", "application/vnd.epson.quickanime"],
-      ["qbo", "application/vnd.intu.qbo"],
-      ["qcp", "audio/vnd.qcelp"],
-      ["qd3", "x-world/x-3dmf"],
-      ["qd3d", "x-world/x-3dmf"],
-      ["qfx", "application/vnd.intu.qfx"],
-      ["qif", "image/x-quicktime"],
-      ["qps", "application/vnd.publishare-delta-tree"],
-      ["qt", "video/quicktime"],
-      ["qtc", "video/x-qtc"],
-      ["qti", "image/x-quicktime"],
-      ["qtif", "image/x-quicktime"],
-      ["qxd", "application/vnd.quark.quarkxpress"],
-      ["ra", ["audio/x-realaudio", "audio/x-pn-realaudio", "audio/x-pn-realaudio-plugin"]],
-      ["ram", "audio/x-pn-realaudio"],
-      ["rar", "application/x-rar-compressed"],
-      ["ras", ["image/cmu-raster", "application/x-cmu-raster", "image/x-cmu-raster"]],
-      ["rast", "image/cmu-raster"],
-      ["rcprofile", "application/vnd.ipunplugged.rcprofile"],
-      ["rdf", "application/rdf+xml"],
-      ["rdz", "application/vnd.data-vision.rdz"],
-      ["rep", "application/vnd.businessobjects"],
-      ["res", "application/x-dtbresource+xml"],
-      ["rexx", "text/x-script.rexx"],
-      ["rf", "image/vnd.rn-realflash"],
-      ["rgb", "image/x-rgb"],
-      ["rif", "application/reginfo+xml"],
-      ["rip", "audio/vnd.rip"],
-      ["rl", "application/resource-lists+xml"],
-      ["rlc", "image/vnd.fujixerox.edmics-rlc"],
-      ["rld", "application/resource-lists-diff+xml"],
-      ["rm", ["application/vnd.rn-realmedia", "audio/x-pn-realaudio"]],
-      ["rmi", "audio/mid"],
-      ["rmm", "audio/x-pn-realaudio"],
-      ["rmp", ["audio/x-pn-realaudio-plugin", "audio/x-pn-realaudio"]],
-      ["rms", "application/vnd.jcp.javame.midlet-rms"],
-      ["rnc", "application/relax-ng-compact-syntax"],
-      ["rng", ["application/ringing-tones", "application/vnd.nokia.ringing-tone"]],
-      ["rnx", "application/vnd.rn-realplayer"],
-      ["roff", "application/x-troff"],
-      ["rp", "image/vnd.rn-realpix"],
-      ["rp9", "application/vnd.cloanto.rp9"],
-      ["rpm", "audio/x-pn-realaudio-plugin"],
-      ["rpss", "application/vnd.nokia.radio-presets"],
-      ["rpst", "application/vnd.nokia.radio-preset"],
-      ["rq", "application/sparql-query"],
-      ["rs", "application/rls-services+xml"],
-      ["rsd", "application/rsd+xml"],
-      ["rt", ["text/richtext", "text/vnd.rn-realtext"]],
-      ["rtf", ["application/rtf", "text/richtext", "application/x-rtf"]],
-      ["rtx", ["text/richtext", "application/rtf"]],
-      ["rv", "video/vnd.rn-realvideo"],
-      ["s", "text/x-asm"],
-      ["s3m", "audio/s3m"],
-      ["saf", "application/vnd.yamaha.smaf-audio"],
-      ["saveme", "application/octet-stream"],
-      ["sbk", "application/x-tbook"],
-      ["sbml", "application/sbml+xml"],
-      ["sc", "application/vnd.ibm.secure-container"],
-      ["scd", "application/x-msschedule"],
-      [
-        "scm",
-        ["application/vnd.lotus-screencam", "video/x-scm", "text/x-script.guile", "application/x-lotusscreencam", "text/x-script.scheme"]
-      ],
-      ["scq", "application/scvp-cv-request"],
-      ["scs", "application/scvp-cv-response"],
-      ["sct", "text/scriptlet"],
-      ["scurl", "text/vnd.curl.scurl"],
-      ["sda", "application/vnd.stardivision.draw"],
-      ["sdc", "application/vnd.stardivision.calc"],
-      ["sdd", "application/vnd.stardivision.impress"],
-      ["sdkm", "application/vnd.solent.sdkm+xml"],
-      ["sdml", "text/plain"],
-      ["sdp", ["application/sdp", "application/x-sdp"]],
-      ["sdr", "application/sounder"],
-      ["sdw", "application/vnd.stardivision.writer"],
-      ["sea", ["application/sea", "application/x-sea"]],
-      ["see", "application/vnd.seemail"],
-      ["seed", "application/vnd.fdsn.seed"],
-      ["sema", "application/vnd.sema"],
-      ["semd", "application/vnd.semd"],
-      ["semf", "application/vnd.semf"],
-      ["ser", "application/java-serialized-object"],
-      ["set", "application/set"],
-      ["setpay", "application/set-payment-initiation"],
-      ["setreg", "application/set-registration-initiation"],
-      ["sfd-hdstx", "application/vnd.hydrostatix.sof-data"],
-      ["sfs", "application/vnd.spotfire.sfs"],
-      ["sgl", "application/vnd.stardivision.writer-global"],
-      ["sgm", ["text/sgml", "text/x-sgml"]],
-      ["sgml", ["text/sgml", "text/x-sgml"]],
-      ["sh", ["application/x-shar", "application/x-bsh", "application/x-sh", "text/x-script.sh"]],
-      ["shar", ["application/x-bsh", "application/x-shar"]],
-      ["shf", "application/shf+xml"],
-      ["shtml", ["text/html", "text/x-server-parsed-html"]],
-      ["sid", "audio/x-psid"],
-      ["sis", "application/vnd.symbian.install"],
-      ["sit", ["application/x-stuffit", "application/x-sit"]],
-      ["sitx", "application/x-stuffitx"],
-      ["skd", "application/x-koan"],
-      ["skm", "application/x-koan"],
-      ["skp", ["application/vnd.koan", "application/x-koan"]],
-      ["skt", "application/x-koan"],
-      ["sl", "application/x-seelogo"],
-      ["sldm", "application/vnd.ms-powerpoint.slide.macroenabled.12"],
-      ["sldx", "application/vnd.openxmlformats-officedocument.presentationml.slide"],
-      ["slt", "application/vnd.epson.salt"],
-      ["sm", "application/vnd.stepmania.stepchart"],
-      ["smf", "application/vnd.stardivision.math"],
-      ["smi", ["application/smil", "application/smil+xml"]],
-      ["smil", "application/smil"],
-      ["snd", ["audio/basic", "audio/x-adpcm"]],
-      ["snf", "application/x-font-snf"],
-      ["sol", "application/solids"],
-      ["spc", ["text/x-speech", "application/x-pkcs7-certificates"]],
-      ["spf", "application/vnd.yamaha.smaf-phrase"],
-      ["spl", ["application/futuresplash", "application/x-futuresplash"]],
-      ["spot", "text/vnd.in3d.spot"],
-      ["spp", "application/scvp-vp-response"],
-      ["spq", "application/scvp-vp-request"],
-      ["spr", "application/x-sprite"],
-      ["sprite", "application/x-sprite"],
-      ["src", "application/x-wais-source"],
-      ["sru", "application/sru+xml"],
-      ["srx", "application/sparql-results+xml"],
-      ["sse", "application/vnd.kodak-descriptor"],
-      ["ssf", "application/vnd.epson.ssf"],
-      ["ssi", "text/x-server-parsed-html"],
-      ["ssm", "application/streamingmedia"],
-      ["ssml", "application/ssml+xml"],
-      ["sst", ["application/vnd.ms-pkicertstore", "application/vnd.ms-pki.certstore"]],
-      ["st", "application/vnd.sailingtracker.track"],
-      ["stc", "application/vnd.sun.xml.calc.template"],
-      ["std", "application/vnd.sun.xml.draw.template"],
-      ["step", "application/step"],
-      ["stf", "application/vnd.wt.stf"],
-      ["sti", "application/vnd.sun.xml.impress.template"],
-      ["stk", "application/hyperstudio"],
-      ["stl", ["application/vnd.ms-pkistl", "application/sla", "application/vnd.ms-pki.stl", "application/x-navistyle"]],
-      ["stm", "text/html"],
-      ["stp", "application/step"],
-      ["str", "application/vnd.pg.format"],
-      ["stw", "application/vnd.sun.xml.writer.template"],
-      ["sub", "image/vnd.dvb.subtitle"],
-      ["sus", "application/vnd.sus-calendar"],
-      ["sv4cpio", "application/x-sv4cpio"],
-      ["sv4crc", "application/x-sv4crc"],
-      ["svc", "application/vnd.dvb.service"],
-      ["svd", "application/vnd.svd"],
-      ["svf", ["image/vnd.dwg", "image/x-dwg"]],
-      ["svg", "image/svg+xml"],
-      ["svr", ["x-world/x-svr", "application/x-world"]],
-      ["swf", "application/x-shockwave-flash"],
-      ["swi", "application/vnd.aristanetworks.swi"],
-      ["sxc", "application/vnd.sun.xml.calc"],
-      ["sxd", "application/vnd.sun.xml.draw"],
-      ["sxg", "application/vnd.sun.xml.writer.global"],
-      ["sxi", "application/vnd.sun.xml.impress"],
-      ["sxm", "application/vnd.sun.xml.math"],
-      ["sxw", "application/vnd.sun.xml.writer"],
-      ["t", ["text/troff", "application/x-troff"]],
-      ["talk", "text/x-speech"],
-      ["tao", "application/vnd.tao.intent-module-archive"],
-      ["tar", "application/x-tar"],
-      ["tbk", ["application/toolbook", "application/x-tbook"]],
-      ["tcap", "application/vnd.3gpp2.tcap"],
-      ["tcl", ["text/x-script.tcl", "application/x-tcl"]],
-      ["tcsh", "text/x-script.tcsh"],
-      ["teacher", "application/vnd.smart.teacher"],
-      ["tei", "application/tei+xml"],
-      ["tex", "application/x-tex"],
-      ["texi", "application/x-texinfo"],
-      ["texinfo", "application/x-texinfo"],
-      ["text", ["application/plain", "text/plain"]],
-      ["tfi", "application/thraud+xml"],
-      ["tfm", "application/x-tex-tfm"],
-      ["tgz", ["application/gnutar", "application/x-compressed"]],
-      ["thmx", "application/vnd.ms-officetheme"],
-      ["tif", ["image/tiff", "image/x-tiff"]],
-      ["tiff", ["image/tiff", "image/x-tiff"]],
-      ["tmo", "application/vnd.tmobile-livetv"],
-      ["torrent", "application/x-bittorrent"],
-      ["tpl", "application/vnd.groove-tool-template"],
-      ["tpt", "application/vnd.trid.tpt"],
-      ["tr", "application/x-troff"],
-      ["tra", "application/vnd.trueapp"],
-      ["trm", "application/x-msterminal"],
-      ["tsd", "application/timestamped-data"],
-      ["tsi", "audio/tsp-audio"],
-      ["tsp", ["application/dsptype", "audio/tsplayer"]],
-      ["tsv", "text/tab-separated-values"],
-      ["ttf", "application/x-font-ttf"],
-      ["ttl", "text/turtle"],
-      ["turbot", "image/florian"],
-      ["twd", "application/vnd.simtech-mindmapper"],
-      ["txd", "application/vnd.genomatix.tuxedo"],
-      ["txf", "application/vnd.mobius.txf"],
-      ["txt", "text/plain"],
-      ["ufd", "application/vnd.ufdl"],
-      ["uil", "text/x-uil"],
-      ["uls", "text/iuls"],
-      ["umj", "application/vnd.umajin"],
-      ["uni", "text/uri-list"],
-      ["unis", "text/uri-list"],
-      ["unityweb", "application/vnd.unity"],
-      ["unv", "application/i-deas"],
-      ["uoml", "application/vnd.uoml+xml"],
-      ["uri", "text/uri-list"],
-      ["uris", "text/uri-list"],
-      ["ustar", ["application/x-ustar", "multipart/x-ustar"]],
-      ["utz", "application/vnd.uiq.theme"],
-      ["uu", ["application/octet-stream", "text/x-uuencode"]],
-      ["uue", "text/x-uuencode"],
-      ["uva", "audio/vnd.dece.audio"],
-      ["uvh", "video/vnd.dece.hd"],
-      ["uvi", "image/vnd.dece.graphic"],
-      ["uvm", "video/vnd.dece.mobile"],
-      ["uvp", "video/vnd.dece.pd"],
-      ["uvs", "video/vnd.dece.sd"],
-      ["uvu", "video/vnd.uvvu.mp4"],
-      ["uvv", "video/vnd.dece.video"],
-      ["vcd", "application/x-cdlink"],
-      ["vcf", "text/x-vcard"],
-      ["vcg", "application/vnd.groove-vcard"],
-      ["vcs", "text/x-vcalendar"],
-      ["vcx", "application/vnd.vcx"],
-      ["vda", "application/vda"],
-      ["vdo", "video/vdo"],
-      ["vew", "application/groupwise"],
-      ["vis", "application/vnd.visionary"],
-      ["viv", ["video/vivo", "video/vnd.vivo"]],
-      ["vivo", ["video/vivo", "video/vnd.vivo"]],
-      ["vmd", "application/vocaltec-media-desc"],
-      ["vmf", "application/vocaltec-media-file"],
-      ["voc", ["audio/voc", "audio/x-voc"]],
-      ["vos", "video/vosaic"],
-      ["vox", "audio/voxware"],
-      ["vqe", "audio/x-twinvq-plugin"],
-      ["vqf", "audio/x-twinvq"],
-      ["vql", "audio/x-twinvq-plugin"],
-      ["vrml", ["model/vrml", "x-world/x-vrml", "application/x-vrml"]],
-      ["vrt", "x-world/x-vrt"],
-      ["vsd", ["application/vnd.visio", "application/x-visio"]],
-      ["vsf", "application/vnd.vsf"],
-      ["vst", "application/x-visio"],
-      ["vsw", "application/x-visio"],
-      ["vtu", "model/vnd.vtu"],
-      ["vxml", "application/voicexml+xml"],
-      ["w60", "application/wordperfect6.0"],
-      ["w61", "application/wordperfect6.1"],
-      ["w6w", "application/msword"],
-      ["wad", "application/x-doom"],
-      ["wav", ["audio/wav", "audio/x-wav"]],
-      ["wax", "audio/x-ms-wax"],
-      ["wb1", "application/x-qpro"],
-      ["wbmp", "image/vnd.wap.wbmp"],
-      ["wbs", "application/vnd.criticaltools.wbs+xml"],
-      ["wbxml", "application/vnd.wap.wbxml"],
-      ["wcm", "application/vnd.ms-works"],
-      ["wdb", "application/vnd.ms-works"],
-      ["web", "application/vnd.xara"],
-      ["weba", "audio/webm"],
-      ["webm", "video/webm"],
-      ["webp", "image/webp"],
-      ["wg", "application/vnd.pmi.widget"],
-      ["wgt", "application/widget"],
-      ["wiz", "application/msword"],
-      ["wk1", "application/x-123"],
-      ["wks", "application/vnd.ms-works"],
-      ["wm", "video/x-ms-wm"],
-      ["wma", "audio/x-ms-wma"],
-      ["wmd", "application/x-ms-wmd"],
-      ["wmf", ["windows/metafile", "application/x-msmetafile"]],
-      ["wml", "text/vnd.wap.wml"],
-      ["wmlc", "application/vnd.wap.wmlc"],
-      ["wmls", "text/vnd.wap.wmlscript"],
-      ["wmlsc", "application/vnd.wap.wmlscriptc"],
-      ["wmv", "video/x-ms-wmv"],
-      ["wmx", "video/x-ms-wmx"],
-      ["wmz", "application/x-ms-wmz"],
-      ["woff", "application/x-font-woff"],
-      ["word", "application/msword"],
-      ["wp", "application/wordperfect"],
-      ["wp5", ["application/wordperfect", "application/wordperfect6.0"]],
-      ["wp6", "application/wordperfect"],
-      ["wpd", ["application/wordperfect", "application/vnd.wordperfect", "application/x-wpwin"]],
-      ["wpl", "application/vnd.ms-wpl"],
-      ["wps", "application/vnd.ms-works"],
-      ["wq1", "application/x-lotus"],
-      ["wqd", "application/vnd.wqd"],
-      ["wri", ["application/mswrite", "application/x-wri", "application/x-mswrite"]],
-      ["wrl", ["model/vrml", "x-world/x-vrml", "application/x-world"]],
-      ["wrz", ["model/vrml", "x-world/x-vrml"]],
-      ["wsc", "text/scriplet"],
-      ["wsdl", "application/wsdl+xml"],
-      ["wspolicy", "application/wspolicy+xml"],
-      ["wsrc", "application/x-wais-source"],
-      ["wtb", "application/vnd.webturbo"],
-      ["wtk", "application/x-wintalk"],
-      ["wvx", "video/x-ms-wvx"],
-      ["x-png", "image/png"],
-      ["x3d", "application/vnd.hzn-3d-crossword"],
-      ["xaf", "x-world/x-vrml"],
-      ["xap", "application/x-silverlight-app"],
-      ["xar", "application/vnd.xara"],
-      ["xbap", "application/x-ms-xbap"],
-      ["xbd", "application/vnd.fujixerox.docuworks.binder"],
-      ["xbm", ["image/xbm", "image/x-xbm", "image/x-xbitmap"]],
-      ["xdf", "application/xcap-diff+xml"],
-      ["xdm", "application/vnd.syncml.dm+xml"],
-      ["xdp", "application/vnd.adobe.xdp+xml"],
-      ["xdr", "video/x-amt-demorun"],
-      ["xdssc", "application/dssc+xml"],
-      ["xdw", "application/vnd.fujixerox.docuworks"],
-      ["xenc", "application/xenc+xml"],
-      ["xer", "application/patch-ops-error+xml"],
-      ["xfdf", "application/vnd.adobe.xfdf"],
-      ["xfdl", "application/vnd.xfdl"],
-      ["xgz", "xgl/drawing"],
-      ["xhtml", "application/xhtml+xml"],
-      ["xif", "image/vnd.xiff"],
-      ["xl", "application/excel"],
-      ["xla", ["application/vnd.ms-excel", "application/excel", "application/x-msexcel", "application/x-excel"]],
-      ["xlam", "application/vnd.ms-excel.addin.macroenabled.12"],
-      ["xlb", ["application/excel", "application/vnd.ms-excel", "application/x-excel"]],
-      ["xlc", ["application/vnd.ms-excel", "application/excel", "application/x-excel"]],
-      ["xld", ["application/excel", "application/x-excel"]],
-      ["xlk", ["application/excel", "application/x-excel"]],
-      ["xll", ["application/excel", "application/vnd.ms-excel", "application/x-excel"]],
-      ["xlm", ["application/vnd.ms-excel", "application/excel", "application/x-excel"]],
-      ["xls", ["application/vnd.ms-excel", "application/excel", "application/x-msexcel", "application/x-excel"]],
-      ["xlsb", "application/vnd.ms-excel.sheet.binary.macroenabled.12"],
-      ["xlsm", "application/vnd.ms-excel.sheet.macroenabled.12"],
-      ["xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
-      ["xlt", ["application/vnd.ms-excel", "application/excel", "application/x-excel"]],
-      ["xltm", "application/vnd.ms-excel.template.macroenabled.12"],
-      ["xltx", "application/vnd.openxmlformats-officedocument.spreadsheetml.template"],
-      ["xlv", ["application/excel", "application/x-excel"]],
-      ["xlw", ["application/vnd.ms-excel", "application/excel", "application/x-msexcel", "application/x-excel"]],
-      ["xm", "audio/xm"],
-      ["xml", ["application/xml", "text/xml", "application/atom+xml", "application/rss+xml"]],
-      ["xmz", "xgl/movie"],
-      ["xo", "application/vnd.olpc-sugar"],
-      ["xof", "x-world/x-vrml"],
-      ["xop", "application/xop+xml"],
-      ["xpi", "application/x-xpinstall"],
-      ["xpix", "application/x-vnd.ls-xpix"],
-      ["xpm", ["image/xpm", "image/x-xpixmap"]],
-      ["xpr", "application/vnd.is-xpr"],
-      ["xps", "application/vnd.ms-xpsdocument"],
-      ["xpw", "application/vnd.intercon.formnet"],
-      ["xslt", "application/xslt+xml"],
-      ["xsm", "application/vnd.syncml+xml"],
-      ["xspf", "application/xspf+xml"],
-      ["xsr", "video/x-amt-showrun"],
-      ["xul", "application/vnd.mozilla.xul+xml"],
-      ["xwd", ["image/x-xwd", "image/x-xwindowdump"]],
-      ["xyz", ["chemical/x-xyz", "chemical/x-pdb"]],
-      ["yang", "application/yang"],
-      ["yin", "application/yin+xml"],
-      ["z", ["application/x-compressed", "application/x-compress"]],
-      ["zaz", "application/vnd.zzazz.deck+xml"],
-      ["zip", ["application/zip", "multipart/x-zip", "application/x-zip-compressed", "application/x-compressed"]],
-      ["zir", "application/vnd.zul"],
-      ["zmm", "application/vnd.handheld-entertainment+xml"],
-      ["zoo", "application/octet-stream"],
-      ["zsh", "text/x-script.zsh"]
-    ]);
-    module2.exports = {
-      detectMimeType(filename) {
-        if (!filename) {
-          return defaultMimeType;
-        }
-        const parsed = path3.parse(filename);
-        const extension2 = (parsed.ext.substr(1) || parsed.name || "").split("?").shift().trim().toLowerCase();
-        const value = extensions.has(extension2) ? extensions.get(extension2) : defaultMimeType;
-        if (Array.isArray(value)) {
-          return value[0];
-        }
-        return value;
-      },
-      detectExtension(mimeType) {
-        if (!mimeType) {
-          return defaultExtension;
-        }
-        const parts = mimeType.toLowerCase().trim().split("/");
-        const rootType = parts.shift().trim();
-        const subType = parts.join("/").trim();
-        if (mimeTypes.has(rootType + "/" + subType)) {
-          const value = mimeTypes.get(rootType + "/" + subType);
-          if (Array.isArray(value)) {
-            return value[0];
-          }
-          return value;
-        }
-        switch (rootType) {
-          case "text":
-            return "txt";
-          default:
-            return "bin";
-        }
-      }
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/base64/index.js
-var require_base64 = __commonJS({
-  "node_modules/nodemailer/lib/base64/index.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    function encode(buffer) {
-      if (typeof buffer === "string") {
-        buffer = Buffer.from(buffer, "utf-8");
-      }
-      return buffer.toString("base64");
-    }
-    function wrap(str, lineLength) {
-      str = (str || "").toString();
-      lineLength = lineLength || 76;
-      if (str.length <= lineLength) {
-        return str;
-      }
-      const result = [];
-      let pos = 0;
-      const chunkLength = lineLength * 1024;
-      const wrapRegex = new RegExp(".{" + lineLength + "}", "g");
-      while (pos < str.length) {
-        const wrappedLines = str.substr(pos, chunkLength).replace(wrapRegex, "$&\r\n").trim();
-        result.push(wrappedLines);
-        pos += chunkLength;
-      }
-      return result.join("\r\n").trim();
-    }
-    var Encoder = class extends Transform {
-      constructor(options) {
-        super();
-        this.options = options || {};
-        if (this.options.lineLength !== false) {
-          this.options.lineLength = this.options.lineLength || 76;
-        }
-        this._curLine = "";
-        this._remainingBytes = false;
-        this.inputBytes = 0;
-        this.outputBytes = 0;
-      }
-      _transform(chunk, encoding, done) {
-        if (encoding !== "buffer") {
-          chunk = Buffer.from(chunk, encoding);
-        }
-        if (!chunk || !chunk.length) {
-          return setImmediate(done);
-        }
-        this.inputBytes += chunk.length;
-        if (this._remainingBytes && this._remainingBytes.length) {
-          chunk = Buffer.concat([this._remainingBytes, chunk], this._remainingBytes.length + chunk.length);
-          this._remainingBytes = false;
-        }
-        if (chunk.length % 3) {
-          this._remainingBytes = chunk.slice(chunk.length - chunk.length % 3);
-          chunk = chunk.slice(0, chunk.length - chunk.length % 3);
-        } else {
-          this._remainingBytes = false;
-        }
-        let b64 = this._curLine + encode(chunk);
-        if (this.options.lineLength) {
-          b64 = wrap(b64, this.options.lineLength);
-          const lastLF = b64.lastIndexOf("\n");
-          if (lastLF < 0) {
-            this._curLine = b64;
-            b64 = "";
-          } else if (lastLF === b64.length - 1) {
-            this._curLine = "";
-          } else {
-            this._curLine = b64.substring(lastLF + 1);
-            b64 = b64.substring(0, lastLF + 1);
-          }
-        }
-        if (b64) {
-          this.outputBytes += b64.length;
-          this.push(Buffer.from(b64, "ascii"));
-        }
-        setImmediate(done);
-      }
-      _flush(done) {
-        if (this._remainingBytes && this._remainingBytes.length) {
-          this._curLine += encode(this._remainingBytes);
-        }
-        if (this._curLine) {
-          this._curLine = wrap(this._curLine, this.options.lineLength);
-          this.outputBytes += this._curLine.length;
-          this.push(Buffer.from(this._curLine, "ascii"));
-          this._curLine = "";
-        }
-        done();
-      }
-    };
-    module2.exports = {
-      encode,
-      wrap,
-      Encoder
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/qp/index.js
-var require_qp = __commonJS({
-  "node_modules/nodemailer/lib/qp/index.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var QP_RANGES = [
-      [9],
-      // <TAB>
-      [10],
-      // <LF>
-      [13],
-      // <CR>
-      [32, 60],
-      // <SP>!"#$%&'()*+,-./0123456789:;
-      [62, 126]
-      // >?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}
-    ];
-    function encode(buffer) {
-      if (typeof buffer === "string") {
-        buffer = Buffer.from(buffer, "utf-8");
-      }
-      let result = "";
-      let ord;
-      for (let i2 = 0, len = buffer.length; i2 < len; i2++) {
-        ord = buffer[i2];
-        if (checkRanges(ord, QP_RANGES) && !((ord === 32 || ord === 9) && (i2 === len - 1 || buffer[i2 + 1] === 10 || buffer[i2 + 1] === 13))) {
-          result += String.fromCharCode(ord);
-          continue;
-        }
-        result += "=" + (ord < 16 ? "0" : "") + ord.toString(16).toUpperCase();
-      }
-      return result;
-    }
-    function wrap(str, lineLength) {
-      str = (str || "").toString();
-      lineLength = lineLength || 76;
-      if (str.length <= lineLength) {
-        return str;
-      }
-      let pos = 0;
-      const len = str.length;
-      let match2, code, line;
-      const lineMargin = Math.floor(lineLength / 3);
-      let result = "";
-      while (pos < len) {
-        line = str.substr(pos, lineLength);
-        if (match2 = line.match(/\r\n/)) {
-          line = line.substr(0, match2.index + match2[0].length);
-          result += line;
-          pos += line.length;
-          continue;
-        }
-        if (line.substr(-1) === "\n") {
-          result += line;
-          pos += line.length;
-          continue;
-        }
-        if (match2 = line.substr(-lineMargin).match(/\n.*?$/)) {
-          line = line.substr(0, line.length - (match2[0].length - 1));
-          result += line;
-          pos += line.length;
-          continue;
-        }
-        if (line.length > lineLength - lineMargin && (match2 = line.substr(-lineMargin).match(/[ \t.,!?][^ \t.,!?]*$/))) {
-          line = line.substr(0, line.length - (match2[0].length - 1));
-        } else if (line.match(/[=][\da-f]{0,2}$/i)) {
-          if (match2 = line.match(/[=][\da-f]{0,1}$/i)) {
-            line = line.substr(0, line.length - match2[0].length);
-          }
-          while (line.length > 3 && line.length < len - pos && !line.match(/^(?:=[\da-f]{2}){1,4}$/i) && (match2 = line.match(/[=][\da-f]{2}$/gi))) {
-            code = parseInt(match2[0].substr(1, 2), 16);
-            if (code < 128) {
-              break;
-            }
-            line = line.substr(0, line.length - 3);
-            if (code >= 192) {
-              break;
-            }
-          }
-        }
-        if (pos + line.length < len && line.substr(-1) !== "\n") {
-          if (line.length === lineLength && line.match(/[=][\da-f]{2}$/i)) {
-            line = line.substr(0, line.length - 3);
-          } else if (line.length === lineLength) {
-            line = line.substr(0, line.length - 1);
-          }
-          pos += line.length;
-          line += "=\r\n";
-        } else {
-          pos += line.length;
-        }
-        result += line;
-      }
-      return result;
-    }
-    function checkRanges(nr, ranges) {
-      for (let i2 = ranges.length - 1; i2 >= 0; i2--) {
-        const range = ranges[i2];
-        if (!range.length) {
-          continue;
-        }
-        if (range.length === 1 && nr === range[0]) {
-          return true;
-        }
-        if (range.length === 2 && nr >= range[0] && nr <= range[1]) {
-          return true;
-        }
-      }
-      return false;
-    }
-    var Encoder = class extends Transform {
-      constructor(options) {
-        super();
-        this.options = options || {};
-        if (this.options.lineLength !== false) {
-          this.options.lineLength = this.options.lineLength || 76;
-        }
-        this._curLine = "";
-        this.inputBytes = 0;
-        this.outputBytes = 0;
-      }
-      _transform(chunk, encoding, done) {
-        let qp;
-        if (encoding !== "buffer") {
-          chunk = Buffer.from(chunk, encoding);
-        }
-        if (!chunk || !chunk.length) {
-          return done();
-        }
-        this.inputBytes += chunk.length;
-        if (this.options.lineLength) {
-          qp = this._curLine + encode(chunk);
-          qp = wrap(qp, this.options.lineLength);
-          qp = qp.replace(/(^|\n)([^\n]*)$/, (match2, lineBreak, lastLine) => {
-            this._curLine = lastLine;
-            return lineBreak;
-          });
-          if (qp) {
-            this.outputBytes += qp.length;
-            this.push(qp);
-          }
-        } else {
-          qp = encode(chunk);
-          this.outputBytes += qp.length;
-          this.push(qp, "ascii");
-        }
-        done();
-      }
-      _flush(done) {
-        if (this._curLine) {
-          this.outputBytes += this._curLine.length;
-          this.push(this._curLine, "ascii");
-        }
-        done();
-      }
-    };
-    module2.exports = {
-      encode,
-      wrap,
-      Encoder
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/mime-funcs/index.js
-var require_mime_funcs = __commonJS({
-  "node_modules/nodemailer/lib/mime-funcs/index.js"(exports2, module2) {
-    "use strict";
-    var base64 = require_base64();
-    var qp = require_qp();
-    var mimeTypes = require_mime_types2();
-    module2.exports = {
-      /**
-       * Checks if a value is plaintext string (uses only printable 7bit chars)
-       *
-       * @param {String} value String to be tested
-       * @returns {Boolean} true if it is a plaintext string
-       */
-      isPlainText(value, isParam) {
-        const re = isParam ? /[\x00-\x08\x0b\x0c\x0e-\x1f"\u0080-\uFFFF]/ : /[\x00-\x08\x0b\x0c\x0e-\x1f\u0080-\uFFFF]/;
-        return typeof value === "string" && !re.test(value);
-      },
-      /**
-       * Checks if a multi line string containes lines longer than the selected value.
-       *
-       * Useful when detecting if a mail message needs any processing at all –
-       * if only plaintext characters are used and lines are short, then there is
-       * no need to encode the values in any way. If the value is plaintext but has
-       * longer lines then allowed, then use format=flowed
-       *
-       * @param {Number} lineLength Max line length to check for
-       * @returns {Boolean} Returns true if there is at least one line longer than lineLength chars
-       */
-      hasLongerLines(str, lineLength) {
-        if (str.length > 128 * 1024) {
-          return true;
-        }
-        return new RegExp("^.{" + (lineLength + 1) + ",}", "m").test(str);
-      },
-      /**
-       * Encodes a string or an Buffer to an UTF-8 MIME Word (rfc2047)
-       *
-       * @param {String|Buffer} data String to be encoded
-       * @param {String} mimeWordEncoding='Q' Encoding for the mime word, either Q or B
-       * @param {Number} [maxLength=0] If set, split mime words into several chunks if needed
-       * @return {String} Single or several mime words joined together
-       */
-      encodeWord(data, mimeWordEncoding, maxLength) {
-        mimeWordEncoding = (mimeWordEncoding || "Q").toString().toUpperCase().trim().charAt(0);
-        maxLength = maxLength || 0;
-        let encodedStr;
-        const toCharset = "UTF-8";
-        if (maxLength && maxLength > 7 + toCharset.length) {
-          maxLength -= 7 + toCharset.length;
-        }
-        if (mimeWordEncoding === "Q") {
-          encodedStr = qp.encode(data).replace(/[^a-z0-9!*+\-/=]/gi, (chr) => {
-            const ord = chr.charCodeAt(0).toString(16).toUpperCase();
-            if (chr === " ") {
-              return "_";
-            }
-            return "=" + (ord.length === 1 ? "0" + ord : ord);
-          });
-        } else if (mimeWordEncoding === "B") {
-          encodedStr = typeof data === "string" ? data : base64.encode(data);
-          maxLength = maxLength ? Math.max(3, (maxLength - maxLength % 4) / 4 * 3) : 0;
-        }
-        if (maxLength && (mimeWordEncoding !== "B" ? encodedStr : base64.encode(data)).length > maxLength) {
-          if (mimeWordEncoding === "Q") {
-            encodedStr = this.splitMimeEncodedString(encodedStr, maxLength).join("?= =?" + toCharset + "?" + mimeWordEncoding + "?");
-          } else {
-            const parts = [];
-            let lpart = "";
-            for (let i2 = 0, len = encodedStr.length; i2 < len; i2++) {
-              let chr = encodedStr.charAt(i2);
-              if (/[\ud83c\ud83d\ud83e]/.test(chr) && i2 < len - 1) {
-                chr += encodedStr.charAt(++i2);
-              }
-              if (Buffer.byteLength(lpart + chr) <= maxLength || i2 === 0) {
-                lpart += chr;
-              } else {
-                parts.push(base64.encode(lpart));
-                lpart = chr;
-              }
-            }
-            if (lpart) {
-              parts.push(base64.encode(lpart));
-            }
-            if (parts.length > 1) {
-              encodedStr = parts.join("?= =?" + toCharset + "?" + mimeWordEncoding + "?");
-            } else {
-              encodedStr = parts.join("");
-            }
-          }
-        } else if (mimeWordEncoding === "B") {
-          encodedStr = base64.encode(data);
-        }
-        return "=?" + toCharset + "?" + mimeWordEncoding + "?" + encodedStr + (encodedStr.substr(-2) === "?=" ? "" : "?=");
-      },
-      /**
-       * Finds word sequences with non ascii text and converts these to mime words
-       *
-       * @param {String} value String to be encoded
-       * @param {String} mimeWordEncoding='Q' Encoding for the mime word, either Q or B
-       * @param {Number} [maxLength=0] If set, split mime words into several chunks if needed
-       * @param {Boolean} [encodeAll=false] If true and the value needs encoding then encodes entire string, not just the smallest match
-       * @return {String} String with possible mime words
-       */
-      encodeWords(value, mimeWordEncoding, maxLength, encodeAll) {
-        maxLength = maxLength || 0;
-        const firstMatch = value.match(/(?:^|\s)([^\s]*["\u0080-\uFFFF])/);
-        if (!firstMatch) {
-          return value;
-        }
-        if (encodeAll) {
-          return this.encodeWord(value, mimeWordEncoding, maxLength);
-        }
-        const lastMatch = value.match(/(["\u0080-\uFFFF][^\s]*)[^"\u0080-\uFFFF]*$/);
-        if (!lastMatch) {
-          return value;
-        }
-        const startIndex = firstMatch.index + (firstMatch[0].match(/[^\s]/) || {
-          index: 0
-        }).index;
-        const endIndex = lastMatch.index + (lastMatch[1] || "").length;
-        return (startIndex ? value.substr(0, startIndex) : "") + this.encodeWord(value.substring(startIndex, endIndex), mimeWordEncoding || "Q", maxLength) + (endIndex < value.length ? value.substr(endIndex) : "");
-      },
-      /**
-       * Joins parsed header value together as 'value; param1=value1; param2=value2'
-       * PS: We are following RFC 822 for the list of special characters that we need to keep in quotes.
-       *      Refer: https://www.w3.org/Protocols/rfc1341/4_Content-Type.html
-       * @param {Object} structured Parsed header value
-       * @return {String} joined header value
-       */
-      buildHeaderValue(structured) {
-        const paramsArray = [];
-        Object.keys(structured.params || {}).forEach((param) => {
-          const value = structured.params[param];
-          if (!this.isPlainText(value, true) || value.length >= 75) {
-            this.buildHeaderParam(param, value, 50).forEach((encodedParam) => {
-              if (!/[\s"\\;:/=(),<>@[\]?]|^[-']|'$/.test(encodedParam.value) || encodedParam.key.substr(-1) === "*") {
-                paramsArray.push(encodedParam.key + "=" + encodedParam.value);
-              } else {
-                paramsArray.push(encodedParam.key + "=" + JSON.stringify(encodedParam.value));
-              }
-            });
-          } else if (/[\s'"\\;:/=(),<>@[\]?]|^-/.test(value)) {
-            paramsArray.push(param + "=" + JSON.stringify(value));
-          } else {
-            paramsArray.push(param + "=" + value);
-          }
-        });
-        return structured.value + (paramsArray.length ? "; " + paramsArray.join("; ") : "");
-      },
-      /**
-       * Encodes a string or an Buffer to an UTF-8 Parameter Value Continuation encoding (rfc2231)
-       * Useful for splitting long parameter values.
-       *
-       * For example
-       *      title="unicode string"
-       * becomes
-       *     title*0*=utf-8''unicode
-       *     title*1*=%20string
-       *
-       * @param {String|Buffer} data String to be encoded
-       * @param {Number} [maxLength=50] Max length for generated chunks
-       * @param {String} [fromCharset='UTF-8'] Source sharacter set
-       * @return {Array} A list of encoded keys and headers
-       */
-      buildHeaderParam(key, data, maxLength) {
-        const list = [];
-        let encodedStr = typeof data === "string" ? data : (data || "").toString();
-        let chr, ord;
-        let line;
-        let startPos = 0;
-        let i2, len;
-        maxLength = maxLength || 50;
-        if (this.isPlainText(data, true)) {
-          if (encodedStr.length <= maxLength) {
-            return [
-              {
-                key,
-                value: encodedStr
-              }
-            ];
-          }
-          encodedStr = encodedStr.replace(new RegExp(".{" + maxLength + "}", "g"), (str) => {
-            list.push({
-              line: str
-            });
-            return "";
-          });
-          if (encodedStr) {
-            list.push({
-              line: encodedStr
-            });
-          }
-        } else {
-          if (/[\uD800-\uDBFF]/.test(encodedStr)) {
-            const encodedStrArr = [];
-            for (i2 = 0, len = encodedStr.length; i2 < len; i2++) {
-              chr = encodedStr.charAt(i2);
-              ord = chr.charCodeAt(0);
-              if (ord >= 55296 && ord <= 56319 && i2 < len - 1) {
-                chr += encodedStr.charAt(i2 + 1);
-                encodedStrArr.push(chr);
-                i2++;
-              } else {
-                encodedStrArr.push(chr);
-              }
-            }
-            encodedStr = encodedStrArr;
-          }
-          line = "utf-8''";
-          let encoded = true;
-          startPos = 0;
-          for (i2 = 0, len = encodedStr.length; i2 < len; i2++) {
-            chr = encodedStr[i2];
-            if (encoded) {
-              chr = this.safeEncodeURIComponent(chr);
-            } else {
-              chr = chr === " " ? chr : this.safeEncodeURIComponent(chr);
-              if (chr !== encodedStr[i2]) {
-                if ((this.safeEncodeURIComponent(line) + chr).length >= maxLength) {
-                  list.push({
-                    line,
-                    encoded
-                  });
-                  line = "";
-                  startPos = i2 - 1;
-                } else {
-                  encoded = true;
-                  i2 = startPos;
-                  line = "";
-                  continue;
-                }
-              }
-            }
-            if ((line + chr).length >= maxLength) {
-              list.push({
-                line,
-                encoded
-              });
-              line = chr = encodedStr[i2] === " " ? " " : this.safeEncodeURIComponent(encodedStr[i2]);
-              if (chr === encodedStr[i2]) {
-                encoded = false;
-                startPos = i2 - 1;
-              } else {
-                encoded = true;
-              }
-            } else {
-              line += chr;
-            }
-          }
-          if (line) {
-            list.push({
-              line,
-              encoded
-            });
-          }
-        }
-        return list.map((item, i3) => ({
-          // encoded lines: {name}*{part}*
-          // unencoded lines: {name}*{part}
-          // if any line needs to be encoded then the first line (part==0) is always encoded
-          key: key + "*" + i3 + (item.encoded ? "*" : ""),
-          value: item.line
-        }));
-      },
-      /**
-       * Parses a header value with key=value arguments into a structured
-       * object.
-       *
-       *   parseHeaderValue('content-type: text/plain; CHARSET='UTF-8'') ->
-       *   {
-       *     'value': 'text/plain',
-       *     'params': {
-       *       'charset': 'UTF-8'
-       *     }
-       *   }
-       *
-       * @param {String} str Header value
-       * @return {Object} Header value as a parsed structure
-       */
-      parseHeaderValue(str) {
-        const response = {
-          value: false,
-          params: {}
-        };
-        let key = false;
-        let value = "";
-        let type = "value";
-        let quote = false;
-        let escaped = false;
-        let chr;
-        for (let i2 = 0, len = str.length; i2 < len; i2++) {
-          chr = str.charAt(i2);
-          if (type === "key") {
-            if (chr === "=") {
-              key = value.trim().toLowerCase();
-              type = "value";
-              value = "";
-              continue;
-            }
-            value += chr;
-          } else {
-            if (escaped) {
-              value += chr;
-            } else if (chr === "\\") {
-              escaped = true;
-              continue;
-            } else if (quote && chr === quote) {
-              quote = false;
-            } else if (!quote && chr === '"') {
-              quote = chr;
-            } else if (!quote && chr === ";") {
-              if (key === false) {
-                response.value = value.trim();
-              } else {
-                response.params[key] = value.trim();
-              }
-              type = "key";
-              value = "";
-            } else {
-              value += chr;
-            }
-            escaped = false;
-          }
-        }
-        if (type === "value") {
-          if (key === false) {
-            response.value = value.trim();
-          } else {
-            response.params[key] = value.trim();
-          }
-        } else if (value.trim()) {
-          response.params[value.trim().toLowerCase()] = "";
-        }
-        Object.keys(response.params).forEach((key2) => {
-          let actualKey, nr, match2, value2;
-          if (match2 = key2.match(/(\*(\d+)|\*(\d+)\*|\*)$/)) {
-            actualKey = key2.substr(0, match2.index);
-            nr = Number(match2[2] || match2[3]) || 0;
-            if (!response.params[actualKey] || typeof response.params[actualKey] !== "object") {
-              response.params[actualKey] = {
-                charset: false,
-                values: []
-              };
-            }
-            value2 = response.params[key2];
-            if (nr === 0 && match2[0].substr(-1) === "*" && (match2 = value2.match(/^([^']*)'[^']*'(.*)$/))) {
-              response.params[actualKey].charset = match2[1] || "iso-8859-1";
-              value2 = match2[2];
-            }
-            response.params[actualKey].values[nr] = value2;
-            delete response.params[key2];
-          }
-        });
-        Object.keys(response.params).forEach((key2) => {
-          let value2;
-          if (response.params[key2] && Array.isArray(response.params[key2].values)) {
-            value2 = response.params[key2].values.map((val2) => val2 || "").join("");
-            if (response.params[key2].charset) {
-              response.params[key2] = "=?" + response.params[key2].charset + "?Q?" + value2.replace(/[=?_\s]/g, (s2) => {
-                const c = s2.charCodeAt(0).toString(16);
-                if (s2 === " ") {
-                  return "_";
-                }
-                return "%" + (c.length < 2 ? "0" : "") + c;
-              }).replace(/%/g, "=") + "?=";
-            } else {
-              response.params[key2] = value2;
-            }
-          }
-        });
-        return response;
-      },
-      /**
-       * Returns file extension for a content type string. If no suitable extensions
-       * are found, 'bin' is used as the default extension
-       *
-       * @param {String} mimeType Content type to be checked for
-       * @return {String} File extension
-       */
-      detectExtension: (mimeType) => mimeTypes.detectExtension(mimeType),
-      /**
-       * Returns content type for a file extension. If no suitable content types
-       * are found, 'application/octet-stream' is used as the default content type
-       *
-       * @param {String} extension Extension to be checked for
-       * @return {String} File extension
-       */
-      detectMimeType: (extension2) => mimeTypes.detectMimeType(extension2),
-      /**
-       * Folds long lines, useful for folding header lines (afterSpace=false) and
-       * flowed text (afterSpace=true)
-       *
-       * @param {String} str String to be folded
-       * @param {Number} [lineLength=76] Maximum length of a line
-       * @param {Boolean} afterSpace If true, leave a space in th end of a line
-       * @return {String} String with folded lines
-       */
-      foldLines(str, lineLength, afterSpace) {
-        str = (str || "").toString();
-        lineLength = lineLength || 76;
-        let pos = 0;
-        const len = str.length;
-        let result = "";
-        let line, match2;
-        while (pos < len) {
-          line = str.substr(pos, lineLength);
-          if (line.length < lineLength) {
-            result += line;
-            break;
-          }
-          if (match2 = line.match(/^[^\n\r]*(\r?\n|\r)/)) {
-            line = match2[0];
-            result += line;
-            pos += line.length;
-            continue;
-          } else if ((match2 = line.match(/(\s+)[^\s]*$/)) && match2[0].length - (afterSpace ? (match2[1] || "").length : 0) < line.length) {
-            line = line.substr(0, line.length - (match2[0].length - (afterSpace ? (match2[1] || "").length : 0)));
-          } else if (match2 = str.substr(pos + line.length).match(/^[^\s]+(\s*)/)) {
-            line = line + match2[0].substr(0, match2[0].length - (!afterSpace ? (match2[1] || "").length : 0));
-          }
-          result += line;
-          pos += line.length;
-          if (pos < len) {
-            result += "\r\n";
-          }
-        }
-        return result;
-      },
-      /**
-       * Splits a mime encoded string. Needed for dividing mime words into smaller chunks
-       *
-       * @param {String} str Mime encoded string to be split up
-       * @param {Number} maxlen Maximum length of characters for one part (minimum 12)
-       * @return {Array} Split string
-       */
-      splitMimeEncodedString: (str, maxlen) => {
-        const lines = [];
-        let curLine, match2, chr, done;
-        maxlen = Math.max(maxlen || 0, 12);
-        while (str.length) {
-          curLine = str.substr(0, maxlen);
-          if (match2 = curLine.match(/[=][0-9A-F]?$/i)) {
-            curLine = curLine.substr(0, match2.index);
-          }
-          done = false;
-          while (!done) {
-            done = true;
-            if (match2 = str.substr(curLine.length).match(/^[=]([0-9A-F]{2})/i)) {
-              chr = parseInt(match2[1], 16);
-              if (chr < 194 && chr > 127) {
-                curLine = curLine.substr(0, curLine.length - 3);
-                done = false;
-              }
-            }
-          }
-          if (curLine.length) {
-            lines.push(curLine);
-          }
-          str = str.substr(curLine.length);
-        }
-        return lines;
-      },
-      encodeURICharComponent: (chr) => {
-        let res = "";
-        let ord = chr.charCodeAt(0).toString(16).toUpperCase();
-        if (ord.length % 2) {
-          ord = "0" + ord;
-        }
-        if (ord.length > 2) {
-          for (let i2 = 0, len = ord.length / 2; i2 < len; i2++) {
-            res += "%" + ord.substr(i2, 2);
-          }
-        } else {
-          res += "%" + ord;
-        }
-        return res;
-      },
-      safeEncodeURIComponent(str) {
-        str = (str || "").toString();
-        try {
-          str = encodeURIComponent(str);
-        } catch (_E) {
-          return str.replace(/[^\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]+/g, "");
-        }
-        return str.replace(/[\x00-\x1F *'()<>@,;:\\"[\]?=\u007F-\uFFFF]/g, (chr) => this.encodeURICharComponent(chr));
-      }
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/addressparser/index.js
-var require_addressparser = __commonJS({
-  "node_modules/nodemailer/lib/addressparser/index.js"(exports2, module2) {
-    "use strict";
-    function _handleAddress(tokens, depth) {
-      let isGroup = false;
-      let state = "text";
-      const addresses = [];
-      const data = {
-        address: [],
-        comment: [],
-        group: [],
-        text: [],
-        textWasQuoted: []
-      };
-      let insideQuotes = false;
-      for (let i2 = 0, len = tokens.length; i2 < len; i2++) {
-        const token = tokens[i2];
-        const prevToken = i2 ? tokens[i2 - 1] : null;
-        if (token.type === "operator") {
-          switch (token.value) {
-            case "<":
-              state = "address";
-              insideQuotes = false;
-              break;
-            case "(":
-              state = "comment";
-              insideQuotes = false;
-              break;
-            case ":":
-              state = "group";
-              isGroup = true;
-              insideQuotes = false;
-              break;
-            case '"':
-              insideQuotes = !insideQuotes;
-              state = "text";
-              break;
-            default:
-              state = "text";
-              insideQuotes = false;
-              break;
-          }
-        } else if (token.value) {
-          if (state === "address") {
-            token.value = token.value.replace(/^[^<]*<\s*/, "");
-          }
-          if (prevToken && prevToken.noBreak && data[state].length) {
-            data[state][data[state].length - 1] += token.value;
-            if (state === "text" && insideQuotes) {
-              data.textWasQuoted[data.textWasQuoted.length - 1] = true;
-            }
-          } else {
-            data[state].push(token.value);
-            if (state === "text") {
-              data.textWasQuoted.push(insideQuotes);
-            }
-          }
-        }
-      }
-      if (!data.text.length && data.comment.length) {
-        data.text = data.comment;
-        data.comment = [];
-      }
-      if (isGroup) {
-        data.text = data.text.join(" ");
-        let groupMembers = [];
-        if (data.group.length) {
-          const parsedGroup = addressparser(data.group.join(","), { _depth: depth + 1 });
-          parsedGroup.forEach((member) => {
-            if (member.group) {
-              groupMembers = groupMembers.concat(member.group);
-            } else {
-              groupMembers.push(member);
-            }
-          });
-        }
-        addresses.push({
-          name: data.text || "",
-          group: groupMembers
-        });
-      } else {
-        if (!data.address.length && data.text.length) {
-          for (let i2 = data.text.length - 1; i2 >= 0; i2--) {
-            if (!data.textWasQuoted[i2] && /^[^@\s]+@[^@\s]+$/.test(data.text[i2])) {
-              data.address = data.text.splice(i2, 1);
-              data.textWasQuoted.splice(i2, 1);
-              break;
-            }
-          }
-          if (!data.address.length) {
-            let extracted = false;
-            for (let i2 = data.text.length - 1; i2 >= 0; i2--) {
-              if (!data.textWasQuoted[i2]) {
-                data.text[i2] = data.text[i2].replace(/\s*\b[^@\s]+@[^\s]+\b\s*/, (match2) => {
-                  if (!extracted) {
-                    data.address = [match2.trim()];
-                    extracted = true;
-                    return " ";
-                  }
-                  return match2;
-                }).trim();
-                if (extracted) {
-                  break;
-                }
-              }
-            }
-          }
-        }
-        if (!data.text.length && data.comment.length) {
-          data.text = data.comment;
-          data.comment = [];
-        }
-        if (data.address.length > 1) {
-          data.text = data.text.concat(data.address.splice(1));
-        }
-        data.text = data.text.join(" ");
-        data.address = data.address.join(" ");
-        const address = {
-          address: data.address || data.text || "",
-          name: data.text || data.address || ""
-        };
-        if (address.address === address.name) {
-          if (/@/.test(address.address || "")) {
-            address.name = "";
-          } else {
-            address.address = "";
-          }
-        }
-        addresses.push(address);
-      }
-      return addresses;
-    }
-    var Tokenizer = class {
-      constructor(str) {
-        this.str = (str || "").toString();
-        this.operatorCurrent = "";
-        this.operatorExpecting = "";
-        this.node = null;
-        this.escaped = false;
-        this.inDomainLiteral = false;
-        this.list = [];
-        this.operators = {
-          '"': '"',
-          "(": ")",
-          "<": ">",
-          ",": "",
-          ":": ";",
-          // Semicolons are not a legal delimiter per the RFC2822 grammar other
-          // than for terminating a group, but they are also not valid for any
-          // other use in this context.  Given that some mail clients have
-          // historically allowed the semicolon as a delimiter equivalent to the
-          // comma in their UI, it makes sense to treat them the same as a comma
-          // when used outside of a group.
-          ";": ""
-        };
-      }
-      /**
-       * Tokenizes the original input string
-       *
-       * @return {Array} An array of operator|text tokens
-       */
-      tokenize() {
-        const list = [];
-        for (let i2 = 0, len = this.str.length; i2 < len; i2++) {
-          const chr = this.str.charAt(i2);
-          const nextChr = i2 < len - 1 ? this.str.charAt(i2 + 1) : null;
-          this.checkChar(chr, nextChr);
-        }
-        this.list.forEach((node) => {
-          node.value = (node.value || "").toString().trim();
-          if (node.value) {
-            list.push(node);
-          }
-        });
-        return list;
-      }
-      /**
-       * Checks if a character is an operator or text and acts accordingly
-       *
-       * @param {String} chr Character from the address field
-       */
-      checkChar(chr, nextChr) {
-        if (!this.escaped && !this.operatorExpecting) {
-          if (!this.inDomainLiteral && chr === "[") {
-            this.inDomainLiteral = true;
-          } else if (this.inDomainLiteral && (chr === "]" || chr === "," || chr === ";")) {
-            this.inDomainLiteral = false;
-          }
-        }
-        if (this.escaped) {
-        } else if (chr === this.operatorExpecting) {
-          this.node = {
-            type: "operator",
-            value: chr
-          };
-          if (nextChr && ![" ", "	", "\r", "\n", ",", ";"].includes(nextChr)) {
-            this.node.noBreak = true;
-          }
-          this.list.push(this.node);
-          this.node = null;
-          this.operatorExpecting = "";
-          this.escaped = false;
-          return;
-        } else if (!this.operatorExpecting && !this.inDomainLiteral && chr in this.operators) {
-          this.node = {
-            type: "operator",
-            value: chr
-          };
-          this.list.push(this.node);
-          this.node = null;
-          this.operatorExpecting = this.operators[chr];
-          this.escaped = false;
-          return;
-        } else if (['"', "'"].includes(this.operatorExpecting) && chr === "\\") {
-          this.escaped = true;
-          return;
-        }
-        if (!this.node) {
-          this.node = {
-            type: "text",
-            value: ""
-          };
-          this.list.push(this.node);
-        }
-        if (chr === "\n") {
-          chr = " ";
-        }
-        if (chr.charCodeAt(0) >= 33 || [" ", "	"].includes(chr)) {
-          this.node.value += chr;
-        }
-        this.escaped = false;
-      }
-    };
-    var MAX_NESTED_GROUP_DEPTH = 50;
-    function addressparser(str, options) {
-      options = options || {};
-      const depth = options._depth || 0;
-      if (depth > MAX_NESTED_GROUP_DEPTH) {
-        return [];
-      }
-      const tokenizer = new Tokenizer(str);
-      const tokens = tokenizer.tokenize();
-      const addresses = [];
-      let address = [];
-      let parsedAddresses = [];
-      tokens.forEach((token) => {
-        if (token.type === "operator" && (token.value === "," || token.value === ";")) {
-          if (address.length) {
-            addresses.push(address);
-          }
-          address = [];
-        } else {
-          address.push(token);
-        }
-      });
-      if (address.length) {
-        addresses.push(address);
-      }
-      addresses.forEach((addr) => {
-        const handled = _handleAddress(addr, depth);
-        if (handled.length) {
-          parsedAddresses = parsedAddresses.concat(handled);
-        }
-      });
-      for (let i2 = parsedAddresses.length - 2; i2 >= 0; i2--) {
-        const current = parsedAddresses[i2];
-        const next = parsedAddresses[i2 + 1];
-        if (current.address === "" && current.name && !current.group && next.address && next.name) {
-          next.name = current.name + ", " + next.name;
-          parsedAddresses.splice(i2, 1);
-        }
-      }
-      if (options.flatten) {
-        const flatAddresses = [];
-        const walkAddressList = (list) => {
-          list.forEach((entry) => {
-            if (entry.group) {
-              return walkAddressList(entry.group);
-            }
-            flatAddresses.push(entry);
-          });
-        };
-        walkAddressList(parsedAddresses);
-        return flatAddresses;
-      }
-      return parsedAddresses;
-    }
-    module2.exports = addressparser;
-  }
-});
-
-// node_modules/nodemailer/lib/mime-node/last-newline.js
-var require_last_newline = __commonJS({
-  "node_modules/nodemailer/lib/mime-node/last-newline.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var LastNewline = class extends Transform {
-      constructor() {
-        super();
-        this.lastByte = false;
-      }
-      _transform(chunk, encoding, done) {
-        if (chunk.length) {
-          this.lastByte = chunk[chunk.length - 1];
-        }
-        this.push(chunk);
-        done();
-      }
-      _flush(done) {
-        if (this.lastByte === 10) {
-          return done();
-        }
-        if (this.lastByte === 13) {
-          this.push(Buffer.from("\n"));
-          return done();
-        }
-        this.push(Buffer.from("\r\n"));
-        return done();
-      }
-    };
-    module2.exports = LastNewline;
-  }
-});
-
-// node_modules/nodemailer/lib/mime-node/le-windows.js
-var require_le_windows = __commonJS({
-  "node_modules/nodemailer/lib/mime-node/le-windows.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var LeWindows = class extends Transform {
-      constructor(options) {
-        super(options);
-        this.lastByte = false;
-      }
-      /**
-       * Escapes dots
-       */
-      _transform(chunk, encoding, done) {
-        let buf;
-        let lastPos = 0;
-        for (let i2 = 0, len = chunk.length; i2 < len; i2++) {
-          if (chunk[i2] === 10) {
-            if (i2 && chunk[i2 - 1] !== 13 || !i2 && this.lastByte !== 13) {
-              if (i2 > lastPos) {
-                buf = chunk.slice(lastPos, i2);
-                this.push(buf);
-              }
-              this.push(Buffer.from("\r\n"));
-              lastPos = i2 + 1;
-            }
-          }
-        }
-        if (lastPos && lastPos < chunk.length) {
-          buf = chunk.slice(lastPos);
-          this.push(buf);
-        } else if (!lastPos) {
-          this.push(chunk);
-        }
-        this.lastByte = chunk[chunk.length - 1];
-        done();
-      }
-    };
-    module2.exports = LeWindows;
-  }
-});
-
-// node_modules/nodemailer/lib/mime-node/le-unix.js
-var require_le_unix = __commonJS({
-  "node_modules/nodemailer/lib/mime-node/le-unix.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var LeUnix = class extends Transform {
-      constructor(options) {
-        super(options);
-      }
-      /**
-       * Escapes dots
-       */
-      _transform(chunk, encoding, done) {
-        let buf;
-        let lastPos = 0;
-        for (let i2 = 0, len = chunk.length; i2 < len; i2++) {
-          if (chunk[i2] === 13) {
-            buf = chunk.slice(lastPos, i2);
-            lastPos = i2 + 1;
-            this.push(buf);
-          }
-        }
-        if (lastPos && lastPos < chunk.length) {
-          buf = chunk.slice(lastPos);
-          this.push(buf);
-        } else if (!lastPos) {
-          this.push(chunk);
-        }
-        done();
-      }
-    };
-    module2.exports = LeUnix;
-  }
-});
-
-// node_modules/nodemailer/lib/mime-node/index.js
-var require_mime_node = __commonJS({
-  "node_modules/nodemailer/lib/mime-node/index.js"(exports2, module2) {
-    "use strict";
-    var crypto7 = require("crypto");
-    var fs4 = require("fs");
-    var punycode = require_punycode();
-    var { PassThrough: PassThrough3 } = require("stream");
-    var shared = require_shared3();
-    var mimeFuncs = require_mime_funcs();
-    var qp = require_qp();
-    var base64 = require_base64();
-    var addressparser = require_addressparser();
-    var nmfetch = require_fetch2();
-    var errors = require_errors2();
-    var LastNewline = require_last_newline();
-    var LeWindows = require_le_windows();
-    var LeUnix = require_le_unix();
-    var FORMATTED_HEADERS = ["From", "Sender", "To", "Cc", "Bcc", "Reply-To", "Date", "References"];
-    var MimeNode = class _MimeNode {
-      constructor(contentType, options) {
-        this.nodeCounter = 0;
-        options = options || {};
-        this.baseBoundary = options.baseBoundary || crypto7.randomBytes(8).toString("hex");
-        this.boundaryPrefix = options.boundaryPrefix || "--_NmP";
-        this.disableFileAccess = !!options.disableFileAccess;
-        this.disableUrlAccess = !!options.disableUrlAccess;
-        this.normalizeHeaderKey = options.normalizeHeaderKey;
-        this.date = options.parentNode ? null : /* @__PURE__ */ new Date();
-        this.rootNode = options.rootNode || this;
-        this.keepBcc = !!options.keepBcc;
-        if (options.filename) {
-          this.filename = options.filename;
-          if (!contentType) {
-            contentType = mimeFuncs.detectMimeType(this.filename.split(".").pop());
-          }
-        }
-        this.textEncoding = (options.textEncoding || "").toString().trim().charAt(0).toUpperCase();
-        this.parentNode = options.parentNode;
-        this.hostname = options.hostname;
-        this.newline = options.newline;
-        this.childNodes = [];
-        this._nodeId = ++this.rootNode.nodeCounter;
-        this._headers = [];
-        this._isPlainText = false;
-        this._hasLongLines = false;
-        this._envelope = false;
-        this._raw = false;
-        this._transforms = [];
-        this._processFuncs = [];
-        if (contentType) {
-          this.setHeader("Content-Type", contentType);
-        }
-      }
-      /////// PUBLIC METHODS
-      /**
-       * Creates and appends a child node.Arguments provided are passed to MimeNode constructor
-       *
-       * @param {String} [contentType] Optional content type
-       * @param {Object} [options] Optional options object
-       * @return {Object} Created node object
-       */
-      createChild(contentType, options) {
-        if (!options && typeof contentType === "object") {
-          options = contentType;
-          contentType = void 0;
-        }
-        const node = new _MimeNode(contentType, options);
-        this.appendChild(node);
-        return node;
-      }
-      /**
-       * Appends an existing node to the mime tree. Removes the node from an existing
-       * tree if needed
-       *
-       * @param {Object} childNode node to be appended
-       * @return {Object} Appended node object
-       */
-      appendChild(childNode) {
-        if (childNode.rootNode !== this.rootNode) {
-          childNode.rootNode = this.rootNode;
-          childNode._nodeId = ++this.rootNode.nodeCounter;
-        }
-        childNode.parentNode = this;
-        this.childNodes.push(childNode);
-        return childNode;
-      }
-      /**
-       * Replaces current node with another node
-       *
-       * @param {Object} node Replacement node
-       * @return {Object} Replacement node
-       */
-      replace(node) {
-        if (node === this) {
-          return this;
-        }
-        this.parentNode.childNodes.forEach((childNode, i2) => {
-          if (childNode === this) {
-            node.rootNode = this.rootNode;
-            node.parentNode = this.parentNode;
-            node._nodeId = this._nodeId;
-            this.rootNode = this;
-            this.parentNode = void 0;
-            node.parentNode.childNodes[i2] = node;
-          }
-        });
-        return node;
-      }
-      /**
-       * Removes current node from the mime tree
-       *
-       * @return {Object} removed node
-       */
-      remove() {
-        if (!this.parentNode) {
-          return this;
-        }
-        for (let i2 = this.parentNode.childNodes.length - 1; i2 >= 0; i2--) {
-          if (this.parentNode.childNodes[i2] === this) {
-            this.parentNode.childNodes.splice(i2, 1);
-            this.parentNode = void 0;
-            this.rootNode = this;
-            return this;
-          }
-        }
-      }
-      /**
-       * Sets a header value. If the value for selected key exists, it is overwritten.
-       * You can set multiple values as well by using [{key:'', value:''}] or
-       * {key: 'value'} as the first argument.
-       *
-       * @param {String|Array|Object} key Header key or a list of key value pairs
-       * @param {String} value Header value
-       * @return {Object} current node
-       */
-      setHeader(key, value) {
-        let added = false;
-        if (!value && key && typeof key === "object") {
-          if (key.key && "value" in key) {
-            this.setHeader(key.key, key.value);
-          } else if (Array.isArray(key)) {
-            key.forEach((i2) => {
-              this.setHeader(i2.key, i2.value);
-            });
-          } else {
-            Object.keys(key).forEach((i2) => {
-              this.setHeader(i2, key[i2]);
-            });
-          }
-          return this;
-        }
-        key = this._normalizeHeaderKey(key);
-        const headerValue = {
-          key,
-          value
-        };
-        for (let i2 = 0, len = this._headers.length; i2 < len; i2++) {
-          if (this._headers[i2].key === key) {
-            if (!added) {
-              this._headers[i2] = headerValue;
-              added = true;
-            } else {
-              this._headers.splice(i2, 1);
-              i2--;
-              len--;
-            }
-          }
-        }
-        if (!added) {
-          this._headers.push(headerValue);
-        }
-        return this;
-      }
-      /**
-       * Adds a header value. If the value for selected key exists, the value is appended
-       * as a new field and old one is not touched.
-       * You can set multiple values as well by using [{key:'', value:''}] or
-       * {key: 'value'} as the first argument.
-       *
-       * @param {String|Array|Object} key Header key or a list of key value pairs
-       * @param {String} value Header value
-       * @return {Object} current node
-       */
-      addHeader(key, value) {
-        if (!value && key && typeof key === "object") {
-          if (key.key && key.value) {
-            this.addHeader(key.key, key.value);
-          } else if (Array.isArray(key)) {
-            key.forEach((i2) => {
-              this.addHeader(i2.key, i2.value);
-            });
-          } else {
-            Object.keys(key).forEach((i2) => {
-              this.addHeader(i2, key[i2]);
-            });
-          }
-          return this;
-        } else if (Array.isArray(value)) {
-          value.forEach((val2) => {
-            this.addHeader(key, val2);
-          });
-          return this;
-        }
-        this._headers.push({
-          key: this._normalizeHeaderKey(key),
-          value
-        });
-        return this;
-      }
-      /**
-       * Retrieves the first mathcing value of a selected key
-       *
-       * @param {String} key Key to search for
-       * @retun {String} Value for the key
-       */
-      getHeader(key) {
-        key = this._normalizeHeaderKey(key);
-        for (let i2 = 0, len = this._headers.length; i2 < len; i2++) {
-          if (this._headers[i2].key === key) {
-            return this._headers[i2].value;
-          }
-        }
-      }
-      /**
-       * Sets body content for current node. If the value is a string, charset is added automatically
-       * to Content-Type (if it is text/*). If the value is a Buffer, you need to specify
-       * the charset yourself
-       *
-       * @param (String|Buffer) content Body content
-       * @return {Object} current node
-       */
-      setContent(content) {
-        this.content = content;
-        if (typeof this.content.pipe === "function") {
-          this._contentErrorHandler = (err) => {
-            this.content.removeListener("error", this._contentErrorHandler);
-            this.content = err;
-          };
-          this.content.once("error", this._contentErrorHandler);
-        } else if (typeof this.content === "string") {
-          this._isPlainText = mimeFuncs.isPlainText(this.content);
-          if (this._isPlainText && mimeFuncs.hasLongerLines(this.content, 76)) {
-            this._hasLongLines = true;
-          }
-        }
-        return this;
-      }
-      build(callback) {
-        let promise;
-        if (!callback) {
-          promise = new Promise((resolve, reject) => {
-            callback = shared.callbackPromise(resolve, reject);
-          });
-        }
-        const stream = this.createReadStream();
-        const buf = [];
-        let buflen = 0;
-        let returned = false;
-        stream.on("readable", () => {
-          let chunk;
-          while ((chunk = stream.read()) !== null) {
-            buf.push(chunk);
-            buflen += chunk.length;
-          }
-        });
-        stream.once("error", (err) => {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          return callback(err);
-        });
-        stream.once("end", (chunk) => {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          if (chunk && chunk.length) {
-            buf.push(chunk);
-            buflen += chunk.length;
-          }
-          return callback(null, Buffer.concat(buf, buflen));
-        });
-        return promise;
-      }
-      getTransferEncoding() {
-        let transferEncoding = false;
-        const contentType = (this.getHeader("Content-Type") || "").toString().toLowerCase().trim();
-        if (this.content) {
-          transferEncoding = (this.getHeader("Content-Transfer-Encoding") || "").toString().toLowerCase().trim();
-          if (!transferEncoding || !["base64", "quoted-printable"].includes(transferEncoding)) {
-            if (/^text\//i.test(contentType)) {
-              if (this._isPlainText && !this._hasLongLines) {
-                transferEncoding = "7bit";
-              } else if (typeof this.content === "string" || this.content instanceof Buffer) {
-                transferEncoding = this._getTextEncoding(this.content) === "Q" ? "quoted-printable" : "base64";
-              } else {
-                transferEncoding = this.textEncoding === "B" ? "base64" : "quoted-printable";
-              }
-            } else if (!/^(multipart|message)\//i.test(contentType)) {
-              transferEncoding = transferEncoding || "base64";
-            }
-          }
-        }
-        return transferEncoding;
-      }
-      /**
-       * Builds the header block for the mime node. Append \r\n\r\n before writing the content
-       *
-       * @returns {String} Headers
-       */
-      buildHeaders() {
-        const transferEncoding = this.getTransferEncoding();
-        const headers = [];
-        if (transferEncoding) {
-          this.setHeader("Content-Transfer-Encoding", transferEncoding);
-        }
-        if (this.filename && !this.getHeader("Content-Disposition")) {
-          this.setHeader("Content-Disposition", "attachment");
-        }
-        if (this.rootNode === this) {
-          if (!this.getHeader("Date")) {
-            this.setHeader("Date", this.date.toUTCString().replace(/GMT/, "+0000"));
-          }
-          this.messageId();
-          if (!this.getHeader("MIME-Version")) {
-            this.setHeader("MIME-Version", "1.0");
-          }
-          for (let i2 = this._headers.length - 2; i2 >= 0; i2--) {
-            const header = this._headers[i2];
-            if (header.key === "Content-Type") {
-              this._headers.splice(i2, 1);
-              this._headers.push(header);
-            }
-          }
-        }
-        this._headers.forEach((header) => {
-          let key = header.key;
-          let value = header.value;
-          let structured;
-          let param;
-          const options = {};
-          const formattedHeaders = FORMATTED_HEADERS;
-          if (value && typeof value === "object" && !formattedHeaders.includes(key)) {
-            Object.keys(value).forEach((key2) => {
-              if (key2 !== "value") {
-                options[key2] = value[key2];
-              }
-            });
-            value = (value.value || "").toString();
-            if (!value.trim()) {
-              return;
-            }
-          }
-          if (options.prepared) {
-            if (options.foldLines) {
-              headers.push(mimeFuncs.foldLines(key + ": " + value));
-            } else {
-              headers.push(key + ": " + value);
-            }
-            return;
-          }
-          switch (header.key) {
-            case "Content-Disposition":
-              structured = mimeFuncs.parseHeaderValue(value);
-              if (this.filename) {
-                structured.params.filename = this.filename;
-              }
-              value = mimeFuncs.buildHeaderValue(structured);
-              break;
-            case "Content-Type":
-              structured = mimeFuncs.parseHeaderValue(value);
-              this._handleContentType(structured);
-              if (structured.value.match(/^text\/plain\b/) && typeof this.content === "string" && /[\u0080-\uFFFF]/.test(this.content)) {
-                structured.params.charset = "utf-8";
-              }
-              value = mimeFuncs.buildHeaderValue(structured);
-              if (this.filename) {
-                param = this._encodeWords(this.filename);
-                if (param !== this.filename || /[\s'"\\;:/=(),<>@[\]?]|^-/.test(param)) {
-                  param = '"' + param + '"';
-                }
-                value += "; name=" + param;
-              }
-              break;
-            case "Bcc":
-              if (!this.keepBcc) {
-                return;
-              }
-              break;
-          }
-          value = this._encodeHeaderValue(key, value);
-          if (!(value || "").toString().trim()) {
-            return;
-          }
-          if (typeof this.normalizeHeaderKey === "function") {
-            const normalized = this.normalizeHeaderKey(key, value);
-            if (normalized && typeof normalized === "string" && normalized.length) {
-              key = normalized;
-            }
-          }
-          headers.push(mimeFuncs.foldLines(key + ": " + value, 76));
-        });
-        return headers.join("\r\n");
-      }
-      /**
-       * Streams the rfc2822 message from the current node. If this is a root node,
-       * mandatory header fields are set if missing (Date, Message-Id, MIME-Version)
-       *
-       * @return {String} Compiled message
-       */
-      createReadStream(options) {
-        options = options || {};
-        const stream = new PassThrough3(options);
-        let outputStream = stream;
-        let transform;
-        this.stream(stream, options, (err) => {
-          if (err) {
-            outputStream.emit("error", err);
-            return;
-          }
-          stream.end();
-        });
-        for (let i2 = 0, len = this._transforms.length; i2 < len; i2++) {
-          transform = typeof this._transforms[i2] === "function" ? this._transforms[i2]() : this._transforms[i2];
-          outputStream.once("error", (err) => {
-            transform.emit("error", err);
-          });
-          outputStream = outputStream.pipe(transform);
-        }
-        transform = new LastNewline();
-        outputStream.once("error", (err) => {
-          transform.emit("error", err);
-        });
-        outputStream = outputStream.pipe(transform);
-        for (let i2 = 0, len = this._processFuncs.length; i2 < len; i2++) {
-          transform = this._processFuncs[i2];
-          outputStream = transform(outputStream);
-        }
-        if (this.newline) {
-          const winbreak = ["win", "windows", "dos", "\r\n"].includes(this.newline.toString().toLowerCase());
-          const newlineTransform = winbreak ? new LeWindows() : new LeUnix();
-          const stream2 = outputStream.pipe(newlineTransform);
-          outputStream.on("error", (err) => stream2.emit("error", err));
-          return stream2;
-        }
-        return outputStream;
-      }
-      /**
-       * Appends a transform stream object to the transforms list. Final output
-       * is passed through this stream before exposing
-       *
-       * @param {Object} transform Read-Write stream
-       */
-      transform(transform) {
-        this._transforms.push(transform);
-      }
-      /**
-       * Appends a post process function. The functon is run after transforms and
-       * uses the following syntax
-       *
-       *   processFunc(input) -> outputStream
-       *
-       * @param {Object} processFunc Read-Write stream
-       */
-      processFunc(processFunc) {
-        this._processFuncs.push(processFunc);
-      }
-      stream(outputStream, options, done) {
-        const transferEncoding = this.getTransferEncoding();
-        let contentStream;
-        let localStream;
-        let returned = false;
-        const callback = (err) => {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          done(err);
-        };
-        const finalize = () => {
-          let childId = 0;
-          const processChildNode = () => {
-            if (childId >= this.childNodes.length) {
-              outputStream.write("\r\n--" + this.boundary + "--\r\n");
-              return callback();
-            }
-            const child = this.childNodes[childId++];
-            outputStream.write((childId > 1 ? "\r\n" : "") + "--" + this.boundary + "\r\n");
-            child.stream(outputStream, options, (err) => {
-              if (err) {
-                return callback(err);
-              }
-              setImmediate(processChildNode);
-            });
-          };
-          if (this.multipart) {
-            setImmediate(processChildNode);
-          } else {
-            return callback();
-          }
-        };
-        const sendContent = () => {
-          if (this.content) {
-            if (Object.prototype.toString.call(this.content) === "[object Error]") {
-              return callback(this.content);
-            }
-            if (typeof this.content.pipe === "function") {
-              this.content.removeListener("error", this._contentErrorHandler);
-              this._contentErrorHandler = (err) => callback(err);
-              this.content.once("error", this._contentErrorHandler);
-            }
-            const createStream = () => {
-              if (["quoted-printable", "base64"].includes(transferEncoding)) {
-                contentStream = new (transferEncoding === "base64" ? base64 : qp).Encoder(options);
-                contentStream.pipe(outputStream, {
-                  end: false
-                });
-                contentStream.once("end", finalize);
-                contentStream.once("error", (err) => callback(err));
-                localStream = this._getStream(this.content);
-                localStream.pipe(contentStream);
-              } else {
-                localStream = this._getStream(this.content);
-                localStream.pipe(outputStream, {
-                  end: false
-                });
-                localStream.once("end", finalize);
-              }
-              localStream.once("error", (err) => callback(err));
-            };
-            if (this.content._resolve) {
-              const chunks = [];
-              let chunklen = 0;
-              let returned2 = false;
-              const sourceStream = this._getStream(this.content);
-              sourceStream.on("error", (err) => {
-                if (returned2) {
-                  return;
-                }
-                returned2 = true;
-                callback(err);
-              });
-              sourceStream.on("readable", () => {
-                let chunk;
-                while ((chunk = sourceStream.read()) !== null) {
-                  chunks.push(chunk);
-                  chunklen += chunk.length;
-                }
-              });
-              sourceStream.on("end", () => {
-                if (returned2) {
-                  return;
-                }
-                returned2 = true;
-                this.content._resolve = false;
-                this.content._resolvedValue = Buffer.concat(chunks, chunklen);
-                setImmediate(createStream);
-              });
-            } else {
-              setImmediate(createStream);
-            }
-            return;
-          }
-          return setImmediate(finalize);
-        };
-        if (this._raw) {
-          setImmediate(() => {
-            if (Object.prototype.toString.call(this._raw) === "[object Error]") {
-              return callback(this._raw);
-            }
-            if (typeof this._raw.pipe === "function") {
-              this._raw.removeListener("error", this._contentErrorHandler);
-            }
-            const raw = this._getStream(this._raw);
-            raw.pipe(outputStream, {
-              end: false
-            });
-            raw.on("error", (err) => outputStream.emit("error", err));
-            raw.on("end", finalize);
-          });
-        } else {
-          outputStream.write(this.buildHeaders() + "\r\n\r\n");
-          setImmediate(sendContent);
-        }
-      }
-      /**
-       * Sets envelope to be used instead of the generated one
-       *
-       * @return {Object} SMTP envelope in the form of {from: 'from@example.com', to: ['to@example.com']}
-       */
-      setEnvelope(envelope) {
-        let list;
-        this._envelope = {
-          from: false,
-          to: []
-        };
-        if (envelope.from) {
-          list = [];
-          this._convertAddresses(this._parseAddresses(envelope.from), list);
-          list = list.filter((address) => address && address.address);
-          if (list.length && list[0]) {
-            this._envelope.from = list[0].address;
-          }
-        }
-        ["to", "cc", "bcc"].forEach((key) => {
-          if (envelope[key]) {
-            this._convertAddresses(this._parseAddresses(envelope[key]), this._envelope.to);
-          }
-        });
-        this._envelope.to = this._envelope.to.map((to) => to.address).filter((address) => address);
-        const standardFields = ["to", "cc", "bcc", "from"];
-        Object.keys(envelope).forEach((key) => {
-          if (!standardFields.includes(key)) {
-            this._envelope[key] = envelope[key];
-          }
-        });
-        return this;
-      }
-      /**
-       * Generates and returns an object with parsed address fields
-       *
-       * @return {Object} Address object
-       */
-      getAddresses() {
-        const addresses = {};
-        this._headers.forEach((header) => {
-          const key = header.key.toLowerCase();
-          if (["from", "sender", "reply-to", "to", "cc", "bcc"].includes(key)) {
-            if (!Array.isArray(addresses[key])) {
-              addresses[key] = [];
-            }
-            this._convertAddresses(this._parseAddresses(header.value), addresses[key]);
-          }
-        });
-        return addresses;
-      }
-      /**
-       * Generates and returns SMTP envelope with the sender address and a list of recipients addresses
-       *
-       * @return {Object} SMTP envelope in the form of {from: 'from@example.com', to: ['to@example.com']}
-       */
-      getEnvelope() {
-        if (this._envelope) {
-          return this._envelope;
-        }
-        const envelope = {
-          from: false,
-          to: []
-        };
-        this._headers.forEach((header) => {
-          const list = [];
-          if (header.key === "From" || !envelope.from && ["Reply-To", "Sender"].includes(header.key)) {
-            this._convertAddresses(this._parseAddresses(header.value), list);
-            if (list.length && list[0]) {
-              envelope.from = list[0].address;
-            }
-          } else if (["To", "Cc", "Bcc"].includes(header.key)) {
-            this._convertAddresses(this._parseAddresses(header.value), envelope.to);
-          }
-        });
-        envelope.to = envelope.to.map((to) => to.address);
-        return envelope;
-      }
-      /**
-       * Returns Message-Id value. If it does not exist, then creates one
-       *
-       * @return {String} Message-Id value
-       */
-      messageId() {
-        let messageId = this.getHeader("Message-ID");
-        if (!messageId) {
-          messageId = this._generateMessageId();
-          this.setHeader("Message-ID", messageId);
-        }
-        return messageId;
-      }
-      /**
-       * Sets pregenerated content that will be used as the output of this node
-       *
-       * @param {String|Buffer|Stream} Raw MIME contents
-       */
-      setRaw(raw) {
-        this._raw = raw;
-        if (this._raw && typeof this._raw.pipe === "function") {
-          this._contentErrorHandler = (err) => {
-            this._raw.removeListener("error", this._contentErrorHandler);
-            this._raw = err;
-          };
-          this._raw.once("error", this._contentErrorHandler);
-        }
-        return this;
-      }
-      /////// PRIVATE METHODS
-      /**
-       * Detects and returns handle to a stream related with the content.
-       *
-       * @param {Mixed} content Node content
-       * @returns {Object} Stream object
-       */
-      _getStream(content) {
-        let contentStream;
-        if (content._resolvedValue) {
-          contentStream = new PassThrough3();
-          setImmediate(() => {
-            try {
-              contentStream.end(content._resolvedValue);
-            } catch (_err) {
-              contentStream.emit("error", _err);
-            }
-          });
-          return contentStream;
-        }
-        if (typeof content.pipe === "function") {
-          return content;
-        }
-        if (content && typeof content.path === "string" && !content.href) {
-          if (this.disableFileAccess) {
-            contentStream = new PassThrough3();
-            setImmediate(() => {
-              const err = new Error("File access rejected for " + content.path);
-              err.code = errors.EFILEACCESS;
-              contentStream.emit("error", err);
-            });
-            return contentStream;
-          }
-          return fs4.createReadStream(content.path);
-        }
-        if (content && typeof content.href === "string") {
-          if (this.disableUrlAccess) {
-            contentStream = new PassThrough3();
-            setImmediate(() => {
-              const err = new Error("Url access rejected for " + content.href);
-              err.code = errors.EURLACCESS;
-              contentStream.emit("error", err);
-            });
-            return contentStream;
-          }
-          return nmfetch(content.href, { headers: content.httpHeaders, tls: content.tls });
-        }
-        contentStream = new PassThrough3();
-        setImmediate(() => {
-          try {
-            contentStream.end(content || "");
-          } catch (_err) {
-            contentStream.emit("error", _err);
-          }
-        });
-        return contentStream;
-      }
-      /**
-       * Parses addresses. Takes in a single address or an array or an
-       * array of address arrays (eg. To: [[first group], [second group],...])
-       *
-       * @param {Mixed} addresses Addresses to be parsed
-       * @return {Array} An array of address objects
-       */
-      _parseAddresses(addresses) {
-        return [].concat.apply(
-          [],
-          [].concat(addresses).map((address) => {
-            if (address && address.address) {
-              address.address = this._normalizeAddress(address.address);
-              address.name = address.name || "";
-              return [address];
-            }
-            return addressparser(address);
-          })
-        );
-      }
-      /**
-       * Normalizes a header key, uses Camel-Case form, except for uppercase MIME-
-       *
-       * @param {String} key Key to be normalized
-       * @return {String} key in Camel-Case form
-       */
-      _normalizeHeaderKey(key) {
-        key = (key || "").toString().replace(/\r?\n|\r/g, " ").trim().toLowerCase().replace(/^X-SMTPAPI$|^(MIME|DKIM|ARC|BIMI)\b|^[a-z]|-(SPF|FBL|ID|MD5)$|-[a-z]/gi, (c) => c.toUpperCase()).replace(/^Content-Features$/i, "Content-features");
-        return key;
-      }
-      /**
-       * Checks if the content type is multipart and defines boundary if needed.
-       * Doesn't return anything, modifies object argument instead.
-       *
-       * @param {Object} structured Parsed header value for 'Content-Type' key
-       */
-      _handleContentType(structured) {
-        this.contentType = structured.value.trim().toLowerCase();
-        this.multipart = /^multipart\//i.test(this.contentType) ? this.contentType.substr(this.contentType.indexOf("/") + 1) : false;
-        if (this.multipart) {
-          this.boundary = structured.params.boundary = structured.params.boundary || this.boundary || this._generateBoundary();
-        } else {
-          this.boundary = false;
-        }
-      }
-      /**
-       * Generates a multipart boundary value
-       *
-       * @return {String} boundary value
-       */
-      _generateBoundary() {
-        return this.rootNode.boundaryPrefix + "-" + this.rootNode.baseBoundary + "-Part_" + this._nodeId;
-      }
-      /**
-       * Encodes a header value for use in the generated rfc2822 email.
-       *
-       * @param {String} key Header key
-       * @param {String} value Header value
-       */
-      _encodeHeaderValue(key, value) {
-        key = this._normalizeHeaderKey(key);
-        switch (key) {
-          // Structured headers
-          case "From":
-          case "Sender":
-          case "To":
-          case "Cc":
-          case "Bcc":
-          case "Reply-To":
-            return this._convertAddresses(this._parseAddresses(value));
-          // values enclosed in <>
-          case "Message-ID":
-          case "In-Reply-To":
-          case "Content-Id":
-            value = (value || "").toString().replace(/\r?\n|\r/g, " ");
-            if (value.charAt(0) !== "<") {
-              value = "<" + value;
-            }
-            if (value.charAt(value.length - 1) !== ">") {
-              value = value + ">";
-            }
-            return value;
-          // space separated list of values enclosed in <>
-          case "References":
-            value = [].concat.apply(
-              [],
-              [].concat(value || "").map((elm) => {
-                elm = (elm || "").toString().replace(/\r?\n|\r/g, " ").trim();
-                return elm.replace(/<[^>]*>/g, (str) => str.replace(/\s/g, "")).split(/\s+/);
-              })
-            ).map((elm) => {
-              if (elm.charAt(0) !== "<") {
-                elm = "<" + elm;
-              }
-              if (elm.charAt(elm.length - 1) !== ">") {
-                elm = elm + ">";
-              }
-              return elm;
-            });
-            return value.join(" ").trim();
-          case "Date":
-            if (Object.prototype.toString.call(value) === "[object Date]") {
-              return value.toUTCString().replace(/GMT/, "+0000");
-            }
-            value = (value || "").toString().replace(/\r?\n|\r/g, " ");
-            return this._encodeWords(value);
-          case "Content-Type":
-          case "Content-Disposition":
-            return (value || "").toString().replace(/\r?\n|\r/g, " ");
-          default:
-            value = (value || "").toString().replace(/\r?\n|\r/g, " ");
-            return this._encodeWords(value);
-        }
-      }
-      /**
-       * Rebuilds address object using punycode and other adjustments
-       *
-       * @param {Array} addresses An array of address objects
-       * @param {Array} [uniqueList] An array to be populated with addresses
-       * @return {String} address string
-       */
-      _convertAddresses(addresses, uniqueList) {
-        const values = [];
-        uniqueList = uniqueList || [];
-        [].concat(addresses || []).forEach((address) => {
-          if (address.address) {
-            address.address = this._normalizeAddress(address.address);
-            if (!address.name) {
-              values.push(address.address.indexOf(" ") >= 0 ? `<${address.address}>` : `${address.address}`);
-            } else {
-              values.push(`${this._encodeAddressName(address.name)} <${address.address}>`);
-            }
-            if (!uniqueList.some((a) => a.address === address.address)) {
-              uniqueList.push(address);
-            }
-          } else if (address.group) {
-            const groupListAddresses = (address.group.length ? this._convertAddresses(address.group, uniqueList) : "").trim();
-            values.push(`${this._encodeAddressName(address.name)}:${groupListAddresses};`);
-          }
-        });
-        return values.join(", ");
-      }
-      /**
-       * Normalizes an email address
-       *
-       * @param {Array} address An array of address objects
-       * @return {String} address string
-       */
-      _normalizeAddress(address) {
-        address = (address || "").toString().replace(/[\x00-\x1F<>]+/g, " ").trim();
-        const lastAt = address.lastIndexOf("@");
-        if (lastAt < 0) {
-          return address;
-        }
-        let user = address.substr(0, lastAt);
-        const domain = address.substr(lastAt + 1);
-        let encodedDomain = domain;
-        try {
-          if (/[\x80-\uFFFF]/.test(user)) {
-            encodedDomain = punycode.toUnicode(domain.toLowerCase());
-          } else {
-            encodedDomain = punycode.toASCII(domain.toLowerCase());
-          }
-        } catch (_err) {
-        }
-        if (user.indexOf(" ") >= 0) {
-          if (user.charAt(0) !== '"') {
-            user = '"' + user;
-          }
-          if (user.substr(-1) !== '"') {
-            user = user + '"';
-          }
-        }
-        return `${user}@${encodedDomain}`;
-      }
-      /**
-       * If needed, mime encodes the name part
-       *
-       * @param {String} name Name part of an address
-       * @returns {String} Mime word encoded string if needed
-       */
-      _encodeAddressName(name) {
-        if (!/^[\w ]*$/.test(name)) {
-          if (/^[\x20-\x7e]*$/.test(name)) {
-            return '"' + name.replace(/([\\"])/g, "\\$1") + '"';
-          } else {
-            return mimeFuncs.encodeWord(name, this._getTextEncoding(name), 52);
-          }
-        }
-        return name;
-      }
-      /**
-       * If needed, mime encodes the name part
-       *
-       * @param {String} name Name part of an address
-       * @returns {String} Mime word encoded string if needed
-       */
-      _encodeWords(value) {
-        return mimeFuncs.encodeWords(value, this._getTextEncoding(value), 52, true);
-      }
-      /**
-       * Detects best mime encoding for a text value
-       *
-       * @param {String} value Value to check for
-       * @return {String} either 'Q' or 'B'
-       */
-      _getTextEncoding(value) {
-        value = (value || "").toString();
-        if (this.textEncoding) {
-          return this.textEncoding;
-        }
-        let nonLatinLen = 0;
-        let latinLen = 0;
-        for (let i2 = 0, len = value.length; i2 < len; i2++) {
-          const code = value.charCodeAt(i2);
-          if (code >= 0 && code <= 8 || code === 11 || code === 12 || code >= 14 && code <= 31 || code >= 128) {
-            nonLatinLen++;
-          } else if (code >= 65 && code <= 90 || code >= 97 && code <= 122) {
-            latinLen++;
-          }
-        }
-        return nonLatinLen < latinLen ? "Q" : "B";
-      }
-      /**
-       * Generates a message id
-       *
-       * @return {String} Random Message-ID value
-       */
-      _generateMessageId() {
-        return "<" + [2, 2, 2, 6].reduce(
-          // crux to generate UUID-like random strings
-          (prev, len) => prev + "-" + crypto7.randomBytes(len).toString("hex"),
-          crypto7.randomBytes(4).toString("hex")
-        ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
-        (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
-      }
-    };
-    module2.exports = MimeNode;
-  }
-});
-
-// node_modules/nodemailer/lib/mail-composer/index.js
-var require_mail_composer = __commonJS({
-  "node_modules/nodemailer/lib/mail-composer/index.js"(exports2, module2) {
-    "use strict";
-    var MimeNode = require_mime_node();
-    var mimeFuncs = require_mime_funcs();
-    var { parseDataURI } = require_shared3();
-    var MailComposer = class {
-      constructor(mail) {
-        this.mail = mail || {};
-        this.message = false;
-      }
-      /**
-       * Builds MimeNode instance
-       */
-      compile() {
-        this._alternatives = this.getAlternatives();
-        this._htmlNode = this._alternatives.filter((alternative) => /^text\/html\b/i.test(alternative.contentType)).pop();
-        this._attachments = this.getAttachments(!!this._htmlNode);
-        this._useRelated = !!(this._htmlNode && this._attachments.related.length);
-        this._useAlternative = this._alternatives.length > 1;
-        this._useMixed = this._attachments.attached.length > 1 || this._alternatives.length && this._attachments.attached.length === 1;
-        if (this.mail.raw) {
-          this.message = new MimeNode("message/rfc822", {
-            newline: this.mail.newline,
-            disableUrlAccess: this.mail.disableUrlAccess,
-            disableFileAccess: this.mail.disableFileAccess
-          }).setRaw(this.mail.raw);
-        } else if (this._useMixed) {
-          this.message = this._createMixed();
-        } else if (this._useAlternative) {
-          this.message = this._createAlternative();
-        } else if (this._useRelated) {
-          this.message = this._createRelated();
-        } else {
-          this.message = this._createContentNode(
-            false,
-            [].concat(this._alternatives || []).concat(this._attachments.attached || []).shift() || {
-              contentType: "text/plain",
-              content: ""
-            }
-          );
-        }
-        if (this.mail.headers) {
-          this.message.addHeader(this.mail.headers);
-        }
-        ["from", "sender", "to", "cc", "bcc", "reply-to", "in-reply-to", "references", "subject", "message-id", "date"].forEach((header) => {
-          const key = header.replace(/-(\w)/g, (o, c) => c.toUpperCase());
-          if (this.mail[key]) {
-            this.message.setHeader(header, this.mail[key]);
-          }
-        });
-        if (this.mail.envelope) {
-          this.message.setEnvelope(this.mail.envelope);
-        }
-        this.message.messageId();
-        return this.message;
-      }
-      /**
-       * List all attachments. Resulting attachment objects can be used as input for MimeNode nodes
-       *
-       * @param {Boolean} findRelated If true separate related attachments from attached ones
-       * @returns {Object} An object of arrays (`related` and `attached`)
-       */
-      getAttachments(findRelated) {
-        let eventObject;
-        const attachments = [].concat(this.mail.attachments || []).map((attachment, i2) => {
-          if (/^data:/i.test(attachment.path || attachment.href)) {
-            attachment = this._processDataUrl(attachment);
-          }
-          const contentType = attachment.contentType || mimeFuncs.detectMimeType(attachment.filename || attachment.path || attachment.href || "bin");
-          const isImage = /^image\//i.test(contentType);
-          const isMessageNode = /^message\//i.test(contentType);
-          const contentDisposition = attachment.contentDisposition || (isMessageNode || isImage && attachment.cid ? "inline" : "attachment");
-          let contentTransferEncoding;
-          if ("contentTransferEncoding" in attachment) {
-            contentTransferEncoding = attachment.contentTransferEncoding;
-          } else if (isMessageNode) {
-            contentTransferEncoding = "8bit";
-          } else {
-            contentTransferEncoding = "base64";
-          }
-          const data = {
-            contentType,
-            contentDisposition,
-            contentTransferEncoding
-          };
-          if (attachment.filename) {
-            data.filename = attachment.filename;
-          } else if (!isMessageNode && attachment.filename !== false) {
-            data.filename = (attachment.path || attachment.href || "").split("/").pop().split("?").shift() || "attachment-" + (i2 + 1);
-            if (data.filename.indexOf(".") < 0) {
-              data.filename += "." + mimeFuncs.detectExtension(data.contentType);
-            }
-          }
-          if (/^https?:\/\//i.test(attachment.path)) {
-            attachment.href = attachment.path;
-            attachment.path = void 0;
-          }
-          if (attachment.cid) {
-            data.cid = attachment.cid;
-          }
-          if (attachment.raw) {
-            data.raw = attachment.raw;
-          } else if (attachment.path) {
-            data.content = {
-              path: attachment.path
-            };
-          } else if (attachment.href) {
-            data.content = {
-              href: attachment.href,
-              httpHeaders: attachment.httpHeaders,
-              tls: attachment.tls
-            };
-          } else {
-            data.content = attachment.content || "";
-          }
-          if (attachment.encoding) {
-            data.encoding = attachment.encoding;
-          }
-          if (attachment.headers) {
-            data.headers = attachment.headers;
-          }
-          return data;
-        });
-        if (this.mail.icalEvent) {
-          eventObject = Object.assign({}, this._getIcalEvent());
-          eventObject.contentType = "application/ics";
-          if (!eventObject.headers) {
-            eventObject.headers = {};
-          }
-          eventObject.filename = eventObject.filename || "invite.ics";
-          eventObject.headers["Content-Disposition"] = "attachment";
-          eventObject.headers["Content-Transfer-Encoding"] = "base64";
-        }
-        if (!findRelated) {
-          return {
-            attached: attachments.concat(eventObject || []),
-            related: []
-          };
-        }
-        return {
-          attached: attachments.filter((attachment) => !attachment.cid).concat(eventObject || []),
-          related: attachments.filter((attachment) => !!attachment.cid)
-        };
-      }
-      /**
-       * Returns the icalEvent value with `path`/`href`/data uri input normalized into
-       * a `content` entry, the same way as for regular attachments. The same event is
-       * included twice (as a text/calendar alternative and as an application/ics
-       * attachment), so the shared content object is marked to be resolved just once
-       * and the buffered result is reused by the second node.
-       *
-       * @returns {Object} Normalized icalEvent data
-       */
-      _getIcalEvent() {
-        if (!this._icalEvent) {
-          let icalEvent;
-          if (typeof this.mail.icalEvent === "object" && (this.mail.icalEvent.content || this.mail.icalEvent.path || this.mail.icalEvent.href || this.mail.icalEvent.raw)) {
-            icalEvent = Object.assign({}, this.mail.icalEvent);
-          } else {
-            icalEvent = {
-              content: this.mail.icalEvent
-            };
-          }
-          if (/^data:/i.test(icalEvent.path || icalEvent.href)) {
-            icalEvent = this._processDataUrl(icalEvent);
-          }
-          if (/^https?:\/\//i.test(icalEvent.path)) {
-            icalEvent.href = icalEvent.path;
-            icalEvent.path = void 0;
-          }
-          if (!icalEvent.raw) {
-            if (icalEvent.path) {
-              icalEvent.content = {
-                path: icalEvent.path
-              };
-              icalEvent.path = void 0;
-            } else if (icalEvent.href) {
-              icalEvent.content = {
-                href: icalEvent.href,
-                httpHeaders: icalEvent.httpHeaders
-              };
-              icalEvent.href = void 0;
-            }
-          }
-          if (icalEvent.content && typeof icalEvent.content === "object") {
-            icalEvent.content._resolve = true;
-          }
-          this._icalEvent = icalEvent;
-        }
-        return this._icalEvent;
-      }
-      /**
-       * List alternatives. Resulting objects can be used as input for MimeNode nodes
-       *
-       * @returns {Array} An array of alternative elements. Includes the `text` and `html` values as well
-       */
-      getAlternatives() {
-        const alternatives = [];
-        let text, html, watchHtml, amp, eventObject;
-        if (this.mail.text) {
-          if (typeof this.mail.text === "object" && (this.mail.text.content || this.mail.text.path || this.mail.text.href || this.mail.text.raw)) {
-            text = this.mail.text;
-          } else {
-            text = {
-              content: this.mail.text
-            };
-          }
-          text.contentType = "text/plain; charset=utf-8";
-        }
-        if (this.mail.watchHtml) {
-          if (typeof this.mail.watchHtml === "object" && (this.mail.watchHtml.content || this.mail.watchHtml.path || this.mail.watchHtml.href || this.mail.watchHtml.raw)) {
-            watchHtml = this.mail.watchHtml;
-          } else {
-            watchHtml = {
-              content: this.mail.watchHtml
-            };
-          }
-          watchHtml.contentType = "text/watch-html; charset=utf-8";
-        }
-        if (this.mail.amp) {
-          if (typeof this.mail.amp === "object" && (this.mail.amp.content || this.mail.amp.path || this.mail.amp.href || this.mail.amp.raw)) {
-            amp = this.mail.amp;
-          } else {
-            amp = {
-              content: this.mail.amp
-            };
-          }
-          amp.contentType = "text/x-amp-html; charset=utf-8";
-        }
-        if (this.mail.icalEvent) {
-          eventObject = Object.assign({}, this._getIcalEvent());
-          eventObject.filename = false;
-          eventObject.contentType = "text/calendar; charset=utf-8; method=" + (eventObject.method || "PUBLISH").toString().trim().toUpperCase();
-          if (!eventObject.headers) {
-            eventObject.headers = {};
-          }
-        }
-        if (this.mail.html) {
-          if (typeof this.mail.html === "object" && (this.mail.html.content || this.mail.html.path || this.mail.html.href || this.mail.html.raw)) {
-            html = this.mail.html;
-          } else {
-            html = {
-              content: this.mail.html
-            };
-          }
-          html.contentType = "text/html; charset=utf-8";
-        }
-        [].concat(text || []).concat(watchHtml || []).concat(amp || []).concat(html || []).concat(eventObject || []).concat(this.mail.alternatives || []).forEach((alternative) => {
-          if (/^data:/i.test(alternative.path || alternative.href)) {
-            alternative = this._processDataUrl(alternative);
-          }
-          const data = {
-            contentType: alternative.contentType || mimeFuncs.detectMimeType(alternative.filename || alternative.path || alternative.href || "txt"),
-            contentTransferEncoding: alternative.contentTransferEncoding
-          };
-          if (alternative.filename) {
-            data.filename = alternative.filename;
-          }
-          if (/^https?:\/\//i.test(alternative.path)) {
-            alternative.href = alternative.path;
-            alternative.path = void 0;
-          }
-          if (alternative.raw) {
-            data.raw = alternative.raw;
-          } else if (alternative.path) {
-            data.content = {
-              path: alternative.path
-            };
-          } else if (alternative.href) {
-            data.content = {
-              href: alternative.href
-            };
-          } else {
-            data.content = alternative.content || "";
-          }
-          if (alternative.encoding) {
-            data.encoding = alternative.encoding;
-          }
-          if (alternative.headers) {
-            data.headers = alternative.headers;
-          }
-          alternatives.push(data);
-        });
-        return alternatives;
-      }
-      /**
-       * Builds multipart/mixed node. It should always contain different type of elements on the same level
-       * eg. text + attachments
-       *
-       * @param {Object} parentNode Parent for this note. If it does not exist, a root node is created
-       * @returns {Object} MimeNode node element
-       */
-      _createMixed(parentNode) {
-        const node = parentNode ? parentNode.createChild("multipart/mixed", {
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        }) : new MimeNode("multipart/mixed", {
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
-        if (this._useAlternative) {
-          this._createAlternative(node);
-        } else if (this._useRelated) {
-          this._createRelated(node);
-        }
-        [].concat(!this._useAlternative && this._alternatives || []).concat(this._attachments.attached || []).forEach((element) => {
-          if (!this._useRelated || element !== this._htmlNode) {
-            this._createContentNode(node, element);
-          }
-        });
-        return node;
-      }
-      /**
-       * Builds multipart/alternative node. It should always contain same type of elements on the same level
-       * eg. text + html view of the same data
-       *
-       * @param {Object} parentNode Parent for this note. If it does not exist, a root node is created
-       * @returns {Object} MimeNode node element
-       */
-      _createAlternative(parentNode) {
-        const node = parentNode ? parentNode.createChild("multipart/alternative", {
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        }) : new MimeNode("multipart/alternative", {
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
-        this._alternatives.forEach((alternative) => {
-          if (this._useRelated && this._htmlNode === alternative) {
-            this._createRelated(node);
-          } else {
-            this._createContentNode(node, alternative);
-          }
-        });
-        return node;
-      }
-      /**
-       * Builds multipart/related node. It should always contain html node with related attachments
-       *
-       * @param {Object} parentNode Parent for this note. If it does not exist, a root node is created
-       * @returns {Object} MimeNode node element
-       */
-      _createRelated(parentNode) {
-        const node = parentNode ? parentNode.createChild('multipart/related; type="text/html"', {
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        }) : new MimeNode('multipart/related; type="text/html"', {
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
-        this._createContentNode(node, this._htmlNode);
-        this._attachments.related.forEach((alternative) => this._createContentNode(node, alternative));
-        return node;
-      }
-      /**
-       * Creates a regular node with contents
-       *
-       * @param {Object} parentNode Parent for this note. If it does not exist, a root node is created
-       * @param {Object} element Node data
-       * @returns {Object} MimeNode node element
-       */
-      _createContentNode(parentNode, element) {
-        element = element || {};
-        element.content = element.content || "";
-        const encoding = (element.encoding || "utf8").toString().toLowerCase().replace(/[-_\s]/g, "");
-        const node = parentNode ? parentNode.createChild(element.contentType, {
-          filename: element.filename,
-          textEncoding: this.mail.textEncoding,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        }) : new MimeNode(element.contentType, {
-          filename: element.filename,
-          baseBoundary: this.mail.baseBoundary,
-          textEncoding: this.mail.textEncoding,
-          boundaryPrefix: this.mail.boundaryPrefix,
-          disableUrlAccess: this.mail.disableUrlAccess,
-          disableFileAccess: this.mail.disableFileAccess,
-          normalizeHeaderKey: this.mail.normalizeHeaderKey,
-          newline: this.mail.newline
-        });
-        if (element.headers) {
-          node.addHeader(element.headers);
-        }
-        if (element.cid) {
-          node.setHeader("Content-Id", "<" + element.cid.replace(/[<>]/g, "") + ">");
-        }
-        if (element.contentTransferEncoding) {
-          node.setHeader("Content-Transfer-Encoding", element.contentTransferEncoding);
-        } else if (this.mail.encoding && /^text\//i.test(element.contentType)) {
-          node.setHeader("Content-Transfer-Encoding", this.mail.encoding);
-        }
-        if (!/^text\//i.test(element.contentType) || element.contentDisposition) {
-          node.setHeader(
-            "Content-Disposition",
-            element.contentDisposition || (element.cid && /^image\//i.test(element.contentType) ? "inline" : "attachment")
-          );
-        }
-        if (typeof element.content === "string" && !["utf8", "usascii", "ascii"].includes(encoding)) {
-          element.content = Buffer.from(element.content, encoding);
-        }
-        if (element.raw) {
-          node.setRaw(element.raw);
-        } else {
-          node.setContent(element.content);
-        }
-        return node;
-      }
-      /**
-       * Parses data uri and converts it to a Buffer
-       *
-       * @param {Object} element Content element
-       * @return {Object} Parsed element
-       */
-      _processDataUrl(element) {
-        const dataUrl = element.path || element.href;
-        if (!dataUrl || typeof dataUrl !== "string") {
-          return element;
-        }
-        if (!dataUrl.startsWith("data:")) {
-          return element;
-        }
-        if (dataUrl.length > 52428800) {
-          let detectedType = "application/octet-stream";
-          const commaPos = dataUrl.indexOf(",");
-          if (commaPos > 0 && commaPos < 200) {
-            const header = dataUrl.substring(5, commaPos);
-            const parts = header.split(";");
-            if (parts[0] && parts[0].includes("/")) {
-              detectedType = parts[0].trim();
-            }
-          }
-          return Object.assign({}, element, {
-            path: false,
-            href: false,
-            content: Buffer.alloc(0),
-            contentType: element.contentType || detectedType
-          });
-        }
-        let parsedDataUri;
-        try {
-          parsedDataUri = parseDataURI(dataUrl);
-        } catch (_err) {
-          return element;
-        }
-        if (!parsedDataUri) {
-          return element;
-        }
-        element.content = parsedDataUri.data;
-        element.contentType = element.contentType || parsedDataUri.contentType;
-        if ("path" in element) {
-          element.path = false;
-        }
-        if ("href" in element) {
-          element.href = false;
-        }
-        return element;
-      }
-    };
-    module2.exports = MailComposer;
-  }
-});
-
-// node_modules/nodemailer/lib/dkim/message-parser.js
-var require_message_parser = __commonJS({
-  "node_modules/nodemailer/lib/dkim/message-parser.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var MessageParser = class extends Transform {
-      constructor(options) {
-        super(options);
-        this.lastBytes = Buffer.alloc(4);
-        this.headersParsed = false;
-        this.headerBytes = 0;
-        this.headerChunks = [];
-        this.rawHeaders = false;
-        this.bodySize = 0;
-      }
-      /**
-       * Keeps count of the last 4 bytes in order to detect line breaks on chunk boundaries
-       *
-       * @param {Buffer} data Next data chunk from the stream
-       */
-      updateLastBytes(data) {
-        const lblen = this.lastBytes.length;
-        const nblen = Math.min(data.length, lblen);
-        for (let i2 = 0, len = lblen - nblen; i2 < len; i2++) {
-          this.lastBytes[i2] = this.lastBytes[i2 + nblen];
-        }
-        for (let i2 = 1; i2 <= nblen; i2++) {
-          this.lastBytes[lblen - i2] = data[data.length - i2];
-        }
-      }
-      /**
-       * Finds and removes message headers from the remaining body. We want to keep
-       * headers separated until final delivery to be able to modify these
-       *
-       * @param {Buffer} data Next chunk of data
-       * @return {Boolean} Returns true if headers are already found or false otherwise
-       */
-      checkHeaders(data) {
-        if (this.headersParsed) {
-          return true;
-        }
-        const lblen = this.lastBytes.length;
-        let headerPos = 0;
-        for (let i2 = 0, len = this.lastBytes.length + data.length; i2 < len; i2++) {
-          let chr;
-          if (i2 < lblen) {
-            chr = this.lastBytes[i2];
-          } else {
-            chr = data[i2 - lblen];
-          }
-          if (chr === 10 && i2) {
-            const pr1 = i2 - 1 < lblen ? this.lastBytes[i2 - 1] : data[i2 - 1 - lblen];
-            const pr2 = i2 > 1 ? i2 - 2 < lblen ? this.lastBytes[i2 - 2] : data[i2 - 2 - lblen] : false;
-            if (pr1 === 10) {
-              this.headersParsed = true;
-              headerPos = i2 - lblen + 1;
-              this.headerBytes += headerPos;
-              break;
-            } else if (pr1 === 13 && pr2 === 10) {
-              this.headersParsed = true;
-              headerPos = i2 - lblen + 1;
-              this.headerBytes += headerPos;
-              break;
-            }
-          }
-        }
-        if (this.headersParsed) {
-          this.headerChunks.push(data.slice(0, headerPos));
-          this.rawHeaders = Buffer.concat(this.headerChunks, this.headerBytes);
-          this.headerChunks = null;
-          this.emit("headers", this.parseHeaders());
-          if (data.length - 1 > headerPos) {
-            const chunk = data.slice(headerPos);
-            this.bodySize += chunk.length;
-            setImmediate(() => this.push(chunk));
-          }
-          return false;
-        }
-        this.headerBytes += data.length;
-        this.headerChunks.push(data);
-        this.updateLastBytes(data);
-        return false;
-      }
-      _transform(chunk, encoding, callback) {
-        if (!chunk || !chunk.length) {
-          return callback();
-        }
-        if (typeof chunk === "string") {
-          chunk = Buffer.from(chunk, encoding);
-        }
-        let headersFound;
-        try {
-          headersFound = this.checkHeaders(chunk);
-        } catch (E) {
-          return callback(E);
-        }
-        if (headersFound) {
-          this.bodySize += chunk.length;
-          this.push(chunk);
-        }
-        setImmediate(callback);
-      }
-      _flush(callback) {
-        if (this.headerChunks) {
-          const chunk = Buffer.concat(this.headerChunks, this.headerBytes);
-          this.bodySize += chunk.length;
-          this.push(chunk);
-          this.headerChunks = null;
-        }
-        callback();
-      }
-      parseHeaders() {
-        const lines = (this.rawHeaders || "").toString().split(/\r?\n/);
-        for (let i2 = lines.length - 1; i2 > 0; i2--) {
-          if (/^\s/.test(lines[i2])) {
-            lines[i2 - 1] += "\n" + lines[i2];
-            lines.splice(i2, 1);
-          }
-        }
-        return lines.filter((line) => line.trim()).map((line) => ({
-          key: line.substr(0, line.indexOf(":")).trim().toLowerCase(),
-          line
-        }));
-      }
-    };
-    module2.exports = MessageParser;
-  }
-});
-
-// node_modules/nodemailer/lib/dkim/relaxed-body.js
-var require_relaxed_body = __commonJS({
-  "node_modules/nodemailer/lib/dkim/relaxed-body.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var crypto7 = require("crypto");
-    var RelaxedBody = class extends Transform {
-      constructor(options) {
-        super();
-        options = options || {};
-        this.chunkBuffer = [];
-        this.chunkBufferLen = 0;
-        this.bodyHash = crypto7.createHash(options.hashAlgo || "sha256");
-        this.remainder = "";
-        this.byteLength = 0;
-        this.debug = options.debug;
-        this._debugBody = options.debug ? [] : false;
-      }
-      updateHash(chunk) {
-        let bodyStr;
-        let nextRemainder = "";
-        let state = "file";
-        for (let i2 = chunk.length - 1; i2 >= 0; i2--) {
-          const c = chunk[i2];
-          if (state === "file" && (c === 10 || c === 13)) {
-          } else if (state === "file" && (c === 9 || c === 32)) {
-            state = "line";
-          } else if (state === "line" && (c === 9 || c === 32)) {
-          } else if (state === "file" || state === "line") {
-            state = "body";
-            if (i2 === chunk.length - 1) {
-              break;
-            }
-          }
-          if (i2 === 0) {
-            if (state === "file" && (!this.remainder || /[\r\n]$/.test(this.remainder)) || state === "line" && (!this.remainder || /[ \t]$/.test(this.remainder))) {
-              this.remainder += chunk.toString("binary");
-              return;
-            } else if (state === "line" || state === "file") {
-              nextRemainder = chunk.toString("binary");
-              chunk = false;
-              break;
-            }
-          }
-          if (state !== "body") {
-            continue;
-          }
-          nextRemainder = chunk.slice(i2 + 1).toString("binary");
-          chunk = chunk.slice(0, i2 + 1);
-          break;
-        }
-        let needsFixing = !!this.remainder;
-        if (chunk && !needsFixing) {
-          for (let i2 = 0, len = chunk.length; i2 < len; i2++) {
-            if (i2 && chunk[i2] === 10 && chunk[i2 - 1] !== 13) {
-              needsFixing = true;
-              break;
-            } else if (i2 && chunk[i2] === 13 && chunk[i2 - 1] === 32) {
-              needsFixing = true;
-              break;
-            } else if (i2 && chunk[i2] === 32 && chunk[i2 - 1] === 32) {
-              needsFixing = true;
-              break;
-            } else if (chunk[i2] === 9) {
-              needsFixing = true;
-              break;
-            }
-          }
-        }
-        if (needsFixing) {
-          bodyStr = this.remainder + (chunk ? chunk.toString("binary") : "");
-          this.remainder = nextRemainder;
-          bodyStr = bodyStr.replace(/\r?\n/g, "\n").replace(/[ \t]*$/gm, "").replace(/[ \t]+/gm, " ").replace(/\n/g, "\r\n");
-          chunk = Buffer.from(bodyStr, "binary");
-        } else if (nextRemainder) {
-          this.remainder = nextRemainder;
-        }
-        if (this.debug) {
-          this._debugBody.push(chunk);
-        }
-        this.bodyHash.update(chunk);
-      }
-      _transform(chunk, encoding, callback) {
-        if (!chunk || !chunk.length) {
-          return callback();
-        }
-        if (typeof chunk === "string") {
-          chunk = Buffer.from(chunk, encoding);
-        }
-        this.updateHash(chunk);
-        this.byteLength += chunk.length;
-        this.push(chunk);
-        callback();
-      }
-      _flush(callback) {
-        if (/[\r\n]$/.test(this.remainder) && this.byteLength > 2) {
-          this.bodyHash.update(Buffer.from("\r\n"));
-        }
-        if (!this.byteLength) {
-          this.push(Buffer.from("\r\n"));
-        }
-        this.emit("hash", this.bodyHash.digest("base64"), this.debug ? Buffer.concat(this._debugBody) : false);
-        callback();
-      }
-    };
-    module2.exports = RelaxedBody;
-  }
-});
-
-// node_modules/nodemailer/lib/dkim/sign.js
-var require_sign2 = __commonJS({
-  "node_modules/nodemailer/lib/dkim/sign.js"(exports2, module2) {
-    "use strict";
-    var punycode = require_punycode();
-    var mimeFuncs = require_mime_funcs();
-    var crypto7 = require("crypto");
-    module2.exports = (headers, hashAlgo, bodyHash, options) => {
-      options = options || {};
-      const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive";
-      const fieldNames = options.headerFieldNames || defaultFieldNames;
-      const canonicalizedHeaderData = relaxedHeaders(headers, fieldNames, options.skipFields);
-      const dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
-      canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
-      const signer = crypto7.createSign(("rsa-" + hashAlgo).toUpperCase());
-      signer.update(canonicalizedHeaderData.headers);
-      let signature;
-      try {
-        signature = signer.sign(options.privateKey, "base64");
-      } catch (_E) {
-        return false;
-      }
-      return dkimHeader + signature.replace(/(^.{73}|.{75}(?!\r?\n|\r))/g, "$&\r\n ").trim();
-    };
-    module2.exports.relaxedHeaders = relaxedHeaders;
-    function generateDKIMHeader(domainName, keySelector, fieldNames, hashAlgo, bodyHash) {
-      const dkim = [
-        "v=1",
-        "a=rsa-" + hashAlgo,
-        "c=relaxed/relaxed",
-        "d=" + punycode.toASCII(domainName),
-        "q=dns/txt",
-        "s=" + keySelector,
-        "bh=" + bodyHash,
-        "h=" + fieldNames
-      ].join("; ");
-      return mimeFuncs.foldLines("DKIM-Signature: " + dkim, 76) + ";\r\n b=";
-    }
-    function relaxedHeaders(headers, fieldNames, skipFields) {
-      const includedFields = /* @__PURE__ */ new Set();
-      const skip = /* @__PURE__ */ new Set();
-      const headerFields = /* @__PURE__ */ new Map();
-      (skipFields || "").toLowerCase().split(":").forEach((field) => {
-        skip.add(field.trim());
-      });
-      (fieldNames || "").toLowerCase().split(":").filter((field) => !skip.has(field.trim())).forEach((field) => {
-        includedFields.add(field.trim());
-      });
-      for (let i2 = headers.length - 1; i2 >= 0; i2--) {
-        const line = headers[i2];
-        if (includedFields.has(line.key) && !headerFields.has(line.key)) {
-          headerFields.set(line.key, relaxedHeaderLine(line.line));
-        }
-      }
-      const headersList = [];
-      const fields = [];
-      includedFields.forEach((field) => {
-        if (headerFields.has(field)) {
-          fields.push(field);
-          headersList.push(field + ":" + headerFields.get(field));
-        }
-      });
-      return {
-        headers: headersList.join("\r\n") + "\r\n",
-        fieldNames: fields.join(":")
-      };
-    }
-    function relaxedHeaderLine(line) {
-      return line.substr(line.indexOf(":") + 1).replace(/\r?\n/g, "").replace(/\s+/g, " ").trim();
-    }
-  }
-});
-
-// node_modules/nodemailer/lib/dkim/index.js
-var require_dkim = __commonJS({
-  "node_modules/nodemailer/lib/dkim/index.js"(exports2, module2) {
-    "use strict";
-    var MessageParser = require_message_parser();
-    var RelaxedBody = require_relaxed_body();
-    var sign = require_sign2();
-    var { PassThrough: PassThrough3 } = require("stream");
-    var fs4 = require("fs");
-    var path3 = require("path");
-    var crypto7 = require("crypto");
-    var DKIM_ALGO = "sha256";
-    var MAX_MESSAGE_SIZE = 2 * 1024 * 1024;
-    var DKIMSigner = class {
-      constructor(options, keys2, input, output) {
-        this.options = options || {};
-        this.keys = keys2;
-        this.cacheTreshold = Number(this.options.cacheTreshold) || MAX_MESSAGE_SIZE;
-        this.hashAlgo = this.options.hashAlgo || DKIM_ALGO;
-        this.cacheDir = this.options.cacheDir || false;
-        this.chunks = [];
-        this.chunklen = 0;
-        this.readPos = 0;
-        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto7.randomBytes(14).toString("hex")) : false;
-        this.cache = false;
-        this.headers = false;
-        this.bodyHash = false;
-        this.parser = false;
-        this.relaxedBody = false;
-        this.input = input;
-        this.output = output;
-        this.output.usingCache = false;
-        this.hasErrored = false;
-        this.input.on("error", (err) => {
-          this.hasErrored = true;
-          this.cleanup();
-          output.emit("error", err);
-        });
-      }
-      cleanup() {
-        if (!this.cache || !this.cachePath) {
-          return;
-        }
-        fs4.unlink(this.cachePath, () => false);
-      }
-      createReadCache() {
-        this.cache = fs4.createReadStream(this.cachePath);
-        this.cache.once("error", (err) => {
-          this.cleanup();
-          this.output.emit("error", err);
-        });
-        this.cache.once("close", () => {
-          this.cleanup();
-        });
-        this.cache.pipe(this.output);
-      }
-      sendNextChunk() {
-        if (this.hasErrored) {
-          return;
-        }
-        if (this.readPos >= this.chunks.length) {
-          if (!this.cache) {
-            return this.output.end();
-          }
-          return this.createReadCache();
-        }
-        const chunk = this.chunks[this.readPos++];
-        if (this.output.write(chunk) === false) {
-          return this.output.once("drain", () => {
-            this.sendNextChunk();
-          });
-        }
-        setImmediate(() => this.sendNextChunk());
-      }
-      sendSignedOutput() {
-        let keyPos = 0;
-        const signNextKey = () => {
-          if (keyPos >= this.keys.length) {
-            this.output.write(this.parser.rawHeaders);
-            return setImmediate(() => this.sendNextChunk());
-          }
-          const key = this.keys[keyPos++];
-          const dkimField = sign(this.headers, this.hashAlgo, this.bodyHash, {
-            domainName: key.domainName,
-            keySelector: key.keySelector,
-            privateKey: key.privateKey,
-            headerFieldNames: this.options.headerFieldNames,
-            skipFields: this.options.skipFields
-          });
-          if (dkimField) {
-            this.output.write(Buffer.from(dkimField + "\r\n"));
-          }
-          return setImmediate(signNextKey);
-        };
-        if (this.bodyHash && this.headers) {
-          return signNextKey();
-        }
-        this.output.write(this.parser.rawHeaders);
-        this.sendNextChunk();
-      }
-      createWriteCache() {
-        this.output.usingCache = true;
-        this.cache = fs4.createWriteStream(this.cachePath);
-        this.cache.once("error", (err) => {
-          this.cleanup();
-          this.relaxedBody.unpipe(this.cache);
-          this.relaxedBody.on("readable", () => {
-            while (this.relaxedBody.read() !== null) {
-            }
-          });
-          this.hasErrored = true;
-          this.output.emit("error", err);
-        });
-        this.cache.once("close", () => {
-          this.sendSignedOutput();
-        });
-        this.relaxedBody.removeAllListeners("readable");
-        this.relaxedBody.pipe(this.cache);
-      }
-      signStream() {
-        this.parser = new MessageParser();
-        this.relaxedBody = new RelaxedBody({
-          hashAlgo: this.hashAlgo
-        });
-        this.parser.on("headers", (value) => {
-          this.headers = value;
-        });
-        this.relaxedBody.on("hash", (value) => {
-          this.bodyHash = value;
-        });
-        this.relaxedBody.on("readable", () => {
-          let chunk;
-          if (this.cache) {
-            return;
-          }
-          while ((chunk = this.relaxedBody.read()) !== null) {
-            this.chunks.push(chunk);
-            this.chunklen += chunk.length;
-            if (this.chunklen >= this.cacheTreshold && this.cachePath) {
-              return this.createWriteCache();
-            }
-          }
-        });
-        this.relaxedBody.on("end", () => {
-          if (this.cache) {
-            return;
-          }
-          this.sendSignedOutput();
-        });
-        this.parser.pipe(this.relaxedBody);
-        setImmediate(() => this.input.pipe(this.parser));
-      }
-    };
-    var DKIM = class {
-      constructor(options) {
-        this.options = options || {};
-        this.keys = [].concat(
-          this.options.keys || {
-            domainName: options.domainName,
-            keySelector: options.keySelector,
-            privateKey: options.privateKey
-          }
-        );
-      }
-      sign(input, extraOptions) {
-        const output = new PassThrough3();
-        let inputStream = input;
-        let writeValue = false;
-        if (Buffer.isBuffer(input)) {
-          writeValue = input;
-          inputStream = new PassThrough3();
-        } else if (typeof input === "string") {
-          writeValue = Buffer.from(input);
-          inputStream = new PassThrough3();
-        }
-        let options = this.options;
-        if (extraOptions && Object.keys(extraOptions).length) {
-          options = Object.assign({}, extraOptions, this.options);
-        }
-        const signer = new DKIMSigner(options, this.keys, inputStream, output);
-        setImmediate(() => {
-          signer.signStream();
-          if (writeValue) {
-            setImmediate(() => {
-              inputStream.end(writeValue);
-            });
-          }
-        });
-        return output;
-      }
-    };
-    module2.exports = DKIM;
-  }
-});
-
-// node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js
-var require_http_proxy_client = __commonJS({
-  "node_modules/nodemailer/lib/smtp-connection/http-proxy-client.js"(exports2, module2) {
-    "use strict";
-    var net = require("net");
-    var tls = require("tls");
-    var urllib = require_url();
-    var errors = require_errors2();
-    var MAX_RESPONSE_HEADER_BYTES = 64 * 1024;
-    function httpProxyClient(proxyUrl, destinationPort, destinationHost, tlsOptions, callback) {
-      if (typeof tlsOptions === "function") {
-        callback = tlsOptions;
-        tlsOptions = {};
-      }
-      tlsOptions = tlsOptions || {};
-      destinationPort = Number(destinationPort) || 0;
-      if (!destinationPort || /[\r\n]/.test(destinationHost)) {
-        const err = new Error("Invalid proxy destination");
-        err.code = errors.EPROXY;
-        return setImmediate(() => callback(err));
-      }
-      const proxy = urllib.parse(proxyUrl);
-      const connectOptions = {
-        host: proxy.hostname,
-        port: Number(proxy.port) ? Number(proxy.port) : proxy.protocol === "https:" ? 443 : 80
-      };
-      let connect;
-      if (proxy.protocol === "https:") {
-        connectOptions.rejectUnauthorized = tlsOptions.rejectUnauthorized !== false;
-        connect = tls.connect.bind(tls);
-      } else {
-        connect = net.connect.bind(net);
-      }
-      let socket;
-      let finished2 = false;
-      const tempSocketErr = (err) => {
-        if (finished2) {
-          return;
-        }
-        finished2 = true;
-        try {
-          socket.destroy();
-        } catch (_E) {
-        }
-        callback(err);
-      };
-      const timeoutErr = () => {
-        const err = new Error("Proxy socket timed out");
-        err.code = "ETIMEDOUT";
-        tempSocketErr(err);
-      };
-      socket = connect(connectOptions, () => {
-        if (finished2) {
-          return;
-        }
-        const reqHeaders = {
-          Host: destinationHost + ":" + destinationPort,
-          Connection: "close"
-        };
-        if (proxy.auth) {
-          reqHeaders["Proxy-Authorization"] = "Basic " + Buffer.from(proxy.auth).toString("base64");
-        }
-        socket.write(
-          // HTTP method
-          "CONNECT " + destinationHost + ":" + destinationPort + " HTTP/1.1\r\n" + // HTTP request headers
-          Object.keys(reqHeaders).map((key) => key + ": " + reqHeaders[key]).join("\r\n") + // End request
-          "\r\n\r\n"
-        );
-        let headers = "";
-        const onSocketData = (chunk) => {
-          let match2;
-          let remainder;
-          if (finished2) {
-            return;
-          }
-          headers += chunk.toString("binary");
-          if (match2 = headers.match(/\r\n\r\n/)) {
-            socket.removeListener("data", onSocketData);
-            remainder = headers.substr(match2.index + match2[0].length);
-            headers = headers.substr(0, match2.index);
-            if (remainder) {
-              socket.unshift(Buffer.from(remainder, "binary"));
-            }
-            finished2 = true;
-            match2 = headers.match(/^HTTP\/\d+\.\d+ (\d+)/i);
-            if (!match2 || (match2[1] || "").charAt(0) !== "2") {
-              try {
-                socket.destroy();
-              } catch (_E) {
-              }
-              const err = new Error("Invalid response from proxy" + (match2 && ": " + match2[1] || ""));
-              err.code = errors.EPROXY;
-              return callback(err);
-            }
-            socket.removeListener("error", tempSocketErr);
-            socket.removeListener("timeout", timeoutErr);
-            socket.setTimeout(0);
-            return callback(null, socket);
-          }
-          if (headers.length > MAX_RESPONSE_HEADER_BYTES) {
-            socket.removeListener("data", onSocketData);
-            const err = new Error("Proxy response headers too large");
-            err.code = errors.EPROXY;
-            return tempSocketErr(err);
-          }
-        };
-        socket.on("data", onSocketData);
-      });
-      socket.setTimeout(httpProxyClient.timeout || 30 * 1e3);
-      socket.on("timeout", timeoutErr);
-      socket.once("error", tempSocketErr);
-    }
-    module2.exports = httpProxyClient;
-  }
-});
-
-// node_modules/nodemailer/lib/mailer/mail-message.js
-var require_mail_message = __commonJS({
-  "node_modules/nodemailer/lib/mailer/mail-message.js"(exports2, module2) {
-    "use strict";
-    var shared = require_shared3();
-    var MimeNode = require_mime_node();
-    var mimeFuncs = require_mime_funcs();
-    var MailMessage = class {
-      constructor(mailer, data) {
-        this.mailer = mailer;
-        this.data = {};
-        this.message = null;
-        data = data || {};
-        const options = mailer.options || {};
-        const defaults = mailer._defaults || {};
-        Object.assign(this.data, data);
-        this.data.headers = this.data.headers || {};
-        Object.keys(defaults).forEach((key) => {
-          if (!(key in this.data)) {
-            this.data[key] = defaults[key];
-          } else if (key === "headers") {
-            Object.keys(defaults.headers).forEach((key2) => {
-              if (!(key2 in this.data.headers)) {
-                this.data.headers[key2] = defaults.headers[key2];
-              }
-            });
-          }
-        });
-        ["disableFileAccess", "disableUrlAccess", "normalizeHeaderKey"].forEach((key) => {
-          if (key in options) {
-            this.data[key] = options[key];
-          }
-        });
-      }
-      resolveContent(...args) {
-        return shared.resolveContent(...args);
-      }
-      resolveAll(callback) {
-        const keys2 = [
-          [this.data, "html"],
-          [this.data, "text"],
-          [this.data, "watchHtml"],
-          [this.data, "amp"],
-          [this.data, "icalEvent"]
-        ];
-        if (this.data.alternatives && this.data.alternatives.length) {
-          this.data.alternatives.forEach((alternative, i2) => {
-            keys2.push([this.data.alternatives, i2]);
-          });
-        }
-        if (this.data.attachments && this.data.attachments.length) {
-          this.data.attachments.forEach((attachment, i2) => {
-            if (!attachment.filename) {
-              attachment.filename = (attachment.path || attachment.href || "").split("/").pop().split("?").shift() || "attachment-" + (i2 + 1);
-              if (attachment.filename.indexOf(".") < 0) {
-                attachment.filename += "." + mimeFuncs.detectExtension(attachment.contentType);
-              }
-            }
-            if (!attachment.contentType) {
-              attachment.contentType = mimeFuncs.detectMimeType(attachment.filename || attachment.path || attachment.href || "bin");
-            }
-            keys2.push([this.data.attachments, i2]);
-          });
-        }
-        const mimeNode = new MimeNode();
-        const addressKeys = ["from", "to", "cc", "bcc", "sender", "replyTo"];
-        addressKeys.forEach((address) => {
-          let value;
-          if (this.message) {
-            value = [].concat(mimeNode._parseAddresses(this.message.getHeader(address === "replyTo" ? "reply-to" : address)) || []);
-          } else if (this.data[address]) {
-            value = [].concat(mimeNode._parseAddresses(this.data[address]) || []);
-          }
-          if (value && value.length) {
-            this.data[address] = value;
-          } else if (address in this.data) {
-            this.data[address] = null;
-          }
-        });
-        const singleKeys = ["from", "sender"];
-        singleKeys.forEach((address) => {
-          if (this.data[address]) {
-            this.data[address] = this.data[address].shift();
-          }
-        });
-        let pos = 0;
-        const resolveNext = () => {
-          if (pos >= keys2.length) {
-            return callback(null, this.data);
-          }
-          const args = keys2[pos++];
-          if (!args[0] || !args[0][args[1]]) {
-            return resolveNext();
-          }
-          shared.resolveContent(
-            ...args,
-            { disableFileAccess: this.data.disableFileAccess, disableUrlAccess: this.data.disableUrlAccess },
-            (err, value) => {
-              if (err) {
-                return callback(err);
-              }
-              const node = {
-                content: value
-              };
-              if (args[0][args[1]] && typeof args[0][args[1]] === "object" && !Buffer.isBuffer(args[0][args[1]])) {
-                Object.keys(args[0][args[1]]).forEach((key) => {
-                  if (!(key in node) && !["content", "path", "href", "raw"].includes(key)) {
-                    node[key] = args[0][args[1]][key];
-                  }
-                });
-              }
-              args[0][args[1]] = node;
-              resolveNext();
-            }
-          );
-        };
-        setImmediate(() => resolveNext());
-      }
-      normalize(callback) {
-        const envelope = this.data.envelope || this.message.getEnvelope();
-        const messageId = this.message.messageId();
-        this.resolveAll((err, data) => {
-          if (err) {
-            return callback(err);
-          }
-          data.envelope = envelope;
-          data.messageId = messageId;
-          ["html", "text", "watchHtml", "amp"].forEach((key) => {
-            if (data[key] && data[key].content) {
-              if (typeof data[key].content === "string") {
-                data[key] = data[key].content;
-              } else if (Buffer.isBuffer(data[key].content)) {
-                data[key] = data[key].content.toString();
-              }
-            }
-          });
-          if (data.icalEvent && Buffer.isBuffer(data.icalEvent.content)) {
-            data.icalEvent.content = data.icalEvent.content.toString("base64");
-            data.icalEvent.encoding = "base64";
-          }
-          if (data.alternatives && data.alternatives.length) {
-            data.alternatives.forEach((alternative) => {
-              if (alternative && alternative.content && Buffer.isBuffer(alternative.content)) {
-                alternative.content = alternative.content.toString("base64");
-                alternative.encoding = "base64";
-              }
-            });
-          }
-          if (data.attachments && data.attachments.length) {
-            data.attachments.forEach((attachment) => {
-              if (attachment && attachment.content && Buffer.isBuffer(attachment.content)) {
-                attachment.content = attachment.content.toString("base64");
-                attachment.encoding = "base64";
-              }
-            });
-          }
-          data.normalizedHeaders = {};
-          Object.keys(data.headers || {}).forEach((key) => {
-            let value = [].concat(data.headers[key] || []).shift();
-            value = value && value.value || value;
-            if (value) {
-              if (["references", "in-reply-to", "message-id", "content-id"].includes(key)) {
-                value = this.message._encodeHeaderValue(key, value);
-              }
-              data.normalizedHeaders[key] = value;
-            }
-          });
-          if (data.list && typeof data.list === "object") {
-            const listHeaders = this._getListHeaders(data.list);
-            listHeaders.forEach((entry) => {
-              data.normalizedHeaders[entry.key] = entry.value.map((val2) => val2 && val2.value || val2).join(", ");
-            });
-          }
-          if (data.references) {
-            data.normalizedHeaders.references = this.message._encodeHeaderValue("references", data.references);
-          }
-          if (data.inReplyTo) {
-            data.normalizedHeaders["in-reply-to"] = this.message._encodeHeaderValue("in-reply-to", data.inReplyTo);
-          }
-          return callback(null, data);
-        });
-      }
-      setMailerHeader() {
-        if (!this.message || !this.data.xMailer) {
-          return;
-        }
-        this.message.setHeader("X-Mailer", this.data.xMailer);
-      }
-      setPriorityHeaders() {
-        if (!this.message || !this.data.priority) {
-          return;
-        }
-        switch ((this.data.priority || "").toString().toLowerCase()) {
-          case "high":
-            this.message.setHeader("X-Priority", "1 (Highest)");
-            this.message.setHeader("X-MSMail-Priority", "High");
-            this.message.setHeader("Importance", "High");
-            break;
-          case "low":
-            this.message.setHeader("X-Priority", "5 (Lowest)");
-            this.message.setHeader("X-MSMail-Priority", "Low");
-            this.message.setHeader("Importance", "Low");
-            break;
-          default:
-        }
-      }
-      setListHeaders() {
-        if (!this.message || !this.data.list || typeof this.data.list !== "object") {
-          return;
-        }
-        this._getListHeaders(this.data.list).forEach((listHeader) => {
-          listHeader.value.forEach((value) => {
-            this.message.addHeader(listHeader.key, value);
-          });
-        });
-      }
-      _getListHeaders(listData) {
-        return Object.keys(listData).map((key) => ({
-          key: "list-" + key.toLowerCase().trim(),
-          value: [].concat(listData[key] || []).map((value) => ({
-            prepared: true,
-            foldLines: true,
-            value: [].concat(value || []).map((value2) => {
-              if (typeof value2 === "string") {
-                value2 = {
-                  url: value2
-                };
-              }
-              if (value2 && value2.url) {
-                if (key.toLowerCase().trim() === "id") {
-                  let comment2 = (value2.comment || "").toString().replace(/\r?\n|\r/g, " ");
-                  if (mimeFuncs.isPlainText(comment2)) {
-                    comment2 = '"' + comment2 + '"';
-                  } else {
-                    comment2 = mimeFuncs.encodeWord(comment2);
-                  }
-                  return (value2.comment ? comment2 + " " : "") + this._formatListUrl(value2.url).replace(/^<[^:]+:\/{0,2}/, "<");
-                }
-                let comment = (value2.comment || "").toString().replace(/\r?\n|\r/g, " ");
-                if (!mimeFuncs.isPlainText(comment)) {
-                  comment = mimeFuncs.encodeWord(comment);
-                }
-                return this._formatListUrl(value2.url) + (value2.comment ? " (" + comment + ")" : "");
-              }
-              return "";
-            }).filter((value2) => value2).join(", ")
-          }))
-        }));
-      }
-      _formatListUrl(url) {
-        url = url.replace(/[\s<]+|[\s>]+/g, "");
-        if (/^(https?|mailto|ftp):/.test(url)) {
-          return "<" + url + ">";
-        }
-        if (/^[^@]+@[^@]+$/.test(url)) {
-          return "<mailto:" + url + ">";
-        }
-        return "<http://" + url + ">";
-      }
-    };
-    module2.exports = MailMessage;
-  }
-});
-
-// node_modules/nodemailer/lib/mailer/index.js
-var require_mailer = __commonJS({
-  "node_modules/nodemailer/lib/mailer/index.js"(exports2, module2) {
-    "use strict";
-    var EventEmitter = require("events");
-    var shared = require_shared3();
-    var mimeTypes = require_mime_types2();
-    var MailComposer = require_mail_composer();
-    var DKIM = require_dkim();
-    var httpProxyClient = require_http_proxy_client();
-    var errors = require_errors2();
-    var util = require("util");
-    var urllib = require_url();
-    var packageData = require_package3();
-    var MailMessage = require_mail_message();
-    var net = require("net");
-    var dns = require("dns");
-    var crypto7 = require("crypto");
-    var Mail = class extends EventEmitter {
-      constructor(transporter, options, defaults) {
-        super();
-        this.options = options || {};
-        this._defaults = defaults || {};
-        this._defaultPlugins = {
-          compile: [(...args) => this._convertDataImages(...args)],
-          stream: []
-        };
-        this._userPlugins = {
-          compile: [],
-          stream: []
-        };
-        this.meta = /* @__PURE__ */ new Map();
-        this.dkim = this.options.dkim ? new DKIM(this.options.dkim) : false;
-        this.transporter = transporter;
-        this.transporter.mailer = this;
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "mail"
-        });
-        this.logger.debug(
-          {
-            tnx: "create"
-          },
-          "Creating transport: %s",
-          this.getVersionString()
-        );
-        if (typeof this.transporter.on === "function") {
-          this.transporter.on("log", (log) => {
-            this.logger.debug(
-              {
-                tnx: "transport"
-              },
-              "%s: %s",
-              log.type,
-              log.message
-            );
-          });
-          this.transporter.on("error", (err) => {
-            this.logger.error(
-              {
-                err,
-                tnx: "transport"
-              },
-              "Transport Error: %s",
-              err.message
-            );
-            this.emit("error", err);
-          });
-          this.transporter.on("idle", (...args) => {
-            this.emit("idle", ...args);
-          });
-          this.transporter.on("clear", (...args) => {
-            this.emit("clear", ...args);
-          });
-        }
-        ["close", "isIdle", "verify"].forEach((method) => {
-          this[method] = (...args) => {
-            if (typeof this.transporter[method] === "function") {
-              if (method === "verify" && typeof this.getSocket === "function") {
-                this.transporter.getSocket = this.getSocket;
-                this.getSocket = false;
-              }
-              return this.transporter[method](...args);
-            }
-            this.logger.warn(
-              {
-                tnx: "transport",
-                methodName: method
-              },
-              "Non existing method %s called for transport",
-              method
-            );
-            return false;
-          };
-        });
-        if (this.options.proxy && typeof this.options.proxy === "string") {
-          this.setupProxy(this.options.proxy);
-        }
-      }
-      use(step, plugin) {
-        step = (step || "").toString();
-        if (!this._userPlugins.hasOwnProperty(step)) {
-          this._userPlugins[step] = [plugin];
-        } else {
-          this._userPlugins[step].push(plugin);
-        }
-        return this;
-      }
-      /**
-       * Sends an email using the preselected transport object
-       *
-       * @param {Object} data E-data description
-       * @param {Function?} callback Callback to run once the sending succeeded or failed
-       */
-      sendMail(data, callback = null) {
-        let promise;
-        if (!callback) {
-          promise = new Promise((resolve, reject) => {
-            callback = shared.callbackPromise(resolve, reject);
-          });
-        }
-        if (typeof this.getSocket === "function") {
-          this.transporter.getSocket = this.getSocket;
-          this.getSocket = false;
-        }
-        const mail = new MailMessage(this, data);
-        this.logger.debug(
-          {
-            tnx: "transport",
-            name: this.transporter.name,
-            version: this.transporter.version,
-            action: "send"
-          },
-          "Sending mail using %s/%s",
-          this.transporter.name,
-          this.transporter.version
-        );
-        this._processPlugins("compile", mail, (err) => {
-          if (err) {
-            this.logger.error(
-              {
-                err,
-                tnx: "plugin",
-                action: "compile"
-              },
-              "PluginCompile Error: %s",
-              err.message
-            );
-            return callback(err);
-          }
-          mail.message = new MailComposer(mail.data).compile();
-          mail.setMailerHeader();
-          mail.setPriorityHeaders();
-          mail.setListHeaders();
-          this._processPlugins("stream", mail, (err2) => {
-            if (err2) {
-              this.logger.error(
-                {
-                  err: err2,
-                  tnx: "plugin",
-                  action: "stream"
-                },
-                "PluginStream Error: %s",
-                err2.message
-              );
-              return callback(err2);
-            }
-            if (mail.data.dkim || this.dkim) {
-              mail.message.processFunc((input) => {
-                const dkim = mail.data.dkim ? new DKIM(mail.data.dkim) : this.dkim;
-                this.logger.debug(
-                  {
-                    tnx: "DKIM",
-                    messageId: mail.message.messageId(),
-                    dkimDomains: dkim.keys.map((key) => key.keySelector + "." + key.domainName).join(", ")
-                  },
-                  "Signing outgoing message with %s keys",
-                  dkim.keys.length
-                );
-                return dkim.sign(input, mail.data._dkim);
-              });
-            }
-            this.transporter.send(mail, (...args) => {
-              if (args[0]) {
-                this.logger.error(
-                  {
-                    err: args[0],
-                    tnx: "transport",
-                    action: "send"
-                  },
-                  "Send Error: %s",
-                  args[0].message
-                );
-              }
-              callback(...args);
-            });
-          });
-        });
-        return promise;
-      }
-      getVersionString() {
-        return util.format(
-          "%s (%s; +%s; %s/%s)",
-          packageData.name,
-          packageData.version,
-          packageData.homepage,
-          this.transporter.name,
-          this.transporter.version
-        );
-      }
-      _processPlugins(step, mail, callback) {
-        step = (step || "").toString();
-        if (!this._userPlugins.hasOwnProperty(step)) {
-          return callback();
-        }
-        const userPlugins = this._userPlugins[step] || [];
-        const defaultPlugins = this._defaultPlugins[step] || [];
-        if (userPlugins.length) {
-          this.logger.debug(
-            {
-              tnx: "transaction",
-              pluginCount: userPlugins.length,
-              step
-            },
-            "Using %s plugins for %s",
-            userPlugins.length,
-            step
-          );
-        }
-        if (userPlugins.length + defaultPlugins.length === 0) {
-          return callback();
-        }
-        let pos = 0;
-        let block = "default";
-        const processPlugins = () => {
-          let curplugins = block === "default" ? defaultPlugins : userPlugins;
-          if (pos >= curplugins.length) {
-            if (block === "default" && userPlugins.length) {
-              block = "user";
-              pos = 0;
-              curplugins = userPlugins;
-            } else {
-              return callback();
-            }
-          }
-          const plugin = curplugins[pos++];
-          plugin(mail, (err) => {
-            if (err) {
-              return callback(err);
-            }
-            processPlugins();
-          });
-        };
-        processPlugins();
-      }
-      /**
-       * Sets up proxy handler for a Nodemailer object
-       *
-       * @param {String} proxyUrl Proxy configuration url
-       */
-      setupProxy(proxyUrl) {
-        const proxy = urllib.parse(proxyUrl);
-        this.getSocket = (options, callback) => {
-          const protocol = proxy.protocol.replace(/:$/, "").toLowerCase();
-          if (this.meta.has("proxy_handler_" + protocol)) {
-            return this.meta.get("proxy_handler_" + protocol)(proxy, options, callback);
-          }
-          switch (protocol) {
-            // Connect using a HTTP CONNECT method
-            case "http":
-            case "https":
-              httpProxyClient(proxy.href, options.port, options.host, this.options.tls || {}, (err2, socket) => {
-                if (err2) {
-                  return callback(err2);
-                }
-                return callback(null, {
-                  connection: socket
-                });
-              });
-              return;
-            case "socks":
-            case "socks5":
-            case "socks4":
-            case "socks4a": {
-              if (!this.meta.has("proxy_socks_module")) {
-                let err2 = new Error("Socks module not loaded");
-                err2.code = errors.EPROXY;
-                return callback(err2);
-              }
-              const connect = (ipaddress) => {
-                const proxyV2 = !!this.meta.get("proxy_socks_module").SocksClient;
-                const socksClient = proxyV2 ? this.meta.get("proxy_socks_module").SocksClient : this.meta.get("proxy_socks_module");
-                const proxyType = Number(proxy.protocol.replace(/\D/g, "")) || 5;
-                const connectionOpts = {
-                  proxy: {
-                    ipaddress,
-                    port: Number(proxy.port),
-                    type: proxyType
-                  },
-                  [proxyV2 ? "destination" : "target"]: {
-                    host: options.host,
-                    port: options.port
-                  },
-                  command: "connect"
-                };
-                if (proxy.auth) {
-                  const username = decodeURIComponent(proxy.auth.split(":").shift());
-                  const password = decodeURIComponent(proxy.auth.split(":").pop());
-                  if (proxyV2) {
-                    connectionOpts.proxy.userId = username;
-                    connectionOpts.proxy.password = password;
-                  } else if (proxyType === 4) {
-                    connectionOpts.userid = username;
-                  } else {
-                    connectionOpts.authentication = {
-                      username,
-                      password
-                    };
-                  }
-                }
-                socksClient.createConnection(connectionOpts, (err2, info) => {
-                  if (err2) {
-                    return callback(err2);
-                  }
-                  return callback(null, {
-                    connection: info.socket || info
-                  });
-                });
-              };
-              if (net.isIP(proxy.hostname)) {
-                return connect(proxy.hostname);
-              }
-              return dns.resolve(proxy.hostname, (err2, address) => {
-                if (err2) {
-                  return callback(err2);
-                }
-                connect(Array.isArray(address) ? address[0] : address);
-              });
-            }
-          }
-          let err = new Error("Unknown proxy configuration");
-          err.code = errors.EPROXY;
-          callback(err);
-        };
-      }
-      _convertDataImages(mail, callback) {
-        if (!this.options.attachDataUrls && !mail.data.attachDataUrls || !mail.data.html) {
-          return callback();
-        }
-        mail.resolveContent(
-          mail.data,
-          "html",
-          { disableFileAccess: mail.data.disableFileAccess, disableUrlAccess: mail.data.disableUrlAccess },
-          (err, html) => {
-            if (err) {
-              return callback(err);
-            }
-            let cidCounter = 0;
-            html = (html || "").toString().replace(
-              /(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;]+);[^"'>\s]+)/gi,
-              (match2, prefix, dataUri, mimeType) => {
-                const cid = crypto7.randomBytes(10).toString("hex") + "@localhost";
-                if (!mail.data.attachments) {
-                  mail.data.attachments = [];
-                }
-                if (!Array.isArray(mail.data.attachments)) {
-                  mail.data.attachments = [].concat(mail.data.attachments || []);
-                }
-                mail.data.attachments.push({
-                  path: dataUri,
-                  cid,
-                  filename: "image-" + ++cidCounter + "." + mimeTypes.detectExtension(mimeType)
-                });
-                return prefix + "cid:" + cid;
-              }
-            );
-            mail.data.html = html;
-            callback();
-          }
-        );
-      }
-      set(key, value) {
-        return this.meta.set(key, value);
-      }
-      get(key) {
-        return this.meta.get(key);
-      }
-    };
-    module2.exports = Mail;
-  }
-});
-
-// node_modules/nodemailer/lib/smtp-connection/data-stream.js
-var require_data_stream2 = __commonJS({
-  "node_modules/nodemailer/lib/smtp-connection/data-stream.js"(exports2, module2) {
-    "use strict";
-    var { Transform } = require("stream");
-    var DataStream = class extends Transform {
-      constructor(options) {
-        super(options);
-        this.options = options || {};
-        this.inByteCount = 0;
-        this.outByteCount = 0;
-        this.lastByte = false;
-      }
-      /**
-       * Escapes dots
-       */
-      _transform(chunk, encoding, done) {
-        const chunks = [];
-        let chunklen = 0;
-        let i2, len, lastPos = 0;
-        let buf;
-        if (!chunk || !chunk.length) {
-          return done();
-        }
-        if (typeof chunk === "string") {
-          chunk = Buffer.from(chunk);
-        }
-        this.inByteCount += chunk.length;
-        for (i2 = 0, len = chunk.length; i2 < len; i2++) {
-          if (chunk[i2] === 46) {
-            if (i2 && chunk[i2 - 1] === 10 || !i2 && (!this.lastByte || this.lastByte === 10)) {
-              buf = chunk.slice(lastPos, i2 + 1);
-              chunks.push(buf);
-              chunks.push(Buffer.from("."));
-              chunklen += buf.length + 1;
-              lastPos = i2 + 1;
-            }
-          } else if (chunk[i2] === 10) {
-            if (i2 && chunk[i2 - 1] !== 13 || !i2 && this.lastByte !== 13) {
-              if (i2 > lastPos) {
-                buf = chunk.slice(lastPos, i2);
-                chunks.push(buf);
-                chunklen += buf.length + 2;
-              } else {
-                chunklen += 2;
-              }
-              chunks.push(Buffer.from("\r\n"));
-              lastPos = i2 + 1;
-            }
-          }
-        }
-        if (chunklen) {
-          if (lastPos < chunk.length) {
-            buf = chunk.slice(lastPos);
-            chunks.push(buf);
-            chunklen += buf.length;
-          }
-          this.outByteCount += chunklen;
-          this.push(Buffer.concat(chunks, chunklen));
-        } else {
-          this.outByteCount += chunk.length;
-          this.push(chunk);
-        }
-        this.lastByte = chunk[chunk.length - 1];
-        done();
-      }
-      /**
-       * Finalizes the stream with a dot on a single line
-       */
-      _flush(done) {
-        let buf;
-        if (this.lastByte === 10) {
-          buf = Buffer.from(".\r\n");
-        } else if (this.lastByte === 13) {
-          buf = Buffer.from("\n.\r\n");
-        } else {
-          buf = Buffer.from("\r\n.\r\n");
-        }
-        this.outByteCount += buf.length;
-        this.push(buf);
-        done();
-      }
-    };
-    module2.exports = DataStream;
-  }
-});
-
-// node_modules/nodemailer/lib/smtp-connection/index.js
-var require_smtp_connection = __commonJS({
-  "node_modules/nodemailer/lib/smtp-connection/index.js"(exports2, module2) {
-    "use strict";
-    var packageInfo = require_package3();
-    var { EventEmitter } = require("events");
-    var net = require("net");
-    var tls = require("tls");
-    var os = require("os");
-    var crypto7 = require("crypto");
-    var DataStream = require_data_stream2();
-    var { PassThrough: PassThrough3 } = require("stream");
-    var shared = require_shared3();
-    var CONNECTION_TIMEOUT = 2 * 60 * 1e3;
-    var SOCKET_TIMEOUT = 10 * 60 * 1e3;
-    var GREETING_TIMEOUT = 30 * 1e3;
-    var DNS_TIMEOUT = 30 * 1e3;
-    var TEARDOWN_NOOP = () => {
-    };
-    function decodeServerResponse(str) {
-      if (!str) {
-        return str;
-      }
-      const utf8 = Buffer.from(str, "binary").toString("utf8");
-      return utf8.includes("\uFFFD") ? str : utf8;
-    }
-    var SMTPConnection = class extends EventEmitter {
-      constructor(options) {
-        super(options);
-        this.id = crypto7.randomBytes(8).toString("base64").replace(/\W/g, "");
-        this.stage = "init";
-        this.options = options || {};
-        this.secureConnection = !!this.options.secure;
-        this.alreadySecured = !!this.options.secured;
-        this.port = Number(this.options.port) || (this.secureConnection ? 465 : 587);
-        this.host = this.options.host || "localhost";
-        this.servername = this.options.servername ? this.options.servername : !net.isIP(this.host) ? this.host : false;
-        this.allowInternalNetworkInterfaces = this.options.allowInternalNetworkInterfaces || false;
-        if (typeof this.options.secure === "undefined" && this.port === 465) {
-          this.secureConnection = true;
-        }
-        this.name = (this.options.name || this._getHostname()).toString().replace(/[\r\n]+/g, "");
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "smtp-connection",
-          sid: this.id
-        });
-        this.customAuth = /* @__PURE__ */ new Map();
-        for (const key of Object.keys(this.options.customAuth || {})) {
-          const mapKey = (key || "").toString().trim().toUpperCase();
-          if (mapKey) {
-            this.customAuth.set(mapKey, this.options.customAuth[key]);
-          }
-        }
-        this.version = packageInfo.version;
-        this.authenticated = false;
-        this.destroyed = false;
-        this.secure = !!this.secureConnection;
-        this._remainder = "";
-        this._responseQueue = [];
-        this.lastServerResponse = false;
-        this._socket = false;
-        this._supportedAuth = [];
-        this.allowsAuth = false;
-        this._envelope = false;
-        this._supportedExtensions = [];
-        this._maxAllowedSize = 0;
-        this._responseActions = [];
-        this._recipientQueue = [];
-        this._greetingTimeout = false;
-        this._connectionTimeout = false;
-        this._destroyed = false;
-        this._closing = false;
-        this._currentDataStream = false;
-        this._onSocketData = (chunk) => this._onData(chunk);
-        this._onSocketError = (error) => this._onError(error, "ESOCKET", false, "CONN");
-        this._onSocketClose = () => this._onClose();
-        this._onSocketEnd = () => this._onEnd();
-        this._onSocketTimeout = () => this._onTimeout();
-        this._onConnectionSocketError = (err) => this._onConnectionError(err, "ESOCKET");
-        this._connectionAttemptId = 0;
-      }
-      /**
-       * Creates a connection to a SMTP server and sets up connection
-       * listener
-       */
-      connect(connectCallback) {
-        if (typeof connectCallback === "function") {
-          this.once("connect", () => {
-            this.logger.debug(
-              {
-                tnx: "smtp"
-              },
-              "SMTP handshake finished"
-            );
-            connectCallback();
-          });
-          const isDestroyedMessage = this._isDestroyedMessage("connect");
-          if (isDestroyedMessage) {
-            return connectCallback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "CONN"));
-          }
-        }
-        let opts = {
-          port: this.port,
-          host: this.host,
-          allowInternalNetworkInterfaces: this.allowInternalNetworkInterfaces,
-          timeout: this.options.dnsTimeout || DNS_TIMEOUT
-        };
-        if (this.options.localAddress) {
-          opts.localAddress = this.options.localAddress;
-        }
-        if (this.options.connection) {
-          this._socket = this.options.connection;
-          this._setupConnectionHandlers();
-          if (this.secureConnection && !this.alreadySecured) {
-            setImmediate(
-              () => this._upgradeConnection((err) => {
-                if (err) {
-                  this._onError(new Error("Error initiating TLS - " + (err.message || err)), "ETLS", false, "CONN");
-                  return;
-                }
-                this._onConnect();
-              })
-            );
-          } else {
-            setImmediate(() => this._onConnect());
-          }
-          return;
-        } else if (this.options.socket) {
-          this._socket = this.options.socket;
-          return this._resolveAndConnect(opts, (_resolved) => {
-            try {
-              this._socket.connect(this.port, this.host, () => {
-                this._socket.setKeepAlive(true);
-                if (this.secureConnection && !this.alreadySecured) {
-                  return this._upgradeConnection((err) => {
-                    if (err) {
-                      this._onError(new Error("Error initiating TLS - " + (err.message || err)), "ETLS", false, "CONN");
-                      return;
-                    }
-                    this._onConnect();
-                  });
-                }
-                this._onConnect();
-              });
-              this._setupConnectionHandlers();
-            } catch (E) {
-              return setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
-            }
-          });
-        } else {
-          if (this.secureConnection) {
-            Object.assign(opts, this.options.tls || {});
-            if (this.servername && !opts.servername) {
-              opts.servername = this.servername;
-            }
-          }
-          return this._resolveAndConnect(opts, (resolved) => {
-            this._fallbackAddresses = (resolved._addresses || []).filter((addr) => addr !== opts.host);
-            this._connectOpts = Object.assign({}, opts);
-            this._connectToHost(opts, this.secureConnection);
-          });
-        }
-      }
-      /**
-       * Resolves the hostname and applies resolved values to opts,
-       * then calls the provided callback with the resolved data
-       *
-       * @param {Object} opts Connection options (modified in place)
-       * @param {Function} callback Called with resolved data on success
-       */
-      _resolveAndConnect(opts, callback) {
-        return shared.resolveHostname(opts, (err, resolved) => {
-          if (err) {
-            return setImmediate(() => this._onError(err, "EDNS", false, "CONN"));
-          }
-          this.logger.debug(
-            {
-              tnx: "dns",
-              source: opts.host,
-              resolved: resolved.host,
-              cached: !!resolved.cached
-            },
-            "Resolved %s as %s [cache %s]",
-            opts.host,
-            resolved.host,
-            resolved.cached ? "hit" : "miss"
-          );
-          for (const key of Object.keys(resolved)) {
-            if (key.charAt(0) !== "_" && resolved[key]) {
-              opts[key] = resolved[key];
-            }
-          }
-          callback(resolved);
-        });
-      }
-      /**
-       * Attempts to connect to the specified host address
-       *
-       * @param {Object} opts Connection options
-       * @param {Boolean} secure Whether to use TLS
-       */
-      _connectToHost(opts, secure) {
-        if (this._destroyed || this._closing) {
-          return;
-        }
-        this._connectionAttemptId++;
-        const currentAttemptId = this._connectionAttemptId;
-        const connectFn = secure ? tls.connect : net.connect;
-        try {
-          this._socket = connectFn(opts, () => {
-            if (this._connectionAttemptId !== currentAttemptId) {
-              return;
-            }
-            this._socket.setKeepAlive(true);
-            this._onConnect();
-          });
-          this._setupConnectionHandlers();
-        } catch (E) {
-          return setImmediate(() => this._onError(E, "ECONNECTION", false, "CONN"));
-        }
-      }
-      /**
-       * Sets up connection timeout and error handlers
-       */
-      _setupConnectionHandlers() {
-        this._connectionTimeout = setTimeout(() => {
-          this._onConnectionError("Connection timeout", "ETIMEDOUT");
-        }, this.options.connectionTimeout || CONNECTION_TIMEOUT);
-        this._socket.on("error", this._onConnectionSocketError);
-      }
-      /**
-       * Handles connection errors with fallback to alternative addresses
-       *
-       * @param {Error|String} err Error object or message
-       * @param {String} code Error code
-       */
-      _onConnectionError(err, code) {
-        clearTimeout(this._connectionTimeout);
-        const canFallback = this._fallbackAddresses && this._fallbackAddresses.length && this.stage === "init" && !this._destroyed;
-        if (!canFallback) {
-          this._onError(err, code, false, "CONN");
-          return;
-        }
-        const nextHost = this._fallbackAddresses.shift();
-        this.logger.info(
-          {
-            tnx: "network",
-            failedHost: this._connectOpts.host,
-            nextHost,
-            error: err.message || err
-          },
-          "Connection to %s failed, trying %s",
-          this._connectOpts.host,
-          nextHost
-        );
-        if (this._socket) {
-          try {
-            this._socket.removeListener("error", this._onConnectionSocketError);
-            this._socket.on("error", TEARDOWN_NOOP);
-            this._socket.destroy();
-          } catch (_E) {
-          }
-          this._socket = null;
-        }
-        this._connectOpts.host = nextHost;
-        this._connectToHost(this._connectOpts, this.secureConnection);
-      }
-      /**
-       * Sends QUIT
-       */
-      quit() {
-        this._sendCommand("QUIT");
-        this._responseActions.push(this.close);
-      }
-      /**
-       * Closes the connection to the server
-       */
-      close() {
-        clearTimeout(this._connectionTimeout);
-        clearTimeout(this._greetingTimeout);
-        this._responseActions = [];
-        if (this._closing) {
-          return;
-        }
-        this._closing = true;
-        const closeMethod = this.stage === "init" ? "destroy" : "end";
-        this.logger.debug(
-          {
-            tnx: "smtp"
-          },
-          'Closing connection to the server using "%s"',
-          closeMethod
-        );
-        const socket = this._socket && this._socket.socket || this._socket;
-        if (this._currentDataStream) {
-          try {
-            this._currentDataStream.unpipe(this._socket);
-          } catch (_E) {
-          }
-          this._currentDataStream = false;
-        }
-        if (socket && !socket.destroyed) {
-          try {
-            socket.setTimeout(0);
-            socket.removeListener("data", this._onSocketData);
-            socket.removeListener("timeout", this._onSocketTimeout);
-            socket.removeListener("close", this._onSocketClose);
-            socket.removeListener("end", this._onSocketEnd);
-            socket.removeListener("error", this._onSocketError);
-            socket.removeListener("error", this._onConnectionSocketError);
-            socket.on("error", TEARDOWN_NOOP);
-            socket[closeMethod]();
-          } catch (_E) {
-          }
-        }
-        this._destroy();
-      }
-      /**
-       * Authenticate user
-       */
-      login(authData, callback) {
-        const isDestroyedMessage = this._isDestroyedMessage("login");
-        if (isDestroyedMessage) {
-          return callback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
-        }
-        this._auth = authData || {};
-        this._authMethod = (this._auth.method || "").toString().trim().toUpperCase() || false;
-        if (!this._authMethod && this._auth.oauth2 && !this._auth.credentials) {
-          this._authMethod = "XOAUTH2";
-        } else if (!this._authMethod || this._authMethod === "XOAUTH2" && !this._auth.oauth2) {
-          this._authMethod = (this._supportedAuth[0] || "PLAIN").toUpperCase().trim();
-        }
-        if (this._authMethod !== "XOAUTH2" && (!this._auth.credentials || !this._auth.credentials.user || !this._auth.credentials.pass)) {
-          if (this._auth.user && this._auth.pass || this.customAuth.has(this._authMethod)) {
-            this._auth.credentials = {
-              user: this._auth.user,
-              pass: this._auth.pass,
-              options: this._auth.options
-            };
-          } else {
-            return callback(this._formatError('Missing credentials for "' + this._authMethod + '"', "EAUTH", false, "API"));
-          }
-        }
-        if (this.customAuth.has(this._authMethod)) {
-          const handler = this.customAuth.get(this._authMethod);
-          let lastResponse;
-          let returned = false;
-          const resolve = () => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            this.logger.info(
-              {
-                tnx: "smtp",
-                username: this._auth.user,
-                action: "authenticated",
-                method: this._authMethod
-              },
-              "User %s authenticated",
-              JSON.stringify(this._auth.user)
-            );
-            this.authenticated = true;
-            callback(null, true);
-          };
-          const reject = (err) => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            callback(this._formatError(err, "EAUTH", lastResponse, "AUTH " + this._authMethod));
-          };
-          const handlerResponse = handler({
-            auth: this._auth,
-            method: this._authMethod,
-            extensions: [].concat(this._supportedExtensions),
-            authMethods: [].concat(this._supportedAuth),
-            maxAllowedSize: this._maxAllowedSize || false,
-            sendCommand: (cmd, done) => {
-              let promise;
-              if (!done) {
-                promise = new Promise((resolve2, reject2) => {
-                  done = shared.callbackPromise(resolve2, reject2);
-                });
-              }
-              this._responseActions.push((str) => {
-                lastResponse = str;
-                let codes = str.match(/^(\d+)(?:\s(\d+\.\d+\.\d+))?\s/);
-                let data = {
-                  command: cmd,
-                  response: str
-                };
-                if (codes) {
-                  data.status = Number(codes[1]) || 0;
-                  if (codes[2]) {
-                    data.code = codes[2];
-                  }
-                  data.text = str.substr(codes[0].length);
-                } else {
-                  data.text = str;
-                  data.status = 0;
-                }
-                done(null, data);
-              });
-              setImmediate(() => this._sendCommand(cmd));
-              return promise;
-            },
-            resolve,
-            reject
-          });
-          if (handlerResponse && typeof handlerResponse.catch === "function") {
-            handlerResponse.then(resolve).catch(reject);
-          }
-          return;
-        }
-        switch (this._authMethod) {
-          case "XOAUTH2":
-            this._handleXOauth2Token(false, callback);
-            return;
-          case "LOGIN":
-            this._responseActions.push((str) => {
-              this._actionAUTH_LOGIN_USER(str, callback);
-            });
-            this._sendCommand("AUTH LOGIN");
-            return;
-          case "PLAIN":
-            this._responseActions.push((str) => {
-              this._actionAUTHComplete(str, callback);
-            });
-            this._sendCommand(
-              "AUTH PLAIN " + Buffer.from(
-                //this._auth.user+'\u0000'+
-                "\0" + // skip authorization identity as it causes problems with some servers
-                this._auth.credentials.user + "\0" + this._auth.credentials.pass,
-                "utf-8"
-              ).toString("base64"),
-              // log entry without passwords
-              "AUTH PLAIN " + Buffer.from(
-                //this._auth.user+'\u0000'+
-                "\0" + // skip authorization identity as it causes problems with some servers
-                this._auth.credentials.user + "\0/* secret */",
-                "utf-8"
-              ).toString("base64")
-            );
-            return;
-          case "CRAM-MD5":
-            this._responseActions.push((str) => {
-              this._actionAUTH_CRAM_MD5(str, callback);
-            });
-            this._sendCommand("AUTH CRAM-MD5");
-            return;
-        }
-        return callback(this._formatError('Unknown authentication method "' + this._authMethod + '"', "EAUTH", false, "API"));
-      }
-      /**
-       * Sends a message
-       *
-       * @param {Object} envelope Envelope object, {from: addr, to: [addr]}
-       * @param {Object} message String, Buffer or a Stream
-       * @param {Function} callback Callback to return once sending is completed
-       */
-      send(envelope, message, done) {
-        if (!message) {
-          return done(this._formatError("Empty message", "EMESSAGE", false, "API"));
-        }
-        const isDestroyedMessage = this._isDestroyedMessage("send message");
-        if (isDestroyedMessage) {
-          return done(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
-        }
-        if (this._maxAllowedSize && envelope.size > this._maxAllowedSize) {
-          return setImmediate(() => {
-            done(this._formatError("Message size larger than allowed " + this._maxAllowedSize, "EMESSAGE", false, "MAIL FROM"));
-          });
-        }
-        let returned = false;
-        const callback = function() {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          done(...arguments);
-        };
-        if (typeof message.on === "function") {
-          message.on("error", (err) => callback(this._formatError(err, "ESTREAM", false, "API")));
-        }
-        const startTime = Date.now();
-        this._setEnvelope(envelope, (err, info) => {
-          if (err) {
-            const stream2 = new PassThrough3();
-            if (typeof message.pipe === "function") {
-              message.pipe(stream2);
-            } else {
-              stream2.write(message);
-              stream2.end();
-            }
-            return callback(err);
-          }
-          const envelopeTime = Date.now();
-          const stream = this._createSendStream((err2, str) => {
-            if (err2) {
-              return callback(err2);
-            }
-            info.envelopeTime = envelopeTime - startTime;
-            info.messageTime = Date.now() - envelopeTime;
-            info.messageSize = stream.outByteCount;
-            info.response = str;
-            return callback(null, info);
-          });
-          if (typeof message.pipe === "function") {
-            message.pipe(stream);
-          } else {
-            stream.write(message);
-            stream.end();
-          }
-        });
-      }
-      /**
-       * Resets connection state
-       *
-       * @param {Function} callback Callback to return once connection is reset
-       */
-      reset(callback) {
-        const isDestroyedMessage = this._isDestroyedMessage("reset");
-        if (isDestroyedMessage) {
-          return callback(this._formatError(isDestroyedMessage, "ECONNECTION", false, "API"));
-        }
-        this._sendCommand("RSET");
-        this._responseActions.push((str) => {
-          if (str.charAt(0) !== "2") {
-            return callback(this._formatError("Could not reset session state. response=" + str, "EPROTOCOL", str, "RSET"));
-          }
-          this._envelope = false;
-          return callback(null, true);
-        });
-      }
-      /**
-       * Connection listener that is run when the connection to
-       * the server is opened
-       *
-       * @event
-       */
-      _onConnect() {
-        clearTimeout(this._connectionTimeout);
-        this.logger.info(
-          {
-            tnx: "network",
-            localAddress: this._socket.localAddress,
-            localPort: this._socket.localPort,
-            remoteAddress: this._socket.remoteAddress,
-            remotePort: this._socket.remotePort
-          },
-          "%s established to %s:%s",
-          this.secure ? "Secure connection" : "Connection",
-          this._socket.remoteAddress,
-          this._socket.remotePort
-        );
-        if (this._destroyed) {
-          this.close();
-          return;
-        }
-        this.stage = "connected";
-        this._socket.removeListener("data", this._onSocketData);
-        this._socket.removeListener("timeout", this._onSocketTimeout);
-        this._socket.removeListener("close", this._onSocketClose);
-        this._socket.removeListener("end", this._onSocketEnd);
-        this._socket.removeListener("error", this._onConnectionSocketError);
-        this._socket.removeListener("error", this._onSocketError);
-        this._socket.on("error", this._onSocketError);
-        this._socket.on("data", this._onSocketData);
-        this._socket.once("close", this._onSocketClose);
-        this._socket.once("end", this._onSocketEnd);
-        this._socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
-        this._socket.on("timeout", this._onSocketTimeout);
-        this._greetingTimeout = setTimeout(() => {
-          if (this._socket && !this._destroyed && this._responseActions[0] === this._actionGreeting) {
-            this._onError("Greeting never received", "ETIMEDOUT", false, "CONN");
-          }
-        }, this.options.greetingTimeout || GREETING_TIMEOUT);
-        this._responseActions.push(this._actionGreeting);
-        this._socket.resume();
-      }
-      /**
-       * 'data' listener for data coming from the server
-       *
-       * @event
-       * @param {Buffer} chunk Data chunk coming from the server
-       */
-      _onData(chunk) {
-        if (this._destroyed || !chunk || !chunk.length) {
-          return;
-        }
-        let data = chunk.toString("binary");
-        let lines = (this._remainder + data).split(/\r?\n/);
-        let lastline;
-        this._remainder = lines.pop();
-        for (let i2 = 0, len = lines.length; i2 < len; i2++) {
-          if (this._responseQueue.length) {
-            lastline = this._responseQueue[this._responseQueue.length - 1];
-            if (/^\d+-/.test(lastline.split("\n").pop())) {
-              this._responseQueue[this._responseQueue.length - 1] += "\n" + lines[i2];
-              continue;
-            }
-          }
-          this._responseQueue.push(lines[i2]);
-        }
-        if (this._responseQueue.length) {
-          lastline = this._responseQueue[this._responseQueue.length - 1];
-          if (/^\d+-/.test(lastline.split("\n").pop())) {
-            return;
-          }
-        }
-        this._processResponse();
-      }
-      /**
-       * 'error' listener for the socket
-       *
-       * @event
-       * @param {Error} err Error object
-       * @param {String} type Error name
-       */
-      _onError(err, type, data, command) {
-        clearTimeout(this._connectionTimeout);
-        clearTimeout(this._greetingTimeout);
-        if (this._destroyed) {
-          return;
-        }
-        err = this._formatError(err, type, data, command);
-        const transientCodes = ["ETIMEDOUT", "ESOCKET", "ECONNECTION"];
-        if (transientCodes.includes(err.code)) {
-          this.logger.warn(data, err.message);
-        } else {
-          this.logger.error(data, err.message);
-        }
-        this.emit("error", err);
-        this.close();
-      }
-      _formatError(message, type, response, command) {
-        let err;
-        if (/Error\]$/i.test(Object.prototype.toString.call(message))) {
-          err = message;
-        } else {
-          err = new Error(message);
-        }
-        if (type && type !== "Error") {
-          err.code = type;
-        }
-        if (response) {
-          err.response = response;
-          err.message += ": " + response;
-        }
-        const responseCode = typeof response === "string" && Number((response.match(/^\d+/) || [])[0]) || false;
-        if (responseCode) {
-          err.responseCode = responseCode;
-        }
-        if (command) {
-          err.command = command;
-        }
-        return err;
-      }
-      /**
-       * 'close' listener for the socket
-       *
-       * @event
-       */
-      _onClose() {
-        let serverResponse = false;
-        if (this._remainder && this._remainder.trim()) {
-          this.lastServerResponse = serverResponse = decodeServerResponse(this._remainder.trim());
-          if (this.options.debug || this.options.transactionLog) {
-            this.logger.debug(
-              {
-                tnx: "server"
-              },
-              serverResponse
-            );
-          }
-        }
-        this.logger.info(
-          {
-            tnx: "network"
-          },
-          "Connection closed"
-        );
-        if (this.upgrading && !this._destroyed) {
-          return this._onError(new Error("Connection closed unexpectedly"), "ETLS", serverResponse, "CONN");
-        } else if (![this._actionGreeting, this.close].includes(this._responseActions[0]) && !this._destroyed) {
-          return this._onError(new Error("Connection closed unexpectedly"), "ECONNECTION", serverResponse, "CONN");
-        } else if (/^[45]\d{2}\b/.test(serverResponse)) {
-          return this._onError(new Error("Connection closed unexpectedly"), "ECONNECTION", serverResponse, "CONN");
-        }
-        this._destroy();
-      }
-      /**
-       * 'end' listener for the socket
-       *
-       * @event
-       */
-      _onEnd() {
-        if (this._socket && !this._socket.destroyed) {
-          this._socket.end();
-        }
-      }
-      /**
-       * 'timeout' listener for the socket
-       *
-       * @event
-       */
-      _onTimeout() {
-        return this._onError(new Error("Timeout"), "ETIMEDOUT", false, "CONN");
-      }
-      /**
-       * Destroys the client, emits 'end'
-       */
-      _destroy() {
-        if (this._destroyed) {
-          return;
-        }
-        this._destroyed = true;
-        this.destroyed = true;
-        this.emit("end");
-      }
-      /**
-       * Upgrades the connection to TLS
-       *
-       * @param {Function} callback Callback function to run when the connection
-       *        has been secured
-       */
-      _upgradeConnection(callback) {
-        this._remainder = "";
-        this._responseQueue = [];
-        this._socket.removeListener("data", this._onSocketData);
-        this._socket.removeListener("timeout", this._onSocketTimeout);
-        const socketPlain = this._socket;
-        const opts = Object.assign(
-          {
-            socket: this._socket,
-            host: this.host
-          },
-          this.options.tls || {}
-        );
-        if (this.servername && !opts.servername) {
-          opts.servername = this.servername;
-        }
-        const removePlainSocketListeners = () => {
-          socketPlain.removeListener("close", this._onSocketClose);
-          socketPlain.removeListener("end", this._onSocketEnd);
-          socketPlain.removeListener("error", this._onSocketError);
-          socketPlain.removeListener("error", this._onConnectionSocketError);
-        };
-        this.upgrading = true;
-        try {
-          this._socket = tls.connect(opts, () => {
-            this.secure = true;
-            this.upgrading = false;
-            this._socket.on("data", this._onSocketData);
-            removePlainSocketListeners();
-            return callback(null, true);
-          });
-        } catch (err) {
-          removePlainSocketListeners();
-          return callback(err);
-        }
-        this._socket.on("error", this._onSocketError);
-        this._socket.once("close", this._onSocketClose);
-        this._socket.once("end", this._onSocketEnd);
-        this._socket.setTimeout(this.options.socketTimeout || SOCKET_TIMEOUT);
-        this._socket.on("timeout", this._onSocketTimeout);
-        socketPlain.resume();
-      }
-      /**
-       * Processes queued responses from the server
-       */
-      _processResponse() {
-        if (!this._responseQueue.length) {
-          return false;
-        }
-        const raw = (this._responseQueue.shift() || "").toString();
-        if (!raw.trim()) {
-          setImmediate(() => this._processResponse());
-          return;
-        }
-        let str = this.lastServerResponse = decodeServerResponse(raw);
-        if (/^\d+-/.test(str.split("\n").pop())) {
-          this._responseQueue.unshift(raw);
-          return;
-        }
-        if (this.options.debug || this.options.transactionLog) {
-          this.logger.debug(
-            {
-              tnx: "server"
-            },
-            str.replace(/\r?\n$/, "")
-          );
-        }
-        const action = this._responseActions.shift();
-        if (typeof action === "function") {
-          action.call(this, str);
-          setImmediate(() => this._processResponse());
-        } else {
-          return this._onError(new Error("Unexpected Response"), "EPROTOCOL", str, "CONN");
-        }
-      }
-      /**
-       * Send a command to the server, append \r\n
-       *
-       * @param {String} str String to be sent to the server
-       * @param {String} logStr Optional string to be used for logging instead of the actual string
-       */
-      _sendCommand(str, logStr) {
-        if (this._destroyed) {
-          return;
-        }
-        if (this._socket.destroyed) {
-          return this.close();
-        }
-        if (this.options.debug || this.options.transactionLog) {
-          this.logger.debug(
-            {
-              tnx: "client"
-            },
-            (logStr || str || "").toString().replace(/\r?\n$/, "")
-          );
-        }
-        this._socket.write(Buffer.from(str + "\r\n", "utf-8"));
-      }
-      /**
-       * Initiates a new message by submitting envelope data, starting with
-       * MAIL FROM: command
-       *
-       * @param {Object} envelope Envelope object in the form of
-       *        {from:'...', to:['...']}
-       *        or
-       *        {from:{address:'...',name:'...'}, to:[address:'...',name:'...']}
-       */
-      _setEnvelope(envelope, callback) {
-        const args = [];
-        let useSmtpUtf8 = false;
-        this._envelope = envelope || {};
-        this._envelope.from = (this._envelope.from && this._envelope.from.address || this._envelope.from || "").toString().trim();
-        this._envelope.to = [].concat(this._envelope.to || []).map((to) => (to && to.address || to || "").toString().trim());
-        if (!this._envelope.to.length) {
-          return callback(this._formatError("No recipients defined", "EENVELOPE", false, "API"));
-        }
-        if (this._envelope.from && /[\r\n<>]/.test(this._envelope.from)) {
-          return callback(this._formatError("Invalid sender " + JSON.stringify(this._envelope.from), "EENVELOPE", false, "API"));
-        }
-        if (/[\x80-\uFFFF]/.test(this._envelope.from)) {
-          useSmtpUtf8 = true;
-        }
-        for (let i2 = 0, len = this._envelope.to.length; i2 < len; i2++) {
-          if (!this._envelope.to[i2] || /[\r\n<>]/.test(this._envelope.to[i2])) {
-            return callback(this._formatError("Invalid recipient " + JSON.stringify(this._envelope.to[i2]), "EENVELOPE", false, "API"));
-          }
-          if (/[\x80-\uFFFF]/.test(this._envelope.to[i2])) {
-            useSmtpUtf8 = true;
-          }
-        }
-        this._envelope.rcptQueue = [].concat(this._envelope.to || []);
-        this._envelope.rejected = [];
-        this._envelope.rejectedErrors = [];
-        this._envelope.accepted = [];
-        if (this._envelope.dsn) {
-          try {
-            this._envelope.dsn = this._setDsnEnvelope(this._envelope.dsn);
-          } catch (err) {
-            return callback(this._formatError("Invalid DSN " + err.message, "EENVELOPE", false, "API"));
-          }
-        }
-        if (this._envelope.requireTLSExtensionEnabled) {
-          if (!this.secure) {
-            return callback(
-              this._formatError("REQUIRETLS can only be used over TLS connections (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM")
-            );
-          }
-          if (!this._supportedExtensions.includes("REQUIRETLS")) {
-            return callback(
-              this._formatError("Server does not support REQUIRETLS extension (RFC 8689)", "EREQUIRETLS", false, "MAIL FROM")
-            );
-          }
-        }
-        this._responseActions.push((str) => {
-          this._actionMAIL(str, callback);
-        });
-        if (useSmtpUtf8 && this._supportedExtensions.includes("SMTPUTF8")) {
-          args.push("SMTPUTF8");
-          this._usingSmtpUtf8 = true;
-        }
-        if (this._envelope.use8BitMime && this._supportedExtensions.includes("8BITMIME")) {
-          args.push("BODY=8BITMIME");
-          this._using8BitMime = true;
-        }
-        if (this._envelope.size && this._supportedExtensions.includes("SIZE")) {
-          const sizeValue = Number(this._envelope.size) || 0;
-          if (sizeValue > 0) {
-            args.push("SIZE=" + sizeValue);
-          }
-        }
-        if (this._envelope.dsn && this._supportedExtensions.includes("DSN")) {
-          if (this._envelope.dsn.ret) {
-            args.push("RET=" + shared.encodeXText(this._envelope.dsn.ret));
-          }
-          if (this._envelope.dsn.envid) {
-            args.push("ENVID=" + shared.encodeXText(this._envelope.dsn.envid));
-          }
-        }
-        if (this._envelope.requireTLSExtensionEnabled) {
-          args.push("REQUIRETLS");
-        }
-        this._sendCommand("MAIL FROM:<" + this._envelope.from + ">" + (args.length ? " " + args.join(" ") : ""));
-      }
-      _setDsnEnvelope(params) {
-        let ret = (params.ret || params.return || "").toString().toUpperCase() || null;
-        if (ret) {
-          switch (ret) {
-            case "HDRS":
-            case "HEADERS":
-              ret = "HDRS";
-              break;
-            case "FULL":
-            case "BODY":
-              ret = "FULL";
-              break;
-          }
-        }
-        if (ret && !["FULL", "HDRS"].includes(ret)) {
-          throw new Error("ret: " + JSON.stringify(ret));
-        }
-        const envid = (params.envid || params.id || "").toString() || null;
-        let notify = params.notify || null;
-        if (notify) {
-          if (typeof notify === "string") {
-            notify = notify.split(",");
-          }
-          notify = notify.map((n) => n.trim().toUpperCase());
-          const validNotify = ["NEVER", "SUCCESS", "FAILURE", "DELAY"];
-          const invalidNotify = notify.filter((n) => !validNotify.includes(n));
-          if (invalidNotify.length || notify.length > 1 && notify.includes("NEVER")) {
-            throw new Error("notify: " + JSON.stringify(notify.join(",")));
-          }
-          notify = notify.join(",");
-        }
-        let orcpt = (params.recipient || params.orcpt || "").toString() || null;
-        if (orcpt && orcpt.indexOf(";") < 0) {
-          orcpt = "rfc822;" + orcpt;
-        }
-        return {
-          ret,
-          envid,
-          notify,
-          orcpt
-        };
-      }
-      _getDsnRcptToArgs() {
-        const args = [];
-        if (this._envelope.dsn && this._supportedExtensions.includes("DSN")) {
-          if (this._envelope.dsn.notify) {
-            args.push("NOTIFY=" + shared.encodeXText(this._envelope.dsn.notify));
-          }
-          if (this._envelope.dsn.orcpt) {
-            args.push("ORCPT=" + shared.encodeXText(this._envelope.dsn.orcpt));
-          }
-        }
-        return args.length ? " " + args.join(" ") : "";
-      }
-      _createSendStream(callback) {
-        const dataStream = new DataStream();
-        if (this.options.lmtp) {
-          this._envelope.accepted.forEach((recipient, i2) => {
-            const final = i2 === this._envelope.accepted.length - 1;
-            this._responseActions.push((str) => {
-              this._actionLMTPStream(recipient, final, str, callback);
-            });
-          });
-        } else {
-          this._responseActions.push((str) => {
-            this._actionSMTPStream(str, callback);
-          });
-        }
-        this._currentDataStream = dataStream;
-        dataStream.pipe(this._socket, {
-          end: false
-        });
-        if (this.options.debug) {
-          const logStream = new PassThrough3();
-          logStream.on("readable", () => {
-            let chunk;
-            while (chunk = logStream.read()) {
-              this.logger.debug(
-                {
-                  tnx: "message"
-                },
-                chunk.toString("binary").replace(/\r?\n$/, "")
-              );
-            }
-          });
-          dataStream.pipe(logStream);
-        }
-        dataStream.once("end", () => {
-          if (this._currentDataStream === dataStream) {
-            this._currentDataStream = false;
-          }
-          this.logger.info(
-            {
-              tnx: "message",
-              inByteCount: dataStream.inByteCount,
-              outByteCount: dataStream.outByteCount
-            },
-            "<%s bytes encoded mime message (source size %s bytes)>",
-            dataStream.outByteCount,
-            dataStream.inByteCount
-          );
-        });
-        return dataStream;
-      }
-      /** ACTIONS **/
-      /**
-       * Will be run after the connection is created and the server sends
-       * a greeting. If the incoming message starts with 220 initiate
-       * SMTP session by sending EHLO command
-       *
-       * @param {String} str Message from the server
-       */
-      _actionGreeting(str) {
-        clearTimeout(this._greetingTimeout);
-        if (str.substr(0, 3) !== "220") {
-          this._onError(new Error("Invalid greeting. response=" + str), "EPROTOCOL", str, "CONN");
-          return;
-        }
-        if (this.options.lmtp) {
-          this._responseActions.push(this._actionLHLO);
-          this._sendCommand("LHLO " + this.name);
-        } else {
-          this._responseActions.push(this._actionEHLO);
-          this._sendCommand("EHLO " + this.name);
-        }
-      }
-      /**
-       * Handles server response for LHLO command. If it yielded in
-       * error, emit 'error', otherwise treat this as an EHLO response
-       *
-       * @param {String} str Message from the server
-       */
-      _actionLHLO(str) {
-        if (str.charAt(0) !== "2") {
-          this._onError(new Error("Invalid LHLO. response=" + str), "EPROTOCOL", str, "LHLO");
-          return;
-        }
-        this._actionEHLO(str);
-      }
-      /**
-       * Handles server response for EHLO command. If it yielded in
-       * error, try HELO instead, otherwise initiate TLS negotiation
-       * if STARTTLS is supported by the server or move into the
-       * authentication phase.
-       *
-       * @param {String} str Message from the server
-       */
-      _actionEHLO(str) {
-        let match2;
-        if (str.substr(0, 3) === "421") {
-          this._onError(new Error("Server terminates connection. response=" + str), "ECONNECTION", str, "EHLO");
-          return;
-        }
-        if (str.charAt(0) !== "2") {
-          if (this.options.requireTLS) {
-            this._onError(
-              new Error("EHLO failed but HELO does not support required STARTTLS. response=" + str),
-              "ECONNECTION",
-              str,
-              "EHLO"
-            );
-            return;
-          }
-          this._responseActions.push(this._actionHELO);
-          this._sendCommand("HELO " + this.name);
-          return;
-        }
-        this._ehloLines = str.split(/\r?\n/).map((line) => line.replace(/^\d+[ -]/, "").trim()).filter((line) => line).slice(1);
-        if (!this.secure && !this.options.ignoreTLS && (/[ -]STARTTLS\b/im.test(str) || this.options.requireTLS)) {
-          this._sendCommand("STARTTLS");
-          this._responseActions.push(this._actionSTARTTLS);
-          return;
-        }
-        if (/[ -]SMTPUTF8\b/im.test(str)) {
-          this._supportedExtensions.push("SMTPUTF8");
-        }
-        if (/[ -]DSN\b/im.test(str)) {
-          this._supportedExtensions.push("DSN");
-        }
-        if (/[ -]8BITMIME\b/im.test(str)) {
-          this._supportedExtensions.push("8BITMIME");
-        }
-        if (/[ -]REQUIRETLS\b/im.test(str)) {
-          this._supportedExtensions.push("REQUIRETLS");
-        }
-        if (/[ -]PIPELINING\b/im.test(str)) {
-          this._supportedExtensions.push("PIPELINING");
-        }
-        if (/[ -]AUTH\b/i.test(str)) {
-          this.allowsAuth = true;
-        }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)PLAIN/i.test(str)) {
-          this._supportedAuth.push("PLAIN");
-        }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)LOGIN/i.test(str)) {
-          this._supportedAuth.push("LOGIN");
-        }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)CRAM-MD5/i.test(str)) {
-          this._supportedAuth.push("CRAM-MD5");
-        }
-        if (/[ -]AUTH(?:(\s+|=)[^\n]*\s+|\s+|=)XOAUTH2/i.test(str)) {
-          this._supportedAuth.push("XOAUTH2");
-        }
-        if (match2 = str.match(/[ -]SIZE(?:[ \t]+(\d+))?/im)) {
-          this._supportedExtensions.push("SIZE");
-          this._maxAllowedSize = Number(match2[1]) || 0;
-        }
-        this.emit("connect");
-      }
-      /**
-       * Handles server response for HELO command. If it yielded in
-       * error, emit 'error', otherwise move into the authentication phase.
-       *
-       * @param {String} str Message from the server
-       */
-      _actionHELO(str) {
-        if (str.charAt(0) !== "2") {
-          this._onError(new Error("Invalid HELO. response=" + str), "EPROTOCOL", str, "HELO");
-          return;
-        }
-        this.allowsAuth = true;
-        this.emit("connect");
-      }
-      /**
-       * Handles server response for STARTTLS command. If there's an error
-       * try HELO instead, otherwise initiate TLS upgrade. If the upgrade
-       * succeedes restart the EHLO
-       *
-       * @param {String} str Message from the server
-       */
-      _actionSTARTTLS(str) {
-        if (str.charAt(0) !== "2") {
-          if (this.options.opportunisticTLS) {
-            this.logger.info(
-              {
-                tnx: "smtp"
-              },
-              "Failed STARTTLS upgrade, continuing unencrypted"
-            );
-            return this.emit("connect");
-          }
-          this._onError(new Error("Error upgrading connection with STARTTLS"), "ETLS", str, "STARTTLS");
-          return;
-        }
-        this._upgradeConnection((err, secured) => {
-          if (err) {
-            this._onError(new Error("Error initiating TLS - " + (err.message || err)), "ETLS", false, "STARTTLS");
-            return;
-          }
-          this.logger.info(
-            {
-              tnx: "smtp"
-            },
-            "Connection upgraded with STARTTLS"
-          );
-          if (secured) {
-            if (this.options.lmtp) {
-              this._responseActions.push(this._actionLHLO);
-              this._sendCommand("LHLO " + this.name);
-            } else {
-              this._responseActions.push(this._actionEHLO);
-              this._sendCommand("EHLO " + this.name);
-            }
-          } else {
-            this.emit("connect");
-          }
-        });
-      }
-      /**
-       * Handle the response for AUTH LOGIN command. We are expecting
-       * '334 VXNlcm5hbWU6' (base64 for 'Username:'). Data to be sent as
-       * response needs to be base64 encoded username. We do not need
-       * exact match but settle with 334 response in general as some
-       * hosts invalidly use a longer message than VXNlcm5hbWU6
-       *
-       * @param {String} str Message from the server
-       */
-      _actionAUTH_LOGIN_USER(str, callback) {
-        if (!/^334[ -]/.test(str)) {
-          callback(this._formatError('Invalid login sequence while waiting for "334 VXNlcm5hbWU6"', "EAUTH", str, "AUTH LOGIN"));
-          return;
-        }
-        this._responseActions.push((str2) => {
-          this._actionAUTH_LOGIN_PASS(str2, callback);
-        });
-        this._sendCommand(Buffer.from(this._auth.credentials.user + "", "utf-8").toString("base64"));
-      }
-      /**
-       * Handle the response for AUTH CRAM-MD5 command. We are expecting
-       * '334 <challenge string>'. Data to be sent as response needs to be
-       * base64 decoded challenge string, MD5 hashed using the password as
-       * a HMAC key, prefixed by the username and a space, and finally all
-       * base64 encoded again.
-       *
-       * @param {String} str Message from the server
-       */
-      _actionAUTH_CRAM_MD5(str, callback) {
-        const challengeMatch = str.match(/^334\s+(.+)$/);
-        if (!challengeMatch) {
-          return callback(
-            this._formatError("Invalid login sequence while waiting for server challenge string", "EAUTH", str, "AUTH CRAM-MD5")
-          );
-        }
-        const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-        const hmacMD5 = crypto7.createHmac("md5", this._auth.credentials.pass);
-        hmacMD5.update(base64decoded);
-        const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
-        this._responseActions.push((str2) => {
-          this._actionAUTH_CRAM_MD5_PASS(str2, callback);
-        });
-        this._sendCommand(
-          Buffer.from(prepended).toString("base64"),
-          // hidden hash for logs
-          Buffer.from(this._auth.credentials.user + " /* secret */").toString("base64")
-        );
-      }
-      /**
-       * Handles the response to CRAM-MD5 authentication, if there's no error,
-       * the user can be considered logged in. Start waiting for a message to send
-       *
-       * @param {String} str Message from the server
-       */
-      _actionAUTH_CRAM_MD5_PASS(str, callback) {
-        if (!str.match(/^235\s+/)) {
-          return callback(this._formatError('Invalid login sequence while waiting for "235"', "EAUTH", str, "AUTH CRAM-MD5"));
-        }
-        this.logger.info(
-          {
-            tnx: "smtp",
-            username: this._auth.user,
-            action: "authenticated",
-            method: this._authMethod
-          },
-          "User %s authenticated",
-          JSON.stringify(this._auth.user)
-        );
-        this.authenticated = true;
-        callback(null, true);
-      }
-      /**
-       * Handle the response for AUTH LOGIN command. We are expecting
-       * '334 UGFzc3dvcmQ6' (base64 for 'Password:'). Data to be sent as
-       * response needs to be base64 encoded password.
-       *
-       * @param {String} str Message from the server
-       */
-      _actionAUTH_LOGIN_PASS(str, callback) {
-        if (!/^334[ -]/.test(str)) {
-          return callback(this._formatError('Invalid login sequence while waiting for "334 UGFzc3dvcmQ6"', "EAUTH", str, "AUTH LOGIN"));
-        }
-        this._responseActions.push((str2) => {
-          this._actionAUTHComplete(str2, callback);
-        });
-        this._sendCommand(
-          Buffer.from((this._auth.credentials.pass || "").toString(), "utf-8").toString("base64"),
-          // Hidden pass for logs
-          Buffer.from("/* secret */", "utf-8").toString("base64")
-        );
-      }
-      /**
-       * Handles the response for authentication, if there's no error,
-       * the user can be considered logged in. Start waiting for a message to send
-       *
-       * @param {String} str Message from the server
-       */
-      _actionAUTHComplete(str, isRetry, callback) {
-        if (!callback && typeof isRetry === "function") {
-          callback = isRetry;
-          isRetry = false;
-        }
-        if (str.substr(0, 3) === "334") {
-          this._responseActions.push((str2) => {
-            if (isRetry || this._authMethod !== "XOAUTH2") {
-              this._actionAUTHComplete(str2, true, callback);
-            } else {
-              setImmediate(() => this._handleXOauth2Token(true, callback));
-            }
-          });
-          this._sendCommand("");
-          return;
-        }
-        if (str.charAt(0) !== "2") {
-          this.logger.info(
-            {
-              tnx: "smtp",
-              username: this._auth.user,
-              action: "authfail",
-              method: this._authMethod
-            },
-            "User %s failed to authenticate",
-            JSON.stringify(this._auth.user)
-          );
-          return callback(this._formatError("Invalid login", "EAUTH", str, "AUTH " + this._authMethod));
-        }
-        this.logger.info(
-          {
-            tnx: "smtp",
-            username: this._auth.user,
-            action: "authenticated",
-            method: this._authMethod
-          },
-          "User %s authenticated",
-          JSON.stringify(this._auth.user)
-        );
-        this.authenticated = true;
-        callback(null, true);
-      }
-      /**
-       * Handle response for a MAIL FROM: command
-       *
-       * @param {String} str Message from the server
-       */
-      _actionMAIL(str, callback) {
-        if (Number(str.charAt(0)) !== 2) {
-          const message = this._usingSmtpUtf8 && /^550 /.test(str) && /[\x80-\uFFFF]/.test(this._envelope.from) ? "Internationalized mailbox name not allowed" : "Mail command failed";
-          return callback(this._formatError(message, "EENVELOPE", str, "MAIL FROM"));
-        }
-        if (!this._envelope.rcptQueue.length) {
-          return callback(this._formatError("Can't send mail - no recipients defined", "EENVELOPE", false, "API"));
-        }
-        this._recipientQueue = [];
-        const usePipelining = this._supportedExtensions.includes("PIPELINING");
-        do {
-          const curRecipient = this._envelope.rcptQueue.shift();
-          this._recipientQueue.push(curRecipient);
-          this._responseActions.push((str2) => {
-            this._actionRCPT(str2, callback);
-          });
-          this._sendCommand("RCPT TO:<" + curRecipient + ">" + this._getDsnRcptToArgs());
-        } while (usePipelining && this._envelope.rcptQueue.length);
-      }
-      /**
-       * Handle response for a RCPT TO: command
-       *
-       * @param {String} str Message from the server
-       */
-      _actionRCPT(str, callback) {
-        let err;
-        const curRecipient = this._recipientQueue.shift();
-        if (Number(str.charAt(0)) !== 2) {
-          const message = this._usingSmtpUtf8 && /^553 /.test(str) && /[\x80-\uFFFF]/.test(curRecipient) ? "Internationalized mailbox name not allowed" : "Recipient command failed";
-          this._envelope.rejected.push(curRecipient);
-          err = this._formatError(message, "EENVELOPE", str, "RCPT TO");
-          err.recipient = curRecipient;
-          this._envelope.rejectedErrors.push(err);
-        } else {
-          this._envelope.accepted.push(curRecipient);
-        }
-        if (!this._envelope.rcptQueue.length && !this._recipientQueue.length) {
-          if (this._envelope.rejected.length < this._envelope.to.length) {
-            this._responseActions.push((str2) => {
-              this._actionDATA(str2, callback);
-            });
-            this._sendCommand("DATA");
-          } else {
-            err = this._formatError("Can't send mail - all recipients were rejected", "EENVELOPE", str, "RCPT TO");
-            err.rejected = this._envelope.rejected;
-            err.rejectedErrors = this._envelope.rejectedErrors;
-            return callback(err);
-          }
-        } else if (this._envelope.rcptQueue.length) {
-          const nextRecipient = this._envelope.rcptQueue.shift();
-          this._recipientQueue.push(nextRecipient);
-          this._responseActions.push((str2) => {
-            this._actionRCPT(str2, callback);
-          });
-          this._sendCommand("RCPT TO:<" + nextRecipient + ">" + this._getDsnRcptToArgs());
-        }
-      }
-      /**
-       * Handle response for a DATA command
-       *
-       * @param {String} str Message from the server
-       */
-      _actionDATA(str, callback) {
-        if (!/^[23]/.test(str)) {
-          return callback(this._formatError("Data command failed", "EENVELOPE", str, "DATA"));
-        }
-        const response = {
-          accepted: this._envelope.accepted,
-          rejected: this._envelope.rejected
-        };
-        if (this._ehloLines && this._ehloLines.length) {
-          response.ehlo = this._ehloLines;
-        }
-        if (this._envelope.rejectedErrors.length) {
-          response.rejectedErrors = this._envelope.rejectedErrors;
-        }
-        callback(null, response);
-      }
-      /**
-       * Handle response for a DATA stream when using SMTP
-       * We expect a single response that defines if the sending succeeded or failed
-       *
-       * @param {String} str Message from the server
-       */
-      _actionSMTPStream(str, callback) {
-        if (Number(str.charAt(0)) !== 2) {
-          return callback(this._formatError("Message failed", "EMESSAGE", str, "DATA"));
-        }
-        return callback(null, str);
-      }
-      /**
-       * Handle response for a DATA stream
-       * We expect a separate response for every recipient. All recipients can either
-       * succeed or fail separately
-       *
-       * @param {String} recipient The recipient this response applies to
-       * @param {Boolean} final Is this the final recipient?
-       * @param {String} str Message from the server
-       */
-      _actionLMTPStream(recipient, final, str, callback) {
-        let err;
-        if (Number(str.charAt(0)) !== 2) {
-          err = this._formatError("Message failed for recipient " + recipient, "EMESSAGE", str, "DATA");
-          err.recipient = recipient;
-          this._envelope.rejected.push(recipient);
-          this._envelope.rejectedErrors.push(err);
-          for (let i2 = 0, len = this._envelope.accepted.length; i2 < len; i2++) {
-            if (this._envelope.accepted[i2] === recipient) {
-              this._envelope.accepted.splice(i2, 1);
-            }
-          }
-        }
-        if (final) {
-          return callback(null, str);
-        }
-      }
-      _handleXOauth2Token(isRetry, callback) {
-        this._auth.oauth2.getToken(isRetry, (err, accessToken) => {
-          if (err) {
-            this.logger.info(
-              {
-                tnx: "smtp",
-                username: this._auth.user,
-                action: "authfail",
-                method: this._authMethod
-              },
-              "User %s failed to authenticate",
-              JSON.stringify(this._auth.user)
-            );
-            return callback(this._formatError(err, "EAUTH", false, "AUTH XOAUTH2"));
-          }
-          this._responseActions.push((str) => {
-            this._actionAUTHComplete(str, isRetry, callback);
-          });
-          this._sendCommand(
-            "AUTH XOAUTH2 " + this._auth.oauth2.buildXOAuth2Token(accessToken),
-            //  Hidden for logs
-            "AUTH XOAUTH2 " + this._auth.oauth2.buildXOAuth2Token("/* secret */")
-          );
-        });
-      }
-      /**
-       *
-       * @param {string} command
-       * @private
-       */
-      _isDestroyedMessage(command) {
-        if (this._destroyed) {
-          return "Cannot " + command + " - smtp connection is already destroyed.";
-        }
-        if (this._socket) {
-          if (this._socket.destroyed) {
-            return "Cannot " + command + " - smtp connection socket is already destroyed.";
-          }
-          if (!this._socket.writable) {
-            return "Cannot " + command + " - smtp connection socket is already half-closed.";
-          }
-        }
-      }
-      _getHostname() {
-        let defaultHostname;
-        try {
-          defaultHostname = os.hostname() || "";
-        } catch (_err) {
-          defaultHostname = "localhost";
-        }
-        if (!defaultHostname || defaultHostname.indexOf(".") < 0) {
-          defaultHostname = "[127.0.0.1]";
-        }
-        if (defaultHostname.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
-          defaultHostname = "[" + defaultHostname + "]";
-        }
-        return defaultHostname;
-      }
-    };
-    module2.exports = SMTPConnection;
-  }
-});
-
-// node_modules/nodemailer/lib/xoauth2/index.js
-var require_xoauth2 = __commonJS({
-  "node_modules/nodemailer/lib/xoauth2/index.js"(exports2, module2) {
-    "use strict";
-    var { Stream: Stream4 } = require("stream");
-    var nmfetch = require_fetch2();
-    var crypto7 = require("crypto");
-    var shared = require_shared3();
-    var errors = require_errors2();
-    var XOAuth2 = class extends Stream4 {
-      constructor(options, logger) {
-        super();
-        this.options = options || {};
-        if (options && options.serviceClient) {
-          if (!options.privateKey || !options.user) {
-            const err = new Error('Options "privateKey" and "user" are required for service account!');
-            err.code = errors.EOAUTH2;
-            setImmediate(() => this.emit("error", err));
-            return;
-          }
-          const serviceRequestTimeout = Math.min(Math.max(Number(this.options.serviceRequestTimeout) || 0, 0), 3600);
-          this.options.serviceRequestTimeout = serviceRequestTimeout || 5 * 60;
-        }
-        this.logger = shared.getLogger(
-          {
-            logger
-          },
-          {
-            component: this.options.component || "OAuth2"
-          }
-        );
-        this.provisionCallback = typeof this.options.provisionCallback === "function" ? this.options.provisionCallback : false;
-        this.options.accessUrl = this.options.accessUrl || "https://accounts.google.com/o/oauth2/token";
-        this.options.customHeaders = this.options.customHeaders || {};
-        this.options.customParams = this.options.customParams || {};
-        this.accessToken = this.options.accessToken || false;
-        if (this.options.expires && Number(this.options.expires)) {
-          this.expires = this.options.expires;
-        } else {
-          const timeout = Math.max(Number(this.options.timeout) || 0, 0);
-          this.expires = timeout && Date.now() + timeout * 1e3 || 0;
-        }
-        this.renewing = false;
-        this.renewalQueue = [];
-      }
-      /**
-       * Returns or generates (if previous has expired) a XOAuth2 token
-       *
-       * @param {Boolean} renew If false then use cached access token (if available)
-       * @param {Function} callback Callback function with error object and token string
-       */
-      getToken(renew, callback) {
-        if (!renew && this.accessToken && (!this.expires || this.expires > Date.now())) {
-          this.logger.debug(
-            {
-              tnx: "OAUTH2",
-              user: this.options.user,
-              action: "reuse"
-            },
-            "Reusing existing access token for %s",
-            this.options.user
-          );
-          return callback(null, this.accessToken);
-        }
-        if (!this.provisionCallback && !this.options.refreshToken && !this.options.serviceClient) {
-          if (this.accessToken) {
-            this.logger.debug(
-              {
-                tnx: "OAUTH2",
-                user: this.options.user,
-                action: "reuse"
-              },
-              "Reusing existing access token (no refresh capability) for %s",
-              this.options.user
-            );
-            return callback(null, this.accessToken);
-          }
-          this.logger.error(
-            {
-              tnx: "OAUTH2",
-              user: this.options.user,
-              action: "renew"
-            },
-            "Cannot renew access token for %s: No refresh mechanism available",
-            this.options.user
-          );
-          const err = new Error("Can't create new access token for user");
-          err.code = errors.EOAUTH2;
-          return callback(err);
-        }
-        if (this.renewing) {
-          return this.renewalQueue.push({ renew, callback });
-        }
-        this.renewing = true;
-        const generateCallback = (err, accessToken) => {
-          this.renewalQueue.forEach((item) => item.callback(err, accessToken));
-          this.renewalQueue = [];
-          this.renewing = false;
-          if (err) {
-            this.logger.error(
-              {
-                err,
-                tnx: "OAUTH2",
-                user: this.options.user,
-                action: "renew"
-              },
-              "Failed generating new Access Token for %s",
-              this.options.user
-            );
-          } else {
-            this.logger.info(
-              {
-                tnx: "OAUTH2",
-                user: this.options.user,
-                action: "renew"
-              },
-              "Generated new Access Token for %s",
-              this.options.user
-            );
-          }
-          callback(err, accessToken);
-        };
-        if (this.provisionCallback) {
-          this.provisionCallback(this.options.user, !!renew, (err, accessToken, expires) => {
-            if (!err && accessToken) {
-              this.accessToken = accessToken;
-              this.expires = expires || 0;
-            }
-            generateCallback(err, accessToken);
-          });
-        } else {
-          this.generateToken(generateCallback);
-        }
-      }
-      /**
-       * Updates token values
-       *
-       * @param {String} accessToken New access token
-       * @param {Number} timeout Access token lifetime in seconds
-       *
-       * Emits 'token': { user: User email-address, accessToken: the new accessToken, timeout: TTL in seconds}
-       */
-      updateToken(accessToken, timeout) {
-        this.accessToken = accessToken;
-        timeout = Math.max(Number(timeout) || 0, 0);
-        this.expires = timeout && Date.now() + timeout * 1e3 || 0;
-        this.emit("token", {
-          user: this.options.user,
-          accessToken: accessToken || "",
-          expires: this.expires
-        });
-      }
-      /**
-       * Generates a new XOAuth2 token with the credentials provided at initialization
-       *
-       * @param {Function} callback Callback function with error object and token string
-       */
-      generateToken(callback) {
-        let urlOptions;
-        let loggedUrlOptions;
-        if (this.options.serviceClient) {
-          const iat = Math.floor(Date.now() / 1e3);
-          const tokenData = {
-            iss: this.options.serviceClient,
-            scope: this.options.scope || "https://mail.google.com/",
-            sub: this.options.user,
-            aud: this.options.accessUrl,
-            iat,
-            exp: iat + this.options.serviceRequestTimeout
-          };
-          let token;
-          try {
-            token = this.jwtSignRS256(tokenData);
-          } catch (_err) {
-            const err = new Error("Can't generate token. Check your auth options");
-            err.code = errors.EOAUTH2;
-            return callback(err);
-          }
-          urlOptions = {
-            grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-            assertion: token
-          };
-          loggedUrlOptions = {
-            grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-            assertion: tokenData
-          };
-        } else {
-          if (!this.options.refreshToken) {
-            const err = new Error("Can't create new access token for user");
-            err.code = errors.EOAUTH2;
-            return callback(err);
-          }
-          urlOptions = {
-            client_id: this.options.clientId || "",
-            client_secret: this.options.clientSecret || "",
-            refresh_token: this.options.refreshToken,
-            grant_type: "refresh_token"
-          };
-          loggedUrlOptions = {
-            client_id: this.options.clientId || "",
-            client_secret: (this.options.clientSecret || "").substr(0, 6) + "...",
-            refresh_token: (this.options.refreshToken || "").substr(0, 6) + "...",
-            grant_type: "refresh_token"
-          };
-        }
-        Object.assign(urlOptions, this.options.customParams);
-        Object.assign(loggedUrlOptions, this.options.customParams);
-        this.logger.debug(
-          {
-            tnx: "OAUTH2",
-            user: this.options.user,
-            action: "generate"
-          },
-          "Requesting token using: %s",
-          JSON.stringify(loggedUrlOptions)
-        );
-        this.postRequest(this.options.accessUrl, urlOptions, this.options, (error, body) => {
-          let data;
-          if (error) {
-            return callback(error);
-          }
-          try {
-            data = JSON.parse(body.toString());
-          } catch (E) {
-            return callback(E);
-          }
-          if (!data || typeof data !== "object") {
-            this.logger.debug(
-              {
-                tnx: "OAUTH2",
-                user: this.options.user,
-                action: "post"
-              },
-              "Response: %s",
-              (body || "").toString()
-            );
-            const err2 = new Error("Invalid authentication response");
-            err2.code = errors.EOAUTH2;
-            return callback(err2);
-          }
-          const logData = Object.assign({}, data);
-          if (logData.access_token) {
-            logData.access_token = (logData.access_token || "").toString().substr(0, 6) + "...";
-          }
-          this.logger.debug(
-            {
-              tnx: "OAUTH2",
-              user: this.options.user,
-              action: "post"
-            },
-            "Response: %s",
-            JSON.stringify(logData)
-          );
-          if (data.error) {
-            let errorMessage = data.error;
-            if (data.error_description) {
-              errorMessage += ": " + data.error_description;
-            }
-            if (data.error_uri) {
-              errorMessage += " (" + data.error_uri + ")";
-            }
-            const err2 = new Error(errorMessage);
-            err2.code = errors.EOAUTH2;
-            return callback(err2);
-          }
-          if (data.access_token) {
-            this.updateToken(data.access_token, data.expires_in);
-            return callback(null, this.accessToken);
-          }
-          const err = new Error("No access token");
-          err.code = errors.EOAUTH2;
-          return callback(err);
-        });
-      }
-      /**
-       * Converts an access_token and user id into a base64 encoded XOAuth2 token
-       *
-       * @param {String} [accessToken] Access token string
-       * @return {String} Base64 encoded token for IMAP or SMTP login
-       */
-      buildXOAuth2Token(accessToken) {
-        const authData = ["user=" + (this.options.user || ""), "auth=Bearer " + (accessToken || this.accessToken), "", ""];
-        return Buffer.from(authData.join(""), "utf-8").toString("base64");
-      }
-      /**
-       * Custom POST request handler.
-       * This is only needed to keep paths short in Windows – usually this module
-       * is a dependency of a dependency and if it tries to require something
-       * like the request module the paths get way too long to handle for Windows.
-       * As we do only a simple POST request we do not actually require complicated
-       * logic support (no redirects, no nothing) anyway.
-       *
-       * @param {String} url Url to POST to
-       * @param {String|Buffer} payload Payload to POST
-       * @param {Function} callback Callback function with (err, buff)
-       */
-      postRequest(url, payload, params, callback) {
-        let returned = false;
-        const chunks = [];
-        let chunklen = 0;
-        const fetchOptions = {
-          method: "post",
-          headers: params.customHeaders,
-          body: payload,
-          allowErrorResponse: true
-        };
-        if (/^https:/i.test(url)) {
-          fetchOptions.tls = Object.assign({ rejectUnauthorized: true }, params.tls || {});
-        }
-        const req = nmfetch(url, fetchOptions);
-        req.on("readable", () => {
-          let chunk;
-          while ((chunk = req.read()) !== null) {
-            chunks.push(chunk);
-            chunklen += chunk.length;
-          }
-        });
-        req.once("error", (err) => {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          return callback(err);
-        });
-        req.once("end", () => {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          return callback(null, Buffer.concat(chunks, chunklen));
-        });
-      }
-      /**
-       * Encodes a buffer or a string into Base64url format
-       *
-       * @param {Buffer|String} data The data to convert
-       * @return {String} The encoded string
-       */
-      toBase64URL(data) {
-        if (typeof data === "string") {
-          data = Buffer.from(data);
-        }
-        return data.toString("base64").replace(/[=]+/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-      }
-      /**
-       * Creates a JSON Web Token signed with RS256 (SHA256 + RSA)
-       *
-       * @param {Object} payload The payload to include in the generated token
-       * @return {String} The generated and signed token
-       */
-      jwtSignRS256(payload) {
-        payload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val2) => this.toBase64URL(val2)).join(".");
-        const signature = crypto7.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
-        return payload + "." + this.toBase64URL(signature);
-      }
-    };
-    module2.exports = XOAuth2;
-  }
-});
-
-// node_modules/nodemailer/lib/smtp-pool/pool-resource.js
-var require_pool_resource = __commonJS({
-  "node_modules/nodemailer/lib/smtp-pool/pool-resource.js"(exports2, module2) {
-    "use strict";
-    var SMTPConnection = require_smtp_connection();
-    var assign = require_shared3().assign;
-    var XOAuth2 = require_xoauth2();
-    var errors = require_errors2();
-    var EventEmitter = require("events");
-    var PoolResource = class extends EventEmitter {
-      constructor(pool) {
-        super();
-        this.pool = pool;
-        this.options = pool.options;
-        this.logger = this.pool.logger;
-        if (this.options.auth) {
-          switch ((this.options.auth.type || "").toString().toUpperCase()) {
-            case "OAUTH2": {
-              const oauth2 = new XOAuth2(this.options.auth, this.logger);
-              oauth2.provisionCallback = this.pool.mailer && this.pool.mailer.get("oauth2_provision_cb") || oauth2.provisionCallback;
-              this.auth = {
-                type: "OAUTH2",
-                user: this.options.auth.user,
-                oauth2,
-                method: "XOAUTH2"
-              };
-              oauth2.on("token", (token) => this.pool.mailer.emit("token", token));
-              oauth2.on("error", (err) => this.emit("error", err));
-              break;
-            }
-            default:
-              if (!this.options.auth.user && !this.options.auth.pass) {
-                break;
-              }
-              this.auth = {
-                type: (this.options.auth.type || "").toString().toUpperCase() || "LOGIN",
-                user: this.options.auth.user,
-                credentials: {
-                  user: this.options.auth.user || "",
-                  pass: this.options.auth.pass,
-                  options: this.options.auth.options
-                },
-                method: (this.options.auth.method || "").trim().toUpperCase() || this.options.authMethod || false
-              };
-          }
-        }
-        this._connection = false;
-        this._connected = false;
-        this.messages = 0;
-        this.available = true;
-      }
-      /**
-       * Initiates a connection to the SMTP server
-       *
-       * @param {Function} callback Callback function to run once the connection is established or failed
-       */
-      connect(callback) {
-        this.pool.getSocket(this.options, (err, socketOptions) => {
-          if (err) {
-            return callback(err);
-          }
-          let returned = false;
-          let options = this.options;
-          if (socketOptions && socketOptions.connection) {
-            this.logger.info(
-              {
-                tnx: "proxy",
-                remoteAddress: socketOptions.connection.remoteAddress,
-                remotePort: socketOptions.connection.remotePort,
-                destHost: options.host || "",
-                destPort: options.port || "",
-                action: "connected"
-              },
-              "Using proxied socket from %s:%s to %s:%s",
-              socketOptions.connection.remoteAddress,
-              socketOptions.connection.remotePort,
-              options.host || "",
-              options.port || ""
-            );
-            options = Object.assign(assign(false, options), socketOptions);
-          }
-          this.connection = new SMTPConnection(options);
-          this.connection.once("error", (err2) => {
-            this.emit("error", err2);
-            if (returned) {
-              return;
-            }
-            returned = true;
-            return callback(err2);
-          });
-          this.connection.once("end", () => {
-            this.close();
-            if (returned) {
-              return;
-            }
-            returned = true;
-            const timer = setTimeout(() => {
-              if (returned) {
-                return;
-              }
-              const err2 = new Error("Unexpected socket close");
-              if (this.connection && this.connection._socket && this.connection._socket.upgrading) {
-                err2.code = errors.ETLS;
-              }
-              callback(err2);
-            }, 1e3);
-            try {
-              timer.unref();
-            } catch (_E) {
-            }
-          });
-          this.connection.connect(() => {
-            if (returned) {
-              return;
-            }
-            if (this.auth && (this.connection.allowsAuth || options.forceAuth)) {
-              this.connection.login(this.auth, (err2) => {
-                if (returned) {
-                  return;
-                }
-                returned = true;
-                if (err2) {
-                  this.connection.close();
-                  this.emit("error", err2);
-                  return callback(err2);
-                }
-                this._connected = true;
-                callback(null, true);
-              });
-            } else {
-              returned = true;
-              this._connected = true;
-              return callback(null, true);
-            }
-          });
-        });
-      }
-      /**
-       * Sends an e-mail to be sent using the selected settings
-       *
-       * @param {Object} mail Mail object
-       * @param {Function} callback Callback function
-       */
-      send(mail, callback) {
-        if (!this._connected) {
-          return this.connect((err) => {
-            if (err) {
-              return callback(err);
-            }
-            return this.send(mail, callback);
-          });
-        }
-        const envelope = mail.message.getEnvelope();
-        const messageId = mail.message.messageId();
-        const recipients = [].concat(envelope.to || []);
-        if (recipients.length > 3) {
-          recipients.push("...and " + recipients.splice(2).length + " more");
-        }
-        this.logger.info(
-          {
-            tnx: "send",
-            messageId,
-            cid: this.id
-          },
-          "Sending message %s using #%s to <%s>",
-          messageId,
-          this.id,
-          recipients.join(", ")
-        );
-        if (mail.data.dsn) {
-          envelope.dsn = mail.data.dsn;
-        }
-        if (mail.data.requireTLSExtensionEnabled) {
-          envelope.requireTLSExtensionEnabled = mail.data.requireTLSExtensionEnabled;
-        }
-        this.connection.send(envelope, mail.message.createReadStream(), (err, info) => {
-          this.messages++;
-          if (err) {
-            this.connection.close();
-            this.emit("error", err);
-            return callback(err);
-          }
-          info.envelope = {
-            from: envelope.from,
-            to: envelope.to
-          };
-          info.messageId = messageId;
-          setImmediate(() => {
-            if (this.messages >= this.options.maxMessages) {
-              const err2 = new Error("Resource exhausted");
-              err2.code = errors.EMAXLIMIT;
-              this.connection.close();
-              this.emit("error", err2);
-            } else {
-              this.pool._checkRateLimit(() => {
-                this.available = true;
-                this.emit("available");
-              });
-            }
-          });
-          callback(null, info);
-        });
-      }
-      /**
-       * Closes the connection
-       */
-      close() {
-        this._connected = false;
-        if (this.auth && this.auth.oauth2) {
-          this.auth.oauth2.removeAllListeners();
-        }
-        if (this.connection) {
-          this.connection.close();
-        }
-        this.emit("close");
-      }
-    };
-    module2.exports = PoolResource;
-  }
-});
-
-// node_modules/nodemailer/lib/well-known/services.json
-var require_services = __commonJS({
-  "node_modules/nodemailer/lib/well-known/services.json"(exports2, module2) {
-    module2.exports = {
-      "1und1": {
-        description: "1&1 Mail (German hosting provider)",
-        host: "smtp.1und1.de",
-        port: 465,
-        secure: true,
-        authMethod: "LOGIN"
-      },
-      "126": {
-        description: "126 Mail (NetEase)",
-        host: "smtp.126.com",
-        port: 465,
-        secure: true
-      },
-      "163": {
-        description: "163 Mail (NetEase)",
-        host: "smtp.163.com",
-        port: 465,
-        secure: true
-      },
-      Aliyun: {
-        description: "Alibaba Cloud Mail",
-        domains: ["aliyun.com"],
-        host: "smtp.aliyun.com",
-        port: 465,
-        secure: true
-      },
-      AliyunQiye: {
-        description: "Alibaba Cloud Enterprise Mail",
-        host: "smtp.qiye.aliyun.com",
-        port: 465,
-        secure: true
-      },
-      AOL: {
-        description: "AOL Mail",
-        domains: ["aol.com"],
-        host: "smtp.aol.com",
-        port: 587
-      },
-      Aruba: {
-        description: "Aruba PEC (Italian email provider)",
-        domains: ["aruba.it", "pec.aruba.it"],
-        aliases: ["Aruba PEC"],
-        host: "smtps.aruba.it",
-        port: 465,
-        secure: true,
-        authMethod: "LOGIN"
-      },
-      Bluewin: {
-        description: "Bluewin (Swiss email provider)",
-        host: "smtpauths.bluewin.ch",
-        domains: ["bluewin.ch"],
-        port: 465
-      },
-      BOL: {
-        description: "BOL Mail (Brazilian provider)",
-        domains: ["bol.com.br"],
-        host: "smtp.bol.com.br",
-        port: 587,
-        requireTLS: true
-      },
-      DebugMail: {
-        description: "DebugMail (email testing service)",
-        host: "debugmail.io",
-        port: 25
-      },
-      Disroot: {
-        description: "Disroot (privacy-focused provider)",
-        domains: ["disroot.org"],
-        host: "disroot.org",
-        port: 587,
-        secure: false,
-        authMethod: "LOGIN"
-      },
-      DynectEmail: {
-        description: "Dyn Email Delivery",
-        aliases: ["Dynect"],
-        host: "smtp.dynect.net",
-        port: 25
-      },
-      ElasticEmail: {
-        description: "Elastic Email",
-        aliases: ["Elastic Email"],
-        host: "smtp.elasticemail.com",
-        port: 465,
-        secure: true
-      },
-      Ethereal: {
-        description: "Ethereal Email (email testing service)",
-        aliases: ["ethereal.email"],
-        host: "smtp.ethereal.email",
-        port: 587
-      },
-      FastMail: {
-        description: "FastMail",
-        domains: ["fastmail.fm"],
-        host: "smtp.fastmail.com",
-        port: 465,
-        secure: true
-      },
-      "Feishu Mail": {
-        description: "Feishu Mail (Lark)",
-        aliases: ["Feishu", "FeishuMail"],
-        domains: ["www.feishu.cn"],
-        host: "smtp.feishu.cn",
-        port: 465,
-        secure: true
-      },
-      "Forward Email": {
-        description: "Forward Email (email forwarding service)",
-        aliases: ["FE", "ForwardEmail"],
-        domains: ["forwardemail.net"],
-        host: "smtp.forwardemail.net",
-        port: 465,
-        secure: true
-      },
-      GandiMail: {
-        description: "Gandi Mail",
-        aliases: ["Gandi", "Gandi Mail"],
-        host: "mail.gandi.net",
-        port: 587
-      },
-      Gmail: {
-        description: "Gmail",
-        aliases: ["Google Mail"],
-        domains: ["gmail.com", "googlemail.com"],
-        host: "smtp.gmail.com",
-        port: 465,
-        secure: true
-      },
-      GmailWorkspace: {
-        description: "Gmail Workspace",
-        aliases: ["Google Workspace Mail"],
-        host: "smtp-relay.gmail.com",
-        port: 465,
-        secure: true
-      },
-      GMX: {
-        description: "GMX Mail",
-        domains: ["gmx.com", "gmx.net", "gmx.de"],
-        host: "mail.gmx.com",
-        port: 587
-      },
-      Godaddy: {
-        description: "GoDaddy Email (US)",
-        host: "smtpout.secureserver.net",
-        port: 25
-      },
-      GodaddyAsia: {
-        description: "GoDaddy Email (Asia)",
-        host: "smtp.asia.secureserver.net",
-        port: 25
-      },
-      GodaddyEurope: {
-        description: "GoDaddy Email (Europe)",
-        host: "smtp.europe.secureserver.net",
-        port: 25
-      },
-      "hot.ee": {
-        description: "Hot.ee (Estonian email provider)",
-        host: "mail.hot.ee"
-      },
-      Hotmail: {
-        description: "Outlook.com / Hotmail",
-        aliases: ["Outlook", "Outlook.com", "Hotmail.com"],
-        domains: ["hotmail.com", "outlook.com"],
-        host: "smtp-mail.outlook.com",
-        port: 587
-      },
-      iCloud: {
-        description: "iCloud Mail",
-        aliases: ["Me", "Mac"],
-        domains: ["me.com", "mac.com"],
-        host: "smtp.mail.me.com",
-        port: 587
-      },
-      Infomaniak: {
-        description: "Infomaniak Mail (Swiss hosting provider)",
-        host: "mail.infomaniak.com",
-        domains: ["ik.me", "ikmail.com", "etik.com"],
-        port: 587
-      },
-      KolabNow: {
-        description: "KolabNow (secure email service)",
-        domains: ["kolabnow.com"],
-        aliases: ["Kolab"],
-        host: "smtp.kolabnow.com",
-        port: 465,
-        secure: true,
-        authMethod: "LOGIN"
-      },
-      Loopia: {
-        description: "Loopia (Swedish hosting provider)",
-        host: "mailcluster.loopia.se",
-        port: 465
-      },
-      Loops: {
-        description: "Loops",
-        host: "smtp.loops.so",
-        port: 587
-      },
-      "mail.ee": {
-        description: "Mail.ee (Estonian email provider)",
-        host: "smtp.mail.ee"
-      },
-      "Mail.ru": {
-        description: "Mail.ru",
-        host: "smtp.mail.ru",
-        port: 465,
-        secure: true
-      },
-      "Mailcatch.app": {
-        description: "Mailcatch (email testing service)",
-        host: "sandbox-smtp.mailcatch.app",
-        port: 2525
-      },
-      Maildev: {
-        description: "MailDev (local email testing)",
-        port: 1025,
-        ignoreTLS: true
-      },
-      MailerSend: {
-        description: "MailerSend",
-        host: "smtp.mailersend.net",
-        port: 587
-      },
-      Mailgun: {
-        description: "Mailgun",
-        host: "smtp.mailgun.org",
-        port: 465,
-        secure: true
-      },
-      Mailjet: {
-        description: "Mailjet",
-        host: "in.mailjet.com",
-        port: 587
-      },
-      Mailosaur: {
-        description: "Mailosaur (email testing service)",
-        host: "mailosaur.io",
-        port: 25
-      },
-      Mailtrap: {
-        description: "Mailtrap",
-        host: "live.smtp.mailtrap.io",
-        port: 587
-      },
-      Mandrill: {
-        description: "Mandrill (by Mailchimp)",
-        host: "smtp.mandrillapp.com",
-        port: 587
-      },
-      Naver: {
-        description: "Naver Mail (Korean email provider)",
-        host: "smtp.naver.com",
-        port: 587
-      },
-      OhMySMTP: {
-        description: "OhMySMTP (email delivery service)",
-        host: "smtp.ohmysmtp.com",
-        port: 587,
-        secure: false
-      },
-      One: {
-        description: "One.com Email",
-        host: "send.one.com",
-        port: 465,
-        secure: true
-      },
-      OpenMailBox: {
-        description: "OpenMailBox",
-        aliases: ["OMB", "openmailbox.org"],
-        host: "smtp.openmailbox.org",
-        port: 465,
-        secure: true
-      },
-      Outlook365: {
-        description: "Microsoft 365 / Office 365",
-        host: "smtp.office365.com",
-        port: 587,
-        secure: false
-      },
-      Postmark: {
-        description: "Postmark",
-        aliases: ["PostmarkApp"],
-        host: "smtp.postmarkapp.com",
-        port: 2525
-      },
-      Proton: {
-        description: "Proton Mail",
-        aliases: ["ProtonMail", "Proton.me", "Protonmail.com", "Protonmail.ch"],
-        domains: ["proton.me", "protonmail.com", "pm.me", "protonmail.ch"],
-        host: "smtp.protonmail.ch",
-        port: 587,
-        requireTLS: true
-      },
-      "qiye.aliyun": {
-        description: "Alibaba Mail Enterprise Edition",
-        host: "smtp.mxhichina.com",
-        port: "465",
-        secure: true
-      },
-      QQ: {
-        description: "QQ Mail",
-        domains: ["qq.com"],
-        host: "smtp.qq.com",
-        port: 465,
-        secure: true
-      },
-      QQex: {
-        description: "QQ Enterprise Mail",
-        aliases: ["QQ Enterprise"],
-        domains: ["exmail.qq.com"],
-        host: "smtp.exmail.qq.com",
-        port: 465,
-        secure: true
-      },
-      Resend: {
-        description: "Resend",
-        host: "smtp.resend.com",
-        port: 465,
-        secure: true
-      },
-      Runbox: {
-        description: "Runbox (Norwegian email provider)",
-        domains: ["runbox.com"],
-        host: "smtp.runbox.com",
-        port: 465,
-        secure: true
-      },
-      SendCloud: {
-        description: "SendCloud (Chinese email delivery)",
-        host: "smtp.sendcloud.net",
-        port: 2525
-      },
-      SendGrid: {
-        description: "SendGrid",
-        host: "smtp.sendgrid.net",
-        port: 587
-      },
-      SendinBlue: {
-        description: "Brevo (formerly Sendinblue)",
-        aliases: ["Brevo"],
-        host: "smtp-relay.brevo.com",
-        port: 587
-      },
-      SendPulse: {
-        description: "SendPulse",
-        host: "smtp-pulse.com",
-        port: 465,
-        secure: true
-      },
-      SES: {
-        description: "AWS SES US East (N. Virginia)",
-        host: "email-smtp.us-east-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-AP-NORTHEAST-1": {
-        description: "AWS SES Asia Pacific (Tokyo)",
-        host: "email-smtp.ap-northeast-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-AP-NORTHEAST-2": {
-        description: "AWS SES Asia Pacific (Seoul)",
-        host: "email-smtp.ap-northeast-2.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-AP-NORTHEAST-3": {
-        description: "AWS SES Asia Pacific (Osaka)",
-        host: "email-smtp.ap-northeast-3.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-AP-SOUTH-1": {
-        description: "AWS SES Asia Pacific (Mumbai)",
-        host: "email-smtp.ap-south-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-AP-SOUTHEAST-1": {
-        description: "AWS SES Asia Pacific (Singapore)",
-        host: "email-smtp.ap-southeast-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-AP-SOUTHEAST-2": {
-        description: "AWS SES Asia Pacific (Sydney)",
-        host: "email-smtp.ap-southeast-2.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-CA-CENTRAL-1": {
-        description: "AWS SES Canada (Central)",
-        host: "email-smtp.ca-central-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-EU-CENTRAL-1": {
-        description: "AWS SES Europe (Frankfurt)",
-        host: "email-smtp.eu-central-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-EU-NORTH-1": {
-        description: "AWS SES Europe (Stockholm)",
-        host: "email-smtp.eu-north-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-EU-WEST-1": {
-        description: "AWS SES Europe (Ireland)",
-        host: "email-smtp.eu-west-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-EU-WEST-2": {
-        description: "AWS SES Europe (London)",
-        host: "email-smtp.eu-west-2.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-EU-WEST-3": {
-        description: "AWS SES Europe (Paris)",
-        host: "email-smtp.eu-west-3.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-SA-EAST-1": {
-        description: "AWS SES South America (S\xE3o Paulo)",
-        host: "email-smtp.sa-east-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-US-EAST-1": {
-        description: "AWS SES US East (N. Virginia)",
-        host: "email-smtp.us-east-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-US-EAST-2": {
-        description: "AWS SES US East (Ohio)",
-        host: "email-smtp.us-east-2.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-US-GOV-EAST-1": {
-        description: "AWS SES GovCloud (US-East)",
-        host: "email-smtp.us-gov-east-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-US-GOV-WEST-1": {
-        description: "AWS SES GovCloud (US-West)",
-        host: "email-smtp.us-gov-west-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-US-WEST-1": {
-        description: "AWS SES US West (N. California)",
-        host: "email-smtp.us-west-1.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      "SES-US-WEST-2": {
-        description: "AWS SES US West (Oregon)",
-        host: "email-smtp.us-west-2.amazonaws.com",
-        port: 465,
-        secure: true
-      },
-      Seznam: {
-        description: "Seznam Email (Czech email provider)",
-        aliases: ["Seznam Email"],
-        domains: ["seznam.cz", "email.cz", "post.cz", "spoluzaci.cz"],
-        host: "smtp.seznam.cz",
-        port: 465,
-        secure: true
-      },
-      SMTP2GO: {
-        description: "SMTP2GO",
-        host: "mail.smtp2go.com",
-        port: 2525
-      },
-      Sparkpost: {
-        description: "SparkPost",
-        aliases: ["SparkPost", "SparkPost Mail"],
-        domains: ["sparkpost.com"],
-        host: "smtp.sparkpostmail.com",
-        port: 587,
-        secure: false
-      },
-      Tipimail: {
-        description: "Tipimail (email delivery service)",
-        host: "smtp.tipimail.com",
-        port: 587
-      },
-      Tutanota: {
-        description: "Tutanota (Tuta Mail)",
-        domains: ["tutanota.com", "tuta.com", "tutanota.de", "tuta.io"],
-        host: "smtp.tutanota.com",
-        port: 465,
-        secure: true
-      },
-      Yahoo: {
-        description: "Yahoo Mail",
-        domains: ["yahoo.com"],
-        host: "smtp.mail.yahoo.com",
-        port: 465,
-        secure: true
-      },
-      Yandex: {
-        description: "Yandex Mail",
-        domains: ["yandex.ru"],
-        host: "smtp.yandex.ru",
-        port: 465,
-        secure: true
-      },
-      Zimbra: {
-        description: "Zimbra Mail Server",
-        aliases: ["Zimbra Collaboration"],
-        host: "smtp.zimbra.com",
-        port: 587,
-        requireTLS: true
-      },
-      Zoho: {
-        description: "Zoho Mail",
-        host: "smtp.zoho.com",
-        port: 465,
-        secure: true,
-        authMethod: "LOGIN"
-      }
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/well-known/index.js
-var require_well_known = __commonJS({
-  "node_modules/nodemailer/lib/well-known/index.js"(exports2, module2) {
-    "use strict";
-    var services = require_services();
-    var normalized = {};
-    Object.keys(services).forEach((key) => {
-      const service = services[key];
-      const normalizedService = normalizeService(service);
-      normalized[normalizeKey(key)] = normalizedService;
-      [].concat(service.aliases || []).forEach((alias) => {
-        normalized[normalizeKey(alias)] = normalizedService;
-      });
-      [].concat(service.domains || []).forEach((domain) => {
-        normalized[normalizeKey(domain)] = normalizedService;
-      });
-    });
-    function normalizeKey(key) {
-      return key.replace(/[^a-zA-Z0-9.-]/g, "").toLowerCase();
-    }
-    function normalizeService(service) {
-      const response = {};
-      Object.keys(service).forEach((key) => {
-        if (!["domains", "aliases"].includes(key)) {
-          response[key] = service[key];
-        }
-      });
-      return response;
-    }
-    module2.exports = function(key) {
-      key = normalizeKey(key.split("@").pop());
-      return normalized[key] || false;
-    };
-  }
-});
-
-// node_modules/nodemailer/lib/smtp-pool/index.js
-var require_smtp_pool = __commonJS({
-  "node_modules/nodemailer/lib/smtp-pool/index.js"(exports2, module2) {
-    "use strict";
-    var EventEmitter = require("events");
-    var PoolResource = require_pool_resource();
-    var SMTPConnection = require_smtp_connection();
-    var wellKnown = require_well_known();
-    var shared = require_shared3();
-    var errors = require_errors2();
-    var packageData = require_package3();
-    var SMTPPool = class extends EventEmitter {
-      constructor(options) {
-        super();
-        options = options || {};
-        if (typeof options === "string") {
-          options = {
-            url: options
-          };
-        }
-        let urlData;
-        let service = options.service;
-        if (typeof options.getSocket === "function") {
-          this.getSocket = options.getSocket;
-        }
-        if (options.url) {
-          urlData = shared.parseConnectionUrl(options.url);
-          service = service || urlData.service;
-        }
-        this.options = shared.assign(
-          false,
-          // create new object
-          options,
-          // regular options
-          urlData,
-          // url options
-          service && wellKnown(service)
-          // wellknown options
-        );
-        this.options.maxConnections = this.options.maxConnections || 5;
-        this.options.maxMessages = this.options.maxMessages || 100;
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "smtp-pool"
-        });
-        this.name = "SMTP (pool)";
-        this.version = packageData.version + "[client:" + packageData.version + "]";
-        this._rateLimit = {
-          counter: 0,
-          timeout: null,
-          waiting: [],
-          checkpoint: false,
-          delta: Number(this.options.rateDelta) || 1e3,
-          limit: Number(this.options.rateLimit) || 0
-        };
-        this._closed = false;
-        this._queue = [];
-        this._connections = [];
-        this._connectionCounter = 0;
-        this.idling = true;
-        setImmediate(() => {
-          if (this.idling) {
-            this.emit("idle");
-          }
-        });
-      }
-      /**
-       * Placeholder function for creating proxy sockets. This method immediatelly returns
-       * without a socket
-       *
-       * @param {Object} options Connection options
-       * @param {Function} callback Callback function to run with the socket keys
-       */
-      getSocket(options, callback) {
-        return setImmediate(() => callback(null, false));
-      }
-      /**
-       * Queues an e-mail to be sent using the selected settings
-       *
-       * @param {Object} mail Mail object
-       * @param {Function} callback Callback function
-       */
-      send(mail, callback) {
-        if (this._closed) {
-          return false;
-        }
-        this._queue.push({
-          mail,
-          requeueAttempts: 0,
-          callback
-        });
-        if (this.idling && this._queue.length >= this.options.maxConnections) {
-          this.idling = false;
-        }
-        setImmediate(() => this._processMessages());
-        return true;
-      }
-      /**
-       * Closes all connections in the pool. If there is a message being sent, the connection
-       * is closed later
-       */
-      close() {
-        let connection;
-        const len = this._connections.length;
-        this._closed = true;
-        clearTimeout(this._rateLimit.timeout);
-        if (!len && !this._queue.length) {
-          return;
-        }
-        for (let i2 = len - 1; i2 >= 0; i2--) {
-          if (this._connections[i2] && this._connections[i2].available) {
-            connection = this._connections[i2];
-            connection.close();
-            this.logger.info(
-              {
-                tnx: "connection",
-                cid: connection.id,
-                action: "removed"
-              },
-              "Connection #%s removed",
-              connection.id
-            );
-          }
-        }
-        if (len && !this._connections.length) {
-          this.logger.debug(
-            {
-              tnx: "connection"
-            },
-            "All connections removed"
-          );
-        }
-        if (!this._queue.length) {
-          return;
-        }
-        const invokeCallbacks = () => {
-          if (!this._queue.length) {
-            this.logger.debug(
-              {
-                tnx: "connection"
-              },
-              "Pending queue entries cleared"
-            );
-            return;
-          }
-          const entry = this._queue.shift();
-          if (entry && typeof entry.callback === "function") {
-            try {
-              entry.callback(new Error("Connection pool was closed"));
-            } catch (E) {
-              this.logger.error(
-                {
-                  err: E,
-                  tnx: "callback",
-                  cid: connection.id
-                },
-                "Callback error for #%s: %s",
-                connection.id,
-                E.message
-              );
-            }
-          }
-          setImmediate(invokeCallbacks);
-        };
-        setImmediate(invokeCallbacks);
-      }
-      /**
-       * Check the queue and available connections. If there is a message to be sent and there is
-       * an available connection, then use this connection to send the mail
-       */
-      _processMessages() {
-        if (this._closed) {
-          return;
-        }
-        if (!this._queue.length) {
-          if (!this.idling) {
-            this.idling = true;
-            this.emit("idle");
-          }
-          return;
-        }
-        let connection = this._connections.find((c) => c.available);
-        if (!connection && this._connections.length < this.options.maxConnections) {
-          connection = this._createConnection();
-        }
-        if (!connection) {
-          this.idling = false;
-          return;
-        }
-        if (!this.idling && this._queue.length < this.options.maxConnections) {
-          this.idling = true;
-          this.emit("idle");
-        }
-        const entry = connection.queueEntry = this._queue.shift();
-        entry.messageId = (connection.queueEntry.mail.message.getHeader("message-id") || "").replace(/[<>\s]/g, "");
-        connection.available = false;
-        this.logger.debug(
-          {
-            tnx: "pool",
-            cid: connection.id,
-            messageId: entry.messageId,
-            action: "assign"
-          },
-          "Assigned message <%s> to #%s (%s)",
-          entry.messageId,
-          connection.id,
-          connection.messages + 1
-        );
-        if (this._rateLimit.limit) {
-          this._rateLimit.counter++;
-          if (!this._rateLimit.checkpoint) {
-            this._rateLimit.checkpoint = Date.now();
-          }
-        }
-        connection.send(entry.mail, (err, info) => {
-          if (entry === connection.queueEntry) {
-            try {
-              entry.callback(err, info);
-            } catch (E) {
-              this.logger.error(
-                {
-                  err: E,
-                  tnx: "callback",
-                  cid: connection.id
-                },
-                "Callback error for #%s: %s",
-                connection.id,
-                E.message
-              );
-            }
-            connection.queueEntry = false;
-          }
-        });
-      }
-      /**
-       * Creates a new pool resource
-       */
-      _createConnection() {
-        const connection = new PoolResource(this);
-        connection.id = ++this._connectionCounter;
-        this.logger.info(
-          {
-            tnx: "pool",
-            cid: connection.id,
-            action: "conection"
-          },
-          "Created new pool resource #%s",
-          connection.id
-        );
-        connection.on("available", () => {
-          this.logger.debug(
-            {
-              tnx: "connection",
-              cid: connection.id,
-              action: "available"
-            },
-            "Connection #%s became available",
-            connection.id
-          );
-          if (this._closed) {
-            this.close();
-          } else {
-            this._processMessages();
-          }
-        });
-        connection.once("error", (err) => {
-          if (err.code !== errors.EMAXLIMIT) {
-            this.logger.warn(
-              {
-                err,
-                tnx: "pool",
-                cid: connection.id
-              },
-              "Pool Error for #%s: %s",
-              connection.id,
-              err.message
-            );
-          } else {
-            this.logger.debug(
-              {
-                tnx: "pool",
-                cid: connection.id,
-                action: "maxlimit"
-              },
-              "Max messages limit exchausted for #%s",
-              connection.id
-            );
-          }
-          if (connection.queueEntry) {
-            try {
-              connection.queueEntry.callback(err);
-            } catch (E) {
-              this.logger.error(
-                {
-                  err: E,
-                  tnx: "callback",
-                  cid: connection.id
-                },
-                "Callback error for #%s: %s",
-                connection.id,
-                E.message
-              );
-            }
-            connection.queueEntry = false;
-          }
-          this._removeConnection(connection);
-          this._continueProcessing();
-        });
-        connection.once("close", () => {
-          this.logger.info(
-            {
-              tnx: "connection",
-              cid: connection.id,
-              action: "closed"
-            },
-            "Connection #%s was closed",
-            connection.id
-          );
-          this._removeConnection(connection);
-          if (connection.queueEntry) {
-            setTimeout(() => {
-              if (connection.queueEntry) {
-                if (this._shouldRequeuOnConnectionClose(connection.queueEntry)) {
-                  this._requeueEntryOnConnectionClose(connection);
-                } else {
-                  this._failDeliveryOnConnectionClose(connection);
-                }
-              }
-              this._continueProcessing();
-            }, 50);
-          } else {
-            if (!this._closed && this.idling && !this._connections.length) {
-              this.emit("clear");
-            }
-            this._continueProcessing();
-          }
-        });
-        this._connections.push(connection);
-        return connection;
-      }
-      _shouldRequeuOnConnectionClose(queueEntry) {
-        if (this.options.maxRequeues === void 0 || this.options.maxRequeues < 0) {
-          return true;
-        }
-        return queueEntry.requeueAttempts < this.options.maxRequeues;
-      }
-      _failDeliveryOnConnectionClose(connection) {
-        if (connection.queueEntry && connection.queueEntry.callback) {
-          try {
-            connection.queueEntry.callback(new Error("Reached maximum number of retries after connection was closed"));
-          } catch (E) {
-            this.logger.error(
-              {
-                err: E,
-                tnx: "callback",
-                messageId: connection.queueEntry.messageId,
-                cid: connection.id
-              },
-              "Callback error for #%s: %s",
-              connection.id,
-              E.message
-            );
-          }
-          connection.queueEntry = false;
-        }
-      }
-      _requeueEntryOnConnectionClose(connection) {
-        connection.queueEntry.requeueAttempts += 1;
-        this.logger.debug(
-          {
-            tnx: "pool",
-            cid: connection.id,
-            messageId: connection.queueEntry.messageId,
-            action: "requeue"
-          },
-          "Re-queued message <%s> for #%s. Attempt: #%s",
-          connection.queueEntry.messageId,
-          connection.id,
-          connection.queueEntry.requeueAttempts
-        );
-        this._queue.unshift(connection.queueEntry);
-        connection.queueEntry = false;
-      }
-      /**
-       * Continue to process message if the pool hasn't closed
-       */
-      _continueProcessing() {
-        if (this._closed) {
-          this.close();
-        } else {
-          setTimeout(() => this._processMessages(), 100);
-        }
-      }
-      /**
-       * Remove resource from pool
-       *
-       * @param {Object} connection The PoolResource to remove
-       */
-      _removeConnection(connection) {
-        const index = this._connections.indexOf(connection);
-        if (index !== -1) {
-          this._connections.splice(index, 1);
-        }
-      }
-      /**
-       * Checks if connections have hit current rate limit and if so, queues the availability callback
-       *
-       * @param {Function} callback Callback function to run once rate limiter has been cleared
-       */
-      _checkRateLimit(callback) {
-        if (!this._rateLimit.limit) {
-          return callback();
-        }
-        const now = Date.now();
-        if (this._rateLimit.counter < this._rateLimit.limit) {
-          return callback();
-        }
-        this._rateLimit.waiting.push(callback);
-        if (this._rateLimit.checkpoint <= now - this._rateLimit.delta) {
-          return this._clearRateLimit();
-        }
-        if (!this._rateLimit.timeout) {
-          this._rateLimit.timeout = setTimeout(() => this._clearRateLimit(), this._rateLimit.delta - (now - this._rateLimit.checkpoint));
-          this._rateLimit.checkpoint = now;
-        }
-      }
-      /**
-       * Clears current rate limit limitation and runs paused callback
-       */
-      _clearRateLimit() {
-        clearTimeout(this._rateLimit.timeout);
-        this._rateLimit.timeout = null;
-        this._rateLimit.counter = 0;
-        this._rateLimit.checkpoint = false;
-        while (this._rateLimit.waiting.length) {
-          const cb = this._rateLimit.waiting.shift();
-          setImmediate(cb);
-        }
-      }
-      /**
-       * Returns true if there are free slots in the queue
-       */
-      isIdle() {
-        return this.idling;
-      }
-      /**
-       * Verifies SMTP configuration
-       *
-       * @param {Function} callback Callback function
-       */
-      verify(callback) {
-        let promise;
-        if (!callback) {
-          promise = new Promise((resolve, reject) => {
-            callback = shared.callbackPromise(resolve, reject);
-          });
-        }
-        const auth = new PoolResource(this).auth;
-        this.getSocket(this.options, (err, socketOptions) => {
-          if (err) {
-            return callback(err);
-          }
-          let options = this.options;
-          if (socketOptions && socketOptions.connection) {
-            this.logger.info(
-              {
-                tnx: "proxy",
-                remoteAddress: socketOptions.connection.remoteAddress,
-                remotePort: socketOptions.connection.remotePort,
-                destHost: options.host || "",
-                destPort: options.port || "",
-                action: "connected"
-              },
-              "Using proxied socket from %s:%s to %s:%s",
-              socketOptions.connection.remoteAddress,
-              socketOptions.connection.remotePort,
-              options.host || "",
-              options.port || ""
-            );
-            options = Object.assign(shared.assign(false, options), socketOptions);
-          }
-          const connection = new SMTPConnection(options);
-          let returned = false;
-          connection.once("error", (err2) => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            connection.close();
-            return callback(err2);
-          });
-          connection.once("end", () => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            return callback(new Error("Connection closed"));
-          });
-          const finalize = () => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            connection.quit();
-            return callback(null, true);
-          };
-          connection.connect(() => {
-            if (returned) {
-              return;
-            }
-            if (auth && (connection.allowsAuth || options.forceAuth)) {
-              connection.login(auth, (err2) => {
-                if (returned) {
-                  return;
-                }
-                if (err2) {
-                  returned = true;
-                  connection.close();
-                  return callback(err2);
-                }
-                finalize();
-              });
-            } else if (!auth && connection.allowsAuth && options.forceAuth) {
-              const err2 = new Error("Authentication info was not provided");
-              err2.code = errors.ENOAUTH;
-              returned = true;
-              connection.close();
-              return callback(err2);
-            } else {
-              finalize();
-            }
-          });
-        });
-        return promise;
-      }
-    };
-    module2.exports = SMTPPool;
-  }
-});
-
-// node_modules/nodemailer/lib/smtp-transport/index.js
-var require_smtp_transport = __commonJS({
-  "node_modules/nodemailer/lib/smtp-transport/index.js"(exports2, module2) {
-    "use strict";
-    var EventEmitter = require("events");
-    var SMTPConnection = require_smtp_connection();
-    var wellKnown = require_well_known();
-    var shared = require_shared3();
-    var XOAuth2 = require_xoauth2();
-    var errors = require_errors2();
-    var packageData = require_package3();
-    var SMTPTransport = class extends EventEmitter {
-      constructor(options) {
-        super();
-        options = options || {};
-        if (typeof options === "string") {
-          options = {
-            url: options
-          };
-        }
-        let urlData;
-        let service = options.service;
-        if (typeof options.getSocket === "function") {
-          this.getSocket = options.getSocket;
-        }
-        if (options.url) {
-          urlData = shared.parseConnectionUrl(options.url);
-          service = service || urlData.service;
-        }
-        this.options = shared.assign(
-          false,
-          // create new object
-          options,
-          // regular options
-          urlData,
-          // url options
-          service && wellKnown(service)
-          // wellknown options
-        );
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "smtp-transport"
-        });
-        this.name = "SMTP";
-        this.version = packageData.version + "[client:" + packageData.version + "]";
-        if (this.options.auth) {
-          this.auth = this.getAuth({});
-        }
-      }
-      /**
-       * Placeholder function for creating proxy sockets. This method immediatelly returns
-       * without a socket
-       *
-       * @param {Object} options Connection options
-       * @param {Function} callback Callback function to run with the socket keys
-       */
-      getSocket(options, callback) {
-        return setImmediate(() => callback(null, false));
-      }
-      getAuth(authOpts) {
-        if (!authOpts) {
-          if (this.auth && this.auth.oauth2 && this.mailer) {
-            this.auth.oauth2.provisionCallback = this.mailer.get("oauth2_provision_cb") || this.auth.oauth2.provisionCallback;
-          }
-          return this.auth;
-        }
-        const authData = Object.assign(
-          {},
-          this.options.auth && typeof this.options.auth === "object" ? this.options.auth : {},
-          typeof authOpts === "object" ? authOpts : {}
-        );
-        if (Object.keys(authData).length === 0) {
-          return false;
-        }
-        switch ((authData.type || "").toString().toUpperCase()) {
-          case "OAUTH2": {
-            if (!authData.service && !authData.user) {
-              return false;
-            }
-            const oauth2 = new XOAuth2(authData, this.logger);
-            oauth2.provisionCallback = this.mailer && this.mailer.get("oauth2_provision_cb") || oauth2.provisionCallback;
-            oauth2.on("token", (token) => this.mailer.emit("token", token));
-            oauth2.on("error", (err) => this.emit("error", err));
-            return {
-              type: "OAUTH2",
-              user: authData.user,
-              oauth2,
-              method: "XOAUTH2"
-            };
-          }
-          default:
-            return {
-              type: (authData.type || "").toString().toUpperCase() || "LOGIN",
-              user: authData.user,
-              credentials: {
-                user: authData.user || "",
-                pass: authData.pass,
-                options: authData.options
-              },
-              method: (authData.method || "").trim().toUpperCase() || this.options.authMethod || false
-            };
-        }
-      }
-      /**
-       * Sends an e-mail using the selected settings
-       *
-       * @param {Object} mail Mail object
-       * @param {Function} callback Callback function
-       */
-      send(mail, callback) {
-        this.getSocket(this.options, (err, socketOptions) => {
-          if (err) {
-            return callback(err);
-          }
-          let returned = false;
-          let options = this.options;
-          if (socketOptions && socketOptions.connection) {
-            this.logger.info(
-              {
-                tnx: "proxy",
-                remoteAddress: socketOptions.connection.remoteAddress,
-                remotePort: socketOptions.connection.remotePort,
-                destHost: options.host || "",
-                destPort: options.port || "",
-                action: "connected"
-              },
-              "Using proxied socket from %s:%s to %s:%s",
-              socketOptions.connection.remoteAddress,
-              socketOptions.connection.remotePort,
-              options.host || "",
-              options.port || ""
-            );
-            options = Object.assign(shared.assign(false, options), socketOptions);
-          }
-          const connection = new SMTPConnection(options);
-          let perCallAuth;
-          const cleanupPerCallAuth = () => {
-            if (perCallAuth && perCallAuth !== this.auth && perCallAuth.oauth2) {
-              perCallAuth.oauth2.removeAllListeners();
-            }
-            perCallAuth = null;
-          };
-          connection.once("error", (err2) => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            cleanupPerCallAuth();
-            connection.close();
-            return callback(err2);
-          });
-          connection.once("end", () => {
-            if (returned) {
-              return;
-            }
-            const timer = setTimeout(() => {
-              if (returned) {
-                return;
-              }
-              returned = true;
-              cleanupPerCallAuth();
-              const err2 = new Error("Unexpected socket close");
-              if (connection && connection._socket && connection._socket.upgrading) {
-                err2.code = errors.ETLS;
-              }
-              callback(err2);
-            }, 1e3);
-            try {
-              timer.unref();
-            } catch (_E) {
-            }
-          });
-          const sendMessage = () => {
-            const envelope = mail.message.getEnvelope();
-            const messageId = mail.message.messageId();
-            const recipients = [].concat(envelope.to || []);
-            if (recipients.length > 3) {
-              recipients.push("...and " + recipients.splice(2).length + " more");
-            }
-            if (mail.data.dsn) {
-              envelope.dsn = mail.data.dsn;
-            }
-            if (mail.data.requireTLSExtensionEnabled) {
-              envelope.requireTLSExtensionEnabled = mail.data.requireTLSExtensionEnabled;
-            }
-            this.logger.info(
-              {
-                tnx: "send",
-                messageId
-              },
-              "Sending message %s to <%s>",
-              messageId,
-              recipients.join(", ")
-            );
-            connection.send(envelope, mail.message.createReadStream(), (err2, info) => {
-              returned = true;
-              cleanupPerCallAuth();
-              connection.close();
-              if (err2) {
-                this.logger.error(
-                  {
-                    err: err2,
-                    tnx: "send"
-                  },
-                  "Send error for %s: %s",
-                  messageId,
-                  err2.message
-                );
-                return callback(err2);
-              }
-              info.envelope = {
-                from: envelope.from,
-                to: envelope.to
-              };
-              info.messageId = messageId;
-              try {
-                return callback(null, info);
-              } catch (E) {
-                this.logger.error(
-                  {
-                    err: E,
-                    tnx: "callback"
-                  },
-                  "Callback error for %s: %s",
-                  messageId,
-                  E.message
-                );
-              }
-            });
-          };
-          connection.connect(() => {
-            if (returned) {
-              return;
-            }
-            perCallAuth = this.getAuth(mail.data.auth);
-            if (perCallAuth && (connection.allowsAuth || options.forceAuth)) {
-              connection.login(perCallAuth, (err2) => {
-                cleanupPerCallAuth();
-                if (returned) {
-                  return;
-                }
-                if (err2) {
-                  returned = true;
-                  connection.close();
-                  return callback(err2);
-                }
-                sendMessage();
-              });
-            } else {
-              sendMessage();
-            }
-          });
-        });
-      }
-      /**
-       * Verifies SMTP configuration
-       *
-       * @param {Function} callback Callback function
-       */
-      verify(callback) {
-        let promise;
-        if (!callback) {
-          promise = new Promise((resolve, reject) => {
-            callback = shared.callbackPromise(resolve, reject);
-          });
-        }
-        this.getSocket(this.options, (err, socketOptions) => {
-          if (err) {
-            return callback(err);
-          }
-          let options = this.options;
-          if (socketOptions && socketOptions.connection) {
-            this.logger.info(
-              {
-                tnx: "proxy",
-                remoteAddress: socketOptions.connection.remoteAddress,
-                remotePort: socketOptions.connection.remotePort,
-                destHost: options.host || "",
-                destPort: options.port || "",
-                action: "connected"
-              },
-              "Using proxied socket from %s:%s to %s:%s",
-              socketOptions.connection.remoteAddress,
-              socketOptions.connection.remotePort,
-              options.host || "",
-              options.port || ""
-            );
-            options = Object.assign(shared.assign(false, options), socketOptions);
-          }
-          const connection = new SMTPConnection(options);
-          let returned = false;
-          let perCallAuth;
-          const cleanupPerCallAuth = () => {
-            if (perCallAuth && perCallAuth !== this.auth && perCallAuth.oauth2) {
-              perCallAuth.oauth2.removeAllListeners();
-            }
-            perCallAuth = null;
-          };
-          connection.once("error", (err2) => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            cleanupPerCallAuth();
-            connection.close();
-            return callback(err2);
-          });
-          connection.once("end", () => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            cleanupPerCallAuth();
-            return callback(new Error("Connection closed"));
-          });
-          const finalize = () => {
-            if (returned) {
-              return;
-            }
-            returned = true;
-            cleanupPerCallAuth();
-            connection.quit();
-            return callback(null, true);
-          };
-          connection.connect(() => {
-            if (returned) {
-              return;
-            }
-            perCallAuth = this.getAuth({});
-            if (perCallAuth && (connection.allowsAuth || options.forceAuth)) {
-              connection.login(perCallAuth, (err2) => {
-                cleanupPerCallAuth();
-                if (returned) {
-                  return;
-                }
-                if (err2) {
-                  returned = true;
-                  connection.close();
-                  return callback(err2);
-                }
-                finalize();
-              });
-            } else if (!perCallAuth && connection.allowsAuth && options.forceAuth) {
-              const err2 = new Error("Authentication info was not provided");
-              err2.code = errors.ENOAUTH;
-              returned = true;
-              cleanupPerCallAuth();
-              connection.close();
-              return callback(err2);
-            } else {
-              finalize();
-            }
-          });
-        });
-        return promise;
-      }
-      /**
-       * Releases resources
-       */
-      close() {
-        if (this.auth && this.auth.oauth2) {
-          this.auth.oauth2.removeAllListeners();
-        }
-        this.emit("close");
-      }
-    };
-    module2.exports = SMTPTransport;
-  }
-});
-
-// node_modules/nodemailer/lib/sendmail-transport/index.js
-var require_sendmail_transport = __commonJS({
-  "node_modules/nodemailer/lib/sendmail-transport/index.js"(exports2, module2) {
-    "use strict";
-    var { spawn } = require("child_process");
-    var packageData = require_package3();
-    var shared = require_shared3();
-    var errors = require_errors2();
-    var LeWindows = require_le_windows();
-    var LeUnix = require_le_unix();
-    var SendmailTransport = class {
-      constructor(options) {
-        options = options || {};
-        this._spawn = spawn;
-        this.options = options;
-        this.name = "Sendmail";
-        this.version = packageData.version;
-        this.path = "sendmail";
-        this.args = false;
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "sendmail"
-        });
-        if (typeof options === "string") {
-          this.path = options;
-        } else if (typeof options === "object") {
-          if (options.path) {
-            this.path = options.path;
-          }
-          if (Array.isArray(options.args)) {
-            this.args = options.args;
-          }
-        }
-        this.winbreak = ["win", "windows", "dos", "\r\n"].includes((options.newline || "").toString().toLowerCase());
-      }
-      /**
-       * <p>Compiles a mailcomposer message and forwards it to handler that sends it.</p>
-       *
-       * @param {Object} emailMessage MailComposer object
-       * @param {Function} callback Callback function to run when the sending is completed
-       */
-      send(mail, done) {
-        mail.message.keepBcc = true;
-        const envelope = mail.data.envelope || mail.message.getEnvelope();
-        const messageId = mail.message.messageId();
-        let returned;
-        const hasInvalidAddresses = [].concat(envelope.from || []).concat(envelope.to || []).some((addr) => /^-/.test(addr));
-        if (hasInvalidAddresses) {
-          const err = new Error("Can not send mail. Invalid envelope addresses.");
-          err.code = errors.ESENDMAIL;
-          return done(err);
-        }
-        const args = this.args ? ["-i"].concat(this.args).concat(envelope.to) : ["-i"].concat(envelope.from ? ["-f", envelope.from] : []).concat(envelope.to);
-        const callback = (err) => {
-          if (returned) {
-            return;
-          }
-          returned = true;
-          if (typeof done === "function") {
-            if (err) {
-              return done(err);
-            }
-            return done(null, {
-              envelope,
-              messageId,
-              response: "Messages queued for delivery"
-            });
-          }
-        };
-        let sendmail;
-        try {
-          sendmail = this._spawn(this.path, args);
-        } catch (E) {
-          this.logger.error(
-            {
-              err: E,
-              tnx: "spawn",
-              messageId
-            },
-            "Error occurred while spawning sendmail. %s",
-            E.message
-          );
-          return callback(E);
-        }
-        if (sendmail) {
-          sendmail.on("error", (err) => {
-            this.logger.error(
-              {
-                err,
-                tnx: "spawn",
-                messageId
-              },
-              "Error occurred when sending message %s. %s",
-              messageId,
-              err.message
-            );
-            callback(err);
-          });
-          sendmail.once("exit", (code) => {
-            if (!code) {
-              return callback();
-            }
-            const err = new Error(
-              code === 127 ? "Sendmail command not found, process exited with code " + code : "Sendmail exited with code " + code
-            );
-            err.code = errors.ESENDMAIL;
-            this.logger.error(
-              {
-                err,
-                tnx: "stdin",
-                messageId
-              },
-              "Error sending message %s to sendmail. %s",
-              messageId,
-              err.message
-            );
-            callback(err);
-          });
-          sendmail.once("close", callback);
-          sendmail.stdin.on("error", (err) => {
-            this.logger.error(
-              {
-                err,
-                tnx: "stdin",
-                messageId
-              },
-              "Error occurred when piping message %s to sendmail. %s",
-              messageId,
-              err.message
-            );
-            callback(err);
-          });
-          const recipients = [].concat(envelope.to || []);
-          if (recipients.length > 3) {
-            recipients.push("...and " + recipients.splice(2).length + " more");
-          }
-          this.logger.info(
-            {
-              tnx: "send",
-              messageId
-            },
-            "Sending message %s to <%s>",
-            messageId,
-            recipients.join(", ")
-          );
-          const sourceStream = mail.message.createReadStream();
-          let stream = sourceStream;
-          if (this.options.newline) {
-            stream = sourceStream.pipe(this.winbreak ? new LeWindows() : new LeUnix());
-            sourceStream.once("error", (err) => stream.emit("error", err));
-          }
-          stream.once("error", (err) => {
-            this.logger.error(
-              {
-                err,
-                tnx: "stdin",
-                messageId
-              },
-              "Error occurred when generating message %s. %s",
-              messageId,
-              err.message
-            );
-            sendmail.kill("SIGINT");
-            callback(err);
-          });
-          stream.pipe(sendmail.stdin);
-        } else {
-          const err = new Error("sendmail was not found");
-          err.code = errors.ESENDMAIL;
-          return callback(err);
-        }
-      }
-    };
-    module2.exports = SendmailTransport;
-  }
-});
-
-// node_modules/nodemailer/lib/stream-transport/index.js
-var require_stream_transport = __commonJS({
-  "node_modules/nodemailer/lib/stream-transport/index.js"(exports2, module2) {
-    "use strict";
-    var packageData = require_package3();
-    var shared = require_shared3();
-    var LeWindows = require_le_windows();
-    var LeUnix = require_le_unix();
-    var StreamTransport = class {
-      constructor(options) {
-        options = options || {};
-        this.options = options;
-        this.name = "StreamTransport";
-        this.version = packageData.version;
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "stream-transport"
-        });
-        this.winbreak = ["win", "windows", "dos", "\r\n"].includes((options.newline || "").toString().toLowerCase());
-      }
-      /**
-       * Compiles a mailcomposer message and forwards it to handler that sends it
-       *
-       * @param {Object} emailMessage MailComposer object
-       * @param {Function} callback Callback function to run when the sending is completed
-       */
-      send(mail, done) {
-        mail.message.keepBcc = true;
-        const envelope = mail.data.envelope || mail.message.getEnvelope();
-        const messageId = mail.message.messageId();
-        const recipients = [].concat(envelope.to || []);
-        if (recipients.length > 3) {
-          recipients.push("...and " + recipients.splice(2).length + " more");
-        }
-        this.logger.info(
-          {
-            tnx: "send",
-            messageId
-          },
-          "Sending message %s to <%s> using %s line breaks",
-          messageId,
-          recipients.join(", "),
-          this.winbreak ? "<CR><LF>" : "<LF>"
-        );
-        setImmediate(() => {
-          let stream;
-          try {
-            stream = mail.message.createReadStream();
-            if (this.options.newline) {
-              const sourceStream = stream;
-              stream = sourceStream.pipe(this.winbreak ? new LeWindows() : new LeUnix());
-              sourceStream.once("error", (err) => stream.emit("error", err));
-            }
-          } catch (E) {
-            this.logger.error(
-              {
-                err: E,
-                tnx: "send",
-                messageId
-              },
-              "Creating send stream failed for %s. %s",
-              messageId,
-              E.message
-            );
-            return done(E);
-          }
-          if (!this.options.buffer) {
-            stream.once("error", (err) => {
-              this.logger.error(
-                {
-                  err,
-                  tnx: "send",
-                  messageId
-                },
-                "Failed creating message for %s. %s",
-                messageId,
-                err.message
-              );
-            });
-            return done(null, {
-              envelope,
-              messageId,
-              message: stream
-            });
-          }
-          const chunks = [];
-          let chunklen = 0;
-          stream.on("readable", () => {
-            let chunk;
-            while ((chunk = stream.read()) !== null) {
-              chunks.push(chunk);
-              chunklen += chunk.length;
-            }
-          });
-          stream.once("error", (err) => {
-            this.logger.error(
-              {
-                err,
-                tnx: "send",
-                messageId
-              },
-              "Failed creating message for %s. %s",
-              messageId,
-              err.message
-            );
-            return done(err);
-          });
-          stream.on(
-            "end",
-            () => done(null, {
-              envelope,
-              messageId,
-              message: Buffer.concat(chunks, chunklen)
-            })
-          );
-        });
-      }
-    };
-    module2.exports = StreamTransport;
-  }
-});
-
-// node_modules/nodemailer/lib/json-transport/index.js
-var require_json_transport = __commonJS({
-  "node_modules/nodemailer/lib/json-transport/index.js"(exports2, module2) {
-    "use strict";
-    var packageData = require_package3();
-    var shared = require_shared3();
-    var JSONTransport = class {
-      constructor(options) {
-        options = options || {};
-        this.options = options;
-        this.name = "JSONTransport";
-        this.version = packageData.version;
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "json-transport"
-        });
-      }
-      /**
-       * <p>Compiles a mailcomposer message and forwards it to handler that sends it.</p>
-       *
-       * @param {Object} emailMessage MailComposer object
-       * @param {Function} callback Callback function to run when the sending is completed
-       */
-      send(mail, done) {
-        mail.message.keepBcc = true;
-        const envelope = mail.data.envelope || mail.message.getEnvelope();
-        const messageId = mail.message.messageId();
-        const recipients = [].concat(envelope.to || []);
-        if (recipients.length > 3) {
-          recipients.push("...and " + recipients.splice(2).length + " more");
-        }
-        this.logger.info(
-          {
-            tnx: "send",
-            messageId
-          },
-          "Composing JSON structure of %s to <%s>",
-          messageId,
-          recipients.join(", ")
-        );
-        setImmediate(() => {
-          mail.normalize((err, data) => {
-            if (err) {
-              this.logger.error(
-                {
-                  err,
-                  tnx: "send",
-                  messageId
-                },
-                "Failed building JSON structure for %s. %s",
-                messageId,
-                err.message
-              );
-              return done(err);
-            }
-            delete data.envelope;
-            delete data.normalizedHeaders;
-            return done(null, {
-              envelope,
-              messageId,
-              message: this.options.skipEncoding ? data : JSON.stringify(data)
-            });
-          });
-        });
-      }
-    };
-    module2.exports = JSONTransport;
-  }
-});
-
-// node_modules/nodemailer/lib/ses-transport/index.js
-var require_ses_transport = __commonJS({
-  "node_modules/nodemailer/lib/ses-transport/index.js"(exports2, module2) {
-    "use strict";
-    var EventEmitter = require("events");
-    var packageData = require_package3();
-    var shared = require_shared3();
-    var errors = require_errors2();
-    var LeWindows = require_le_windows();
-    var MimeNode = require_mime_node();
-    function tagSesError(err) {
-      if (err && typeof err === "object" && !err.code) {
-        err.code = errors.ESES;
-      }
-      return err;
-    }
-    var SESTransport = class extends EventEmitter {
-      constructor(options) {
-        super();
-        options = options || {};
-        this.options = options;
-        this.ses = this.options.SES;
-        this.name = "SESTransport";
-        this.version = packageData.version;
-        this.logger = shared.getLogger(this.options, {
-          component: this.options.component || "ses-transport"
-        });
-      }
-      getRegion(cb) {
-        if (this.ses.sesClient.config && typeof this.ses.sesClient.config.region === "function") {
-          return this.ses.sesClient.config.region().then(
-            (region) => cb(null, region),
-            (err) => cb(err)
-          );
-        }
-        return cb(null, false);
-      }
-      /**
-       * Compiles a mailcomposer message and forwards it to SES
-       *
-       * @param {Object} emailMessage MailComposer object
-       * @param {Function} callback Callback function to run when the sending is completed
-       */
-      send(mail, callback) {
-        let fromHeader = mail.message._headers.find((header) => /^from$/i.test(header.key));
-        if (fromHeader) {
-          const mimeNode = new MimeNode("text/plain");
-          fromHeader = mimeNode._convertAddresses(mimeNode._parseAddresses(fromHeader.value));
-        }
-        const envelope = mail.data.envelope || mail.message.getEnvelope();
-        const messageId = mail.message.messageId();
-        const recipients = [].concat(envelope.to || []);
-        if (recipients.length > 3) {
-          recipients.push("...and " + recipients.splice(2).length + " more");
-        }
-        this.logger.info(
-          {
-            tnx: "send",
-            messageId
-          },
-          "Sending message %s to <%s>",
-          messageId,
-          recipients.join(", ")
-        );
-        const getRawMessage = (next) => {
-          if (!mail.data._dkim) {
-            mail.data._dkim = {};
-          }
-          if (mail.data._dkim.skipFields && typeof mail.data._dkim.skipFields === "string") {
-            mail.data._dkim.skipFields += ":date:message-id";
-          } else {
-            mail.data._dkim.skipFields = "date:message-id";
-          }
-          const sourceStream = mail.message.createReadStream();
-          const stream = sourceStream.pipe(new LeWindows());
-          const chunks = [];
-          let chunklen = 0;
-          stream.on("readable", () => {
-            let chunk;
-            while ((chunk = stream.read()) !== null) {
-              chunks.push(chunk);
-              chunklen += chunk.length;
-            }
-          });
-          sourceStream.once("error", (err) => stream.emit("error", err));
-          stream.once("error", (err) => next(err));
-          stream.once("end", () => next(null, Buffer.concat(chunks, chunklen)));
-        };
-        setImmediate(
-          () => getRawMessage((err, raw) => {
-            if (err) {
-              this.logger.error(
-                {
-                  err,
-                  tnx: "send",
-                  messageId
-                },
-                "Failed creating message for %s. %s",
-                messageId,
-                err.message
-              );
-              return callback(err);
-            }
-            const sesMessage = Object.assign(
-              {
-                Content: {
-                  Raw: {
-                    // required
-                    Data: raw
-                    // required
-                  }
-                },
-                FromEmailAddress: fromHeader || envelope.from,
-                Destination: {
-                  ToAddresses: envelope.to
-                }
-              },
-              mail.data.ses || {}
-            );
-            this.getRegion((err2, region) => {
-              if (err2 || !region) {
-                region = "us-east-1";
-              }
-              let sendPromise;
-              try {
-                const command = new this.ses.SendEmailCommand(sesMessage);
-                sendPromise = this.ses.sesClient.send(command);
-              } catch (err3) {
-                tagSesError(err3);
-                this.logger.error(
-                  {
-                    err: err3,
-                    tnx: "send"
-                  },
-                  "Send error for %s: %s",
-                  messageId,
-                  err3.message
-                );
-                setImmediate(() => callback(err3));
-                return;
-              }
-              sendPromise.then((data) => {
-                if (region === "us-east-1") {
-                  region = "email";
-                }
-                const info = {
-                  envelope: {
-                    from: envelope.from,
-                    to: envelope.to
-                  },
-                  messageId: "<" + data.MessageId + (!/@/.test(data.MessageId) ? "@" + region + ".amazonses.com" : "") + ">",
-                  response: data.MessageId,
-                  raw
-                };
-                setImmediate(() => callback(null, info));
-              }).catch((err3) => {
-                tagSesError(err3);
-                this.logger.error(
-                  {
-                    err: err3,
-                    tnx: "send"
-                  },
-                  "Send error for %s: %s",
-                  messageId,
-                  err3.message
-                );
-                setImmediate(() => callback(err3));
-              });
-            });
-          })
-        );
-      }
-      /**
-       * Verifies SES configuration
-       *
-       * @param {Function} callback Callback function
-       */
-      verify(callback) {
-        let promise;
-        if (!callback) {
-          promise = new Promise((resolve, reject) => {
-            callback = shared.callbackPromise(resolve, reject);
-          });
-        }
-        const cb = (err) => {
-          if (err && !["InvalidParameterValue", "MessageRejected"].includes(err.code || err.Code || err.name)) {
-            return callback(tagSesError(err));
-          }
-          return callback(null, true);
-        };
-        const sesMessage = {
-          Content: {
-            Raw: {
-              Data: Buffer.from("From: <invalid@invalid>\r\nTo: <invalid@invalid>\r\n Subject: Invalid\r\n\r\nInvalid")
-            }
-          },
-          FromEmailAddress: "invalid@invalid",
-          Destination: {
-            ToAddresses: ["invalid@invalid"]
-          }
-        };
-        this.getRegion(() => {
-          let sendPromise;
-          try {
-            const command = new this.ses.SendEmailCommand(sesMessage);
-            sendPromise = this.ses.sesClient.send(command);
-          } catch (err) {
-            setImmediate(() => cb(err));
-            return;
-          }
-          sendPromise.then(() => setImmediate(() => cb(null))).catch((err) => setImmediate(() => cb(err)));
-        });
-        return promise;
-      }
-    };
-    module2.exports = SESTransport;
-  }
-});
-
-// node_modules/nodemailer/lib/nodemailer.js
-var require_nodemailer = __commonJS({
-  "node_modules/nodemailer/lib/nodemailer.js"(exports2, module2) {
-    "use strict";
-    var Mailer = require_mailer();
-    var shared = require_shared3();
-    var SMTPPool = require_smtp_pool();
-    var SMTPTransport = require_smtp_transport();
-    var SendmailTransport = require_sendmail_transport();
-    var StreamTransport = require_stream_transport();
-    var JSONTransport = require_json_transport();
-    var SESTransport = require_ses_transport();
-    var errors = require_errors2();
-    var nmfetch = require_fetch2();
-    var packageData = require_package3();
-    var ETHEREAL_API = (process.env.ETHEREAL_API || "https://api.nodemailer.com").replace(/\/+$/, "");
-    var ETHEREAL_WEB = (process.env.ETHEREAL_WEB || "https://ethereal.email").replace(/\/+$/, "");
-    var ETHEREAL_API_KEY = (process.env.ETHEREAL_API_KEY || "").replace(/\s*/g, "") || null;
-    var ETHEREAL_CACHE = ["true", "yes", "y", "1"].includes((process.env.ETHEREAL_CACHE || "yes").toString().trim().toLowerCase());
-    var testAccount = false;
-    module2.exports.createTransport = function(transporter, defaults) {
-      let options;
-      if (
-        // provided transporter is a configuration object, not transporter plugin
-        typeof transporter === "object" && typeof transporter.send !== "function" || // provided transporter looks like a connection url
-        typeof transporter === "string" && /^(smtps?|direct):/i.test(transporter)
-      ) {
-        const urlConfig = typeof transporter === "string" ? transporter : transporter.url;
-        if (urlConfig) {
-          options = shared.parseConnectionUrl(urlConfig);
-        } else {
-          options = transporter;
-        }
-        if (options.pool) {
-          transporter = new SMTPPool(options);
-        } else if (options.sendmail) {
-          transporter = new SendmailTransport(options);
-        } else if (options.streamTransport) {
-          transporter = new StreamTransport(options);
-        } else if (options.jsonTransport) {
-          transporter = new JSONTransport(options);
-        } else if (options.SES) {
-          if (options.SES.ses && options.SES.aws) {
-            const error = new Error(
-              "Using legacy SES configuration, expecting @aws-sdk/client-sesv2, see https://nodemailer.com/transports/ses/"
-            );
-            error.code = errors.ECONFIG;
-            throw error;
-          }
-          transporter = new SESTransport(options);
-        } else {
-          transporter = new SMTPTransport(options);
-        }
-      }
-      return new Mailer(transporter, options, defaults);
-    };
-    module2.exports.createTestAccount = function(apiUrl, callback) {
-      let promise;
-      if (!callback && typeof apiUrl === "function") {
-        callback = apiUrl;
-        apiUrl = false;
-      }
-      if (!callback) {
-        promise = new Promise((resolve, reject) => {
-          callback = shared.callbackPromise(resolve, reject);
-        });
-      }
-      if (ETHEREAL_CACHE && testAccount) {
-        setImmediate(() => callback(null, testAccount));
-        return promise;
-      }
-      apiUrl = apiUrl || ETHEREAL_API;
-      const chunks = [];
-      let chunklen = 0;
-      const requestHeaders = {};
-      const requestBody = {
-        requestor: packageData.name,
-        version: packageData.version
-      };
-      if (ETHEREAL_API_KEY) {
-        requestHeaders.Authorization = "Bearer " + ETHEREAL_API_KEY;
-      }
-      const fetchOptions = {
-        contentType: "application/json",
-        method: "POST",
-        headers: requestHeaders,
-        body: Buffer.from(JSON.stringify(requestBody))
-      };
-      if (/^https:/i.test(apiUrl)) {
-        fetchOptions.tls = { rejectUnauthorized: true };
-      }
-      const req = nmfetch(apiUrl + "/user", fetchOptions);
-      req.on("readable", () => {
-        let chunk;
-        while ((chunk = req.read()) !== null) {
-          chunks.push(chunk);
-          chunklen += chunk.length;
-        }
-      });
-      req.once("error", (err) => callback(err));
-      req.once("end", () => {
-        const res = Buffer.concat(chunks, chunklen);
-        let data;
-        try {
-          data = JSON.parse(res.toString());
-        } catch (E) {
-          return callback(E);
-        }
-        if (data.status !== "success" || data.error) {
-          return callback(new Error(data.error || "Request failed"));
-        }
-        delete data.status;
-        testAccount = data;
-        callback(null, testAccount);
-      });
-      return promise;
-    };
-    module2.exports.getTestMessageUrl = function(info) {
-      if (!info || !info.response) {
-        return false;
-      }
-      const infoProps = /* @__PURE__ */ new Map();
-      const response = info.response.toString();
-      if (response.length > 2 && response.charAt(response.length - 1) === "]") {
-        const open2 = response.indexOf("[", response.lastIndexOf("]", response.length - 2) + 1);
-        if (open2 >= 0 && open2 < response.length - 2) {
-          const props = response.substring(open2 + 1, response.length - 1);
-          props.replace(/\b([A-Z0-9]+)=([^\s]+)/g, (m2, key, value) => {
-            infoProps.set(key, value);
-          });
-        }
-      }
-      if (infoProps.has("STATUS") && infoProps.has("MSGID")) {
-        return (testAccount.web || ETHEREAL_WEB) + "/message/" + infoProps.get("MSGID");
-      }
-      return false;
-    };
-  }
-});
-
 // src/server/app.ts
 var app_exports = {};
 __export(app_exports, {
@@ -71717,7 +59895,7 @@ __export(app_exports, {
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
-var import_crypto9 = __toESM(require("crypto"), 1);
+var import_crypto12 = __toESM(require("crypto"), 1);
 var import_express = __toESM(require_express2(), 1);
 
 // node_modules/@google/genai/dist/node/index.mjs
@@ -108722,52 +96900,6 @@ function Base64_encode(input) {
   }
   return o;
 }
-function Base64_encode_pass(input) {
-  var o = "";
-  var c1 = 0, c2 = 0, c3 = 0, e1 = 0, e2 = 0, e3 = 0, e4 = 0;
-  for (var i2 = 0; i2 < input.length; ) {
-    c1 = input.charCodeAt(i2++);
-    if (c1 > 255)
-      c1 = 95;
-    e1 = c1 >> 2;
-    c2 = input.charCodeAt(i2++);
-    if (c2 > 255)
-      c2 = 95;
-    e2 = (c1 & 3) << 4 | c2 >> 4;
-    c3 = input.charCodeAt(i2++);
-    if (c3 > 255)
-      c3 = 95;
-    e3 = (c2 & 15) << 2 | c3 >> 6;
-    e4 = c3 & 63;
-    if (isNaN(c2)) {
-      e3 = e4 = 64;
-    } else if (isNaN(c3)) {
-      e4 = 64;
-    }
-    o += Base64_map.charAt(e1) + Base64_map.charAt(e2) + Base64_map.charAt(e3) + Base64_map.charAt(e4);
-  }
-  return o;
-}
-function Base64_encode_arr(input) {
-  var o = "";
-  var c1 = 0, c2 = 0, c3 = 0, e1 = 0, e2 = 0, e3 = 0, e4 = 0;
-  for (var i2 = 0; i2 < input.length; ) {
-    c1 = input[i2++];
-    e1 = c1 >> 2;
-    c2 = input[i2++];
-    e2 = (c1 & 3) << 4 | c2 >> 4;
-    c3 = input[i2++];
-    e3 = (c2 & 15) << 2 | c3 >> 6;
-    e4 = c3 & 63;
-    if (isNaN(c2)) {
-      e3 = e4 = 64;
-    } else if (isNaN(c3)) {
-      e4 = 64;
-    }
-    o += Base64_map.charAt(e1) + Base64_map.charAt(e2) + Base64_map.charAt(e3) + Base64_map.charAt(e4);
-  }
-  return o;
-}
 function Base64_decode(input) {
   var o = "";
   var c1 = 0, c2 = 0, c3 = 0, e1 = 0, e2 = 0, e3 = 0, e4 = 0;
@@ -108834,12 +96966,6 @@ var s2a = function s2a2(s2) {
     return x2.charCodeAt(0) & 255;
   });
 };
-function s2ab(s2) {
-  if (typeof ArrayBuffer === "undefined") return s2a(s2);
-  var buf = new ArrayBuffer(s2.length), view = new Uint8Array(buf);
-  for (var i2 = 0; i2 != s2.length; ++i2) view[i2] = s2.charCodeAt(i2) & 255;
-  return buf;
-}
 function a2s(data) {
   if (Array.isArray(data)) return data.map(function(c) {
     return String.fromCharCode(c);
@@ -108847,10 +96973,6 @@ function a2s(data) {
   var o = [];
   for (var i2 = 0; i2 < data.length; ++i2) o[i2] = String.fromCharCode(data[i2]);
   return o.join("");
-}
-function a2u(data) {
-  if (typeof Uint8Array === "undefined") throw new Error("Unsupported");
-  return new Uint8Array(data);
 }
 function ab2a(data) {
   if (typeof ArrayBuffer == "undefined") throw new Error("Unsupported");
@@ -110319,10 +98441,6 @@ function SSF_load(fmt, idx) {
   table_fmt[idx] = fmt;
   return idx;
 }
-function SSF_load_table(tbl) {
-  for (var i2 = 0; i2 != 392; ++i2)
-    if (tbl[i2] !== void 0) SSF_load(tbl[i2], i2);
-}
 function make_ssf() {
   table_fmt = SSF_init_table();
 }
@@ -111025,7 +99143,7 @@ var CFB = /* @__PURE__ */ (function _CFB() {
     rebuild_cfb(cfb);
     switch (_opts.fileType) {
       case "zip":
-        return write_zip2(cfb, _opts);
+        return write_zip(cfb, _opts);
     }
     var L = (function(cfb2) {
       var mini_size = 0, fat_size = 0;
@@ -111794,7 +99912,7 @@ var CFB = /* @__PURE__ */ (function _CFB() {
     if (_usz != usz) warn_or_throw(wrn, "Bad uncompressed size: " + usz + " != " + _usz);
     cfb_add(o, name, data, { unsafe: true, mt: date });
   }
-  function write_zip2(cfb, options) {
+  function write_zip(cfb, options) {
     var _opts = options || {};
     var out = [], cdirs = [];
     var o = new_buf(1);
@@ -112143,71 +100261,6 @@ var CFB = /* @__PURE__ */ (function _CFB() {
   return exports2;
 })();
 var _fs;
-function blobify(data) {
-  if (typeof data === "string") return s2ab(data);
-  if (Array.isArray(data)) return a2u(data);
-  return data;
-}
-function write_dl(fname, payload, enc) {
-  if (typeof _fs !== "undefined" && _fs.writeFileSync) return enc ? _fs.writeFileSync(fname, payload, enc) : _fs.writeFileSync(fname, payload);
-  if (typeof Deno !== "undefined") {
-    if (enc && typeof payload == "string") switch (enc) {
-      case "utf8":
-        payload = new TextEncoder(enc).encode(payload);
-        break;
-      case "binary":
-        payload = s2ab(payload);
-        break;
-      /* TODO: binary equivalent */
-      default:
-        throw new Error("Unsupported encoding " + enc);
-    }
-    return Deno.writeFileSync(fname, payload);
-  }
-  var data = enc == "utf8" ? utf8write(payload) : payload;
-  if (typeof IE_SaveFile !== "undefined") return IE_SaveFile(data, fname);
-  if (typeof Blob !== "undefined") {
-    var blob = new Blob([blobify(data)], { type: "application/octet-stream" });
-    if (typeof navigator !== "undefined" && navigator.msSaveBlob) return navigator.msSaveBlob(blob, fname);
-    if (typeof saveAs !== "undefined") return saveAs(blob, fname);
-    if (typeof URL !== "undefined" && typeof document !== "undefined" && document.createElement && URL.createObjectURL) {
-      var url = URL.createObjectURL(blob);
-      if (typeof chrome === "object" && typeof (chrome.downloads || {}).download == "function") {
-        if (URL.revokeObjectURL && typeof setTimeout !== "undefined") setTimeout(function() {
-          URL.revokeObjectURL(url);
-        }, 6e4);
-        return chrome.downloads.download({ url, filename: fname, saveAs: true });
-      }
-      var a = document.createElement("a");
-      if (a.download != null) {
-        a.download = fname;
-        a.href = url;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        if (URL.revokeObjectURL && typeof setTimeout !== "undefined") setTimeout(function() {
-          URL.revokeObjectURL(url);
-        }, 6e4);
-        return url;
-      }
-    } else if (typeof URL !== "undefined" && !URL.createObjectURL && typeof chrome === "object") {
-      var b64 = "data:application/octet-stream;base64," + Base64_encode_arr(new Uint8Array(blobify(data)));
-      return chrome.downloads.download({ url: b64, filename: fname, saveAs: true });
-    }
-  }
-  if (typeof $ !== "undefined" && typeof File !== "undefined" && typeof Folder !== "undefined") try {
-    var out = File(fname);
-    out.open("w");
-    out.encoding = "binary";
-    if (Array.isArray(payload)) payload = a2s(payload);
-    out.write(payload);
-    out.close();
-    return payload;
-  } catch (e2) {
-    if (!e2.message || e2.message.indexOf("onstruct") == -1) throw e2;
-  }
-  throw new Error("cannot save file " + fname);
-}
 function read_binary(path3) {
   if (typeof _fs !== "undefined") return _fs.readFileSync(path3);
   if (typeof Deno !== "undefined") return Deno.readFileSync(path3);
@@ -112228,27 +100281,9 @@ function keys(o) {
   for (var i2 = 0; i2 < ks.length; ++i2) if (Object.prototype.hasOwnProperty.call(o, ks[i2])) o2.push(ks[i2]);
   return o2;
 }
-function evert_key(obj, key) {
-  var o = [], K = keys(obj);
-  for (var i2 = 0; i2 !== K.length; ++i2) if (o[obj[K[i2]][key]] == null) o[obj[K[i2]][key]] = K[i2];
-  return o;
-}
 function evert(obj) {
   var o = [], K = keys(obj);
   for (var i2 = 0; i2 !== K.length; ++i2) o[obj[K[i2]]] = K[i2];
-  return o;
-}
-function evert_num(obj) {
-  var o = [], K = keys(obj);
-  for (var i2 = 0; i2 !== K.length; ++i2) o[obj[K[i2]]] = parseInt(K[i2], 10);
-  return o;
-}
-function evert_arr(obj) {
-  var o = [], K = keys(obj);
-  for (var i2 = 0; i2 !== K.length; ++i2) {
-    if (o[obj[K[i2]]] == null) o[obj[K[i2]]] = [];
-    o[obj[K[i2]]].push(K[i2]);
-  }
   return o;
 }
 var dnthresh = /* @__PURE__ */ Date.UTC(1899, 11, 30, 0, 0, 0);
@@ -112682,9 +100717,6 @@ function zip_add_file(zip, path3, content) {
     CFB.utils.cfb_add(zip, path3, content);
   } else zip.file(path3, content);
 }
-function zip_new() {
-  return CFB.utils.cfb_new();
-}
 function zip_read(d, o) {
   switch (o.type) {
     case "base64":
@@ -112793,18 +100825,6 @@ var unescapexml = /* @__PURE__ */ (function() {
   };
 })();
 var decregex = /[&<>'"]/g;
-var charegex = /[\u0000-\u0008\u000b-\u001f\uFFFE-\uFFFF]/g;
-function escapexml(text) {
-  var s2 = text + "";
-  return s2.replace(decregex, function(y) {
-    return rencoding[y];
-  }).replace(charegex, function(s3) {
-    return "_x" + ("000" + s3.charCodeAt(0).toString(16)).slice(-4) + "_";
-  });
-}
-function escapexmltag(text) {
-  return escapexml(text).replace(/ /g, "_x0020_");
-}
 var htmlcharegex = /[\u0000-\u001f]/g;
 function escapehtml(text) {
   var s2 = text + "";
@@ -112812,14 +100832,6 @@ function escapehtml(text) {
     return rencoding[y];
   }).replace(/\n/g, "<br/>").replace(htmlcharegex, function(s3) {
     return "&#x" + ("000" + s3.charCodeAt(0).toString(16)).slice(-4) + ";";
-  });
-}
-function escapexlml(text) {
-  var s2 = text + "";
-  return s2.replace(decregex, function(y) {
-    return rencoding[y];
-  }).replace(htmlcharegex, function(s3) {
-    return "&#x" + s3.charCodeAt(0).toString(16).toUpperCase() + ";";
   });
 }
 var xlml_fixstr = /* @__PURE__ */ (function() {
@@ -112831,9 +100843,6 @@ var xlml_fixstr = /* @__PURE__ */ (function() {
     return str.replace(entregex, entrepl);
   };
 })();
-function xlml_unfixstr(str) {
-  return str.replace(/(\r\n|[\r\n])/g, "&#10;");
-}
 function parsexmlbool(value) {
   switch (value) {
     case 1:
@@ -112974,9 +100983,6 @@ function parseVector(data, opts) {
   return res;
 }
 var wtregex = /(^\s|\s$|\n)/;
-function writetag(f3, g) {
-  return "<" + f3 + (g.match(wtregex) ? ' xml:space="preserve"' : "") + ">" + g + "</" + f3 + ">";
-}
 function wxt_helper(h2) {
   return keys(h2).map(function(k) {
     return " " + k + '="' + h2[k] + '"';
@@ -112984,28 +100990,6 @@ function wxt_helper(h2) {
 }
 function writextag(f3, g, h2) {
   return "<" + f3 + (h2 != null ? wxt_helper(h2) : "") + (g != null ? (g.match(wtregex) ? ' xml:space="preserve"' : "") + ">" + g + "</" + f3 : "/") + ">";
-}
-function write_w3cdtf(d, t2) {
-  try {
-    return d.toISOString().replace(/\.\d*/, "");
-  } catch (e2) {
-    if (t2) throw e2;
-  }
-  return "";
-}
-function write_vt(s2, xlsx) {
-  switch (typeof s2) {
-    case "string":
-      var o = writextag("vt:lpwstr", escapexml(s2));
-      if (xlsx) o = o.replace(/&quot;/g, "_x0022_");
-      return o;
-    case "number":
-      return writextag((s2 | 0) == s2 ? "vt:i4" : "vt:r8", escapexml(String(s2)));
-    case "boolean":
-      return writextag("vt:bool", s2 ? "true" : "false");
-  }
-  if (s2 instanceof Date) return writextag("vt:filetime", write_w3cdtf(s2));
-  throw new Error("Unable to serialize " + s2);
 }
 function xlml_normalize(d) {
   if (has_buf && /*::typeof Buffer !== "undefined" && d != null && d instanceof Buffer &&*/
@@ -113038,15 +101022,6 @@ var XMLNS_main = [
   "http://schemas.microsoft.com/office/excel/2006/main",
   "http://schemas.microsoft.com/office/excel/2006/2"
 ];
-var XLMLNS = {
-  "o": "urn:schemas-microsoft-com:office:office",
-  "x": "urn:schemas-microsoft-com:office:excel",
-  "ss": "urn:schemas-microsoft-com:office:spreadsheet",
-  "dt": "uuid:C2F41010-65B3-11d1-A29F-00AA00C14882",
-  "mv": "http://macVmlSchemaUri",
-  "v": "urn:schemas-microsoft-com:vml",
-  "html": "http://www.w3.org/TR/REC-html40"
-};
 function read_double_le(b, idx) {
   var s2 = 1 - 2 * (b[idx + 7] >>> 7);
   var e2 = ((b[idx + 7] & 127) << 4) + (b[idx + 6] >>> 4 & 15);
@@ -113548,34 +101523,6 @@ function buf_array() {
   };
   return { next, push, end, _bufs: bufs, end2 };
 }
-function write_record(ba, type, payload, length) {
-  var t2 = +type, l;
-  if (isNaN(t2)) return;
-  if (!length) length = XLSBRecordEnum[t2].p || (payload || []).length || 0;
-  l = 1 + (t2 >= 128 ? 1 : 0) + 1;
-  if (length >= 128) ++l;
-  if (length >= 16384) ++l;
-  if (length >= 2097152) ++l;
-  var o = ba.next(l);
-  if (t2 <= 127) o.write_shift(1, t2);
-  else {
-    o.write_shift(1, (t2 & 127) + 128);
-    o.write_shift(1, t2 >> 7);
-  }
-  for (var i2 = 0; i2 != 4; ++i2) {
-    if (length >= 128) {
-      o.write_shift(1, (length & 127) + 128);
-      length >>= 7;
-    } else {
-      o.write_shift(1, length);
-      break;
-    }
-  }
-  if (
-    /*:: length != null &&*/
-    length > 0 && is_buf(payload)
-  ) ba.push(payload);
-}
 function shift_cell_xls(cell, tgt, opts) {
   var out = dup(cell);
   if (tgt.s) {
@@ -113683,10 +101630,6 @@ function encode_range(cs, ce) {
   if (typeof cs !== "string") cs = encode_cell(cs);
   if (typeof ce !== "string") ce = encode_cell(ce);
   return cs == ce ? cs : cs + ":" + ce;
-}
-function fix_range(a1) {
-  var s2 = decode_range(a1);
-  return "$" + encode_col(s2.s.c) + "$" + encode_row(s2.s.r) + ":$" + encode_col(s2.e.c) + "$" + encode_row(s2.e.r);
 }
 function formula_quote_sheet_name(sname, opts) {
   if (!sname && !(opts && opts.biff <= 5 && opts.biff >= 2)) throw new Error("empty sheet name");
@@ -113857,33 +101800,12 @@ function aoa_to_sheet(data, opts) {
 function parse_Int32LE(data) {
   return data.read_shift(4, "i");
 }
-function write_UInt32LE(x2, o) {
-  if (!o) o = new_buf(4);
-  o.write_shift(4, x2);
-  return o;
-}
 function parse_XLWideString(data) {
   var cchCharacters = data.read_shift(4);
   return cchCharacters === 0 ? "" : data.read_shift(cchCharacters, "dbcs");
 }
-function write_XLWideString(data, o) {
-  var _null = false;
-  if (o == null) {
-    _null = true;
-    o = new_buf(4 + 2 * data.length);
-  }
-  o.write_shift(4, data.length);
-  if (data.length > 0) o.write_shift(0, data, "dbcs");
-  return _null ? o.slice(0, o.l) : o;
-}
 function parse_StrRun(data) {
   return { ich: data.read_shift(2), ifnt: data.read_shift(2) };
-}
-function write_StrRun(run, o) {
-  if (!o) o = new_buf(4);
-  o.write_shift(2, run.ich || 0);
-  o.write_shift(2, run.ifnt || 0);
-  return o;
 }
 function parse_RichStr(data, length) {
   var start = data.l;
@@ -113899,29 +101821,7 @@ function parse_RichStr(data, length) {
   data.l = start + length;
   return z;
 }
-function write_RichStr(str, o) {
-  var _null = false;
-  if (o == null) {
-    _null = true;
-    o = new_buf(15 + 4 * str.t.length);
-  }
-  o.write_shift(1, 0);
-  write_XLWideString(str.t, o);
-  return _null ? o.slice(0, o.l) : o;
-}
 var parse_BrtCommentText = parse_RichStr;
-function write_BrtCommentText(str, o) {
-  var _null = false;
-  if (o == null) {
-    _null = true;
-    o = new_buf(23 + 4 * str.t.length);
-  }
-  o.write_shift(1, 1);
-  write_XLWideString(str.t, o);
-  o.write_shift(4, 1);
-  write_StrRun({ ich: 0, ifnt: 0 }, o);
-  return _null ? o.slice(0, o.l) : o;
-}
 function parse_XLSBCell(data) {
   var col = data.read_shift(4);
   var iStyleRef = data.read_shift(2);
@@ -113929,62 +101829,25 @@ function parse_XLSBCell(data) {
   data.l++;
   return { c: col, iStyleRef };
 }
-function write_XLSBCell(cell, o) {
-  if (o == null) o = new_buf(8);
-  o.write_shift(-4, cell.c);
-  o.write_shift(3, cell.iStyleRef || cell.s);
-  o.write_shift(1, 0);
-  return o;
-}
 function parse_XLSBShortCell(data) {
   var iStyleRef = data.read_shift(2);
   iStyleRef += data.read_shift(1) << 16;
   data.l++;
   return { c: -1, iStyleRef };
 }
-function write_XLSBShortCell(cell, o) {
-  if (o == null) o = new_buf(4);
-  o.write_shift(3, cell.iStyleRef || cell.s);
-  o.write_shift(1, 0);
-  return o;
-}
 var parse_XLSBCodeName = parse_XLWideString;
-var write_XLSBCodeName = write_XLWideString;
 function parse_XLNullableWideString(data) {
   var cchCharacters = data.read_shift(4);
   return cchCharacters === 0 || cchCharacters === 4294967295 ? "" : data.read_shift(cchCharacters, "dbcs");
 }
-function write_XLNullableWideString(data, o) {
-  var _null = false;
-  if (o == null) {
-    _null = true;
-    o = new_buf(127);
-  }
-  o.write_shift(4, data.length > 0 ? data.length : 4294967295);
-  if (data.length > 0) o.write_shift(0, data, "dbcs");
-  return _null ? o.slice(0, o.l) : o;
-}
 var parse_XLNameWideString = parse_XLWideString;
 var parse_RelID = parse_XLNullableWideString;
-var write_RelID = write_XLNullableWideString;
 function parse_RkNumber(data) {
   var b = data.slice(data.l, data.l + 4);
   var fX100 = b[0] & 1, fInt = b[0] & 2;
   data.l += 4;
   var RK = fInt === 0 ? __double([0, 0, 0, 0, b[0] & 252, b[1], b[2], b[3]], 0) : __readInt32LE(b, 0) >> 2;
   return fX100 ? RK / 100 : RK;
-}
-function write_RkNumber(data, o) {
-  if (o == null) o = new_buf(4);
-  var fX100 = 0, fInt = 0, d100 = data * 100;
-  if (data == (data | 0) && data >= -(1 << 29) && data < 1 << 29) {
-    fInt = 1;
-  } else if (d100 == (d100 | 0) && d100 >= -(1 << 29) && d100 < 1 << 29) {
-    fInt = 1;
-    fX100 = 1;
-  }
-  if (fInt) o.write_shift(-4, ((fX100 ? d100 : data) << 2) + (fX100 + 2));
-  else throw new Error("unsupported RkNumber " + data);
 }
 function parse_RfX(data) {
   var cell = { s: {}, e: {} };
@@ -113994,22 +101857,10 @@ function parse_RfX(data) {
   cell.e.c = data.read_shift(4);
   return cell;
 }
-function write_RfX(r2, o) {
-  if (!o) o = new_buf(16);
-  o.write_shift(4, r2.s.r);
-  o.write_shift(4, r2.e.r);
-  o.write_shift(4, r2.s.c);
-  o.write_shift(4, r2.e.c);
-  return o;
-}
 var parse_UncheckedRfX = parse_RfX;
-var write_UncheckedRfX = write_RfX;
 function parse_Xnum(data) {
   if (data.length - data.l < 8) throw "XLS Xnum Buffer underflow";
   return data.read_shift(8, "f");
-}
-function write_Xnum(data, o) {
-  return (o || new_buf(8)).write_shift(8, data, "f");
 }
 function parse_BrtColor(data) {
   var out = {};
@@ -114040,41 +101891,6 @@ function parse_BrtColor(data) {
   if (nTS != 0) out.tint = nTS > 0 ? nTS / 32767 : nTS / 32768;
   return out;
 }
-function write_BrtColor(color, o) {
-  if (!o) o = new_buf(8);
-  if (!color || color.auto) {
-    o.write_shift(4, 0);
-    o.write_shift(4, 0);
-    return o;
-  }
-  if (color.index != null) {
-    o.write_shift(1, 2);
-    o.write_shift(1, color.index);
-  } else if (color.theme != null) {
-    o.write_shift(1, 6);
-    o.write_shift(1, color.theme);
-  } else {
-    o.write_shift(1, 5);
-    o.write_shift(1, 0);
-  }
-  var nTS = color.tint || 0;
-  if (nTS > 0) nTS *= 32767;
-  else if (nTS < 0) nTS *= 32768;
-  o.write_shift(2, nTS);
-  if (!color.rgb || color.theme != null) {
-    o.write_shift(2, 0);
-    o.write_shift(1, 0);
-    o.write_shift(1, 0);
-  } else {
-    var rgb = color.rgb || "FFFFFF";
-    if (typeof rgb == "number") rgb = ("000000" + rgb.toString(16)).slice(-6);
-    o.write_shift(1, parseInt(rgb.slice(0, 2), 16));
-    o.write_shift(1, parseInt(rgb.slice(2, 4), 16));
-    o.write_shift(1, parseInt(rgb.slice(4, 6), 16));
-    o.write_shift(1, 255);
-  }
-  return o;
-}
 function parse_FontFlags(data) {
   var d = data.read_shift(1);
   data.l++;
@@ -114089,13 +101905,6 @@ function parse_FontFlags(data) {
     fExtend: d & 128
   };
   return out;
-}
-function write_FontFlags(font, o) {
-  if (!o) o = new_buf(2);
-  var grbit = (font.italic ? 2 : 0) | (font.strike ? 8 : 0) | (font.outline ? 16 : 0) | (font.shadow ? 32 : 0) | (font.condense ? 64 : 0) | (font.extend ? 128 : 0);
-  o.write_shift(1, grbit);
-  o.write_shift(1, 0);
-  return o;
 }
 function parse_ClipboardFormatOrString(o, w) {
   var ClipFmt = { 2: "BITMAP", 3: "METAFILEPICT", 8: "DIB", 14: "ENHMETAFILE" };
@@ -114604,55 +102413,6 @@ var ct2type = {
   "image/png": "TODO",
   "sheet": "js"
 };
-var CT_LIST = {
-  workbooks: {
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
-    xlsm: "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
-    xlsb: "application/vnd.ms-excel.sheet.binary.macroEnabled.main",
-    xlam: "application/vnd.ms-excel.addin.macroEnabled.main+xml",
-    xltx: "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml"
-  },
-  strs: {
-    /* Shared Strings */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml",
-    xlsb: "application/vnd.ms-excel.sharedStrings"
-  },
-  comments: {
-    /* Comments */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml",
-    xlsb: "application/vnd.ms-excel.comments"
-  },
-  sheets: {
-    /* Worksheet */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml",
-    xlsb: "application/vnd.ms-excel.worksheet"
-  },
-  charts: {
-    /* Chartsheet */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml",
-    xlsb: "application/vnd.ms-excel.chartsheet"
-  },
-  dialogs: {
-    /* Dialogsheet */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.dialogsheet+xml",
-    xlsb: "application/vnd.ms-excel.dialogsheet"
-  },
-  macros: {
-    /* Macrosheet (Excel 4.0 Macros) */
-    xlsx: "application/vnd.ms-excel.macrosheet+xml",
-    xlsb: "application/vnd.ms-excel.macrosheet"
-  },
-  metadata: {
-    /* Metadata (Stock/Geography and Dynamic Array) */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml",
-    xlsb: "application/vnd.ms-excel.sheetMetadata"
-  },
-  styles: {
-    /* Styles */
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml",
-    xlsb: "application/vnd.ms-excel.styles"
-  }
-};
 function new_ct() {
   return {
     workbooks: [],
@@ -114706,80 +102466,6 @@ function parse_ct(data) {
   ct.defaults = ctext;
   delete ct.calcchains;
   return ct;
-}
-function write_ct(ct, opts, raw) {
-  var type2ct = evert_arr(ct2type);
-  var o = [], v;
-  if (!raw) {
-    o[o.length] = XML_HEADER;
-    o[o.length] = writextag("Types", null, {
-      "xmlns": XMLNS.CT,
-      "xmlns:xsd": XMLNS.xsd,
-      "xmlns:xsi": XMLNS.xsi
-    });
-    o = o.concat([
-      ["xml", "application/xml"],
-      ["bin", "application/vnd.ms-excel.sheet.binary.macroEnabled.main"],
-      ["vml", "application/vnd.openxmlformats-officedocument.vmlDrawing"],
-      ["data", "application/vnd.openxmlformats-officedocument.model+data"],
-      /* from test files */
-      ["bmp", "image/bmp"],
-      ["png", "image/png"],
-      ["gif", "image/gif"],
-      ["emf", "image/x-emf"],
-      ["wmf", "image/x-wmf"],
-      ["jpg", "image/jpeg"],
-      ["jpeg", "image/jpeg"],
-      ["tif", "image/tiff"],
-      ["tiff", "image/tiff"],
-      ["pdf", "application/pdf"],
-      ["rels", "application/vnd.openxmlformats-package.relationships+xml"]
-    ].map(function(x2) {
-      return writextag("Default", null, { "Extension": x2[0], "ContentType": x2[1] });
-    }));
-  }
-  var f1 = function(w) {
-    if (ct[w] && ct[w].length > 0) {
-      v = ct[w][0];
-      o[o.length] = writextag("Override", null, {
-        "PartName": (v[0] == "/" ? "" : "/") + v,
-        "ContentType": CT_LIST[w][opts.bookType] || CT_LIST[w]["xlsx"]
-      });
-    }
-  };
-  var f22 = function(w) {
-    (ct[w] || []).forEach(function(v2) {
-      o[o.length] = writextag("Override", null, {
-        "PartName": (v2[0] == "/" ? "" : "/") + v2,
-        "ContentType": CT_LIST[w][opts.bookType] || CT_LIST[w]["xlsx"]
-      });
-    });
-  };
-  var f3 = function(t2) {
-    (ct[t2] || []).forEach(function(v2) {
-      o[o.length] = writextag("Override", null, {
-        "PartName": (v2[0] == "/" ? "" : "/") + v2,
-        "ContentType": type2ct[t2][0]
-      });
-    });
-  };
-  f1("workbooks");
-  f22("sheets");
-  f22("charts");
-  f3("themes");
-  ["strs", "styles"].forEach(f1);
-  ["coreprops", "extprops", "custprops"].forEach(f3);
-  f3("vba");
-  f3("comments");
-  f3("threadedcomments");
-  f3("drawings");
-  f22("metadata");
-  f3("people");
-  if (!raw && o.length > 2) {
-    o[o.length] = "</Types>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
 }
 var RELS = {
   WB: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
@@ -114842,37 +102528,6 @@ function parse_rels(data, currentFilePath) {
   rels["!id"] = hash;
   return rels;
 }
-function write_rels(rels) {
-  var o = [XML_HEADER, writextag("Relationships", null, {
-    //'xmlns:ns0': XMLNS.RELS,
-    "xmlns": XMLNS.RELS
-  })];
-  keys(rels["!id"]).forEach(function(rid) {
-    o[o.length] = writextag("Relationship", null, rels["!id"][rid]);
-  });
-  if (o.length > 2) {
-    o[o.length] = "</Relationships>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
-function add_rels(rels, rId, f3, type, relobj, targetmode) {
-  if (!relobj) relobj = {};
-  if (!rels["!id"]) rels["!id"] = {};
-  if (!rels["!idx"]) rels["!idx"] = 1;
-  if (rId < 0) for (rId = rels["!idx"]; rels["!id"]["rId" + rId]; ++rId) {
-  }
-  rels["!idx"] = rId + 1;
-  relobj.Id = "rId" + rId;
-  relobj.Type = type;
-  relobj.Target = f3;
-  if (targetmode) relobj.TargetMode = targetmode;
-  else if ([RELS.HLINK, RELS.XPATH, RELS.XMISS].indexOf(relobj.Type) > -1) relobj.TargetMode = "External";
-  if (rels["!id"][relobj.Id]) throw new Error("Cannot rewrite rId " + rId);
-  rels["!id"][relobj.Id] = relobj;
-  rels[("/" + relobj.Target).replace("//", "/")] = relobj;
-  return rId;
-}
 var CT_ODS = "application/vnd.oasis.opendocument.spreadsheet";
 function parse_manifest(d, opts) {
   var str = xlml_normalize(d);
@@ -114896,43 +102551,6 @@ function parse_manifest(d, opts) {
         if (opts && opts.WTF)
           throw Rn;
     }
-}
-function write_manifest(manifest) {
-  var o = [XML_HEADER];
-  o.push('<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">\n');
-  o.push('  <manifest:file-entry manifest:full-path="/" manifest:version="1.2" manifest:media-type="application/vnd.oasis.opendocument.spreadsheet"/>\n');
-  for (var i2 = 0; i2 < manifest.length; ++i2)
-    o.push('  <manifest:file-entry manifest:full-path="' + manifest[i2][0] + '" manifest:media-type="' + manifest[i2][1] + '"/>\n');
-  o.push("</manifest:manifest>");
-  return o.join("");
-}
-function write_rdf_type(file, res, tag) {
-  return [
-    '  <rdf:Description rdf:about="' + file + '">\n',
-    '    <rdf:type rdf:resource="http://docs.oasis-open.org/ns/office/1.2/meta/' + (tag || "odf") + "#" + res + '"/>\n',
-    "  </rdf:Description>\n"
-  ].join("");
-}
-function write_rdf_has(base, file) {
-  return [
-    '  <rdf:Description rdf:about="' + base + '">\n',
-    '    <ns0:hasPart xmlns:ns0="http://docs.oasis-open.org/ns/office/1.2/meta/pkg#" rdf:resource="' + file + '"/>\n',
-    "  </rdf:Description>\n"
-  ].join("");
-}
-function write_rdf(rdf) {
-  var o = [XML_HEADER];
-  o.push('<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n');
-  for (var i2 = 0; i2 != rdf.length; ++i2) {
-    o.push(write_rdf_type(rdf[i2][0], rdf[i2][1]));
-    o.push(write_rdf_has("", rdf[i2][0]));
-  }
-  o.push(write_rdf_type("", "Document", "pkg"));
-  o.push("</rdf:RDF>");
-  return o.join("");
-}
-function write_meta_ods(wb, opts) {
-  return '<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.2"><office:meta><meta:generator>SheetJS ' + XLSX.version + "</meta:generator></office:meta></office:document-meta>";
 }
 var CORE_PROPS = [
   ["cp:category", "Category"],
@@ -114961,41 +102579,6 @@ function parse_core_props(data) {
   }
   return p;
 }
-function cp_doit(f3, g, h2, o, p) {
-  if (p[f3] != null || g == null || g === "") return;
-  p[f3] = g;
-  g = escapexml(g);
-  o[o.length] = h2 ? writextag(f3, g, h2) : writetag(f3, g);
-}
-function write_core_props(cp, _opts) {
-  var opts = _opts || {};
-  var o = [XML_HEADER, writextag("cp:coreProperties", null, {
-    //'xmlns': XMLNS.CORE_PROPS,
-    "xmlns:cp": XMLNS.CORE_PROPS,
-    "xmlns:dc": XMLNS.dc,
-    "xmlns:dcterms": XMLNS.dcterms,
-    "xmlns:dcmitype": XMLNS.dcmitype,
-    "xmlns:xsi": XMLNS.xsi
-  })], p = {};
-  if (!cp && !opts.Props) return o.join("");
-  if (cp) {
-    if (cp.CreatedDate != null) cp_doit("dcterms:created", typeof cp.CreatedDate === "string" ? cp.CreatedDate : write_w3cdtf(cp.CreatedDate, opts.WTF), { "xsi:type": "dcterms:W3CDTF" }, o, p);
-    if (cp.ModifiedDate != null) cp_doit("dcterms:modified", typeof cp.ModifiedDate === "string" ? cp.ModifiedDate : write_w3cdtf(cp.ModifiedDate, opts.WTF), { "xsi:type": "dcterms:W3CDTF" }, o, p);
-  }
-  for (var i2 = 0; i2 != CORE_PROPS.length; ++i2) {
-    var f3 = CORE_PROPS[i2];
-    var v = opts.Props && opts.Props[f3[1]] != null ? opts.Props[f3[1]] : cp ? cp[f3[1]] : null;
-    if (v === true) v = "1";
-    else if (v === false) v = "0";
-    else if (typeof v == "number") v = String(v);
-    if (v != null) cp_doit(f3[0], v, null, o, p);
-  }
-  if (o.length > 2) {
-    o[o.length] = "</cp:coreProperties>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 var EXT_PROPS = [
   ["Application", "Application", "string"],
   ["AppVersion", "AppVersion", "string"],
@@ -115008,14 +102591,6 @@ var EXT_PROPS = [
   ["ScaleCrop", "ScaleCrop", "bool"],
   ["HeadingPairs", "HeadingPairs", "raw"],
   ["TitlesOfParts", "TitlesOfParts", "raw"]
-];
-var PseudoPropsPairs = [
-  "Worksheets",
-  "SheetNames",
-  "NamedRanges",
-  "DefinedNames",
-  "Chartsheets",
-  "ChartNames"
 ];
 function load_props_pairs(HP, TOP, props, opts) {
   var v = [];
@@ -115087,38 +102662,6 @@ function parse_ext_props(data, p, opts) {
   if (q.HeadingPairs && q.TitlesOfParts) load_props_pairs(q.HeadingPairs, q.TitlesOfParts, p, opts);
   return p;
 }
-function write_ext_props(cp) {
-  var o = [], W = writextag;
-  if (!cp) cp = {};
-  cp.Application = "SheetJS";
-  o[o.length] = XML_HEADER;
-  o[o.length] = writextag("Properties", null, {
-    "xmlns": XMLNS.EXT_PROPS,
-    "xmlns:vt": XMLNS.vt
-  });
-  EXT_PROPS.forEach(function(f3) {
-    if (cp[f3[1]] === void 0) return;
-    var v;
-    switch (f3[2]) {
-      case "string":
-        v = escapexml(String(cp[f3[1]]));
-        break;
-      case "bool":
-        v = cp[f3[1]] ? "true" : "false";
-        break;
-    }
-    if (v !== void 0) o[o.length] = W(f3[0], v);
-  });
-  o[o.length] = W("HeadingPairs", W("vt:vector", W("vt:variant", "<vt:lpstr>Worksheets</vt:lpstr>") + W("vt:variant", W("vt:i4", String(cp.Worksheets))), { size: 2, baseType: "variant" }));
-  o[o.length] = W("TitlesOfParts", W("vt:vector", cp.SheetNames.map(function(s2) {
-    return "<vt:lpstr>" + escapexml(s2) + "</vt:lpstr>";
-  }).join(""), { size: cp.Worksheets, baseType: "lpstr" }));
-  if (o.length > 2) {
-    o[o.length] = "</Properties>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 var custregex = /<[^<>]+>[^<]*/g;
 function parse_cust_props(data, opts) {
   var p = {}, name = "";
@@ -115180,27 +102723,6 @@ function parse_cust_props(data, opts) {
   }
   return p;
 }
-function write_cust_props(cp) {
-  var o = [XML_HEADER, writextag("Properties", null, {
-    "xmlns": XMLNS.CUST_PROPS,
-    "xmlns:vt": XMLNS.vt
-  })];
-  if (!cp) return o.join("");
-  var pid = 1;
-  keys(cp).forEach(function custprop(k) {
-    ++pid;
-    o[o.length] = writextag("property", write_vt(cp[k], true), {
-      "fmtid": "{D5CDD505-2E9C-101B-9397-08002B2CF9AE}",
-      "pid": pid,
-      "name": escapexml(k)
-    });
-  });
-  if (o.length > 2) {
-    o[o.length] = "</Properties>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 var XLMLDocPropsMap = {
   Title: "Title",
   Subject: "Subject",
@@ -115241,86 +102763,9 @@ function xlml_set_prop(Props, tag, val2) {
   tag = evert_XLMLDPM[tag] || tag;
   Props[tag] = val2;
 }
-function xlml_write_docprops(Props, opts) {
-  var o = [];
-  keys(XLMLDocPropsMap).map(function(m2) {
-    for (var i2 = 0; i2 < CORE_PROPS.length; ++i2) if (CORE_PROPS[i2][1] == m2) return CORE_PROPS[i2];
-    for (i2 = 0; i2 < EXT_PROPS.length; ++i2) if (EXT_PROPS[i2][1] == m2) return EXT_PROPS[i2];
-    throw m2;
-  }).forEach(function(p) {
-    if (Props[p[1]] == null) return;
-    var m2 = opts && opts.Props && opts.Props[p[1]] != null ? opts.Props[p[1]] : Props[p[1]];
-    switch (p[2]) {
-      case "date":
-        m2 = new Date(m2).toISOString().replace(/\.\d*Z/, "Z");
-        break;
-    }
-    if (typeof m2 == "number") m2 = String(m2);
-    else if (m2 === true || m2 === false) {
-      m2 = m2 ? "1" : "0";
-    } else if (m2 instanceof Date) m2 = new Date(m2).toISOString().replace(/\.\d*Z/, "");
-    o.push(writetag(XLMLDocPropsMap[p[1]] || p[1], m2));
-  });
-  return writextag("DocumentProperties", o.join(""), { xmlns: XLMLNS.o });
-}
-function xlml_write_custprops(Props, Custprops) {
-  var BLACKLIST = ["Worksheets", "SheetNames"];
-  var T = "CustomDocumentProperties";
-  var o = [];
-  if (Props) keys(Props).forEach(function(k) {
-    if (!Object.prototype.hasOwnProperty.call(Props, k)) return;
-    for (var i2 = 0; i2 < CORE_PROPS.length; ++i2) if (k == CORE_PROPS[i2][1]) return;
-    for (i2 = 0; i2 < EXT_PROPS.length; ++i2) if (k == EXT_PROPS[i2][1]) return;
-    for (i2 = 0; i2 < BLACKLIST.length; ++i2) if (k == BLACKLIST[i2]) return;
-    var m2 = Props[k];
-    var t2 = "string";
-    if (typeof m2 == "number") {
-      t2 = "float";
-      m2 = String(m2);
-    } else if (m2 === true || m2 === false) {
-      t2 = "boolean";
-      m2 = m2 ? "1" : "0";
-    } else m2 = String(m2);
-    o.push(writextag(escapexmltag(k), m2, { "dt:dt": t2 }));
-  });
-  if (Custprops) keys(Custprops).forEach(function(k) {
-    if (!Object.prototype.hasOwnProperty.call(Custprops, k)) return;
-    if (Props && Object.prototype.hasOwnProperty.call(Props, k)) return;
-    var m2 = Custprops[k];
-    var t2 = "string";
-    if (typeof m2 == "number") {
-      t2 = "float";
-      m2 = String(m2);
-    } else if (m2 === true || m2 === false) {
-      t2 = "boolean";
-      m2 = m2 ? "1" : "0";
-    } else if (m2 instanceof Date) {
-      t2 = "dateTime.tz";
-      m2 = m2.toISOString();
-    } else m2 = String(m2);
-    o.push(writextag(escapexmltag(k), m2, { "dt:dt": t2 }));
-  });
-  return "<" + T + ' xmlns="' + XLMLNS.o + '">' + o.join("") + "</" + T + ">";
-}
 function parse_FILETIME(blob) {
   var dwLowDateTime = blob.read_shift(4), dwHighDateTime = blob.read_shift(4);
   return new Date((dwHighDateTime / 1e7 * Math.pow(2, 32) + dwLowDateTime / 1e7 - 11644473600) * 1e3).toISOString().replace(/\.000/, "");
-}
-function write_FILETIME(time) {
-  var date = typeof time == "string" ? new Date(Date.parse(time)) : time;
-  var t2 = date.getTime() / 1e3 + 11644473600;
-  var l = t2 % Math.pow(2, 32), h2 = (t2 - l) / Math.pow(2, 32);
-  l *= 1e7;
-  h2 *= 1e7;
-  var w = l / Math.pow(2, 32) | 0;
-  if (w > 0) {
-    l = l % Math.pow(2, 32);
-    h2 += w;
-  }
-  var o = new_buf(8);
-  o.write_shift(4, l);
-  o.write_shift(4, h2);
-  return o;
 }
 function parse_lpstr(blob, type, pad) {
   var start = blob.l;
@@ -115447,35 +102892,6 @@ function parse_TypedPropertyValue(blob, type, _opts) {
     default:
       throw new Error("TypedPropertyValue unrecognized type " + type + " " + t2);
   }
-}
-function write_TypedPropertyValue(type, value) {
-  var o = new_buf(4), p = new_buf(4);
-  o.write_shift(4, type == 80 ? 31 : type);
-  switch (type) {
-    case 3:
-      p.write_shift(-4, value);
-      break;
-    case 5:
-      p = new_buf(8);
-      p.write_shift(8, value, "f");
-      break;
-    case 11:
-      p.write_shift(4, value ? 1 : 0);
-      break;
-    case 64:
-      p = write_FILETIME(value);
-      break;
-    case 31:
-    case 80:
-      p = new_buf(4 + 2 * (value.length + 1) + (value.length % 2 ? 0 : 2));
-      p.write_shift(4, value.length + 1);
-      p.write_shift(0, value, "dbcs");
-      while (p.l != p.length) p.write_shift(1, 0);
-      break;
-    default:
-      throw new Error("TypedPropertyValue unrecognized type " + type + " " + value);
-  }
-  return bconcat([o, p]);
 }
 function parse_PropertySet(blob, PIDSI) {
   var start_addr = blob.l;
@@ -115620,86 +103036,6 @@ function parse_PropertySet(blob, PIDSI) {
   blob.l = start_addr + size;
   return PropH;
 }
-var XLSPSSkip = ["CodePage", "Thumbnail", "_PID_LINKBASE", "_PID_HLINKS", "SystemIdentifier", "FMTID"];
-function guess_property_type(val2) {
-  switch (typeof val2) {
-    case "boolean":
-      return 11;
-    case "number":
-      return (val2 | 0) == val2 ? 3 : 5;
-    case "string":
-      return 31;
-    case "object":
-      if (val2 instanceof Date) return 64;
-      break;
-  }
-  return -1;
-}
-function write_PropertySet(entries, RE, PIDSI) {
-  var hdr = new_buf(8), piao = [], prop = [];
-  var sz = 8, i2 = 0;
-  var pr = new_buf(8), pio = new_buf(8);
-  pr.write_shift(4, 2);
-  pr.write_shift(4, 1200);
-  pio.write_shift(4, 1);
-  prop.push(pr);
-  piao.push(pio);
-  sz += 8 + pr.length;
-  if (!RE) {
-    pio = new_buf(8);
-    pio.write_shift(4, 0);
-    piao.unshift(pio);
-    var bufs = [new_buf(4)];
-    bufs[0].write_shift(4, entries.length);
-    for (i2 = 0; i2 < entries.length; ++i2) {
-      var value = entries[i2][0];
-      pr = new_buf(4 + 4 + 2 * (value.length + 1) + (value.length % 2 ? 0 : 2));
-      pr.write_shift(4, i2 + 2);
-      pr.write_shift(4, value.length + 1);
-      pr.write_shift(0, value, "dbcs");
-      while (pr.l != pr.length) pr.write_shift(1, 0);
-      bufs.push(pr);
-    }
-    pr = bconcat(bufs);
-    prop.unshift(pr);
-    sz += 8 + pr.length;
-  }
-  for (i2 = 0; i2 < entries.length; ++i2) {
-    if (RE && !RE[entries[i2][0]]) continue;
-    if (XLSPSSkip.indexOf(entries[i2][0]) > -1 || PseudoPropsPairs.indexOf(entries[i2][0]) > -1) continue;
-    if (entries[i2][1] == null) continue;
-    var val2 = entries[i2][1], idx = 0;
-    if (RE) {
-      idx = +RE[entries[i2][0]];
-      var pinfo = PIDSI[idx];
-      if (pinfo.p == "version" && typeof val2 == "string") {
-        var arr = val2.split(".");
-        val2 = (+arr[0] << 16) + (+arr[1] || 0);
-      }
-      pr = write_TypedPropertyValue(pinfo.t, val2);
-    } else {
-      var T = guess_property_type(val2);
-      if (T == -1) {
-        T = 31;
-        val2 = String(val2);
-      }
-      pr = write_TypedPropertyValue(T, val2);
-    }
-    prop.push(pr);
-    pio = new_buf(8);
-    pio.write_shift(4, !RE ? 2 + i2 : idx);
-    piao.push(pio);
-    sz += 8 + pr.length;
-  }
-  var w = 8 * (prop.length + 1);
-  for (i2 = 0; i2 < prop.length; ++i2) {
-    piao[i2].write_shift(4, w);
-    w += prop[i2].length;
-  }
-  hdr.write_shift(4, sz);
-  hdr.write_shift(4, prop.length);
-  return bconcat([hdr].concat(piao).concat(prop));
-}
 function parse_PropertySetStream(file, PIDSI, clsid) {
   var blob = file.content;
   if (!blob) return {};
@@ -115735,34 +103071,9 @@ function parse_PropertySetStream(file, PIDSI, clsid) {
   rval.FMTID = [FMTID0, FMTID1];
   return rval;
 }
-function write_PropertySetStream(entries, clsid, RE, PIDSI, entries2, clsid2) {
-  var hdr = new_buf(entries2 ? 68 : 48);
-  var bufs = [hdr];
-  hdr.write_shift(2, 65534);
-  hdr.write_shift(2, 0);
-  hdr.write_shift(4, 842412599);
-  hdr.write_shift(16, CFB.utils.consts.HEADER_CLSID, "hex");
-  hdr.write_shift(4, entries2 ? 2 : 1);
-  hdr.write_shift(16, clsid, "hex");
-  hdr.write_shift(4, entries2 ? 68 : 48);
-  var ps0 = write_PropertySet(entries, RE, PIDSI);
-  bufs.push(ps0);
-  if (entries2) {
-    var ps1 = write_PropertySet(entries2, null, null);
-    hdr.write_shift(16, clsid2, "hex");
-    hdr.write_shift(4, 68 + ps0.length);
-    bufs.push(ps1);
-  }
-  return bconcat(bufs);
-}
 function parsenoop2(blob, length) {
   blob.read_shift(length);
   return null;
-}
-function writezeroes(n, o) {
-  if (!o) o = new_buf(n);
-  for (var j = 0; j < n; ++j) o.write_shift(1, 0);
-  return o;
 }
 function parslurp(blob, length, cb) {
   var arr = [], target = blob.l + length;
@@ -115773,18 +103084,8 @@ function parslurp(blob, length, cb) {
 function parsebool(blob, length) {
   return blob.read_shift(length) === 1;
 }
-function writebool(v, o) {
-  if (!o) o = new_buf(2);
-  o.write_shift(2, +!!v);
-  return o;
-}
 function parseuint16(blob) {
   return blob.read_shift(2, "u");
-}
-function writeuint16(v, o) {
-  if (!o) o = new_buf(2);
-  o.write_shift(2, v);
-  return o;
 }
 function parseuint16a(blob, length) {
   return parslurp(blob, length, parseuint16);
@@ -115792,12 +103093,6 @@ function parseuint16a(blob, length) {
 function parse_Bes(blob) {
   var v = blob.read_shift(1), t2 = blob.read_shift(1);
   return t2 === 1 ? v : v === 1;
-}
-function write_Bes(v, t2, o) {
-  if (!o) o = new_buf(2);
-  o.write_shift(1, t2 == "e" ? +v : +!!v);
-  o.write_shift(1, t2 == "e" ? 1 : 0);
-  return o;
 }
 function parse_ShortXLUnicodeString(blob, length, opts) {
   var cch = blob.read_shift(opts && opts.biff >= 12 ? 2 : 1);
@@ -115839,17 +103134,6 @@ function parse_XLUnicodeRichExtendedString(blob) {
   current_codepage = cp;
   return z;
 }
-function write_XLUnicodeRichExtendedString(xlstr) {
-  var str = xlstr.t || "", nfmts = 1;
-  var hdr = new_buf(3 + (nfmts > 1 ? 2 : 0));
-  hdr.write_shift(2, str.length);
-  hdr.write_shift(1, (nfmts > 1 ? 8 : 0) | 1);
-  if (nfmts > 1) hdr.write_shift(2, nfmts);
-  var otext = new_buf(2 * str.length);
-  otext.write_shift(2 * str.length, str, "utf16le");
-  var out = [hdr, otext];
-  return bconcat(out);
-}
 function parse_XLUnicodeStringNoCch(blob, cch, opts) {
   var retval;
   if (opts) {
@@ -115880,13 +103164,6 @@ function parse_XLUnicodeString2(blob, length, opts) {
     return "";
   }
   return blob.read_shift(cch, opts.biff <= 4 || !blob.lens ? "cpstr" : "sbcs-cont");
-}
-function write_XLUnicodeString(str, opts, o) {
-  if (!o) o = new_buf(3 + 2 * str.length);
-  o.write_shift(2, str.length);
-  o.write_shift(1, 1);
-  o.write_shift(31, str, "utf16le");
-  return o;
 }
 function parse_ControlInfo(blob) {
   var flags = blob.read_shift(1);
@@ -115938,13 +103215,6 @@ function parse_HyperlinkString(blob) {
   var o = len > 0 ? blob.read_shift(len, "utf16le").replace(chr0, "") : "";
   return o;
 }
-function write_HyperlinkString(str, o) {
-  if (!o) o = new_buf(6 + str.length * 2);
-  o.write_shift(4, 1 + str.length);
-  for (var i2 = 0; i2 < str.length; ++i2) o.write_shift(2, str.charCodeAt(i2));
-  o.write_shift(2, 0);
-  return o;
-}
 function parse_Hyperlink(blob, length) {
   var end = blob.l + length;
   var sVer = blob.read_shift(4);
@@ -115973,50 +103243,6 @@ function parse_Hyperlink(blob, length) {
   if (displayName) out.Tooltip = displayName;
   return out;
 }
-function write_Hyperlink(hl) {
-  var out = new_buf(512), i2 = 0;
-  var Target = hl.Target;
-  if (Target.slice(0, 7) == "file://") Target = Target.slice(7);
-  var hashidx = Target.indexOf("#");
-  var F2 = hashidx > -1 ? 31 : 23;
-  switch (Target.charAt(0)) {
-    case "#":
-      F2 = 28;
-      break;
-    case ".":
-      F2 &= ~2;
-      break;
-  }
-  out.write_shift(4, 2);
-  out.write_shift(4, F2);
-  var data = [8, 6815827, 6619237, 4849780, 83];
-  for (i2 = 0; i2 < data.length; ++i2) out.write_shift(4, data[i2]);
-  if (F2 == 28) {
-    Target = Target.slice(1);
-    write_HyperlinkString(Target, out);
-  } else if (F2 & 2) {
-    data = "e0 c9 ea 79 f9 ba ce 11 8c 82 00 aa 00 4b a9 0b".split(" ");
-    for (i2 = 0; i2 < data.length; ++i2) out.write_shift(1, parseInt(data[i2], 16));
-    var Pretarget = hashidx > -1 ? Target.slice(0, hashidx) : Target;
-    out.write_shift(4, 2 * (Pretarget.length + 1));
-    for (i2 = 0; i2 < Pretarget.length; ++i2) out.write_shift(2, Pretarget.charCodeAt(i2));
-    out.write_shift(2, 0);
-    if (F2 & 8) write_HyperlinkString(hashidx > -1 ? Target.slice(hashidx + 1) : "", out);
-  } else {
-    data = "03 03 00 00 00 00 00 00 c0 00 00 00 00 00 00 46".split(" ");
-    for (i2 = 0; i2 < data.length; ++i2) out.write_shift(1, parseInt(data[i2], 16));
-    var P = 0;
-    while (Target.slice(P * 3, P * 3 + 3) == "../" || Target.slice(P * 3, P * 3 + 3) == "..\\") ++P;
-    out.write_shift(2, P);
-    out.write_shift(4, Target.length - 3 * P + 1);
-    for (i2 = 0; i2 < Target.length - 3 * P; ++i2) out.write_shift(1, Target.charCodeAt(i2 + 3 * P) & 255);
-    out.write_shift(1, 0);
-    out.write_shift(2, 65535);
-    out.write_shift(2, 57005);
-    for (i2 = 0; i2 < 6; ++i2) out.write_shift(4, 0);
-  }
-  return out.slice(0, out.l);
-}
 function parse_LongRGBA(blob) {
   var r2 = blob.read_shift(1), g = blob.read_shift(1), b = blob.read_shift(1), a = blob.read_shift(1);
   return [r2, g, b, a];
@@ -116036,13 +103262,6 @@ function parse_XLSCell(blob, length, opts) {
     blob.l += 2;
   } else ret.ixfe = blob.read_shift(2);
   return ret;
-}
-function write_XLSCell(R, C, ixfe, o) {
-  if (!o) o = new_buf(6);
-  o.write_shift(2, R);
-  o.write_shift(2, C);
-  o.write_shift(2, ixfe || 0);
-  return o;
 }
 function parse_frtHeader(blob) {
   var rt = blob.read_shift(2);
@@ -116080,14 +103299,6 @@ function parse_Ref8U(blob) {
   var colFirst = blob.read_shift(2);
   var colLast = blob.read_shift(2);
   return { s: { c: colFirst, r: rwFirst }, e: { c: colLast, r: rwLast } };
-}
-function write_Ref8U(r2, o) {
-  if (!o) o = new_buf(8);
-  o.write_shift(2, r2.s.r);
-  o.write_shift(2, r2.e.r);
-  o.write_shift(2, r2.s.c);
-  o.write_shift(2, r2.e.c);
-  return o;
 }
 function parse_RefU(blob) {
   var rwFirst = blob.read_shift(2);
@@ -116206,45 +103417,6 @@ function parse_BOF(blob, length) {
   blob.read_shift(length);
   return o;
 }
-function write_BOF(wb, t2, o) {
-  var h2 = 1536, w = 16;
-  switch (o.bookType) {
-    case "biff8":
-      break;
-    case "biff5":
-      h2 = 1280;
-      w = 8;
-      break;
-    case "biff4":
-      h2 = 4;
-      w = 6;
-      break;
-    case "biff3":
-      h2 = 3;
-      w = 6;
-      break;
-    case "biff2":
-      h2 = 2;
-      w = 4;
-      break;
-    case "xla":
-      break;
-    default:
-      throw new Error("unsupported BIFF version");
-  }
-  var out = new_buf(w);
-  out.write_shift(2, h2);
-  out.write_shift(2, t2);
-  if (w > 4) out.write_shift(2, 29282);
-  if (w > 6) out.write_shift(2, 1997);
-  if (w > 8) {
-    out.write_shift(2, 49161);
-    out.write_shift(2, 1);
-    out.write_shift(2, 1798);
-    out.write_shift(2, 0);
-  }
-  return out;
-}
 function parse_InterfaceHdr(blob, length) {
   if (length === 0) return 1200;
   if (blob.read_shift(2) !== 1200) {
@@ -116260,16 +103432,6 @@ function parse_WriteAccess(blob, length, opts) {
   var UserName = parse_XLUnicodeString2(blob, 0, opts);
   blob.read_shift(length + l - blob.l);
   return UserName;
-}
-function write_WriteAccess(s2, opts) {
-  var b8 = !opts || opts.biff == 8;
-  var o = new_buf(b8 ? 112 : 54);
-  o.write_shift(opts.biff == 8 ? 2 : 1, 7);
-  if (b8) o.write_shift(1, 0);
-  o.write_shift(4, 859007059);
-  o.write_shift(4, 5458548 | (b8 ? 0 : 536870912));
-  while (o.l < o.length) o.write_shift(1, b8 ? 0 : 32);
-  return o;
 }
 function parse_WsBool(blob, length, opts) {
   var flags = opts && opts.biff == 8 || length == 2 ? blob.read_shift(2) : (blob.l += length, 0);
@@ -116303,19 +103465,6 @@ function parse_BoundSheet8(blob, length, opts) {
   if (name.length === 0) name = "Sheet1";
   return { pos, hs: hidden, dt, name };
 }
-function write_BoundSheet8(data, opts) {
-  var w = !opts || opts.biff >= 8 ? 2 : 1;
-  var o = new_buf(8 + w * data.name.length);
-  o.write_shift(4, data.pos);
-  o.write_shift(1, data.hs || 0);
-  o.write_shift(1, data.dt);
-  o.write_shift(1, data.name.length);
-  if (opts.biff >= 8) o.write_shift(1, 1);
-  o.write_shift(w * data.name.length, data.name, opts.biff < 8 ? "sbcs" : "utf16le");
-  var out = o.slice(0, o.l);
-  out.l = o.l;
-  return out;
-}
 function parse_SST(blob, length) {
   var end = blob.l + length;
   var cnt = blob.read_shift(4);
@@ -116327,18 +103476,6 @@ function parse_SST(blob, length) {
   strs2.Count = cnt;
   strs2.Unique = ucnt;
   return strs2;
-}
-function write_SST(sst, opts) {
-  var header = new_buf(8);
-  header.write_shift(4, sst.Count);
-  header.write_shift(4, sst.Unique);
-  var strs2 = [];
-  for (var j = 0; j < sst.length; ++j) strs2[j] = write_XLUnicodeRichExtendedString(sst[j], opts);
-  var o = bconcat([header].concat(strs2));
-  o.parts = [header.length].concat(strs2.map(function(str) {
-    return str.length;
-  }));
-  return o;
 }
 function parse_ExtSST(blob, length) {
   var extsst = {};
@@ -116397,33 +103534,10 @@ function parse_Window1(blob) {
     TabRatio: wTabRatio
   };
 }
-function write_Window1() {
-  var o = new_buf(18);
-  o.write_shift(2, 0);
-  o.write_shift(2, 0);
-  o.write_shift(2, 29280);
-  o.write_shift(2, 17600);
-  o.write_shift(2, 56);
-  o.write_shift(2, 0);
-  o.write_shift(2, 0);
-  o.write_shift(2, 1);
-  o.write_shift(2, 500);
-  return o;
-}
 function parse_Window2(blob, length, opts) {
   if (opts && opts.biff >= 2 && opts.biff < 5) return {};
   var f3 = blob.read_shift(2);
   return { RTL: f3 & 64 };
-}
-function write_Window2(view) {
-  var o = new_buf(18), f3 = 1718;
-  if (view && view.RTL) f3 |= 64;
-  o.write_shift(2, f3);
-  o.write_shift(4, 0);
-  o.write_shift(4, 64);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  return o;
 }
 function parse_Pane() {
 }
@@ -116446,30 +103560,10 @@ function parse_Font(blob, length, opts) {
   o.name = parse_ShortXLUnicodeString(blob, 0, opts);
   return o;
 }
-function write_Font(data, opts) {
-  var name = data.name || "Arial";
-  var b5 = opts && opts.biff == 5, w = b5 ? 15 + name.length : 16 + 2 * name.length;
-  var o = new_buf(w);
-  o.write_shift(2, (data.sz || 12) * 20);
-  o.write_shift(4, 0);
-  o.write_shift(2, 400);
-  o.write_shift(4, 0);
-  o.write_shift(2, 0);
-  o.write_shift(1, name.length);
-  if (!b5) o.write_shift(1, 1);
-  o.write_shift((b5 ? 1 : 2) * name.length, name, b5 ? "sbcs" : "utf16le");
-  return o;
-}
 function parse_LabelSst(blob, length, opts) {
   var cell = parse_XLSCell(blob, length, opts);
   cell.isst = blob.read_shift(4);
   return cell;
-}
-function write_LabelSst(R, C, v, os) {
-  var o = new_buf(10);
-  write_XLSCell(R, C, os, o);
-  o.write_shift(4, v);
-  return o;
 }
 function parse_Label(blob, length, opts) {
   if (opts.biffguess && opts.biff == 2) opts.biff = 5;
@@ -116479,45 +103573,12 @@ function parse_Label(blob, length, opts) {
   cell.val = str;
   return cell;
 }
-function write_Label(R, C, v, os, opts) {
-  var b8 = !opts || opts.biff == 8;
-  var o = new_buf(6 + 2 + +b8 + (1 + b8) * v.length);
-  write_XLSCell(R, C, os, o);
-  o.write_shift(2, v.length);
-  if (b8) o.write_shift(1, 1);
-  o.write_shift((1 + b8) * v.length, v, b8 ? "utf16le" : "sbcs");
-  return o;
-}
 function parse_Format(blob, length, opts) {
   var numFmtId = blob.read_shift(2);
   var fmtstr = parse_XLUnicodeString2(blob, 0, opts);
   return [numFmtId, fmtstr];
 }
-function write_Format(i2, f3, opts, o) {
-  var b5 = opts && opts.biff == 5;
-  if (!o) o = new_buf(b5 ? 3 + f3.length : 5 + 2 * f3.length);
-  o.write_shift(2, i2);
-  o.write_shift(b5 ? 1 : 2, f3.length);
-  if (!b5) o.write_shift(1, 1);
-  o.write_shift((b5 ? 1 : 2) * f3.length, f3, b5 ? "sbcs" : "utf16le");
-  var out = o.length > o.l ? o.slice(0, o.l) : o;
-  if (out.l == null) out.l = out.length;
-  return out;
-}
 var parse_BIFF2Format = parse_XLUnicodeString2;
-function write_BIFF2Format(f3) {
-  var o = new_buf(1 + f3.length);
-  o.write_shift(1, f3.length);
-  o.write_shift(f3.length, f3, "sbcs");
-  return o;
-}
-function write_BIFF4Format(f3) {
-  var o = new_buf(3 + f3.length);
-  o.l += 2;
-  o.write_shift(1, f3.length);
-  o.write_shift(f3.length, f3, "sbcs");
-  return o;
-}
 function parse_Dimensions(blob, length, opts) {
   var end = blob.l + length;
   var w = opts.biff == 8 || !opts.biff ? 4 : 2;
@@ -116525,16 +103586,6 @@ function parse_Dimensions(blob, length, opts) {
   var c = blob.read_shift(2), C = blob.read_shift(2);
   blob.l = end;
   return { s: { r: r2, c }, e: { r: R, c: C } };
-}
-function write_Dimensions(range, opts) {
-  var w = opts.biff == 8 || !opts.biff ? 4 : 2;
-  var o = new_buf(2 * w + 6);
-  o.write_shift(w, range.s.r);
-  o.write_shift(w, range.e.r + 1);
-  o.write_shift(2, range.s.c);
-  o.write_shift(2, range.e.c + 1);
-  o.write_shift(2, 0);
-  return o;
 }
 function parse_RK(blob) {
   var rw = blob.read_shift(2), col = blob.read_shift(2);
@@ -116607,25 +103658,6 @@ function parse_XF(blob, length, opts) {
   o.data = parse_CellStyleXF(blob, length, o.fStyle, opts);
   return o;
 }
-function write_XF(data, ixfeP, opts, o) {
-  var b5 = opts && opts.biff == 5;
-  if (!o) o = new_buf(b5 ? 16 : 20);
-  o.write_shift(2, 0);
-  if (data.style) {
-    o.write_shift(2, data.numFmtId || 0);
-    o.write_shift(2, 65524);
-  } else {
-    o.write_shift(2, data.numFmtId || 0);
-    o.write_shift(2, ixfeP << 4);
-  }
-  var f3 = 0;
-  if (data.numFmtId > 0 && b5) f3 |= 1024;
-  o.write_shift(4, f3);
-  o.write_shift(4, 0);
-  if (!b5) o.write_shift(4, 0);
-  o.write_shift(2, 0);
-  return o;
-}
 function parse_BIFF2XF(blob) {
   var o = {};
   o.ifnt = blob.read_shift(1);
@@ -116637,21 +103669,6 @@ function parse_BIFF2XF(blob) {
   o.data = {};
   return o;
 }
-function write_BIFF2XF(xf) {
-  var o = new_buf(4);
-  o.l += 2;
-  o.write_shift(1, xf.numFmtId);
-  o.l++;
-  return o;
-}
-function write_BIFF3XF(xf) {
-  var o = new_buf(12);
-  o.l++;
-  o.write_shift(1, xf.numFmtId);
-  o.l += 10;
-  return o;
-}
-var write_BIFF4XF = write_BIFF3XF;
 function parse_BIFF3XF(blob) {
   var o = {};
   o.ifnt = blob.read_shift(1);
@@ -116678,13 +103695,6 @@ function parse_Guts(blob) {
   if (out[0] > 7 || out[1] > 7) throw new Error("Bad Gutters: " + out.join("|"));
   return out;
 }
-function write_Guts(guts) {
-  var o = new_buf(8);
-  o.write_shift(4, 0);
-  o.write_shift(2, guts[0] ? guts[0] + 1 : 0);
-  o.write_shift(2, guts[1] ? guts[1] + 1 : 0);
-  return o;
-}
 function parse_BoolErr(blob, length, opts) {
   var cell = parse_XLSCell(blob, 6, opts);
   var val2 = parse_Bes(blob, 2);
@@ -116692,24 +103702,12 @@ function parse_BoolErr(blob, length, opts) {
   cell.t = val2 === true || val2 === false ? "b" : "e";
   return cell;
 }
-function write_BoolErr(R, C, v, os, opts, t2) {
-  var o = new_buf(8);
-  write_XLSCell(R, C, os, o);
-  write_Bes(v, t2, o);
-  return o;
-}
 function parse_Number(blob, length, opts) {
   if (opts.biffguess && opts.biff == 2) opts.biff = 5;
   var cell = parse_XLSCell(blob, 6, opts);
   var xnum = parse_Xnum(blob, 8);
   cell.val = xnum;
   return cell;
-}
-function write_Number(R, C, v, os) {
-  var o = new_buf(14);
-  write_XLSCell(R, C, os, o);
-  write_Xnum(v, o);
-  return o;
 }
 var parse_XLHeaderFooter = parse_OptXLUnicodeString;
 function parse_SupBook(blob, length, opts) {
@@ -116837,25 +103835,11 @@ function parse_Note(blob, length, opts) {
   }
   return parse_NoteSh(blob, length, opts);
 }
-function write_NOTE_BIFF2(text, R, C, len) {
-  var o = new_buf(6 + (len || text.length));
-  o.write_shift(2, R);
-  o.write_shift(2, C);
-  o.write_shift(2, len || text.length);
-  o.write_shift(text.length, text, "sbcs");
-  return o;
-}
 function parse_MergeCells(blob, length) {
   var merges = [];
   var cmcs = blob.read_shift(2);
   while (cmcs--) merges.push(parse_Ref8U(blob, length));
   return merges;
-}
-function write_MergeCells(merges) {
-  var o = new_buf(2 + merges.length * 8);
-  o.write_shift(2, merges.length);
-  for (var i2 = 0; i2 < merges.length; ++i2) write_Ref8U(merges[i2], o);
-  return o;
 }
 function parse_Obj(blob, length, opts) {
   if (opts && opts.biff < 8) return parse_BIFF5Obj(blob, length, opts);
@@ -116936,17 +103920,6 @@ function parse_HLink(blob, length) {
   var hlink = parse_Hyperlink(blob, length - 24);
   return [ref, hlink];
 }
-function write_HLink(hl) {
-  var O = new_buf(24);
-  var ref = decode_cell(hl[0]);
-  O.write_shift(2, ref.r);
-  O.write_shift(2, ref.r);
-  O.write_shift(2, ref.c);
-  O.write_shift(2, ref.c);
-  var clsid = "d0 c9 ea 79 f9 ba ce 11 8c 82 00 aa 00 4b a9 0b".split(" ");
-  for (var i2 = 0; i2 < 16; ++i2) O.write_shift(1, parseInt(clsid[i2], 16));
-  return bconcat([O, write_Hyperlink(hl[1])]);
-}
 function parse_HLinkTooltip(blob, length) {
   blob.read_shift(2);
   var ref = parse_Ref8U(blob, 8);
@@ -116954,31 +103927,12 @@ function parse_HLinkTooltip(blob, length) {
   wzTooltip = wzTooltip.replace(chr0, "");
   return [ref, wzTooltip];
 }
-function write_HLinkTooltip(hl) {
-  var TT = hl[1].Tooltip;
-  var O = new_buf(10 + 2 * (TT.length + 1));
-  O.write_shift(2, 2048);
-  var ref = decode_cell(hl[0]);
-  O.write_shift(2, ref.r);
-  O.write_shift(2, ref.r);
-  O.write_shift(2, ref.c);
-  O.write_shift(2, ref.c);
-  for (var i2 = 0; i2 < TT.length; ++i2) O.write_shift(2, TT.charCodeAt(i2));
-  O.write_shift(2, 0);
-  return O;
-}
 function parse_Country(blob) {
   var o = [0, 0], d;
   d = blob.read_shift(2);
   o[0] = CountryEnum[d] || d;
   d = blob.read_shift(2);
   o[1] = CountryEnum[d] || d;
-  return o;
-}
-function write_Country(o) {
-  if (!o) o = new_buf(4);
-  o.write_shift(2, 1);
-  o.write_shift(2, 1);
   return o;
 }
 function parse_ClrtClient(blob) {
@@ -117013,20 +103967,6 @@ function parse_ColInfo(blob, length, opts) {
   if (opts.biff >= 5 || !opts.biff) o.level = flags >> 8 & 7;
   return o;
 }
-function write_ColInfo(col, idx) {
-  var o = new_buf(12);
-  o.write_shift(2, idx);
-  o.write_shift(2, idx);
-  o.write_shift(2, col.width * 256);
-  o.write_shift(2, 0);
-  var f3 = 0;
-  if (col.hidden) f3 |= 1;
-  o.write_shift(1, f3);
-  f3 = col.level || 0;
-  o.write_shift(1, f3);
-  o.write_shift(2, 0);
-  return o;
-}
 function parse_Setup(blob, length) {
   var o = {};
   if (length < 32) return o;
@@ -117047,11 +103987,6 @@ function parse_ShtProps(blob, length, opts) {
   if (d & 16) def.area = true;
   return def;
 }
-function write_RRTabId(n) {
-  var out = new_buf(2 * n);
-  for (var i2 = 0; i2 < n; ++i2) out.write_shift(2, i2 + 1);
-  return out;
-}
 var parse_Blank = parse_XLSCell;
 var parse_Scl = parseuint16a;
 var parse_String = parse_XLUnicodeString;
@@ -117062,23 +103997,6 @@ function parse_ImData(blob) {
   var o = { fmt: cf, env: env2, len: lcb, data: blob.slice(blob.l, blob.l + lcb) };
   blob.l += lcb;
   return o;
-}
-function write_BIFF2Cell(out, r2, c, ixfe, ifmt) {
-  if (!out) out = new_buf(7);
-  out.write_shift(2, r2);
-  out.write_shift(2, c);
-  out.write_shift(
-    1,
-    ixfe || 0
-    /* & 0x3F */
-  );
-  out.write_shift(
-    1,
-    ifmt || 0
-    /* & 0x3F */
-  );
-  out.write_shift(1, 0);
-  return out;
 }
 function parse_BIFF2STR(blob, length, opts) {
   if (opts.biffguess && opts.biff == 5) opts.biff = 2;
@@ -117095,24 +104013,12 @@ function parse_BIFF2NUM(blob, length, opts) {
   cell.val = num;
   return cell;
 }
-function write_BIFF2NUM(r2, c, val2, ixfe, ifmt) {
-  var out = new_buf(15);
-  write_BIFF2Cell(out, r2, c, ixfe || 0, ifmt || 0);
-  out.write_shift(8, val2, "f");
-  return out;
-}
 function parse_BIFF2INT(blob, length, opts) {
   var cell = parse_XLSCell(blob, 7, opts);
   var num = blob.read_shift(2);
   cell.t = "n";
   cell.val = num;
   return cell;
-}
-function write_BIFF2INT(r2, c, val2, ixfe, ifmt) {
-  var out = new_buf(9);
-  write_BIFF2Cell(out, r2, c, ixfe || 0, ifmt || 0);
-  out.write_shift(2, val2);
-  return out;
 }
 function parse_BIFF2STRING(blob) {
   var cch = blob.read_shift(1);
@@ -120204,36 +107110,6 @@ function parse_sst_xml(data, opts) {
   }
   return s2;
 }
-var straywsregex = /^\s|\s$|[\t\n\r]/;
-function write_sst_xml(sst, opts) {
-  if (!opts.bookSST) return "";
-  var o = [XML_HEADER];
-  o[o.length] = writextag("sst", null, {
-    xmlns: XMLNS_main[0],
-    count: sst.Count,
-    uniqueCount: sst.Unique
-  });
-  for (var i2 = 0; i2 != sst.length; ++i2) {
-    if (sst[i2] == null) continue;
-    var s2 = sst[i2];
-    var sitag = "<si>";
-    if (s2.r) sitag += s2.r;
-    else {
-      sitag += "<t";
-      if (!s2.t) s2.t = "";
-      if (typeof s2.t !== "string") s2.t = String(s2.t);
-      if (s2.t.match(straywsregex)) sitag += ' xml:space="preserve"';
-      sitag += ">" + escapexml(s2.t) + "</t>";
-    }
-    sitag += "</si>";
-    o[o.length] = sitag;
-  }
-  if (o.length > 2) {
-    o[o.length] = "</sst>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 function parse_BrtBeginSst(data) {
   return [data.read_shift(4), data.read_shift(4)];
 }
@@ -120264,24 +107140,6 @@ function parse_sst_bin(data, opts) {
     }
   });
   return s2;
-}
-function write_BrtBeginSst(sst, o) {
-  if (!o) o = new_buf(8);
-  o.write_shift(4, sst.Count);
-  o.write_shift(4, sst.Unique);
-  return o;
-}
-var write_BrtSSTItem = write_RichStr;
-function write_sst_bin(sst) {
-  var ba = buf_array();
-  write_record(ba, 159, write_BrtBeginSst(sst));
-  for (var i2 = 0; i2 < sst.length; ++i2) write_record(ba, 19, write_BrtSSTItem(sst[i2]));
-  write_record(
-    ba,
-    160
-    /* BrtEndSst */
-  );
-  return ba.end();
 }
 function _JS2ANSI(str) {
   if (typeof $cptable !== "undefined") return $cptable.utils.encode(current_ansi, str);
@@ -120680,33 +107538,6 @@ function rtf_to_workbook(d, opts) {
   var wb = sheet_to_workbook(rtf_to_sheet(d, opts), opts);
   wb.bookType = "rtf";
   return wb;
-}
-function sheet_to_rtf(ws, opts) {
-  var o = ["{\\rtf1\\ansi"];
-  if (!ws["!ref"])
-    return o[0] + "}";
-  var r2 = safe_decode_range(ws["!ref"]), cell;
-  var dense = ws["!data"] != null, row = [];
-  for (var R = r2.s.r; R <= r2.e.r; ++R) {
-    o.push("\\trowd\\trautofit1");
-    for (var C = r2.s.c; C <= r2.e.c; ++C)
-      o.push("\\cellx" + (C + 1));
-    o.push("\\pard\\intbl");
-    if (dense)
-      row = ws["!data"][R] || [];
-    for (C = r2.s.c; C <= r2.e.c; ++C) {
-      var coord = encode_cell({ r: R, c: C });
-      cell = dense ? row[C] : ws[coord];
-      if (!cell || cell.v == null && (!cell.f || cell.F)) {
-        o.push(" \\cell");
-        continue;
-      }
-      o.push(" " + (cell.w || (format_cell(cell), cell.w) || "").replace(/[\r\n]/g, "\\par "));
-      o.push("\\cell");
-    }
-    o.push("\\pard\\intbl\\row");
-  }
-  return o.join("") + "}";
 }
 function hex2RGB(h2) {
   var o = h2.slice(h2[0] === "#" ? 1 : 0).slice(0, 6);
@@ -121299,21 +108130,6 @@ function parse_numFmts(t2, styles, opts) {
     }
   }
 }
-function write_numFmts(NF) {
-  var o = ["<numFmts>"];
-  [[5, 8], [23, 26], [41, 44], [
-    /*63*/
-    50,
-    /*66],[164,*/
-    392
-  ]].forEach(function(r2) {
-    for (var i2 = r2[0]; i2 <= r2[1]; ++i2) if (NF[i2] != null) o[o.length] = writextag("numFmt", null, { numFmtId: i2, formatCode: escapexml(NF[i2]) });
-  });
-  if (o.length === 1) return "";
-  o[o.length] = "</numFmts>";
-  o[0] = writextag("numFmts", null, { count: o.length - 2 }).replace("/>", ">");
-  return o.join("");
-}
 var cellXF_uint = ["numFmtId", "fillId", "fontId", "borderId", "xfId"];
 var cellXF_bool = ["applyAlignment", "applyBorder", "applyFill", "applyFont", "applyNumberFormat", "applyProtection", "pivotButton", "quotePrefix"];
 function parse_cellXfs(t2, styles, opts) {
@@ -121395,17 +108211,6 @@ function parse_cellXfs(t2, styles, opts) {
     }
   });
 }
-function write_cellXfs(cellXfs) {
-  var o = [];
-  o[o.length] = writextag("cellXfs", null);
-  cellXfs.forEach(function(c) {
-    o[o.length] = writextag("xf", null, c);
-  });
-  o[o.length] = "</cellXfs>";
-  if (o.length === 2) return "";
-  o[0] = writextag("cellXfs", null, { count: o.length - 2 }).replace("/>", ">");
-  return o.join("");
-}
 var parse_sty_xml = /* @__PURE__ */ (function make_pstyx() {
   return function parse_sty_xml2(data, themes, opts) {
     var styles = {};
@@ -121420,38 +108225,10 @@ var parse_sty_xml = /* @__PURE__ */ (function make_pstyx() {
     return styles;
   };
 })();
-function write_sty_xml(wb, opts) {
-  var o = [XML_HEADER, writextag("styleSheet", null, {
-    "xmlns": XMLNS_main[0],
-    "xmlns:vt": XMLNS.vt
-  })], w;
-  if (wb.SSF && (w = write_numFmts(wb.SSF)) != null) o[o.length] = w;
-  o[o.length] = '<fonts count="1"><font><sz val="12"/><color theme="1"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>';
-  o[o.length] = '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>';
-  o[o.length] = '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>';
-  o[o.length] = '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>';
-  if (w = write_cellXfs(opts.cellXfs)) o[o.length] = w;
-  o[o.length] = '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>';
-  o[o.length] = '<dxfs count="0"/>';
-  o[o.length] = '<tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleMedium4"/>';
-  if (o.length > 2) {
-    o[o.length] = "</styleSheet>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 function parse_BrtFmt(data, length) {
   var numFmtId = data.read_shift(2);
   var stFmtCode = parse_XLWideString(data, length - 2);
   return [numFmtId, stFmtCode];
-}
-function write_BrtFmt(i2, f3, o) {
-  if (!o) o = new_buf(6 + 4 * f3.length);
-  o.write_shift(2, i2);
-  write_XLWideString(f3, o);
-  var out = o.length > o.l ? o.slice(0, o.l) : o;
-  if (o.l == null) o.l = o.length;
-  return out;
 }
 function parse_BrtFont(data, length, opts) {
   var out = {};
@@ -121494,67 +108271,7 @@ function parse_BrtFont(data, length, opts) {
   out.name = parse_XLWideString(data, length - 21);
   return out;
 }
-function write_BrtFont(font, o) {
-  if (!o) o = new_buf(25 + 4 * 32);
-  o.write_shift(2, font.sz * 20);
-  write_FontFlags(font, o);
-  o.write_shift(2, font.bold ? 700 : 400);
-  var sss = 0;
-  if (font.vertAlign == "superscript") sss = 1;
-  else if (font.vertAlign == "subscript") sss = 2;
-  o.write_shift(2, sss);
-  o.write_shift(1, font.underline || 0);
-  o.write_shift(1, font.family || 0);
-  o.write_shift(1, font.charset || 0);
-  o.write_shift(1, 0);
-  write_BrtColor(font.color, o);
-  var scheme = 0;
-  if (font.scheme == "major") scheme = 1;
-  if (font.scheme == "minor") scheme = 2;
-  o.write_shift(1, scheme);
-  write_XLWideString(font.name, o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
-var XLSBFillPTNames = [
-  "none",
-  "solid",
-  "mediumGray",
-  "darkGray",
-  "lightGray",
-  "darkHorizontal",
-  "darkVertical",
-  "darkDown",
-  "darkUp",
-  "darkGrid",
-  "darkTrellis",
-  "lightHorizontal",
-  "lightVertical",
-  "lightDown",
-  "lightUp",
-  "lightGrid",
-  "lightTrellis",
-  "gray125",
-  "gray0625"
-];
-var rev_XLSBFillPTNames;
 var parse_BrtFill = parsenoop;
-function write_BrtFill(fill2, o) {
-  if (!o) o = new_buf(4 * 3 + 8 * 7 + 16 * 1);
-  if (!rev_XLSBFillPTNames) rev_XLSBFillPTNames = evert(XLSBFillPTNames);
-  var fls = rev_XLSBFillPTNames[fill2.patternType];
-  if (fls == null) fls = 40;
-  o.write_shift(4, fls);
-  var j = 0;
-  if (fls != 40) {
-    write_BrtColor({ auto: 1 }, o);
-    write_BrtColor({ auto: 1 }, o);
-    for (; j < 12; ++j) o.write_shift(4, 0);
-  } else {
-    for (; j < 4; ++j) o.write_shift(4, 0);
-    for (; j < 12; ++j) o.write_shift(4, 0);
-  }
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
 function parse_BrtXF(data, length) {
   var tgt = data.l + length;
   var ixfeParent = data.read_shift(2);
@@ -121562,57 +108279,7 @@ function parse_BrtXF(data, length) {
   data.l = tgt;
   return { ixfe: ixfeParent, numFmtId: ifmt };
 }
-function write_BrtXF(data, ixfeP, o) {
-  if (!o) o = new_buf(16);
-  o.write_shift(2, ixfeP || 0);
-  o.write_shift(2, data.numFmtId || 0);
-  o.write_shift(2, 0);
-  o.write_shift(2, 0);
-  o.write_shift(2, 0);
-  o.write_shift(1, 0);
-  o.write_shift(1, 0);
-  var flow = 0;
-  o.write_shift(1, flow);
-  o.write_shift(1, 0);
-  o.write_shift(1, 0);
-  o.write_shift(1, 0);
-  return o;
-}
-function write_Blxf(data, o) {
-  if (!o) o = new_buf(10);
-  o.write_shift(1, 0);
-  o.write_shift(1, 0);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  return o;
-}
 var parse_BrtBorder = parsenoop;
-function write_BrtBorder(border, o) {
-  if (!o) o = new_buf(51);
-  o.write_shift(1, 0);
-  write_Blxf(null, o);
-  write_Blxf(null, o);
-  write_Blxf(null, o);
-  write_Blxf(null, o);
-  write_Blxf(null, o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
-function write_BrtStyle(style, o) {
-  if (!o) o = new_buf(12 + 4 * 10);
-  o.write_shift(4, style.xfId);
-  o.write_shift(2, 1);
-  o.write_shift(1, +style.builtinId);
-  o.write_shift(1, 0);
-  write_XLNullableWideString(style.name || "", o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
-function write_BrtBeginTableStyles(cnt, defTableStyle, defPivotStyle) {
-  var o = new_buf(4 + 256 * 2 * 4);
-  o.write_shift(4, cnt);
-  write_XLNullableWideString(defTableStyle, o);
-  write_XLNullableWideString(defPivotStyle, o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
 function parse_sty_bin(data, themes, opts) {
   var styles = {};
   styles.NumberFmt = [];
@@ -121685,158 +108352,6 @@ function parse_sty_bin(data, themes, opts) {
     }
   });
   return styles;
-}
-function write_FMTS_bin(ba, NF) {
-  if (!NF) return;
-  var cnt = 0;
-  [[5, 8], [23, 26], [41, 44], [
-    /*63*/
-    50,
-    /*66],[164,*/
-    392
-  ]].forEach(function(r2) {
-    for (var i2 = r2[0]; i2 <= r2[1]; ++i2) if (NF[i2] != null) ++cnt;
-  });
-  if (cnt == 0) return;
-  write_record(ba, 615, write_UInt32LE(cnt));
-  [[5, 8], [23, 26], [41, 44], [
-    /*63*/
-    50,
-    /*66],[164,*/
-    392
-  ]].forEach(function(r2) {
-    for (var i2 = r2[0]; i2 <= r2[1]; ++i2) if (NF[i2] != null) write_record(ba, 44, write_BrtFmt(i2, NF[i2]));
-  });
-  write_record(
-    ba,
-    616
-    /* BrtEndFmts */
-  );
-}
-function write_FONTS_bin(ba) {
-  var cnt = 1;
-  if (cnt == 0) return;
-  write_record(ba, 611, write_UInt32LE(cnt));
-  write_record(ba, 43, write_BrtFont({
-    sz: 12,
-    color: { theme: 1 },
-    name: "Calibri",
-    family: 2,
-    scheme: "minor"
-  }));
-  write_record(
-    ba,
-    612
-    /* BrtEndFonts */
-  );
-}
-function write_FILLS_bin(ba) {
-  var cnt = 2;
-  if (cnt == 0) return;
-  write_record(ba, 603, write_UInt32LE(cnt));
-  write_record(ba, 45, write_BrtFill({ patternType: "none" }));
-  write_record(ba, 45, write_BrtFill({ patternType: "gray125" }));
-  write_record(
-    ba,
-    604
-    /* BrtEndFills */
-  );
-}
-function write_BORDERS_bin(ba) {
-  var cnt = 1;
-  if (cnt == 0) return;
-  write_record(ba, 613, write_UInt32LE(cnt));
-  write_record(ba, 46, write_BrtBorder({}));
-  write_record(
-    ba,
-    614
-    /* BrtEndBorders */
-  );
-}
-function write_CELLSTYLEXFS_bin(ba) {
-  var cnt = 1;
-  write_record(ba, 626, write_UInt32LE(cnt));
-  write_record(ba, 47, write_BrtXF({
-    numFmtId: 0,
-    fontId: 0,
-    fillId: 0,
-    borderId: 0
-  }, 65535));
-  write_record(
-    ba,
-    627
-    /* BrtEndCellStyleXFs */
-  );
-}
-function write_CELLXFS_bin(ba, data) {
-  write_record(ba, 617, write_UInt32LE(data.length));
-  data.forEach(function(c) {
-    write_record(ba, 47, write_BrtXF(c, 0));
-  });
-  write_record(
-    ba,
-    618
-    /* BrtEndCellXFs */
-  );
-}
-function write_STYLES_bin(ba) {
-  var cnt = 1;
-  write_record(ba, 619, write_UInt32LE(cnt));
-  write_record(ba, 48, write_BrtStyle({
-    xfId: 0,
-    builtinId: 0,
-    name: "Normal"
-  }));
-  write_record(
-    ba,
-    620
-    /* BrtEndStyles */
-  );
-}
-function write_DXFS_bin(ba) {
-  var cnt = 0;
-  write_record(ba, 505, write_UInt32LE(cnt));
-  write_record(
-    ba,
-    506
-    /* BrtEndDXFs */
-  );
-}
-function write_TABLESTYLES_bin(ba) {
-  var cnt = 0;
-  write_record(ba, 508, write_BrtBeginTableStyles(cnt, "TableStyleMedium9", "PivotStyleMedium4"));
-  write_record(
-    ba,
-    509
-    /* BrtEndTableStyles */
-  );
-}
-function write_COLORPALETTE_bin() {
-  return;
-}
-function write_sty_bin(wb, opts) {
-  var ba = buf_array();
-  write_record(
-    ba,
-    278
-    /* BrtBeginStyleSheet */
-  );
-  write_FMTS_bin(ba, wb.SSF);
-  write_FONTS_bin(ba, wb);
-  write_FILLS_bin(ba, wb);
-  write_BORDERS_bin(ba, wb);
-  write_CELLSTYLEXFS_bin(ba, wb);
-  write_CELLXFS_bin(ba, opts.cellXfs);
-  write_STYLES_bin(ba, wb);
-  write_DXFS_bin(ba, wb);
-  write_TABLESTYLES_bin(ba, wb);
-  write_COLORPALETTE_bin(ba, wb);
-  write_record(
-    ba,
-    279
-    /* BrtEndStyleSheet */
-  );
-  return ba.end();
 }
 var XLSXThemeClrScheme = [
   "</a:lt1>",
@@ -122247,13 +108762,6 @@ function parse_BrtMdtinfo(data, length) {
     name: parse_XLWideString(data, length - 8)
   };
 }
-function write_BrtMdtinfo(data) {
-  var o = new_buf(12 + 2 * data.name.length);
-  o.write_shift(4, data.flags);
-  o.write_shift(4, data.version);
-  write_XLWideString(data.name, o);
-  return o.slice(0, o.l);
-}
 function parse_BrtMdb(data) {
   var out = [];
   var cnt = data.read_shift(4);
@@ -122261,30 +108769,9 @@ function parse_BrtMdb(data) {
     out.push([data.read_shift(4), data.read_shift(4)]);
   return out;
 }
-function write_BrtMdb(mdb) {
-  var o = new_buf(4 + 8 * mdb.length);
-  o.write_shift(4, mdb.length);
-  for (var i2 = 0; i2 < mdb.length; ++i2) {
-    o.write_shift(4, mdb[i2][0]);
-    o.write_shift(4, mdb[i2][1]);
-  }
-  return o;
-}
-function write_BrtBeginEsfmd(cnt, name) {
-  var o = new_buf(8 + 2 * name.length);
-  o.write_shift(4, cnt);
-  write_XLWideString(name, o);
-  return o.slice(0, o.l);
-}
 function parse_BrtBeginEsmdb(data) {
   data.l += 4;
   return data.read_shift(4) != 0;
-}
-function write_BrtBeginEsmdb(cnt, cm) {
-  var o = new_buf(8);
-  o.write_shift(4, cnt);
-  o.write_shift(4, cm ? 1 : 0);
-  return o;
 }
 function parse_xlmeta_bin(data, name, _opts) {
   var out = { Types: [], Cell: [], Value: [] };
@@ -122326,30 +108813,6 @@ function parse_xlmeta_bin(data, name, _opts) {
     }
   });
   return out;
-}
-function write_xlmeta_bin() {
-  var ba = buf_array();
-  write_record(ba, 332);
-  write_record(ba, 334, write_UInt32LE(1));
-  write_record(ba, 335, write_BrtMdtinfo({
-    name: "XLDAPR",
-    version: 12e4,
-    flags: 3496657072
-  }));
-  write_record(ba, 336);
-  write_record(ba, 339, write_BrtBeginEsfmd(1, "XLDAPR"));
-  write_record(ba, 52);
-  write_record(ba, 35, write_UInt32LE(514));
-  write_record(ba, 4096, write_UInt32LE(0));
-  write_record(ba, 4097, writeuint16(1));
-  write_record(ba, 36);
-  write_record(ba, 53);
-  write_record(ba, 340);
-  write_record(ba, 337, write_BrtBeginEsmdb(1, true));
-  write_record(ba, 51, write_BrtMdb([[1, 0]]));
-  write_record(ba, 338);
-  write_record(ba, 333);
-  return ba.end();
 }
 function parse_xlmeta_xml(data, name, opts) {
   var out = { Types: [], Cell: [], Value: [] };
@@ -122430,11 +108893,6 @@ function parse_xlmeta_xml(data, name, opts) {
     return x2;
   });
   return out;
-}
-function write_xlmeta_xml() {
-  var o = [XML_HEADER];
-  o.push('<metadata xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:xlrd="http://schemas.microsoft.com/office/spreadsheetml/2017/richdata" xmlns:xda="http://schemas.microsoft.com/office/spreadsheetml/2017/dynamicarray">\n  <metadataTypes count="1">\n    <metadataType name="XLDAPR" minSupportedVersion="120000" copy="1" pasteAll="1" pasteValues="1" merge="1" splitFirst="1" rowColShift="1" clearFormats="1" clearComments="1" assign="1" coerce="1" cellMeta="1"/>\n  </metadataTypes>\n  <futureMetadata name="XLDAPR" count="1">\n    <bk>\n      <extLst>\n        <ext uri="{bdbb8cdc-fa1e-496e-a857-3c3f30c029c3}">\n          <xda:dynamicArrayProperties fDynamic="1" fCollapsed="0"/>\n        </ext>\n      </extLst>\n    </bk>\n  </futureMetadata>\n  <cellMetadata count="1">\n    <bk>\n      <rc t="1" v="0"/>\n    </bk>\n  </cellMetadata>\n</metadata>');
-  return o.join("");
 }
 function parse_cc_xml(data) {
   var d = [];
@@ -122601,61 +109059,6 @@ function parse_vml(data, sheet, comments) {
     }
   });
 }
-function write_vml(rId, comments, ws) {
-  var csize = [21600, 21600];
-  var bbox = ["m0,0l0", csize[1], csize[0], csize[1], csize[0], "0xe"].join(",");
-  var o = [
-    writextag("xml", null, { "xmlns:v": XLMLNS.v, "xmlns:o": XLMLNS.o, "xmlns:x": XLMLNS.x, "xmlns:mv": XLMLNS.mv }).replace(/\/>/, ">"),
-    writextag("o:shapelayout", writextag("o:idmap", null, { "v:ext": "edit", "data": rId }), { "v:ext": "edit" })
-  ];
-  var _shapeid = 65536 * rId;
-  var _comments = comments || [];
-  if (_comments.length > 0) o.push(writextag("v:shapetype", [
-    writextag("v:stroke", null, { joinstyle: "miter" }),
-    writextag("v:path", null, { gradientshapeok: "t", "o:connecttype": "rect" })
-  ].join(""), { id: "_x0000_t202", coordsize: csize.join(","), "o:spt": 202, path: bbox }));
-  _comments.forEach(function(x2) {
-    ++_shapeid;
-    o.push(write_vml_comment(x2, _shapeid));
-  });
-  o.push("</xml>");
-  return o.join("");
-}
-function write_vml_comment(x2, _shapeid, ws) {
-  var c = decode_cell(x2[0]);
-  var fillopts = (
-    /*::(*/
-    { "color2": "#BEFF82", "type": "gradient" }
-  );
-  if (fillopts.type == "gradient") fillopts.angle = "-180";
-  var fillparm = fillopts.type == "gradient" ? writextag("o:fill", null, { type: "gradientUnscaled", "v:ext": "view" }) : null;
-  var fillxml = writextag("v:fill", fillparm, fillopts);
-  var shadata = { on: "t", "obscured": "t" };
-  return [
-    "<v:shape" + wxt_helper({
-      id: "_x0000_s" + _shapeid,
-      type: "#_x0000_t202",
-      style: "position:absolute; margin-left:80pt;margin-top:5pt;width:104pt;height:64pt;z-index:10" + (x2[1].hidden ? ";visibility:hidden" : ""),
-      fillcolor: "#ECFAD4",
-      strokecolor: "#edeaa1"
-    }) + ">",
-    fillxml,
-    writextag("v:shadow", null, shadata),
-    writextag("v:path", null, { "o:connecttype": "none" }),
-    '<v:textbox><div style="text-align:left"></div></v:textbox>',
-    '<x:ClientData ObjectType="Note">',
-    "<x:MoveWithCells/>",
-    "<x:SizeWithCells/>",
-    /* Part 4 19.4.2.3 Anchor (Anchor) */
-    writetag("x:Anchor", [c.c + 1, 0, c.r + 1, 0, c.c + 3, 20, c.r + 5, 20].join(",")),
-    writetag("x:AutoFill", "False"),
-    writetag("x:Row", String(c.r)),
-    writetag("x:Column", String(c.c)),
-    x2[1].hidden ? "" : "<x:Visible/>",
-    "</x:ClientData>",
-    "</v:shape>"
-  ].join("");
-}
 function sheet_insert_comments(sheet, comments, threaded, people) {
   var dense = sheet["!data"] != null;
   var cell;
@@ -122723,59 +109126,6 @@ function parse_comments_xml(data, opts) {
   });
   return commentList;
 }
-function write_comments_xml(data) {
-  var o = [XML_HEADER, writextag("comments", null, { "xmlns": XMLNS_main[0] })];
-  var iauthor = [];
-  o.push("<authors>");
-  data.forEach(function(x2) {
-    x2[1].forEach(function(w) {
-      var a = escapexml(w.a);
-      if (iauthor.indexOf(a) == -1) {
-        iauthor.push(a);
-        o.push("<author>" + a + "</author>");
-      }
-      if (w.T && w.ID && iauthor.indexOf("tc=" + w.ID) == -1) {
-        iauthor.push("tc=" + w.ID);
-        o.push("<author>tc=" + w.ID + "</author>");
-      }
-    });
-  });
-  if (iauthor.length == 0) {
-    iauthor.push("SheetJ5");
-    o.push("<author>SheetJ5</author>");
-  }
-  o.push("</authors>");
-  o.push("<commentList>");
-  data.forEach(function(d) {
-    var lastauthor = 0, ts = [], tcnt = 0;
-    if (d[1][0] && d[1][0].T && d[1][0].ID) lastauthor = iauthor.indexOf("tc=" + d[1][0].ID);
-    d[1].forEach(function(c) {
-      if (c.a) lastauthor = iauthor.indexOf(escapexml(c.a));
-      if (c.T) ++tcnt;
-      ts.push(c.t == null ? "" : escapexml(c.t));
-    });
-    if (tcnt === 0) {
-      d[1].forEach(function(c) {
-        o.push('<comment ref="' + d[0] + '" authorId="' + iauthor.indexOf(escapexml(c.a)) + '"><text>');
-        o.push(writetag("t", c.t == null ? "" : escapexml(c.t)));
-        o.push("</text></comment>");
-      });
-    } else {
-      if (d[1][0] && d[1][0].T && d[1][0].ID) lastauthor = iauthor.indexOf("tc=" + d[1][0].ID);
-      o.push('<comment ref="' + d[0] + '" authorId="' + lastauthor + '"><text>');
-      var t2 = "Comment:\n    " + ts[0] + "\n";
-      for (var i2 = 1; i2 < ts.length; ++i2) t2 += "Reply:\n    " + ts[i2] + "\n";
-      o.push(writetag("t", escapexml(t2)));
-      o.push("</text></comment>");
-    }
-  });
-  o.push("</commentList>");
-  if (o.length > 2) {
-    o[o.length] = "</comments>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 function parse_tcmnt_xml(data, opts) {
   var out = [];
   var pass = false, comment = {}, tidx = 0;
@@ -122832,30 +109182,6 @@ function parse_tcmnt_xml(data, opts) {
   });
   return out;
 }
-function write_tcmnt_xml(comments, people, opts) {
-  var o = [XML_HEADER, writextag("ThreadedComments", null, { "xmlns": XMLNS.TCMNT }).replace(/[\/]>/, ">")];
-  comments.forEach(function(carr) {
-    var rootid = "";
-    (carr[1] || []).forEach(function(c, idx) {
-      if (!c.T) {
-        delete c.ID;
-        return;
-      }
-      if (c.a && people.indexOf(c.a) == -1) people.push(c.a);
-      var tcopts = {
-        ref: carr[0],
-        id: "{54EE7951-7262-4200-6969-" + ("000000000000" + opts.tcid++).slice(-12) + "}"
-      };
-      if (idx == 0) rootid = tcopts.id;
-      else tcopts.parentId = rootid;
-      c.ID = tcopts.id;
-      if (c.a) tcopts.personId = "{54EE7950-7262-4200-6969-" + ("000000000000" + people.indexOf(c.a)).slice(-12) + "}";
-      o.push(writextag("threadedComment", writetag("text", c.t || ""), tcopts));
-    });
-  });
-  o.push("</ThreadedComments>");
-  return o.join("");
-}
 function parse_people_xml(data, opts) {
   var out = [];
   var pass = false;
@@ -122895,22 +109221,6 @@ function parse_people_xml(data, opts) {
   });
   return out;
 }
-function write_people_xml(people) {
-  var o = [XML_HEADER, writextag("personList", null, {
-    "xmlns": XMLNS.TCMNT,
-    "xmlns:x": XMLNS_main[0]
-  }).replace(/[\/]>/, ">")];
-  people.forEach(function(person, idx) {
-    o.push(writextag("person", null, {
-      displayName: person,
-      id: "{54EE7950-7262-4200-6969-" + ("000000000000" + idx).slice(-12) + "}",
-      userId: person,
-      providerId: "None"
-    }));
-  });
-  o.push("</personList>");
-  return o.join("");
-}
 function parse_BrtBeginComment(data) {
   var out = {};
   out.iauthor = data.read_shift(4);
@@ -122920,20 +109230,7 @@ function parse_BrtBeginComment(data) {
   data.l += 16;
   return out;
 }
-function write_BrtBeginComment(data, o) {
-  if (o == null) o = new_buf(36);
-  o.write_shift(4, data[1].iauthor);
-  write_UncheckedRfX(data[0], o);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  return o;
-}
 var parse_BrtCommentAuthor = parse_XLWideString;
-function write_BrtCommentAuthor(data) {
-  return write_XLWideString(data.slice(0, 54));
-}
 function parse_comments_bin(data, opts) {
   var out = [];
   var authors = [];
@@ -122979,70 +109276,6 @@ function parse_comments_bin(data, opts) {
   });
   return out;
 }
-function write_comments_bin(data) {
-  var ba = buf_array();
-  var iauthor = [];
-  write_record(
-    ba,
-    628
-    /* BrtBeginComments */
-  );
-  write_record(
-    ba,
-    630
-    /* BrtBeginCommentAuthors */
-  );
-  data.forEach(function(comment) {
-    comment[1].forEach(function(c) {
-      if (iauthor.indexOf(c.a) > -1) return;
-      iauthor.push(c.a.slice(0, 54));
-      write_record(ba, 632, write_BrtCommentAuthor(c.a));
-      if (c.T && c.ID && iauthor.indexOf("tc=" + c.ID) == -1) {
-        iauthor.push("tc=" + c.ID);
-        write_record(ba, 632, write_BrtCommentAuthor("tc=" + c.ID));
-      }
-    });
-  });
-  write_record(
-    ba,
-    631
-    /* BrtEndCommentAuthors */
-  );
-  write_record(
-    ba,
-    633
-    /* BrtBeginCommentList */
-  );
-  data.forEach(function(comment) {
-    comment[1].forEach(function(c) {
-      var _ia = -1;
-      if (c.ID) _ia = iauthor.indexOf("tc=" + c.ID);
-      if (_ia == -1 && comment[1][0].T && comment[1][0].ID) _ia = iauthor.indexOf("tc=" + comment[1][0].ID);
-      if (_ia == -1) _ia = iauthor.indexOf(c.a);
-      c.iauthor = _ia;
-      var range = { s: decode_cell(comment[0]), e: decode_cell(comment[0]) };
-      write_record(ba, 635, write_BrtBeginComment([range, c]));
-      if (c.t && c.t.length > 0) write_record(ba, 637, write_BrtCommentText(c));
-      write_record(
-        ba,
-        636
-        /* BrtEndComment */
-      );
-      delete c.iauthor;
-    });
-  });
-  write_record(
-    ba,
-    634
-    /* BrtEndCommentList */
-  );
-  write_record(
-    ba,
-    629
-    /* BrtEndComments */
-  );
-  return ba.end();
-}
 var CT_VBA = "application/vnd.ms-office.vbaProject";
 function make_vba_xls(cfb) {
   var newcfb = CFB.utils.cfb_new({ root: "R" });
@@ -123054,16 +109287,6 @@ function make_vba_xls(cfb) {
   });
   return CFB.write(newcfb);
 }
-function fill_vba_xls(cfb, vba) {
-  vba.FullPaths.forEach(function(p, i2) {
-    if (i2 == 0)
-      return;
-    var newpath = p.replace(/^[\/]*[^\/]*[\/]/, "/_VBA_PROJECT_CUR/");
-    if (newpath.slice(-1) !== "/")
-      CFB.utils.cfb_add(cfb, newpath, vba.FileIndex[i2].content);
-  });
-}
-var VBAFMTS = ["xlsb", "xlsm", "xlam", "biff8", "xla"];
 function parse_ds_bin() {
   return { "!type": "dialog" };
 }
@@ -124247,18 +110470,6 @@ function parse_FormulaValue(blob) {
   }
   return [];
 }
-function write_FormulaValue(value) {
-  if (value == null) {
-    var o = new_buf(8);
-    o.write_shift(1, 3);
-    o.write_shift(1, 0);
-    o.write_shift(2, 0);
-    o.write_shift(2, 0);
-    o.write_shift(2, 65535);
-    return o;
-  } else if (typeof value == "number") return write_Xnum(value);
-  return write_Xnum(0);
-}
 function parse_Formula(blob, length, opts) {
   var end = blob.l + length;
   var cell = parse_XLSCell(blob, 6, opts);
@@ -124273,18 +110484,6 @@ function parse_Formula(blob, length, opts) {
   var cbf = parse_XLSCellParsedFormula(blob, end - blob.l, opts);
   return { cell, val: val2[0], formula: cbf, shared: flags >> 3 & 1, tt: val2[1] };
 }
-function write_Formula(cell, R, C, opts, os) {
-  var o1 = write_XLSCell(R, C, os);
-  var o2 = write_FormulaValue(cell.v);
-  var o3 = new_buf(6);
-  var flags = 1 | 32;
-  o3.write_shift(2, flags);
-  o3.write_shift(4, 0);
-  var bf = new_buf(cell.bf.length);
-  for (var i2 = 0; i2 < cell.bf.length; ++i2) bf[i2] = cell.bf[i2];
-  var out = bconcat([o1, o2, o3, bf]);
-  return out;
-}
 function parse_XLSBParsedFormula(data, length, opts) {
   var cce = data.read_shift(4);
   var rgce = parse_Rgce(data, cce, opts);
@@ -124296,173 +110495,6 @@ var parse_XLSBArrayParsedFormula = parse_XLSBParsedFormula;
 var parse_XLSBCellParsedFormula = parse_XLSBParsedFormula;
 var parse_XLSBNameParsedFormula = parse_XLSBParsedFormula;
 var parse_XLSBSharedParsedFormula = parse_XLSBParsedFormula;
-function write_XLSBFormulaNum(val2) {
-  if ((val2 | 0) == val2 && val2 < Math.pow(2, 16) && val2 >= 0) {
-    var oint = new_buf(11);
-    oint.write_shift(4, 3);
-    oint.write_shift(1, 30);
-    oint.write_shift(2, val2);
-    oint.write_shift(4, 0);
-    return oint;
-  }
-  var num = new_buf(17);
-  num.write_shift(4, 11);
-  num.write_shift(1, 31);
-  num.write_shift(8, val2);
-  num.write_shift(4, 0);
-  return num;
-}
-function write_XLSBFormulaErr(val2) {
-  var oint = new_buf(10);
-  oint.write_shift(4, 2);
-  oint.write_shift(1, 28);
-  oint.write_shift(1, val2);
-  oint.write_shift(4, 0);
-  return oint;
-}
-function write_XLSBFormulaBool(val2) {
-  var oint = new_buf(10);
-  oint.write_shift(4, 2);
-  oint.write_shift(1, 29);
-  oint.write_shift(1, val2 ? 1 : 0);
-  oint.write_shift(4, 0);
-  return oint;
-}
-function write_XLSBFormulaStr(val2) {
-  var preamble = new_buf(7);
-  preamble.write_shift(4, 3 + 2 * val2.length);
-  preamble.write_shift(1, 23);
-  preamble.write_shift(2, val2.length);
-  var body = new_buf(2 * val2.length);
-  body.write_shift(2 * val2.length, val2, "utf16le");
-  var postamble = new_buf(4);
-  postamble.write_shift(4, 0);
-  return bconcat([preamble, body, postamble]);
-}
-function write_XLSBFormulaRef(str) {
-  var cell = decode_cell(str);
-  var out = new_buf(15);
-  out.write_shift(4, 7);
-  out.write_shift(1, 4 | 1 << 5);
-  out.write_shift(4, cell.r);
-  out.write_shift(2, cell.c | (str.charAt(0) == "$" ? 0 : 1) << 14 | (str.match(/\$\d/) ? 0 : 1) << 15);
-  out.write_shift(4, 0);
-  return out;
-}
-function write_XLSBFormulaRef3D(str, wb) {
-  var lastbang = str.lastIndexOf("!");
-  var sname = str.slice(0, lastbang);
-  str = str.slice(lastbang + 1);
-  var cell = decode_cell(str);
-  if (sname.charAt(0) == "'") sname = sname.slice(1, -1).replace(/''/g, "'");
-  var out = new_buf(17);
-  out.write_shift(4, 9);
-  out.write_shift(1, 26 | 1 << 5);
-  out.write_shift(2, 2 + wb.SheetNames.map(function(n) {
-    return n.toLowerCase();
-  }).indexOf(sname.toLowerCase()));
-  out.write_shift(4, cell.r);
-  out.write_shift(2, cell.c | (str.charAt(0) == "$" ? 0 : 1) << 14 | (str.match(/\$\d/) ? 0 : 1) << 15);
-  out.write_shift(4, 0);
-  return out;
-}
-function write_XLSBFormulaRefErr3D(str, wb) {
-  var lastbang = str.lastIndexOf("!");
-  var sname = str.slice(0, lastbang);
-  str = str.slice(lastbang + 1);
-  if (sname.charAt(0) == "'") sname = sname.slice(1, -1).replace(/''/g, "'");
-  var out = new_buf(17);
-  out.write_shift(4, 9);
-  out.write_shift(1, 28 | 1 << 5);
-  out.write_shift(2, 2 + wb.SheetNames.map(function(n) {
-    return n.toLowerCase();
-  }).indexOf(sname.toLowerCase()));
-  out.write_shift(4, 0);
-  out.write_shift(2, 0);
-  out.write_shift(4, 0);
-  return out;
-}
-function write_XLSBFormulaRange(_str) {
-  var parts = _str.split(":"), str = parts[0];
-  var out = new_buf(23);
-  out.write_shift(4, 15);
-  str = parts[0];
-  var cell = decode_cell(str);
-  out.write_shift(1, 4 | 1 << 5);
-  out.write_shift(4, cell.r);
-  out.write_shift(2, cell.c | (str.charAt(0) == "$" ? 0 : 1) << 14 | (str.match(/\$\d/) ? 0 : 1) << 15);
-  out.write_shift(4, 0);
-  str = parts[1];
-  cell = decode_cell(str);
-  out.write_shift(1, 4 | 1 << 5);
-  out.write_shift(4, cell.r);
-  out.write_shift(2, cell.c | (str.charAt(0) == "$" ? 0 : 1) << 14 | (str.match(/\$\d/) ? 0 : 1) << 15);
-  out.write_shift(4, 0);
-  out.write_shift(1, 17);
-  out.write_shift(4, 0);
-  return out;
-}
-function write_XLSBFormulaRangeWS(_str, wb) {
-  var lastbang = _str.lastIndexOf("!");
-  var sname = _str.slice(0, lastbang);
-  _str = _str.slice(lastbang + 1);
-  if (sname.charAt(0) == "'") sname = sname.slice(1, -1).replace(/''/g, "'");
-  var parts = _str.split(":");
-  var out = new_buf(27);
-  out.write_shift(4, 19);
-  var str = parts[0], cell = decode_cell(str);
-  out.write_shift(1, 26 | 1 << 5);
-  out.write_shift(2, 2 + wb.SheetNames.map(function(n) {
-    return n.toLowerCase();
-  }).indexOf(sname.toLowerCase()));
-  out.write_shift(4, cell.r);
-  out.write_shift(2, cell.c | (str.charAt(0) == "$" ? 0 : 1) << 14 | (str.match(/\$\d/) ? 0 : 1) << 15);
-  str = parts[1];
-  cell = decode_cell(str);
-  out.write_shift(1, 26 | 1 << 5);
-  out.write_shift(2, 2 + wb.SheetNames.map(function(n) {
-    return n.toLowerCase();
-  }).indexOf(sname.toLowerCase()));
-  out.write_shift(4, cell.r);
-  out.write_shift(2, cell.c | (str.charAt(0) == "$" ? 0 : 1) << 14 | (str.match(/\$\d/) ? 0 : 1) << 15);
-  out.write_shift(1, 17);
-  out.write_shift(4, 0);
-  return out;
-}
-function write_XLSBFormulaArea3D(_str, wb) {
-  var lastbang = _str.lastIndexOf("!");
-  var sname = _str.slice(0, lastbang);
-  _str = _str.slice(lastbang + 1);
-  if (sname.charAt(0) == "'") sname = sname.slice(1, -1).replace(/''/g, "'");
-  var range = decode_range(_str);
-  var out = new_buf(23);
-  out.write_shift(4, 15);
-  out.write_shift(1, 27 | 1 << 5);
-  out.write_shift(2, 2 + wb.SheetNames.map(function(n) {
-    return n.toLowerCase();
-  }).indexOf(sname.toLowerCase()));
-  out.write_shift(4, range.s.r);
-  out.write_shift(4, range.e.r);
-  out.write_shift(2, range.s.c);
-  out.write_shift(2, range.e.c);
-  out.write_shift(4, 0);
-  return out;
-}
-function write_XLSBFormula(val2, wb) {
-  if (typeof val2 == "number") return write_XLSBFormulaNum(val2);
-  if (typeof val2 == "boolean") return write_XLSBFormulaBool(val2);
-  if (/^#(DIV\/0!|GETTING_DATA|N\/A|NAME\?|NULL!|NUM!|REF!|VALUE!)$/.test(val2)) return write_XLSBFormulaErr(+RBErr[val2]);
-  if (val2.match(/^\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5})$/)) return write_XLSBFormulaRef(val2);
-  if (val2.match(/^\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5}):\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5})$/)) return write_XLSBFormulaRange(val2);
-  if (val2.match(/^#REF!\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5}):\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5})$/)) return write_XLSBFormulaArea3D(val2, wb);
-  if (val2.match(/^(?:'[^\\\/?*\[\]:]*'|[^'][^\\\/?*\[\]:'`~!@#$%^()\-=+{}|;,<.>]*)!\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5})$/)) return write_XLSBFormulaRef3D(val2, wb);
-  if (val2.match(/^(?:'[^\\\/?*\[\]:]*'|[^'][^\\\/?*\[\]:'`~!@#$%^()\-=+{}|;,<.>]*)!\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5}):\$?(?:[A-W][A-Z]{2}|X[A-E][A-Z]|XF[A-D]|[A-Z]{1,2})\$?(?:10[0-3]\d{4}|104[0-7]\d{3}|1048[0-4]\d{2}|10485[0-6]\d|104857[0-6]|[1-9]\d{0,5})$/)) return write_XLSBFormulaRangeWS(val2, wb);
-  if (/^(?:'[^\\\/?*\[\]:]*'|[^'][^\\\/?*\[\]:'`~!@#$%^()\-=+{}|;,<.>]*)!#REF!$/.test(val2)) return write_XLSBFormulaRefErr3D(val2, wb);
-  if (/^".*"$/.test(val2)) return write_XLSBFormulaStr(val2);
-  if (/^[+-]\d+$/.test(val2)) return write_XLSBFormulaNum(parseInt(val2, 10));
-  throw "Formula |" + val2 + "| not supported for XLSB";
-}
-var write_XLSBNameParsedFormula = write_XLSBFormula;
 var Cetab = {
   0: "BEEP",
   1: "OPEN",
@@ -125615,10 +111647,6 @@ function ods_to_csf_formula(f3) {
   f3 = f3.replace(/\[.(#[A-Z]*[?!])\]/g, "$1");
   return f3.replace(/[;~]/g, ",").replace(/\|/g, ";");
 }
-function csf_to_ods_formula(f3) {
-  var o = "of:=" + f3.replace(crefregex, "$1[.$2$3$4$5]").replace(/\]:\[/g, ":");
-  return o.replace(/;/g, "|").replace(/,/g, ";");
-}
 function ods_to_csf_3D(r2) {
   r2 = r2.replace(/\$'([^']|'')+'/g, function($$) {
     return $$.slice(1);
@@ -125630,61 +111658,8 @@ function ods_to_csf_3D(r2) {
   var s2 = a[0].split(".")[0];
   return [s2, a[0].split(".")[1] + (a.length > 1 ? ":" + (a[1].split(".")[1] || a[1].split(".")[0]) : "")];
 }
-function csf_to_ods_3D(r2) {
-  return r2.replace(/!/, ".").replace(/:/, ":.");
-}
 var strs = {};
 var _ssfopts = {};
-var browser_has_Map = typeof Map !== "undefined";
-function get_sst_id(sst, str, rev) {
-  var i2 = 0, len = sst.length;
-  if (rev) {
-    if (browser_has_Map ? rev.has(str) : Object.prototype.hasOwnProperty.call(rev, str)) {
-      var revarr = browser_has_Map ? rev.get(str) : rev[str];
-      for (; i2 < revarr.length; ++i2) {
-        if (sst[revarr[i2]].t === str) {
-          sst.Count++;
-          return revarr[i2];
-        }
-      }
-    }
-  } else for (; i2 < len; ++i2) {
-    if (sst[i2].t === str) {
-      sst.Count++;
-      return i2;
-    }
-  }
-  sst[len] = { t: str };
-  sst.Count++;
-  sst.Unique++;
-  if (rev) {
-    if (browser_has_Map) {
-      if (!rev.has(str)) rev.set(str, []);
-      rev.get(str).push(len);
-    } else {
-      if (!Object.prototype.hasOwnProperty.call(rev, str)) rev[str] = [];
-      rev[str].push(len);
-    }
-  }
-  return len;
-}
-function col_obj_w(C, col) {
-  var p = { min: C + 1, max: C + 1 };
-  var wch = -1;
-  if (col.MDW) MDW = col.MDW;
-  if (col.width != null) p.customWidth = 1;
-  else if (col.wpx != null) wch = px2char(col.wpx);
-  else if (col.wch != null) wch = col.wch;
-  if (wch > -1) {
-    p.width = char2width(wch);
-    p.customWidth = 1;
-  } else if (col.width != null) p.width = col.width;
-  if (col.hidden) p.hidden = true;
-  if (col.level != null) {
-    p.outlineLevel = p.level = col.level;
-  }
-  return p;
-}
 function default_margins(margins, mode) {
   if (!margins) return;
   var defs = [0.7, 0.7, 0.75, 0.75, 0.3, 0.3];
@@ -125695,28 +111670,6 @@ function default_margins(margins, mode) {
   if (margins.bottom == null) margins.bottom = defs[3];
   if (margins.header == null) margins.header = defs[4];
   if (margins.footer == null) margins.footer = defs[5];
-}
-function get_cell_style(styles, cell, opts) {
-  var z = opts.revssf[cell.z != null ? cell.z : "General"];
-  var i2 = 60, len = styles.length;
-  if (z == null && opts.ssf) {
-    for (; i2 < 392; ++i2) if (opts.ssf[i2] == null) {
-      SSF__load(cell.z, i2);
-      opts.ssf[i2] = cell.z;
-      opts.revssf[cell.z] = z = i2;
-      break;
-    }
-  }
-  for (i2 = 0; i2 != len; ++i2) if (styles[i2].numFmtId === z) return i2;
-  styles[len] = {
-    numFmtId: z,
-    fontId: 0,
-    fillId: 0,
-    borderId: 0,
-    xfId: 0,
-    applyNumberFormat: 1
-  };
-  return len;
 }
 function safe_format(p, fmtid, fillid, opts, themes, styles, date1904) {
   try {
@@ -125757,12 +111710,6 @@ function safe_format(p, fmtid, fillid, opts, themes, styles, date1904) {
     }
   } catch (e2) {
     if (opts.WTF && styles.Fills) throw e2;
-  }
-}
-function check_ws(ws, sname, i2) {
-  if (ws && ws["!ref"]) {
-    var range = safe_decode_range(ws["!ref"]);
-    if (range.e.c < range.s.c || range.e.r < range.s.r) throw new Error("Bad range (" + i2 + "): " + ws["!ref"]);
   }
 }
 function parse_ws_xml_dim(ws, s2) {
@@ -125836,12 +111783,6 @@ function parse_ws_xml(data, opts, idx, rels, wb, themes, styles) {
   if (rels["!id"][s2["!legrel"]]) s2["!legdrawel"] = rels["!id"][s2["!legrel"]];
   return s2;
 }
-function write_ws_xml_merges(merges) {
-  if (merges.length === 0) return "";
-  var o = '<mergeCells count="' + merges.length + '">';
-  for (var i2 = 0; i2 != merges.length; ++i2) o += '<mergeCell ref="' + encode_range(merges[i2]) + '"/>';
-  return o + "</mergeCells>";
-}
 function parse_ws_xml_sheetpr(sheetPr, s2, wb, idx) {
   var data = parsexmltag(sheetPr);
   if (!wb.Sheets[idx]) wb.Sheets[idx] = {};
@@ -125849,52 +111790,6 @@ function parse_ws_xml_sheetpr(sheetPr, s2, wb, idx) {
 }
 function parse_ws_xml_sheetpr2(sheetPr, body, s2, wb, idx) {
   parse_ws_xml_sheetpr(sheetPr.slice(0, sheetPr.indexOf(">")), s2, wb, idx);
-}
-function write_ws_xml_sheetpr(ws, wb, idx, opts, o) {
-  var needed = false;
-  var props = {}, payload = null;
-  if (opts.bookType !== "xlsx" && wb.vbaraw) {
-    var cname = wb.SheetNames[idx];
-    try {
-      if (wb.Workbook) cname = wb.Workbook.Sheets[idx].CodeName || cname;
-    } catch (e2) {
-    }
-    needed = true;
-    props.codeName = utf8write(escapexml(cname));
-  }
-  if (ws && ws["!outline"]) {
-    var outlineprops = { summaryBelow: 1, summaryRight: 1 };
-    if (ws["!outline"].above) outlineprops.summaryBelow = 0;
-    if (ws["!outline"].left) outlineprops.summaryRight = 0;
-    payload = (payload || "") + writextag("outlinePr", null, outlineprops);
-  }
-  if (!needed && !payload) return;
-  o[o.length] = writextag("sheetPr", payload, props);
-}
-var sheetprot_deffalse = ["objects", "scenarios", "selectLockedCells", "selectUnlockedCells"];
-var sheetprot_deftrue = [
-  "formatColumns",
-  "formatRows",
-  "formatCells",
-  "insertColumns",
-  "insertRows",
-  "insertHyperlinks",
-  "deleteColumns",
-  "deleteRows",
-  "sort",
-  "autoFilter",
-  "pivotTables"
-];
-function write_ws_xml_protection(sp) {
-  var o = { sheet: 1 };
-  sheetprot_deffalse.forEach(function(n) {
-    if (sp[n] != null && sp[n]) o[n] = "1";
-  });
-  sheetprot_deftrue.forEach(function(n) {
-    if (sp[n] != null && !sp[n]) o[n] = "0";
-  });
-  if (sp.password) o.password = crypto_CreatePasswordVerifier_Method1(sp.password).toString(16).toUpperCase();
-  return writextag("sheetProtection", null, o);
 }
 function parse_ws_xml_hlinks(s2, data, rels) {
   var dense = s2["!data"] != null;
@@ -125935,10 +111830,6 @@ function parse_ws_xml_margins(margin) {
   });
   return o;
 }
-function write_ws_xml_margins(margin) {
-  default_margins(margin);
-  return writextag("pageMargins", null, margin);
-}
 function parse_ws_xml_cols(columns, cols) {
   var seencol = false;
   for (var coli = 0; coli != cols.length; ++coli) {
@@ -125957,38 +111848,9 @@ function parse_ws_xml_cols(columns, cols) {
     while (colm <= colM) columns[colm++] = dup(coll);
   }
 }
-function write_ws_xml_cols(ws, cols) {
-  var o = ["<cols>"], col;
-  for (var i2 = 0; i2 != cols.length; ++i2) {
-    if (!(col = cols[i2])) continue;
-    o[o.length] = writextag("col", null, col_obj_w(i2, col));
-  }
-  o[o.length] = "</cols>";
-  return o.join("");
-}
 function parse_ws_xml_autofilter(data) {
   var o = { ref: (data.match(/ref="([^"]*)"/) || [])[1] };
   return o;
-}
-function write_ws_xml_autofilter(data, ws, wb, idx) {
-  var ref = typeof data.ref == "string" ? data.ref : encode_range(data.ref);
-  if (!wb.Workbook) wb.Workbook = { Sheets: [] };
-  if (!wb.Workbook.Names) wb.Workbook.Names = [];
-  var names = wb.Workbook.Names;
-  var range = decode_range(ref);
-  if (range.s.r == range.e.r) {
-    range.e.r = decode_range(ws["!ref"]).e.r;
-    ref = encode_range(range);
-  }
-  for (var i2 = 0; i2 < names.length; ++i2) {
-    var name = names[i2];
-    if (name.Name != "_xlnm._FilterDatabase") continue;
-    if (name.Sheet != idx) continue;
-    name.Ref = formula_quote_sheet_name(wb.SheetNames[idx]) + "!" + fix_range(ref);
-    break;
-  }
-  if (i2 == names.length) names.push({ Name: "_xlnm._FilterDatabase", Sheet: idx, Ref: "'" + wb.SheetNames[idx] + "'!" + ref });
-  return writextag("autoFilter", null, { ref });
 }
 var sviewregex = /<(?:\w:)?sheetView(?:[^<>a-z][^<>]*)?\/?>/g;
 function parse_ws_xml_sheetviews(data, wb) {
@@ -125999,93 +111861,6 @@ function parse_ws_xml_sheetviews(data, wb) {
     if (+tag.zoomScale) wb.Views[i2].zoom = +tag.zoomScale;
     if (tag.rightToLeft && parsexmlbool(tag.rightToLeft)) wb.Views[i2].RTL = true;
   });
-}
-function write_ws_xml_sheetviews(ws, opts, idx, wb) {
-  var sview = { workbookViewId: "0" };
-  if ((((wb || {}).Workbook || {}).Views || [])[0]) sview.rightToLeft = wb.Workbook.Views[0].RTL ? "1" : "0";
-  return writextag("sheetViews", writextag("sheetView", null, sview), {});
-}
-function write_ws_xml_cell(cell, ref, ws, opts, idx, wb, date1904) {
-  if (cell.c) ws["!comments"].push([ref, cell.c]);
-  if ((cell.v === void 0 || cell.t === "z" && !(opts || {}).sheetStubs) && typeof cell.f !== "string" && typeof cell.z == "undefined") return "";
-  var vv = "";
-  var oldt = cell.t, oldv = cell.v;
-  if (cell.t !== "z") switch (cell.t) {
-    case "b":
-      vv = cell.v ? "1" : "0";
-      break;
-    case "n":
-      if (isNaN(cell.v)) {
-        cell.t = "e";
-        vv = BErr[cell.v = 36];
-      } else if (!isFinite(cell.v)) {
-        cell.t = "e";
-        vv = BErr[cell.v = 7];
-      } else vv = "" + cell.v;
-      break;
-    case "e":
-      vv = BErr[cell.v];
-      break;
-    case "d":
-      if (opts && opts.cellDates) {
-        var _vv = parseDate(cell.v, date1904);
-        vv = _vv.toISOString();
-        if (_vv.getUTCFullYear() < 1900) vv = vv.slice(vv.indexOf("T") + 1).replace("Z", "");
-      } else {
-        cell = dup(cell);
-        cell.t = "n";
-        vv = "" + (cell.v = datenum(parseDate(cell.v, date1904), date1904));
-      }
-      if (typeof cell.z === "undefined") cell.z = table_fmt[14];
-      break;
-    default:
-      vv = cell.v;
-      break;
-  }
-  var v = cell.t == "z" || cell.v == null ? "" : writetag("v", escapexml(vv)), o = { r: ref };
-  var os = get_cell_style(opts.cellXfs, cell, opts);
-  if (os !== 0) o.s = os;
-  switch (cell.t) {
-    case "n":
-      break;
-    case "d":
-      o.t = "d";
-      break;
-    case "b":
-      o.t = "b";
-      break;
-    case "e":
-      o.t = "e";
-      break;
-    case "z":
-      break;
-    default:
-      if (cell.v == null) {
-        delete cell.t;
-        break;
-      }
-      if (cell.v.length > 32767) throw new Error("Text length must not exceed 32767 characters");
-      if (opts && opts.bookSST) {
-        v = writetag("v", "" + get_sst_id(opts.Strings, cell.v, opts.revStrings));
-        o.t = "s";
-        break;
-      } else o.t = "str";
-      break;
-  }
-  if (cell.t != oldt) {
-    cell.t = oldt;
-    cell.v = oldv;
-  }
-  if (typeof cell.f == "string" && cell.f) {
-    var ff = cell.F && cell.F.slice(0, ref.length) == ref ? { t: "array", ref: cell.F } : null;
-    v = writextag("f", escapexml(cell.f), ff) + (cell.v != null ? v : "");
-  }
-  if (cell.l) {
-    cell.l.display = escapexml(vv);
-    ws["!links"].push([ref, cell.l]);
-  }
-  if (cell.D) o.cm = 1;
-  return writextag("c", v, o);
 }
 var parse_ws_xml_data = /* @__PURE__ */ (function() {
   var cellregex = /<(?:\w+:)?c[ \/>]/, rowregex = /<\/(?:\w+:)?row>/;
@@ -126335,141 +112110,6 @@ var parse_ws_xml_data = /* @__PURE__ */ (function() {
     if (rows.length > 0) s2["!rows"] = rows;
   };
 })();
-function write_ws_xml_data(ws, opts, idx, wb) {
-  var o = [], r2 = [], range = safe_decode_range(ws["!ref"]), cell = "", ref, rr = "", cols = [], R = 0, C = 0, rows = ws["!rows"];
-  var dense = ws["!data"] != null, data = dense ? ws["!data"] : [];
-  var params = { r: rr }, row, height = -1;
-  var date1904 = (((wb || {}).Workbook || {}).WBProps || {}).date1904;
-  for (C = range.s.c; C <= range.e.c; ++C) cols[C] = encode_col(C);
-  for (R = range.s.r; R <= range.e.r; ++R) {
-    r2 = [];
-    rr = encode_row(R);
-    var data_R = dense ? data[R] : [];
-    for (C = range.s.c; C <= range.e.c; ++C) {
-      ref = cols[C] + rr;
-      var _cell = dense ? data_R[C] : ws[ref];
-      if (_cell === void 0) continue;
-      if ((cell = write_ws_xml_cell(_cell, ref, ws, opts, idx, wb, date1904)) != null) r2.push(cell);
-    }
-    if (r2.length > 0 || rows && rows[R]) {
-      params = { r: rr };
-      if (rows && rows[R]) {
-        row = rows[R];
-        if (row.hidden) params.hidden = 1;
-        height = -1;
-        if (row.hpx) height = px2pt(row.hpx);
-        else if (row.hpt) height = row.hpt;
-        if (height > -1) {
-          params.ht = height;
-          params.customHeight = 1;
-        }
-        if (row.level) {
-          params.outlineLevel = row.level;
-        }
-      }
-      o[o.length] = writextag("row", r2.join(""), params);
-    }
-  }
-  if (rows) for (; R < rows.length; ++R) {
-    if (rows && rows[R]) {
-      params = { r: R + 1 };
-      row = rows[R];
-      if (row.hidden) params.hidden = 1;
-      height = -1;
-      if (row.hpx) height = px2pt(row.hpx);
-      else if (row.hpt) height = row.hpt;
-      if (height > -1) {
-        params.ht = height;
-        params.customHeight = 1;
-      }
-      if (row.level) {
-        params.outlineLevel = row.level;
-      }
-      o[o.length] = writextag("row", "", params);
-    }
-  }
-  return o.join("");
-}
-function write_ws_xml(idx, opts, wb, rels) {
-  var o = [XML_HEADER, writextag("worksheet", null, {
-    "xmlns": XMLNS_main[0],
-    "xmlns:r": XMLNS.r
-  })];
-  var s2 = wb.SheetNames[idx], sidx = 0, rdata = "";
-  var ws = wb.Sheets[s2];
-  if (ws == null) ws = {};
-  var ref = ws["!ref"] || "A1";
-  var range = safe_decode_range(ref);
-  if (range.e.c > 16383 || range.e.r > 1048575) {
-    if (opts.WTF) throw new Error("Range " + ref + " exceeds format limit A1:XFD1048576");
-    range.e.c = Math.min(range.e.c, 16383);
-    range.e.r = Math.min(range.e.c, 1048575);
-    ref = encode_range(range);
-  }
-  if (!rels) rels = {};
-  ws["!comments"] = [];
-  var _drawing = [];
-  write_ws_xml_sheetpr(ws, wb, idx, opts, o);
-  o[o.length] = writextag("dimension", null, { "ref": ref });
-  o[o.length] = write_ws_xml_sheetviews(ws, opts, idx, wb);
-  if (opts.sheetFormat) o[o.length] = writextag("sheetFormatPr", null, {
-    defaultRowHeight: opts.sheetFormat.defaultRowHeight || "16",
-    baseColWidth: opts.sheetFormat.baseColWidth || "10",
-    outlineLevelRow: opts.sheetFormat.outlineLevelRow || "7"
-  });
-  if (ws["!cols"] != null && ws["!cols"].length > 0) o[o.length] = write_ws_xml_cols(ws, ws["!cols"]);
-  o[sidx = o.length] = "<sheetData/>";
-  ws["!links"] = [];
-  if (ws["!ref"] != null) {
-    rdata = write_ws_xml_data(ws, opts, idx, wb, rels);
-    if (rdata.length > 0) o[o.length] = rdata;
-  }
-  if (o.length > sidx + 1) {
-    o[o.length] = "</sheetData>";
-    o[sidx] = o[sidx].replace("/>", ">");
-  }
-  if (ws["!protect"]) o[o.length] = write_ws_xml_protection(ws["!protect"]);
-  if (ws["!autofilter"] != null) o[o.length] = write_ws_xml_autofilter(ws["!autofilter"], ws, wb, idx);
-  if (ws["!merges"] != null && ws["!merges"].length > 0) o[o.length] = write_ws_xml_merges(ws["!merges"]);
-  var relc = -1, rel, rId = -1;
-  if (
-    /*::(*/
-    ws["!links"].length > 0
-  ) {
-    o[o.length] = "<hyperlinks>";
-    ws["!links"].forEach(function(l) {
-      if (!l[1].Target) return;
-      rel = { "ref": l[0] };
-      if (l[1].Target.charAt(0) != "#") {
-        rId = add_rels(rels, -1, escapexml(l[1].Target).replace(/#[\s\S]*$/, ""), RELS.HLINK);
-        rel["r:id"] = "rId" + rId;
-      }
-      if ((relc = l[1].Target.indexOf("#")) > -1) rel.location = escapexml(l[1].Target.slice(relc + 1));
-      if (l[1].Tooltip) rel.tooltip = escapexml(l[1].Tooltip);
-      rel.display = l[1].display;
-      o[o.length] = writextag("hyperlink", null, rel);
-    });
-    o[o.length] = "</hyperlinks>";
-  }
-  delete ws["!links"];
-  if (ws["!margins"] != null) o[o.length] = write_ws_xml_margins(ws["!margins"]);
-  if (!opts || opts.ignoreEC || opts.ignoreEC == void 0) o[o.length] = writetag("ignoredErrors", writextag("ignoredError", null, { numberStoredAsText: 1, sqref: ref }));
-  if (_drawing.length > 0) {
-    rId = add_rels(rels, -1, "../drawings/drawing" + (idx + 1) + ".xml", RELS.DRAW);
-    o[o.length] = writextag("drawing", null, { "r:id": "rId" + rId });
-    ws["!drawing"] = _drawing;
-  }
-  if (ws["!comments"].length > 0) {
-    rId = add_rels(rels, -1, "../drawings/vmlDrawing" + (idx + 1) + ".vml", RELS.VML);
-    o[o.length] = writextag("legacyDrawing", null, { "r:id": "rId" + rId });
-    ws["!legacy"] = rId;
-  }
-  if (o.length > 1) {
-    o[o.length] = "</worksheet>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 function parse_BrtRowHdr(data, length) {
   var z = {};
   var tgt = data.l + length;
@@ -126484,54 +112124,7 @@ function parse_BrtRowHdr(data, length) {
   if (flags & 32) z.hpt = miyRw / 20;
   return z;
 }
-function write_BrtRowHdr(R, range, ws) {
-  var o = new_buf(17 + 8 * 16);
-  var row = (ws["!rows"] || [])[R] || {};
-  o.write_shift(4, R);
-  o.write_shift(4, 0);
-  var miyRw = 320;
-  if (row.hpx) miyRw = px2pt(row.hpx) * 20;
-  else if (row.hpt) miyRw = row.hpt * 20;
-  o.write_shift(2, miyRw);
-  o.write_shift(1, 0);
-  var flags = 0;
-  if (row.level) flags |= row.level;
-  if (row.hidden) flags |= 16;
-  if (row.hpx || row.hpt) flags |= 32;
-  o.write_shift(1, flags);
-  o.write_shift(1, 0);
-  var ncolspan = 0, lcs = o.l;
-  o.l += 4;
-  var caddr = { r: R, c: 0 };
-  var dense = ws["!data"] != null;
-  for (var i2 = 0; i2 < 16; ++i2) {
-    if (range.s.c > i2 + 1 << 10 || range.e.c < i2 << 10) continue;
-    var first = -1, last = -1;
-    for (var j = i2 << 10; j < i2 + 1 << 10; ++j) {
-      caddr.c = j;
-      var cell = dense ? (ws["!data"][caddr.r] || [])[caddr.c] : ws[encode_cell(caddr)];
-      if (cell) {
-        if (first < 0) first = j;
-        last = j;
-      }
-    }
-    if (first < 0) continue;
-    ++ncolspan;
-    o.write_shift(4, first);
-    o.write_shift(4, last);
-  }
-  var l = o.l;
-  o.l = lcs;
-  o.write_shift(4, ncolspan);
-  o.l = l;
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
-function write_row_header(ba, ws, range, R) {
-  var o = write_BrtRowHdr(R, range, ws);
-  if (o.length > 17 || (ws["!rows"] || [])[R]) write_record(ba, 0, o);
-}
 var parse_BrtWsDim = parse_UncheckedRfX;
-var write_BrtWsDim = write_UncheckedRfX;
 function parse_BrtWsFmtInfo() {
 }
 function parse_BrtWsProp(data, length) {
@@ -126544,148 +112137,63 @@ function parse_BrtWsProp(data, length) {
   z.name = parse_XLSBCodeName(data, length - 19);
   return z;
 }
-function write_BrtWsProp(str, outl, o) {
-  if (o == null) o = new_buf(84 + 4 * str.length);
-  var f3 = 192;
-  if (outl) {
-    if (outl.above) f3 &= ~64;
-    if (outl.left) f3 &= ~128;
-  }
-  o.write_shift(1, f3);
-  for (var i2 = 1; i2 < 3; ++i2) o.write_shift(1, 0);
-  write_BrtColor({ auto: 1 }, o);
-  o.write_shift(-4, -1);
-  o.write_shift(-4, -1);
-  write_XLSBCodeName(str, o);
-  return o.slice(0, o.l);
-}
 function parse_BrtCellBlank(data) {
   var cell = parse_XLSBCell(data);
   return [cell];
 }
-function write_BrtCellBlank(cell, ncell, o) {
-  if (o == null) o = new_buf(8);
-  return write_XLSBCell(ncell, o);
-}
 function parse_BrtShortBlank(data) {
   var cell = parse_XLSBShortCell(data);
   return [cell];
-}
-function write_BrtShortBlank(cell, ncell, o) {
-  if (o == null) o = new_buf(4);
-  return write_XLSBShortCell(ncell, o);
 }
 function parse_BrtCellBool(data) {
   var cell = parse_XLSBCell(data);
   var fBool = data.read_shift(1);
   return [cell, fBool, "b"];
 }
-function write_BrtCellBool(cell, ncell, o) {
-  if (o == null) o = new_buf(9);
-  write_XLSBCell(ncell, o);
-  o.write_shift(1, cell.v ? 1 : 0);
-  return o;
-}
 function parse_BrtShortBool(data) {
   var cell = parse_XLSBShortCell(data);
   var fBool = data.read_shift(1);
   return [cell, fBool, "b"];
-}
-function write_BrtShortBool(cell, ncell, o) {
-  if (o == null) o = new_buf(5);
-  write_XLSBShortCell(ncell, o);
-  o.write_shift(1, cell.v ? 1 : 0);
-  return o;
 }
 function parse_BrtCellError(data) {
   var cell = parse_XLSBCell(data);
   var bError = data.read_shift(1);
   return [cell, bError, "e"];
 }
-function write_BrtCellError(cell, ncell, o) {
-  if (o == null) o = new_buf(9);
-  write_XLSBCell(ncell, o);
-  o.write_shift(1, cell.v);
-  return o;
-}
 function parse_BrtShortError(data) {
   var cell = parse_XLSBShortCell(data);
   var bError = data.read_shift(1);
   return [cell, bError, "e"];
-}
-function write_BrtShortError(cell, ncell, o) {
-  if (o == null) o = new_buf(8);
-  write_XLSBShortCell(ncell, o);
-  o.write_shift(1, cell.v);
-  o.write_shift(2, 0);
-  o.write_shift(1, 0);
-  return o;
 }
 function parse_BrtCellIsst(data) {
   var cell = parse_XLSBCell(data);
   var isst = data.read_shift(4);
   return [cell, isst, "s"];
 }
-function write_BrtCellIsst(cell, ncell, o) {
-  if (o == null) o = new_buf(12);
-  write_XLSBCell(ncell, o);
-  o.write_shift(4, ncell.v);
-  return o;
-}
 function parse_BrtShortIsst(data) {
   var cell = parse_XLSBShortCell(data);
   var isst = data.read_shift(4);
   return [cell, isst, "s"];
-}
-function write_BrtShortIsst(cell, ncell, o) {
-  if (o == null) o = new_buf(8);
-  write_XLSBShortCell(ncell, o);
-  o.write_shift(4, ncell.v);
-  return o;
 }
 function parse_BrtCellReal(data) {
   var cell = parse_XLSBCell(data);
   var value = parse_Xnum(data);
   return [cell, value, "n"];
 }
-function write_BrtCellReal(cell, ncell, o) {
-  if (o == null) o = new_buf(16);
-  write_XLSBCell(ncell, o);
-  write_Xnum(cell.v, o);
-  return o;
-}
 function parse_BrtShortReal(data) {
   var cell = parse_XLSBShortCell(data);
   var value = parse_Xnum(data);
   return [cell, value, "n"];
-}
-function write_BrtShortReal(cell, ncell, o) {
-  if (o == null) o = new_buf(12);
-  write_XLSBShortCell(ncell, o);
-  write_Xnum(cell.v, o);
-  return o;
 }
 function parse_BrtCellRk(data) {
   var cell = parse_XLSBCell(data);
   var value = parse_RkNumber(data);
   return [cell, value, "n"];
 }
-function write_BrtCellRk(cell, ncell, o) {
-  if (o == null) o = new_buf(12);
-  write_XLSBCell(ncell, o);
-  write_RkNumber(cell.v, o);
-  return o;
-}
 function parse_BrtShortRk(data) {
   var cell = parse_XLSBShortCell(data);
   var value = parse_RkNumber(data);
   return [cell, value, "n"];
-}
-function write_BrtShortRk(cell, ncell, o) {
-  if (o == null) o = new_buf(8);
-  write_XLSBShortCell(ncell, o);
-  write_RkNumber(cell.v, o);
-  return o;
 }
 function parse_BrtCellRString(data) {
   var cell = parse_XLSBCell(data);
@@ -126697,24 +112205,10 @@ function parse_BrtCellSt(data) {
   var value = parse_XLWideString(data);
   return [cell, value, "str"];
 }
-function write_BrtCellSt(cell, ncell, o) {
-  var data = cell.v == null ? "" : String(cell.v);
-  if (o == null) o = new_buf(12 + 4 * cell.v.length);
-  write_XLSBCell(ncell, o);
-  write_XLWideString(data, o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
 function parse_BrtShortSt(data) {
   var cell = parse_XLSBShortCell(data);
   var value = parse_XLWideString(data);
   return [cell, value, "str"];
-}
-function write_BrtShortSt(cell, ncell, o) {
-  var data = cell.v == null ? "" : String(cell.v);
-  if (o == null) o = new_buf(8 + 4 * data.length);
-  write_XLSBShortCell(ncell, o);
-  write_XLWideString(data, o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
 }
 function parse_BrtFmlaBool(data, length, opts) {
   var end = data.l + length;
@@ -126769,12 +112263,6 @@ function parse_BrtFmlaString(data, length, opts) {
   return o;
 }
 var parse_BrtMergeCell = parse_UncheckedRfX;
-var write_BrtMergeCell = write_UncheckedRfX;
-function write_BrtBeginMergeCells(cnt, o) {
-  if (o == null) o = new_buf(4);
-  o.write_shift(4, cnt);
-  return o;
-}
 function parse_BrtHLink(data, length) {
   var end = data.l + length;
   var rfx = parse_UncheckedRfX(data, 16);
@@ -126786,17 +112274,6 @@ function parse_BrtHLink(data, length) {
   var o = { rfx, relId, loc, display };
   if (tooltip) o.Tooltip = tooltip;
   return o;
-}
-function write_BrtHLink(l, rId) {
-  var o = new_buf(50 + 4 * (l[1].Target.length + (l[1].Tooltip || "").length));
-  write_UncheckedRfX({ s: decode_cell(l[0]), e: decode_cell(l[0]) }, o);
-  write_RelID("rId" + rId, o);
-  var locidx = l[1].Target.indexOf("#");
-  var loc = locidx == -1 ? "" : l[1].Target.slice(locidx + 1);
-  write_XLWideString(loc || "", o);
-  write_XLWideString(l[1].Tooltip || "", o);
-  write_XLWideString("", o);
-  return o.slice(0, o.l);
 }
 function parse_BrtPane() {
 }
@@ -126823,24 +112300,6 @@ function parse_BrtShrFmla(data, length, opts) {
   } else data.l = end;
   return o;
 }
-function write_BrtColInfo(C, col, o) {
-  if (o == null) o = new_buf(18);
-  var p = col_obj_w(C, col);
-  o.write_shift(-4, C);
-  o.write_shift(-4, C);
-  o.write_shift(4, (p.width || 10) * 256);
-  o.write_shift(
-    4,
-    0
-    /*ixfe*/
-  );
-  var flags = 0;
-  if (col.hidden) flags |= 1;
-  if (typeof p.width == "number") flags |= 2;
-  if (col.level) flags |= col.level << 8;
-  o.write_shift(2, flags);
-  return o;
-}
 var BrtMarginKeys = ["left", "right", "top", "bottom", "header", "footer"];
 function parse_BrtMargins(data) {
   var margins = {};
@@ -126849,84 +112308,10 @@ function parse_BrtMargins(data) {
   });
   return margins;
 }
-function write_BrtMargins(margins, o) {
-  if (o == null) o = new_buf(6 * 8);
-  default_margins(margins);
-  BrtMarginKeys.forEach(function(k) {
-    write_Xnum(margins[k], o);
-  });
-  return o;
-}
 function parse_BrtBeginWsView(data) {
   var f3 = data.read_shift(2);
   data.l += 28;
   return { RTL: f3 & 32 };
-}
-function write_BrtBeginWsView(ws, Workbook, o) {
-  if (o == null) o = new_buf(30);
-  var f3 = 924;
-  if ((((Workbook || {}).Views || [])[0] || {}).RTL) f3 |= 32;
-  o.write_shift(2, f3);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  o.write_shift(1, 0);
-  o.write_shift(1, 0);
-  o.write_shift(2, 0);
-  o.write_shift(2, 100);
-  o.write_shift(2, 0);
-  o.write_shift(2, 0);
-  o.write_shift(2, 0);
-  o.write_shift(4, 0);
-  return o;
-}
-function write_BrtCellIgnoreEC(ref) {
-  var o = new_buf(24);
-  o.write_shift(4, 4);
-  o.write_shift(4, 1);
-  write_UncheckedRfX(ref, o);
-  return o;
-}
-function write_BrtSheetProtection(sp, o) {
-  if (o == null) o = new_buf(16 * 4 + 2);
-  o.write_shift(2, sp.password ? crypto_CreatePasswordVerifier_Method1(sp.password) : 0);
-  o.write_shift(4, 1);
-  [
-    ["objects", false],
-    // fObjects
-    ["scenarios", false],
-    // fScenarios
-    ["formatCells", true],
-    // fFormatCells
-    ["formatColumns", true],
-    // fFormatColumns
-    ["formatRows", true],
-    // fFormatRows
-    ["insertColumns", true],
-    // fInsertColumns
-    ["insertRows", true],
-    // fInsertRows
-    ["insertHyperlinks", true],
-    // fInsertHyperlinks
-    ["deleteColumns", true],
-    // fDeleteColumns
-    ["deleteRows", true],
-    // fDeleteRows
-    ["selectLockedCells", false],
-    // fSelLockedCells
-    ["sort", true],
-    // fSort
-    ["autoFilter", true],
-    // fAutoFilter
-    ["pivotTables", true],
-    // fPivotTables
-    ["selectUnlockedCells", false]
-    // fSelUnlockedCells
-  ].forEach(function(n) {
-    if (n[1]) o.write_shift(4, sp[n[0]] != null && !sp[n[0]] ? 1 : 0);
-    else o.write_shift(4, sp[n[0]] != null && sp[n[0]] ? 0 : 1);
-  });
-  return o;
 }
 function parse_BrtDVal() {
 }
@@ -127316,264 +112701,6 @@ function parse_ws_bin(data, _opts, idx, rels, wb, themes, styles) {
   if (rels["!id"][s2["!legrel"]]) s2["!legdrawel"] = rels["!id"][s2["!legrel"]];
   return s2;
 }
-function write_ws_bin_cell(ba, cell, R, C, opts, ws, last_seen, date1904) {
-  var o = { r: R, c: C };
-  if (cell.c) ws["!comments"].push([encode_cell(o), cell.c]);
-  if (cell.v === void 0) return false;
-  var vv = "";
-  switch (cell.t) {
-    case "b":
-      vv = cell.v ? "1" : "0";
-      break;
-    case "d":
-      cell = dup(cell);
-      cell.z = cell.z || table_fmt[14];
-      cell.v = datenum(parseDate(cell.v, date1904), date1904);
-      cell.t = "n";
-      break;
-    /* falls through */
-    case "n":
-    case "e":
-      vv = "" + cell.v;
-      break;
-    default:
-      vv = cell.v;
-      break;
-  }
-  o.s = get_cell_style(opts.cellXfs, cell, opts);
-  if (cell.l) ws["!links"].push([encode_cell(o), cell.l]);
-  switch (cell.t) {
-    case "s":
-    case "str":
-      if (opts.bookSST) {
-        vv = get_sst_id(opts.Strings, cell.v == null ? "" : String(cell.v), opts.revStrings);
-        o.t = "s";
-        o.v = vv;
-        if (last_seen) write_record(ba, 18, write_BrtShortIsst(cell, o));
-        else write_record(ba, 7, write_BrtCellIsst(cell, o));
-      } else {
-        o.t = "str";
-        if (last_seen) write_record(ba, 17, write_BrtShortSt(cell, o));
-        else write_record(ba, 6, write_BrtCellSt(cell, o));
-      }
-      return true;
-    case "n":
-      if (cell.v == (cell.v | 0) && cell.v > -1e3 && cell.v < 1e3) {
-        if (last_seen) write_record(ba, 13, write_BrtShortRk(cell, o));
-        else write_record(ba, 2, write_BrtCellRk(cell, o));
-      } else if (!isFinite(cell.v)) {
-        o.t = "e";
-        if (isNaN(cell.v)) {
-          if (last_seen) write_record(ba, 14, write_BrtShortError({ t: "e", v: 36 }, o));
-          else write_record(ba, 3, write_BrtCellError({ t: "e", v: 36 }, o));
-        } else {
-          if (last_seen) write_record(ba, 14, write_BrtShortError({ t: "e", v: 7 }, o));
-          else write_record(ba, 3, write_BrtCellError({ t: "e", v: 7 }, o));
-        }
-      } else {
-        if (last_seen) write_record(ba, 16, write_BrtShortReal(cell, o));
-        else write_record(ba, 5, write_BrtCellReal(cell, o));
-      }
-      return true;
-    case "b":
-      o.t = "b";
-      if (last_seen) write_record(ba, 15, write_BrtShortBool(cell, o));
-      else write_record(ba, 4, write_BrtCellBool(cell, o));
-      return true;
-    case "e":
-      o.t = "e";
-      if (last_seen) write_record(ba, 14, write_BrtShortError(cell, o));
-      else write_record(ba, 3, write_BrtCellError(cell, o));
-      return true;
-  }
-  if (last_seen) write_record(ba, 12, write_BrtShortBlank(cell, o));
-  else write_record(ba, 1, write_BrtCellBlank(cell, o));
-  return true;
-}
-function write_CELLTABLE(ba, ws, idx, opts, wb) {
-  var range = safe_decode_range(ws["!ref"] || "A1"), rr = "", cols = [];
-  var date1904 = (((wb || {}).Workbook || {}).WBProps || {}).date1904;
-  write_record(
-    ba,
-    145
-    /* BrtBeginSheetData */
-  );
-  var dense = ws["!data"] != null, row = dense ? ws["!data"][range.s.r] : [];
-  var cap = range.e.r;
-  if (ws["!rows"]) cap = Math.max(range.e.r, ws["!rows"].length - 1);
-  for (var R = range.s.r; R <= cap; ++R) {
-    rr = encode_row(R);
-    if (dense) row = ws["!data"][R];
-    write_row_header(ba, ws, range, R);
-    if (dense && !row) continue;
-    var last_seen = false;
-    if (R <= range.e.r) for (var C = range.s.c; C <= range.e.c; ++C) {
-      if (R === range.s.r) cols[C] = encode_col(C);
-      var cell = dense ? row[C] : ws[cols[C] + rr];
-      if (!cell) {
-        last_seen = false;
-        continue;
-      }
-      last_seen = write_ws_bin_cell(ba, cell, R, C, opts, ws, last_seen, date1904);
-    }
-  }
-  write_record(
-    ba,
-    146
-    /* BrtEndSheetData */
-  );
-}
-function write_MERGECELLS(ba, ws) {
-  if (!ws || !ws["!merges"]) return;
-  write_record(ba, 177, write_BrtBeginMergeCells(ws["!merges"].length));
-  ws["!merges"].forEach(function(m2) {
-    write_record(ba, 176, write_BrtMergeCell(m2));
-  });
-  write_record(
-    ba,
-    178
-    /* BrtEndMergeCells */
-  );
-}
-function write_COLINFOS(ba, ws) {
-  if (!ws || !ws["!cols"]) return;
-  write_record(
-    ba,
-    390
-    /* BrtBeginColInfos */
-  );
-  ws["!cols"].forEach(function(m2, i2) {
-    if (m2) write_record(ba, 60, write_BrtColInfo(i2, m2));
-  });
-  write_record(
-    ba,
-    391
-    /* BrtEndColInfos */
-  );
-}
-function write_IGNOREECS(ba, ws) {
-  if (!ws || !ws["!ref"]) return;
-  write_record(
-    ba,
-    648
-    /* BrtBeginCellIgnoreECs */
-  );
-  write_record(ba, 649, write_BrtCellIgnoreEC(safe_decode_range(ws["!ref"])));
-  write_record(
-    ba,
-    650
-    /* BrtEndCellIgnoreECs */
-  );
-}
-function write_HLINKS(ba, ws, rels) {
-  ws["!links"].forEach(function(l) {
-    if (!l[1].Target) return;
-    var rId = add_rels(rels, -1, l[1].Target.replace(/#[\s\S]*$/, ""), RELS.HLINK);
-    write_record(ba, 494, write_BrtHLink(l, rId));
-  });
-  delete ws["!links"];
-}
-function write_LEGACYDRAWING(ba, ws, idx, rels) {
-  if (ws["!comments"].length > 0) {
-    var rId = add_rels(rels, -1, "../drawings/vmlDrawing" + (idx + 1) + ".vml", RELS.VML);
-    write_record(ba, 551, write_RelID("rId" + rId));
-    ws["!legacy"] = rId;
-  }
-}
-function write_AUTOFILTER(ba, ws, wb, idx) {
-  if (!ws["!autofilter"]) return;
-  var data = ws["!autofilter"];
-  var ref = typeof data.ref === "string" ? data.ref : encode_range(data.ref);
-  if (!wb.Workbook) wb.Workbook = { Sheets: [] };
-  if (!wb.Workbook.Names) wb.Workbook.Names = [];
-  var names = wb.Workbook.Names;
-  var range = decode_range(ref);
-  if (range.s.r == range.e.r) {
-    range.e.r = decode_range(ws["!ref"]).e.r;
-    ref = encode_range(range);
-  }
-  for (var i2 = 0; i2 < names.length; ++i2) {
-    var name = names[i2];
-    if (name.Name != "_xlnm._FilterDatabase") continue;
-    if (name.Sheet != idx) continue;
-    name.Ref = formula_quote_sheet_name(wb.SheetNames[idx]) + "!" + fix_range(ref);
-    break;
-  }
-  if (i2 == names.length) names.push({ Name: "_xlnm._FilterDatabase", Sheet: idx, Ref: formula_quote_sheet_name(wb.SheetNames[idx]) + "!" + fix_range(ref) });
-  write_record(ba, 161, write_UncheckedRfX(safe_decode_range(ref)));
-  write_record(
-    ba,
-    162
-    /* BrtEndAFilter */
-  );
-}
-function write_WSVIEWS2(ba, ws, Workbook) {
-  write_record(
-    ba,
-    133
-    /* BrtBeginWsViews */
-  );
-  {
-    write_record(ba, 137, write_BrtBeginWsView(ws, Workbook));
-    write_record(
-      ba,
-      138
-      /* BrtEndWsView */
-    );
-  }
-  write_record(
-    ba,
-    134
-    /* BrtEndWsViews */
-  );
-}
-function write_WSFMTINFO() {
-}
-function write_SHEETPROTECT(ba, ws) {
-  if (!ws["!protect"]) return;
-  write_record(ba, 535, write_BrtSheetProtection(ws["!protect"]));
-}
-function write_ws_bin(idx, opts, wb, rels) {
-  var ba = buf_array();
-  var s2 = wb.SheetNames[idx], ws = wb.Sheets[s2] || {};
-  var c = s2;
-  try {
-    if (wb && wb.Workbook) c = wb.Workbook.Sheets[idx].CodeName || c;
-  } catch (e2) {
-  }
-  var r2 = safe_decode_range(ws["!ref"] || "A1");
-  if (r2.e.c > 16383 || r2.e.r > 1048575) {
-    if (opts.WTF) throw new Error("Range " + (ws["!ref"] || "A1") + " exceeds format limit A1:XFD1048576");
-    r2.e.c = Math.min(r2.e.c, 16383);
-    r2.e.r = Math.min(r2.e.c, 1048575);
-  }
-  ws["!links"] = [];
-  ws["!comments"] = [];
-  write_record(
-    ba,
-    129
-    /* BrtBeginSheet */
-  );
-  if (wb.vbaraw || ws["!outline"]) write_record(ba, 147, write_BrtWsProp(c, ws["!outline"]));
-  write_record(ba, 148, write_BrtWsDim(r2));
-  write_WSVIEWS2(ba, ws, wb.Workbook);
-  write_WSFMTINFO(ba, ws);
-  write_COLINFOS(ba, ws, idx, opts, wb);
-  write_CELLTABLE(ba, ws, idx, opts, wb);
-  write_SHEETPROTECT(ba, ws);
-  write_AUTOFILTER(ba, ws, wb, idx);
-  write_MERGECELLS(ba, ws);
-  write_HLINKS(ba, ws, rels);
-  if (ws["!margins"]) write_record(ba, 476, write_BrtMargins(ws["!margins"]));
-  if (!opts || opts.ignoreEC || opts.ignoreEC == void 0) write_IGNOREECS(ba, ws);
-  write_LEGACYDRAWING(ba, ws, idx, rels);
-  write_record(
-    ba,
-    130
-    /* BrtEndSheet */
-  );
-  return ba.end();
-}
 function parse_Cache(data) {
   var col = [];
   var num = data.match(/^<c:numCache>/);
@@ -127765,11 +112892,6 @@ function parse_wb_defaults(wb) {
   push_defaults_array(wb.Sheets, SheetDef);
   _ssfopts.date1904 = parsexmlbool(wb.WBProps.date1904);
 }
-function safe1904(wb) {
-  if (!wb.Workbook) return "false";
-  if (!wb.Workbook.WBProps) return "false";
-  return parsexmlbool(wb.Workbook.WBProps.date1904) ? "true" : "false";
-}
 var badchars = /* @__PURE__ */ ":][*?/\\".split("");
 function check_ws_name(n, safe) {
   try {
@@ -127786,36 +112908,6 @@ function check_ws_name(n, safe) {
     throw e2;
   }
   return true;
-}
-function check_wb_names(N, S2, codes) {
-  N.forEach(function(n, i2) {
-    check_ws_name(n);
-    for (var j = 0; j < i2; ++j) if (n == N[j]) throw new Error("Duplicate Sheet Name: " + n);
-    if (codes) {
-      var cn = S2 && S2[i2] && S2[i2].CodeName || n;
-      if (cn.charCodeAt(0) == 95 && cn.length > 22) throw new Error("Bad Code Name: Worksheet" + cn);
-    }
-  });
-}
-function check_wb(wb) {
-  if (!wb || !wb.SheetNames || !wb.Sheets) throw new Error("Invalid Workbook");
-  if (!wb.SheetNames.length) throw new Error("Workbook is empty");
-  var Sheets = wb.Workbook && wb.Workbook.Sheets || [];
-  check_wb_names(wb.SheetNames, Sheets, !!wb.vbaraw);
-  for (var i2 = 0; i2 < wb.SheetNames.length; ++i2) check_ws(wb.Sheets[wb.SheetNames[i2]], wb.SheetNames[i2], i2);
-  wb.SheetNames.forEach(function(n, i3) {
-    var ws = wb.Sheets[n];
-    if (!ws || !ws["!autofilter"]) return;
-    var DN;
-    if (!wb.Workbook) wb.Workbook = {};
-    if (!wb.Workbook.Names) wb.Workbook.Names = [];
-    wb.Workbook.Names.forEach(function(dn) {
-      if (dn.Name == "_xlnm._FilterDatabase" && dn.Sheet == i3) DN = dn;
-    });
-    var nn = formula_quote_sheet_name(n) + "!" + fix_range(ws["!autofilter"].ref);
-    if (DN) DN.Ref = nn;
-    else wb.Workbook.Names.push({ Name: "_xlnm._FilterDatabase", Sheet: i3, Ref: nn });
-  });
 }
 var wbnsregex = /<\w+:workbook/;
 function parse_wb_xml(data, opts) {
@@ -128053,74 +113145,6 @@ function parse_wb_xml(data, opts) {
   parse_wb_defaults(wb);
   return wb;
 }
-function write_wb_xml(wb) {
-  var o = [XML_HEADER];
-  o[o.length] = writextag("workbook", null, {
-    "xmlns": XMLNS_main[0],
-    //'xmlns:mx': XMLNS.mx,
-    //'xmlns:s': XMLNS_main[0],
-    "xmlns:r": XMLNS.r
-  });
-  var write_names = wb.Workbook && (wb.Workbook.Names || []).length > 0;
-  var workbookPr = { codeName: "ThisWorkbook" };
-  if (wb.Workbook && wb.Workbook.WBProps) {
-    WBPropsDef.forEach(function(x2) {
-      if (wb.Workbook.WBProps[x2[0]] == null) return;
-      if (wb.Workbook.WBProps[x2[0]] == x2[1]) return;
-      workbookPr[x2[0]] = wb.Workbook.WBProps[x2[0]];
-    });
-    if (wb.Workbook.WBProps.CodeName) {
-      workbookPr.codeName = wb.Workbook.WBProps.CodeName;
-      delete workbookPr.CodeName;
-    }
-  }
-  o[o.length] = writextag("workbookPr", null, workbookPr);
-  var sheets = wb.Workbook && wb.Workbook.Sheets || [];
-  var i2 = 0;
-  if (sheets && sheets[0] && !!sheets[0].Hidden) {
-    o[o.length] = "<bookViews>";
-    for (i2 = 0; i2 != wb.SheetNames.length; ++i2) {
-      if (!sheets[i2]) break;
-      if (!sheets[i2].Hidden) break;
-    }
-    if (i2 == wb.SheetNames.length) i2 = 0;
-    o[o.length] = '<workbookView firstSheet="' + i2 + '" activeTab="' + i2 + '"/>';
-    o[o.length] = "</bookViews>";
-  }
-  o[o.length] = "<sheets>";
-  for (i2 = 0; i2 != wb.SheetNames.length; ++i2) {
-    var sht = { name: escapexml(wb.SheetNames[i2].slice(0, 31)) };
-    sht.sheetId = "" + (i2 + 1);
-    sht["r:id"] = "rId" + (i2 + 1);
-    if (sheets[i2]) switch (sheets[i2].Hidden) {
-      case 1:
-        sht.state = "hidden";
-        break;
-      case 2:
-        sht.state = "veryHidden";
-        break;
-    }
-    o[o.length] = writextag("sheet", null, sht);
-  }
-  o[o.length] = "</sheets>";
-  if (write_names) {
-    o[o.length] = "<definedNames>";
-    if (wb.Workbook && wb.Workbook.Names) wb.Workbook.Names.forEach(function(n) {
-      var d = { name: n.Name };
-      if (n.Comment) d.comment = n.Comment;
-      if (n.Sheet != null) d.localSheetId = "" + n.Sheet;
-      if (n.Hidden) d.hidden = "1";
-      if (!n.Ref) return;
-      o[o.length] = writextag("definedName", escapexml(n.Ref), d);
-    });
-    o[o.length] = "</definedNames>";
-  }
-  if (o.length > 2) {
-    o[o.length] = "</workbook>";
-    o[1] = o[1].replace("/>", ">");
-  }
-  return o.join("");
-}
 function parse_BrtBundleSh(data, length) {
   var z = {};
   z.Hidden = data.read_shift(4);
@@ -128128,14 +113152,6 @@ function parse_BrtBundleSh(data, length) {
   z.strRelID = parse_RelID(data, length - 8);
   z.name = parse_XLWideString(data);
   return z;
-}
-function write_BrtBundleSh(data, o) {
-  if (!o) o = new_buf(127);
-  o.write_shift(4, data.Hidden);
-  o.write_shift(4, data.iTabID);
-  write_RelID(data.strRelID, o);
-  write_XLWideString(data.name.slice(0, 31), o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
 }
 function parse_BrtWbProp(data, length) {
   var o = {};
@@ -128159,18 +113175,6 @@ function parse_BrtWbProp(data, length) {
   o.showPivotChartFilter = !!(flags & 32768);
   o.updateLinks = ["userSet", "never", "always"][flags >> 8 & 3];
   return o;
-}
-function write_BrtWbProp(data, o) {
-  if (!o) o = new_buf(72);
-  var flags = 0;
-  if (data) {
-    if (data.date1904) flags |= 1;
-    if (data.filterPrivacy) flags |= 8;
-  }
-  o.write_shift(4, flags);
-  o.write_shift(4, 0);
-  write_XLSBCodeName(data && data.CodeName || "ThisWorkbook", o);
-  return o.slice(0, o.l);
 }
 function parse_BrtFRTArchID$(data, length) {
   var o = {};
@@ -128202,30 +113206,6 @@ function parse_BrtName(data, length, opts) {
   if (itab < 268435455) out.Sheet = itab;
   if (comment) out.Comment = comment;
   return out;
-}
-function write_BrtName(name, wb) {
-  var o = new_buf(9);
-  var flags = 0;
-  var dname = name.Name;
-  if (XLSLblBuiltIn.indexOf(dname) > -1) {
-    flags |= 32;
-    dname = dname.slice(6);
-  }
-  o.write_shift(4, flags);
-  o.write_shift(1, 0);
-  o.write_shift(4, name.Sheet == null ? 4294967295 : name.Sheet);
-  var arr = [
-    o,
-    write_XLWideString(dname),
-    write_XLSBNameParsedFormula(name.Ref, wb)
-  ];
-  if (name.Comment) arr.push(write_XLNullableWideString(name.Comment));
-  else {
-    var x2 = new_buf(4);
-    x2.write_shift(4, 4294967295);
-    arr.push(x2);
-  }
-  return bconcat(arr);
 }
 function parse_wb_bin(data, opts) {
   var wb = { AppVersion: {}, WBProps: {}, WBView: [], Sheets: [], CalcPr: {}, xmlns: "" };
@@ -128365,132 +113345,6 @@ function parse_wb_bin(data, opts) {
   wb.Names = Names;
   wb.supbooks = supbooks;
   return wb;
-}
-function write_BUNDLESHS(ba, wb) {
-  write_record(
-    ba,
-    143
-    /* BrtBeginBundleShs */
-  );
-  for (var idx = 0; idx != wb.SheetNames.length; ++idx) {
-    var viz = wb.Workbook && wb.Workbook.Sheets && wb.Workbook.Sheets[idx] && wb.Workbook.Sheets[idx].Hidden || 0;
-    var d = { Hidden: viz, iTabID: idx + 1, strRelID: "rId" + (idx + 1), name: wb.SheetNames[idx] };
-    write_record(ba, 156, write_BrtBundleSh(d));
-  }
-  write_record(
-    ba,
-    144
-    /* BrtEndBundleShs */
-  );
-}
-function write_BrtFileVersion(data, o) {
-  if (!o) o = new_buf(127);
-  for (var i2 = 0; i2 != 4; ++i2) o.write_shift(4, 0);
-  write_XLWideString("SheetJS", o);
-  write_XLWideString(XLSX.version, o);
-  write_XLWideString(XLSX.version, o);
-  write_XLWideString("7262", o);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
-function write_BrtBookView(idx, o) {
-  if (!o) o = new_buf(29);
-  o.write_shift(-4, 0);
-  o.write_shift(-4, 460);
-  o.write_shift(4, 28800);
-  o.write_shift(4, 17600);
-  o.write_shift(4, 500);
-  o.write_shift(4, idx);
-  o.write_shift(4, idx);
-  var flags = 120;
-  o.write_shift(1, flags);
-  return o.length > o.l ? o.slice(0, o.l) : o;
-}
-function write_BOOKVIEWS(ba, wb) {
-  if (!wb.Workbook || !wb.Workbook.Sheets) return;
-  var sheets = wb.Workbook.Sheets;
-  var i2 = 0, vistab = -1, hidden = -1;
-  for (; i2 < sheets.length; ++i2) {
-    if (!sheets[i2] || !sheets[i2].Hidden && vistab == -1) vistab = i2;
-    else if (sheets[i2].Hidden == 1 && hidden == -1) hidden = i2;
-  }
-  if (hidden > vistab) return;
-  write_record(
-    ba,
-    135
-    /* BrtBeginBookViews */
-  );
-  write_record(ba, 158, write_BrtBookView(vistab));
-  write_record(
-    ba,
-    136
-    /* BrtEndBookViews */
-  );
-}
-function write_BRTNAMES(ba, wb) {
-  if (!wb.Workbook || !wb.Workbook.Names) return;
-  wb.Workbook.Names.forEach(function(name) {
-    try {
-      if (name.Flags & 14) return;
-      write_record(ba, 39, write_BrtName(name, wb));
-    } catch (e2) {
-      console.error("Could not serialize defined name " + JSON.stringify(name));
-    }
-  });
-}
-function write_SELF_EXTERNS_xlsb(wb) {
-  var L = wb.SheetNames.length;
-  var o = new_buf(12 * L + 28);
-  o.write_shift(4, L + 2);
-  o.write_shift(4, 0);
-  o.write_shift(4, -2);
-  o.write_shift(4, -2);
-  o.write_shift(4, 0);
-  o.write_shift(4, -1);
-  o.write_shift(4, -1);
-  for (var i2 = 0; i2 < L; ++i2) {
-    o.write_shift(4, 0);
-    o.write_shift(4, i2);
-    o.write_shift(4, i2);
-  }
-  return o;
-}
-function write_EXTERNALS_xlsb(ba, wb) {
-  write_record(
-    ba,
-    353
-    /* BrtBeginExternals */
-  );
-  write_record(
-    ba,
-    357
-    /* BrtSupSelf */
-  );
-  write_record(ba, 362, write_SELF_EXTERNS_xlsb(wb, 0));
-  write_record(
-    ba,
-    354
-    /* BrtEndExternals */
-  );
-}
-function write_wb_bin(wb, opts) {
-  var ba = buf_array();
-  write_record(
-    ba,
-    131
-    /* BrtBeginBook */
-  );
-  write_record(ba, 128, write_BrtFileVersion());
-  write_record(ba, 153, write_BrtWbProp(wb.Workbook && wb.Workbook.WBProps || null));
-  write_BOOKVIEWS(ba, wb, opts);
-  write_BUNDLESHS(ba, wb, opts);
-  write_EXTERNALS_xlsb(ba, wb);
-  if ((wb.Workbook || {}).Names) write_BRTNAMES(ba, wb);
-  write_record(
-    ba,
-    132
-    /* BrtEndBook */
-  );
-  return ba.end();
 }
 function parse_wb(data, name, opts) {
   if (name.slice(-4) === ".bin") return parse_wb_bin(data, opts);
@@ -129830,266 +114684,6 @@ function parse_xlml(data, opts) {
       return parse_xlml_xml(a2s(data), opts);
   }
 }
-function write_props_xlml(wb, opts) {
-  var o = [];
-  if (wb.Props) o.push(xlml_write_docprops(wb.Props, opts));
-  if (wb.Custprops) o.push(xlml_write_custprops(wb.Props, wb.Custprops, opts));
-  return o.join("");
-}
-function write_wb_xlml(wb) {
-  if ((((wb || {}).Workbook || {}).WBProps || {}).date1904) return '<ExcelWorkbook xmlns="urn:schemas-microsoft-com:office:excel"><Date1904/></ExcelWorkbook>';
-  return "";
-}
-function write_sty_xlml(wb, opts) {
-  var styles = ['<Style ss:ID="Default" ss:Name="Normal"><NumberFormat/></Style>'];
-  opts.cellXfs.forEach(function(xf, id) {
-    var payload = [];
-    payload.push(writextag("NumberFormat", null, { "ss:Format": escapexml(table_fmt[xf.numFmtId]) }));
-    var o = (
-      /*::(*/
-      { "ss:ID": "s" + (21 + id) }
-    );
-    styles.push(writextag("Style", payload.join(""), o));
-  });
-  return writextag("Styles", styles.join(""));
-}
-function write_name_xlml(n) {
-  return writextag("NamedRange", null, { "ss:Name": n.Name.slice(0, 6) == "_xlnm." ? n.Name.slice(6) : n.Name, "ss:RefersTo": "=" + a1_to_rc(n.Ref, { r: 0, c: 0 }) });
-}
-function write_names_xlml(wb) {
-  if (!((wb || {}).Workbook || {}).Names) return "";
-  var names = wb.Workbook.Names;
-  var out = [];
-  for (var i2 = 0; i2 < names.length; ++i2) {
-    var n = names[i2];
-    if (n.Sheet != null) continue;
-    if (n.Name.match(/^_xlfn\./)) continue;
-    out.push(write_name_xlml(n));
-  }
-  return writextag("Names", out.join(""));
-}
-function write_ws_xlml_names(ws, opts, idx, wb) {
-  if (!ws) return "";
-  if (!((wb || {}).Workbook || {}).Names) return "";
-  var names = wb.Workbook.Names;
-  var out = [];
-  for (var i2 = 0; i2 < names.length; ++i2) {
-    var n = names[i2];
-    if (n.Sheet != idx) continue;
-    if (n.Name.match(/^_xlfn\./)) continue;
-    out.push(write_name_xlml(n));
-  }
-  return out.join("");
-}
-function write_ws_xlml_wsopts(ws, opts, idx, wb) {
-  if (!ws) return "";
-  var o = [];
-  if (ws["!margins"]) {
-    o.push("<PageSetup>");
-    if (ws["!margins"].header) o.push(writextag("Header", null, { "x:Margin": ws["!margins"].header }));
-    if (ws["!margins"].footer) o.push(writextag("Footer", null, { "x:Margin": ws["!margins"].footer }));
-    o.push(writextag("PageMargins", null, {
-      "x:Bottom": ws["!margins"].bottom || "0.75",
-      "x:Left": ws["!margins"].left || "0.7",
-      "x:Right": ws["!margins"].right || "0.7",
-      "x:Top": ws["!margins"].top || "0.75"
-    }));
-    o.push("</PageSetup>");
-  }
-  if (wb && wb.Workbook && wb.Workbook.Sheets && wb.Workbook.Sheets[idx]) {
-    if (wb.Workbook.Sheets[idx].Hidden) o.push(writextag("Visible", wb.Workbook.Sheets[idx].Hidden == 1 ? "SheetHidden" : "SheetVeryHidden", {}));
-    else {
-      for (var i2 = 0; i2 < idx; ++i2) if (wb.Workbook.Sheets[i2] && !wb.Workbook.Sheets[i2].Hidden) break;
-      if (i2 == idx) o.push("<Selected/>");
-    }
-  }
-  if (((((wb || {}).Workbook || {}).Views || [])[0] || {}).RTL) o.push("<DisplayRightToLeft/>");
-  if (ws["!protect"]) {
-    o.push(writetag("ProtectContents", "True"));
-    if (ws["!protect"].objects) o.push(writetag("ProtectObjects", "True"));
-    if (ws["!protect"].scenarios) o.push(writetag("ProtectScenarios", "True"));
-    if (ws["!protect"].selectLockedCells != null && !ws["!protect"].selectLockedCells) o.push(writetag("EnableSelection", "NoSelection"));
-    else if (ws["!protect"].selectUnlockedCells != null && !ws["!protect"].selectUnlockedCells) o.push(writetag("EnableSelection", "UnlockedCells"));
-    [
-      ["formatCells", "AllowFormatCells"],
-      ["formatColumns", "AllowSizeCols"],
-      ["formatRows", "AllowSizeRows"],
-      ["insertColumns", "AllowInsertCols"],
-      ["insertRows", "AllowInsertRows"],
-      ["insertHyperlinks", "AllowInsertHyperlinks"],
-      ["deleteColumns", "AllowDeleteCols"],
-      ["deleteRows", "AllowDeleteRows"],
-      ["sort", "AllowSort"],
-      ["autoFilter", "AllowFilter"],
-      ["pivotTables", "AllowUsePivotTables"]
-    ].forEach(function(x2) {
-      if (ws["!protect"][x2[0]]) o.push("<" + x2[1] + "/>");
-    });
-  }
-  if (o.length == 0) return "";
-  return writextag("WorksheetOptions", o.join(""), { xmlns: XLMLNS.x });
-}
-function write_ws_xlml_comment(comments) {
-  return comments.map(function(c) {
-    var t2 = xlml_unfixstr(c.t || "");
-    var d = writextag("ss:Data", t2, { "xmlns": "http://www.w3.org/TR/REC-html40" });
-    var p = {};
-    if (c.a) p["ss:Author"] = c.a;
-    if (!comments.hidden) p["ss:ShowAlways"] = "1";
-    return writextag("Comment", d, p);
-  }).join("");
-}
-function write_ws_xlml_cell(cell, ref, ws, opts, idx, wb, addr) {
-  if (!cell || cell.v == void 0 && cell.f == void 0) return "";
-  var attr = {};
-  if (cell.f) attr["ss:Formula"] = "=" + escapexml(a1_to_rc(cell.f, addr));
-  if (cell.F && cell.F.slice(0, ref.length) == ref) {
-    var end = decode_cell(cell.F.slice(ref.length + 1));
-    attr["ss:ArrayRange"] = "RC:R" + (end.r == addr.r ? "" : "[" + (end.r - addr.r) + "]") + "C" + (end.c == addr.c ? "" : "[" + (end.c - addr.c) + "]");
-  }
-  if (cell.l && cell.l.Target) {
-    attr["ss:HRef"] = escapexml(cell.l.Target);
-    if (cell.l.Tooltip) attr["x:HRefScreenTip"] = escapexml(cell.l.Tooltip);
-  }
-  if (ws["!merges"]) {
-    var marr = ws["!merges"];
-    for (var mi = 0; mi != marr.length; ++mi) {
-      if (marr[mi].s.c != addr.c || marr[mi].s.r != addr.r) continue;
-      if (marr[mi].e.c > marr[mi].s.c) attr["ss:MergeAcross"] = marr[mi].e.c - marr[mi].s.c;
-      if (marr[mi].e.r > marr[mi].s.r) attr["ss:MergeDown"] = marr[mi].e.r - marr[mi].s.r;
-    }
-  }
-  var t2 = "", p = "";
-  switch (cell.t) {
-    case "z":
-      if (!opts.sheetStubs) return "";
-      break;
-    case "n":
-      {
-        if (!isFinite(cell.v)) {
-          t2 = "Error";
-          p = BErr[isNaN(cell.v) ? 36 : 7];
-        } else {
-          t2 = "Number";
-          p = String(cell.v);
-        }
-      }
-      break;
-    case "b":
-      t2 = "Boolean";
-      p = cell.v ? "1" : "0";
-      break;
-    case "e":
-      t2 = "Error";
-      p = BErr[cell.v];
-      break;
-    case "d":
-      t2 = "DateTime";
-      p = new Date(cell.v).toISOString();
-      if (cell.z == null) cell.z = cell.z || table_fmt[14];
-      break;
-    case "s":
-      t2 = "String";
-      p = escapexlml(cell.v || "");
-      break;
-  }
-  var os = get_cell_style(opts.cellXfs, cell, opts);
-  attr["ss:StyleID"] = "s" + (21 + os);
-  attr["ss:Index"] = addr.c + 1;
-  var _v = cell.v != null ? p : "";
-  var m2 = cell.t == "z" ? "" : '<Data ss:Type="' + t2 + '">' + _v + "</Data>";
-  if ((cell.c || []).length > 0) m2 += write_ws_xlml_comment(cell.c);
-  return writextag("Cell", m2, attr);
-}
-function write_ws_xlml_row(R, row) {
-  var o = '<Row ss:Index="' + (R + 1) + '"';
-  if (row) {
-    if (row.hpt && !row.hpx) row.hpx = pt2px(row.hpt);
-    if (row.hpx) o += ' ss:AutoFitHeight="0" ss:Height="' + row.hpx + '"';
-    if (row.hidden) o += ' ss:Hidden="1"';
-  }
-  return o + ">";
-}
-function write_ws_xlml_table(ws, opts, idx, wb) {
-  if (!ws["!ref"]) return "";
-  var range = safe_decode_range(ws["!ref"]);
-  var marr = ws["!merges"] || [], mi = 0;
-  var o = [];
-  if (ws["!cols"]) ws["!cols"].forEach(function(n, i2) {
-    process_col(n);
-    var w = !!n.width;
-    var p = col_obj_w(i2, n);
-    var k = { "ss:Index": i2 + 1 };
-    if (w) k["ss:Width"] = width2px(p.width);
-    if (n.hidden) k["ss:Hidden"] = "1";
-    o.push(writextag("Column", null, k));
-  });
-  var dense = ws["!data"] != null;
-  var addr = { r: 0, c: 0 };
-  for (var R = range.s.r; R <= range.e.r; ++R) {
-    var row = [write_ws_xlml_row(R, (ws["!rows"] || [])[R])];
-    addr.r = R;
-    for (var C = range.s.c; C <= range.e.c; ++C) {
-      addr.c = C;
-      var skip = false;
-      for (mi = 0; mi != marr.length; ++mi) {
-        if (marr[mi].s.c > C) continue;
-        if (marr[mi].s.r > R) continue;
-        if (marr[mi].e.c < C) continue;
-        if (marr[mi].e.r < R) continue;
-        if (marr[mi].s.c != C || marr[mi].s.r != R) skip = true;
-        break;
-      }
-      if (skip) continue;
-      var ref = encode_col(C) + encode_row(R), cell = dense ? (ws["!data"][R] || [])[C] : ws[ref];
-      row.push(write_ws_xlml_cell(cell, ref, ws, opts, idx, wb, addr));
-    }
-    row.push("</Row>");
-    if (row.length > 2) o.push(row.join(""));
-  }
-  return o.join("");
-}
-function write_ws_xlml(idx, opts, wb) {
-  var o = [];
-  var s2 = wb.SheetNames[idx];
-  var ws = wb.Sheets[s2];
-  var t2 = ws ? write_ws_xlml_names(ws, opts, idx, wb) : "";
-  if (t2.length > 0) o.push("<Names>" + t2 + "</Names>");
-  t2 = ws ? write_ws_xlml_table(ws, opts, idx, wb) : "";
-  if (t2.length > 0) o.push("<Table>" + t2 + "</Table>");
-  o.push(write_ws_xlml_wsopts(ws, opts, idx, wb));
-  if (ws && ws["!autofilter"]) o.push('<AutoFilter x:Range="' + a1_to_rc(fix_range(ws["!autofilter"].ref), { r: 0, c: 0 }) + '" xmlns="urn:schemas-microsoft-com:office:excel"></AutoFilter>');
-  return o.join("");
-}
-function write_xlml(wb, opts) {
-  if (!opts) opts = {};
-  if (!wb.SSF) wb.SSF = dup(table_fmt);
-  if (wb.SSF) {
-    make_ssf();
-    SSF_load_table(wb.SSF);
-    opts.revssf = evert_num(wb.SSF);
-    opts.revssf[wb.SSF[65535]] = 0;
-    opts.ssf = wb.SSF;
-    opts.cellXfs = [];
-    get_cell_style(opts.cellXfs, {}, { revssf: { "General": 0 } });
-  }
-  var d = [];
-  d.push(write_props_xlml(wb, opts));
-  d.push(write_wb_xlml(wb, opts));
-  d.push("");
-  d.push(write_names_xlml(wb, opts));
-  for (var i2 = 0; i2 < wb.SheetNames.length; ++i2)
-    d.push(writextag("Worksheet", write_ws_xlml(i2, opts, wb), { "ss:Name": escapexml(wb.SheetNames[i2]) }));
-  d[2] = write_sty_xlml(wb, opts);
-  return XML_HEADER + writextag("Workbook", d.join(""), {
-    "xmlns": XLMLNS.ss,
-    "xmlns:o": XLMLNS.o,
-    "xmlns:x": XLMLNS.x,
-    "xmlns:ss": XLMLNS.ss,
-    "xmlns:dt": XLMLNS.dt,
-    "xmlns:html": XLMLNS.html
-  });
-}
 function parse_compobj(obj) {
   var v = {};
   var o = obj.content;
@@ -130897,28 +115491,6 @@ function parse_xls_props(cfb, props, o) {
     delete props.TitlesOfParts;
   }
 }
-function write_xls_props(wb, cfb) {
-  var DSEntries = [], SEntries = [], CEntries = [];
-  var i2 = 0, Keys;
-  var DocSummaryRE = evert_key(DocSummaryPIDDSI, "n");
-  var SummaryRE = evert_key(SummaryPIDSI, "n");
-  if (wb.Props) {
-    Keys = keys(wb.Props);
-    for (i2 = 0; i2 < Keys.length; ++i2) (Object.prototype.hasOwnProperty.call(DocSummaryRE, Keys[i2]) ? DSEntries : Object.prototype.hasOwnProperty.call(SummaryRE, Keys[i2]) ? SEntries : CEntries).push([Keys[i2], wb.Props[Keys[i2]]]);
-  }
-  if (wb.Custprops) {
-    Keys = keys(wb.Custprops);
-    for (i2 = 0; i2 < Keys.length; ++i2) if (!Object.prototype.hasOwnProperty.call(wb.Props || {}, Keys[i2])) (Object.prototype.hasOwnProperty.call(DocSummaryRE, Keys[i2]) ? DSEntries : Object.prototype.hasOwnProperty.call(SummaryRE, Keys[i2]) ? SEntries : CEntries).push([Keys[i2], wb.Custprops[Keys[i2]]]);
-  }
-  var CEntries2 = [];
-  for (i2 = 0; i2 < CEntries.length; ++i2) {
-    if (XLSPSSkip.indexOf(CEntries[i2][0]) > -1 || PseudoPropsPairs.indexOf(CEntries[i2][0]) > -1) continue;
-    if (CEntries[i2][1] == null) continue;
-    CEntries2.push(CEntries[i2]);
-  }
-  if (SEntries.length) CFB.utils.cfb_add(cfb, "/SummaryInformation", write_PropertySetStream(SEntries, PSCLSID.SI, SummaryRE, SummaryPIDSI));
-  if (DSEntries.length || CEntries2.length) CFB.utils.cfb_add(cfb, "/DocumentSummaryInformation", write_PropertySetStream(DSEntries, PSCLSID.DSI, DocSummaryRE, DocSummaryPIDDSI, CEntries2.length ? CEntries2 : null, PSCLSID.UDI));
-}
 function parse_xlscfb(cfb, options) {
   if (!options) options = {};
   fix_read_opts(options);
@@ -130969,33 +115541,6 @@ function parse_xlscfb(cfb, options) {
   WorkbookP.Props = WorkbookP.Custprops = props;
   if (options.bookFiles) WorkbookP.cfb = cfb;
   return WorkbookP;
-}
-function write_xlscfb(wb, opts) {
-  var o = opts || {};
-  var cfb = CFB.utils.cfb_new({ root: "R" });
-  var wbpath = "/Workbook";
-  switch (o.bookType || "xls") {
-    case "xls":
-      o.bookType = "biff8";
-    /* falls through */
-    case "xla":
-      if (!o.bookType) o.bookType = "xla";
-    /* falls through */
-    case "biff8":
-      wbpath = "/Workbook";
-      o.biff = 8;
-      break;
-    case "biff5":
-      wbpath = "/Book";
-      o.biff = 5;
-      break;
-    default:
-      throw new Error("invalid type " + o.bookType + " for XLS CFB");
-  }
-  CFB.utils.cfb_add(cfb, wbpath, write_biff_buf(wb, o));
-  if (o.biff == 8 && (wb.Props || wb.Custprops)) write_xls_props(wb, cfb);
-  if (o.biff == 8 && wb.vbaraw) fill_vba_xls(cfb, CFB.read(wb.vbaraw, { type: typeof wb.vbaraw == "string" ? "binary" : "buffer" }));
-  return cfb;
 }
 var XLSBRecordEnum = {
   0: {
@@ -135727,700 +120272,6 @@ function write_biff_rec(ba, type, payload, length) {
     len > 0 && is_buf(payload)
   ) ba.push(payload);
 }
-function write_biff_continue(ba, type, payload, length) {
-  var len = length || (payload || []).length || 0;
-  if (len <= 8224) return write_biff_rec(ba, type, payload, len);
-  var t2 = type;
-  if (isNaN(t2)) return;
-  var parts = payload.parts || [], sidx = 0;
-  var i2 = 0, w = 0;
-  while (w + (parts[sidx] || 8224) <= 8224) {
-    w += parts[sidx] || 8224;
-    sidx++;
-  }
-  var o = ba.next(4);
-  o.write_shift(2, t2);
-  o.write_shift(2, w);
-  ba.push(payload.slice(i2, i2 + w));
-  i2 += w;
-  while (i2 < len) {
-    o = ba.next(4);
-    o.write_shift(2, 60);
-    w = 0;
-    while (w + (parts[sidx] || 8224) <= 8224) {
-      w += parts[sidx] || 8224;
-      sidx++;
-    }
-    o.write_shift(2, w);
-    ba.push(payload.slice(i2, i2 + w));
-    i2 += w;
-  }
-}
-function write_BIFF2BERR(r2, c, val2, t2) {
-  var out = new_buf(9);
-  write_BIFF2Cell(out, r2, c);
-  write_Bes(val2, t2 || "b", out);
-  return out;
-}
-function write_BIFF2LABEL(r2, c, val2) {
-  var out = new_buf(8 + 2 * val2.length);
-  write_BIFF2Cell(out, r2, c);
-  out.write_shift(1, val2.length);
-  out.write_shift(val2.length, val2, "sbcs");
-  return out.l < out.length ? out.slice(0, out.l) : out;
-}
-function write_comments_biff2(ba, comments) {
-  comments.forEach(function(data) {
-    var text = data[0].map(function(cc) {
-      return cc.t;
-    }).join("");
-    if (text.length <= 2048) return write_biff_rec(ba, 28, write_NOTE_BIFF2(text, data[1], data[2]));
-    write_biff_rec(ba, 28, write_NOTE_BIFF2(text.slice(0, 2048), data[1], data[2], text.length));
-    for (var i2 = 2048; i2 < text.length; i2 += 2048)
-      write_biff_rec(ba, 28, write_NOTE_BIFF2(text.slice(i2, Math.min(i2 + 2048, text.length)), -1, -1, Math.min(2048, text.length - i2)));
-  });
-}
-function write_ws_biff2_cell(ba, cell, R, C, opts, date1904) {
-  var ifmt = 0;
-  if (cell.z != null) {
-    ifmt = opts._BIFF2FmtTable.indexOf(cell.z);
-    if (ifmt == -1) {
-      opts._BIFF2FmtTable.push(cell.z);
-      ifmt = opts._BIFF2FmtTable.length - 1;
-    }
-  }
-  var ixfe = 0;
-  if (cell.z != null) {
-    for (; ixfe < opts.cellXfs.length; ++ixfe) if (opts.cellXfs[ixfe].numFmtId == ifmt) break;
-    if (ixfe == opts.cellXfs.length) opts.cellXfs.push({ numFmtId: ifmt });
-  }
-  if (cell.v != null) switch (cell.t) {
-    case "d":
-    case "n":
-      var v = cell.t == "d" ? datenum(parseDate(cell.v, date1904), date1904) : cell.v;
-      if (opts.biff == 2 && v == (v | 0) && v >= 0 && v < 65536)
-        write_biff_rec(ba, 2, write_BIFF2INT(R, C, v, ixfe, ifmt));
-      else if (isNaN(v))
-        write_biff_rec(ba, 5, write_BIFF2BERR(R, C, 36, "e"));
-      else if (!isFinite(v))
-        write_biff_rec(ba, 5, write_BIFF2BERR(R, C, 7, "e"));
-      else
-        write_biff_rec(ba, 3, write_BIFF2NUM(R, C, v, ixfe, ifmt));
-      return;
-    case "b":
-    case "e":
-      write_biff_rec(ba, 5, write_BIFF2BERR(R, C, cell.v, cell.t));
-      return;
-    /* TODO: codepage, sst */
-    case "s":
-    case "str":
-      write_biff_rec(ba, 4, write_BIFF2LABEL(R, C, cell.v == null ? "" : String(cell.v).slice(0, 255)));
-      return;
-  }
-  write_biff_rec(ba, 1, write_BIFF2Cell(null, R, C));
-}
-function write_ws_biff2(ba, ws, idx, opts, wb) {
-  var dense = ws["!data"] != null;
-  var range = safe_decode_range(ws["!ref"] || "A1"), rr = "", cols = [];
-  if (range.e.c > 255 || range.e.r > 16383) {
-    if (opts.WTF) throw new Error("Range " + (ws["!ref"] || "A1") + " exceeds format limit A1:IV16384");
-    range.e.c = Math.min(range.e.c, 255);
-    range.e.r = Math.min(range.e.r, 16383);
-  }
-  var date1904 = (((wb || {}).Workbook || {}).WBProps || {}).date1904;
-  var row = [], comments = [];
-  for (var C = range.s.c; C <= range.e.c; ++C) cols[C] = encode_col(C);
-  for (var R = range.s.r; R <= range.e.r; ++R) {
-    if (dense) row = ws["!data"][R] || [];
-    rr = encode_row(R);
-    for (C = range.s.c; C <= range.e.c; ++C) {
-      var cell = dense ? row[C] : ws[cols[C] + rr];
-      if (!cell) continue;
-      write_ws_biff2_cell(ba, cell, R, C, opts, date1904);
-      if (cell.c) comments.push([cell.c, R, C]);
-    }
-  }
-  write_comments_biff2(ba, comments);
-}
-function write_biff2_buf(wb, opts) {
-  var o = opts || {};
-  var ba = buf_array();
-  var idx = 0;
-  for (var i2 = 0; i2 < wb.SheetNames.length; ++i2) if (wb.SheetNames[i2] == o.sheet) idx = i2;
-  if (idx == 0 && !!o.sheet && wb.SheetNames[0] != o.sheet) throw new Error("Sheet not found: " + o.sheet);
-  write_biff_rec(ba, o.biff == 4 ? 1033 : o.biff == 3 ? 521 : 9, write_BOF(wb, 16, o));
-  if (((wb.Workbook || {}).WBProps || {}).date1904) write_biff_rec(ba, 34, writebool(true));
-  o.cellXfs = [{ numFmtId: 0 }];
-  o._BIFF2FmtTable = ["General"];
-  o._Fonts = [];
-  var body = buf_array();
-  write_ws_biff2(body, wb.Sheets[wb.SheetNames[idx]], idx, o, wb);
-  o._BIFF2FmtTable.forEach(function(f3) {
-    if (o.biff <= 3) write_biff_rec(ba, 30, write_BIFF2Format(f3));
-    else write_biff_rec(ba, 1054, write_BIFF4Format(f3));
-  });
-  o.cellXfs.forEach(function(xf) {
-    switch (o.biff) {
-      case 2:
-        write_biff_rec(ba, 67, write_BIFF2XF(xf));
-        break;
-      case 3:
-        write_biff_rec(ba, 579, write_BIFF3XF(xf));
-        break;
-      case 4:
-        write_biff_rec(ba, 1091, write_BIFF4XF(xf));
-        break;
-    }
-  });
-  delete o._BIFF2FmtTable;
-  delete o.cellXfs;
-  delete o._Fonts;
-  ba.push(body.end());
-  write_biff_rec(ba, 10);
-  return ba.end();
-}
-var b8oid = 1;
-var b8ocnts = [];
-function write_MsoDrawingGroup() {
-  var buf = new_buf(82 + 8 * b8ocnts.length);
-  buf.write_shift(2, 15);
-  buf.write_shift(2, 61440);
-  buf.write_shift(4, 74 + 8 * b8ocnts.length);
-  {
-    buf.write_shift(2, 0);
-    buf.write_shift(2, 61446);
-    buf.write_shift(4, 16 + 8 * b8ocnts.length);
-    {
-      buf.write_shift(4, b8oid);
-      buf.write_shift(4, b8ocnts.length + 1);
-      var acc = 0;
-      for (var i2 = 0; i2 < b8ocnts.length; ++i2) acc += b8ocnts[i2] && b8ocnts[i2][1] || 0;
-      buf.write_shift(4, acc);
-      buf.write_shift(4, b8ocnts.length);
-    }
-    b8ocnts.forEach(function(b8) {
-      buf.write_shift(4, b8[0]);
-      buf.write_shift(4, b8[2]);
-    });
-  }
-  {
-    buf.write_shift(2, 51);
-    buf.write_shift(2, 61451);
-    buf.write_shift(4, 18);
-    buf.write_shift(2, 191);
-    buf.write_shift(4, 524296);
-    buf.write_shift(2, 385);
-    buf.write_shift(4, 134217793);
-    buf.write_shift(2, 448);
-    buf.write_shift(4, 134217792);
-  }
-  {
-    buf.write_shift(2, 64);
-    buf.write_shift(2, 61726);
-    buf.write_shift(4, 16);
-    buf.write_shift(4, 134217741);
-    buf.write_shift(4, 134217740);
-    buf.write_shift(4, 134217751);
-    buf.write_shift(4, 268435703);
-  }
-  return buf;
-}
-function write_comments_biff8(ba, comments) {
-  var notes = [], sz = 0, pl = buf_array(), baseid = b8oid;
-  var _oasc;
-  comments.forEach(function(c, ci) {
-    var author = "";
-    var text = c[0].map(function(t2) {
-      if (t2.a && !author) author = t2.a;
-      return t2.t;
-    }).join("");
-    ++b8oid;
-    {
-      var oasc = new_buf(150);
-      oasc.write_shift(2, 15);
-      oasc.write_shift(2, 61444);
-      oasc.write_shift(4, 150);
-      {
-        oasc.write_shift(2, 3234);
-        oasc.write_shift(2, 61450);
-        oasc.write_shift(4, 8);
-        oasc.write_shift(4, b8oid);
-        oasc.write_shift(4, 2560);
-      }
-      {
-        oasc.write_shift(2, 227);
-        oasc.write_shift(2, 61451);
-        oasc.write_shift(4, 84);
-        oasc.write_shift(2, 128);
-        oasc.write_shift(4, 0);
-        oasc.write_shift(2, 139);
-        oasc.write_shift(4, 2);
-        oasc.write_shift(2, 191);
-        oasc.write_shift(4, 524296);
-        oasc.write_shift(2, 344);
-        oasc.l += 4;
-        oasc.write_shift(2, 385);
-        oasc.write_shift(4, 134217808);
-        oasc.write_shift(2, 387);
-        oasc.write_shift(4, 134217808);
-        oasc.write_shift(2, 389);
-        oasc.write_shift(4, 268435700);
-        oasc.write_shift(2, 447);
-        oasc.write_shift(4, 1048592);
-        oasc.write_shift(2, 448);
-        oasc.write_shift(4, 134217809);
-        oasc.write_shift(2, 451);
-        oasc.write_shift(4, 268435700);
-        oasc.write_shift(2, 513);
-        oasc.write_shift(4, 134217809);
-        oasc.write_shift(2, 515);
-        oasc.write_shift(4, 268435700);
-        oasc.write_shift(2, 575);
-        oasc.write_shift(4, 196609);
-        oasc.write_shift(2, 959);
-        oasc.write_shift(4, 131072 | (c[0].hidden ? 2 : 0));
-      }
-      {
-        oasc.l += 2;
-        oasc.write_shift(2, 61456);
-        oasc.write_shift(4, 18);
-        oasc.write_shift(2, 3);
-        oasc.write_shift(2, c[2] + 2);
-        oasc.l += 2;
-        oasc.write_shift(2, c[1] + 1);
-        oasc.l += 2;
-        oasc.write_shift(2, c[2] + 4);
-        oasc.l += 2;
-        oasc.write_shift(2, c[1] + 5);
-        oasc.l += 2;
-      }
-      {
-        oasc.l += 2;
-        oasc.write_shift(2, 61457);
-        oasc.l += 4;
-      }
-      oasc.l = 150;
-      if (ci == 0) _oasc = oasc;
-      else write_biff_rec(pl, 236, oasc);
-    }
-    sz += 150;
-    {
-      var obj = new_buf(52);
-      obj.write_shift(2, 21);
-      obj.write_shift(2, 18);
-      obj.write_shift(2, 25);
-      obj.write_shift(2, b8oid);
-      obj.write_shift(2, 0);
-      obj.l = 22;
-      obj.write_shift(2, 13);
-      obj.write_shift(2, 22);
-      obj.write_shift(4, 1651663474);
-      obj.write_shift(4, 2503426821);
-      obj.write_shift(4, 2150634280);
-      obj.write_shift(4, 1768515844 + b8oid * 256);
-      obj.write_shift(2, 0);
-      obj.write_shift(4, 0);
-      obj.l += 4;
-      write_biff_rec(pl, 93, obj);
-    }
-    {
-      var oact = new_buf(8);
-      oact.l += 2;
-      oact.write_shift(2, 61453);
-      oact.l += 4;
-      write_biff_rec(pl, 236, oact);
-    }
-    sz += 8;
-    {
-      var txo = new_buf(18);
-      txo.write_shift(2, 18);
-      txo.l += 8;
-      txo.write_shift(2, text.length);
-      txo.write_shift(2, 16);
-      txo.l += 4;
-      write_biff_rec(pl, 438, txo);
-      {
-        var cont = new_buf(1 + text.length);
-        cont.write_shift(1, 0);
-        cont.write_shift(text.length, text, "sbcs");
-        write_biff_rec(pl, 60, cont);
-      }
-      {
-        var conf = new_buf(16);
-        conf.l += 8;
-        conf.write_shift(2, text.length);
-        conf.l += 6;
-        write_biff_rec(pl, 60, conf);
-      }
-    }
-    {
-      var notesh = new_buf(12 + author.length);
-      notesh.write_shift(2, c[1]);
-      notesh.write_shift(2, c[2]);
-      notesh.write_shift(2, 0 | (c[0].hidden ? 0 : 2));
-      notesh.write_shift(2, b8oid);
-      notesh.write_shift(2, author.length);
-      notesh.write_shift(1, 0);
-      notesh.write_shift(author.length, author, "sbcs");
-      notesh.l++;
-      notes.push(notesh);
-    }
-  });
-  {
-    var hdr = new_buf(80);
-    hdr.write_shift(2, 15);
-    hdr.write_shift(2, 61442);
-    hdr.write_shift(4, sz + hdr.length - 8);
-    {
-      hdr.write_shift(2, 16);
-      hdr.write_shift(2, 61448);
-      hdr.write_shift(4, 8);
-      hdr.write_shift(4, comments.length + 1);
-      hdr.write_shift(4, b8oid);
-    }
-    {
-      hdr.write_shift(2, 15);
-      hdr.write_shift(2, 61443);
-      hdr.write_shift(4, sz + 48);
-      {
-        hdr.write_shift(2, 15);
-        hdr.write_shift(2, 61444);
-        hdr.write_shift(4, 40);
-        {
-          hdr.write_shift(2, 1);
-          hdr.write_shift(2, 61449);
-          hdr.write_shift(4, 16);
-          hdr.l += 16;
-        }
-        {
-          hdr.write_shift(2, 2);
-          hdr.write_shift(2, 61450);
-          hdr.write_shift(4, 8);
-          hdr.write_shift(4, baseid);
-          hdr.write_shift(4, 5);
-        }
-      }
-    }
-    write_biff_rec(
-      ba,
-      236,
-      /* hdr */
-      _oasc ? bconcat([hdr, _oasc]) : hdr
-    );
-  }
-  ba.push(pl.end());
-  notes.forEach(function(n) {
-    write_biff_rec(ba, 28, n);
-  });
-  b8ocnts.push([baseid, comments.length + 1, b8oid]);
-  ++b8oid;
-}
-function write_FONTS_biff8(ba, data, opts) {
-  write_biff_rec(ba, 49, write_Font({
-    sz: 12,
-    color: { theme: 1 },
-    name: "Arial",
-    family: 2,
-    scheme: "minor"
-  }, opts));
-}
-function write_FMTS_biff8(ba, NF, opts) {
-  if (!NF) return;
-  [[5, 8], [23, 26], [41, 44], [
-    /*63*/
-    50,
-    /*66],[164,*/
-    392
-  ]].forEach(function(r2) {
-    for (var i2 = r2[0]; i2 <= r2[1]; ++i2) if (NF[i2] != null) write_biff_rec(ba, 1054, write_Format(i2, NF[i2], opts));
-  });
-}
-function write_FEAT(ba, ws) {
-  var o = new_buf(19);
-  o.write_shift(4, 2151);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  o.write_shift(2, 3);
-  o.write_shift(1, 1);
-  o.write_shift(4, 0);
-  write_biff_rec(ba, 2151, o);
-  o = new_buf(39);
-  o.write_shift(4, 2152);
-  o.write_shift(4, 0);
-  o.write_shift(4, 0);
-  o.write_shift(2, 3);
-  o.write_shift(1, 0);
-  o.write_shift(4, 0);
-  o.write_shift(2, 1);
-  o.write_shift(4, 4);
-  o.write_shift(2, 0);
-  write_Ref8U(safe_decode_range(ws["!ref"] || "A1"), o);
-  o.write_shift(4, 4);
-  write_biff_rec(ba, 2152, o);
-}
-function write_CELLXFS_biff8(ba, opts) {
-  for (var i2 = 0; i2 < 16; ++i2) write_biff_rec(ba, 224, write_XF({ numFmtId: 0, style: true }, 0, opts));
-  opts.cellXfs.forEach(function(c) {
-    write_biff_rec(ba, 224, write_XF(c, 0, opts));
-  });
-}
-function write_ws_biff8_hlinks(ba, ws) {
-  for (var R = 0; R < ws["!links"].length; ++R) {
-    var HL = ws["!links"][R];
-    write_biff_rec(ba, 440, write_HLink(HL));
-    if (HL[1].Tooltip) write_biff_rec(ba, 2048, write_HLinkTooltip(HL));
-  }
-  delete ws["!links"];
-}
-function write_ws_cols_biff8(ba, cols) {
-  if (!cols) return;
-  var cnt = 0;
-  cols.forEach(function(col, idx) {
-    if (++cnt <= 256 && col) {
-      write_biff_rec(ba, 125, write_ColInfo(col_obj_w(idx, col), idx));
-    }
-  });
-}
-function write_ws_biff8_cell(ba, cell, R, C, opts, date1904) {
-  var os = 16 + get_cell_style(opts.cellXfs, cell, opts);
-  if (cell.v == null && !cell.bf) {
-    write_biff_rec(ba, 513, write_XLSCell(R, C, os));
-    return;
-  }
-  if (cell.bf) write_biff_rec(ba, 6, write_Formula(cell, R, C, opts, os));
-  else switch (cell.t) {
-    case "d":
-    case "n":
-      var v = cell.t == "d" ? datenum(parseDate(cell.v, date1904), date1904) : cell.v;
-      if (isNaN(v)) write_biff_rec(ba, 517, write_BoolErr(R, C, 36, os, opts, "e"));
-      else if (!isFinite(v)) write_biff_rec(ba, 517, write_BoolErr(R, C, 7, os, opts, "e"));
-      else write_biff_rec(ba, 515, write_Number(R, C, v, os, opts));
-      break;
-    case "b":
-    case "e":
-      write_biff_rec(ba, 517, write_BoolErr(R, C, cell.v, os, opts, cell.t));
-      break;
-    /* TODO: codepage, sst */
-    case "s":
-    case "str":
-      if (opts.bookSST) {
-        var isst = get_sst_id(opts.Strings, cell.v == null ? "" : String(cell.v), opts.revStrings);
-        write_biff_rec(ba, 253, write_LabelSst(R, C, isst, os, opts));
-      } else write_biff_rec(ba, 516, write_Label(R, C, (cell.v == null ? "" : String(cell.v)).slice(0, 255), os, opts));
-      break;
-    default:
-      write_biff_rec(ba, 513, write_XLSCell(R, C, os));
-  }
-}
-function write_ws_biff8(idx, opts, wb) {
-  var ba = buf_array();
-  var s2 = wb.SheetNames[idx], ws = wb.Sheets[s2] || {};
-  var _WB = (wb || {}).Workbook || {};
-  var _sheet = (_WB.Sheets || [])[idx] || {};
-  var dense = ws["!data"] != null;
-  var b8 = opts.biff == 8;
-  var ref, rr = "", cols = [];
-  var range = safe_decode_range(ws["!ref"] || "A1");
-  var MAX_ROWS = b8 ? 65536 : 16384;
-  if (range.e.c > 255 || range.e.r >= MAX_ROWS) {
-    if (opts.WTF) throw new Error("Range " + (ws["!ref"] || "A1") + " exceeds format limit A1:IV" + MAX_ROWS);
-    range.e.c = Math.min(range.e.c, 255);
-    range.e.r = Math.min(range.e.r, MAX_ROWS - 1);
-  }
-  write_biff_rec(ba, 2057, write_BOF(wb, 16, opts));
-  write_biff_rec(ba, 13, writeuint16(1));
-  write_biff_rec(ba, 12, writeuint16(100));
-  write_biff_rec(ba, 15, writebool(true));
-  write_biff_rec(ba, 17, writebool(false));
-  write_biff_rec(ba, 16, write_Xnum(1e-3));
-  write_biff_rec(ba, 95, writebool(true));
-  write_biff_rec(ba, 42, writebool(false));
-  write_biff_rec(ba, 43, writebool(false));
-  write_biff_rec(ba, 130, writeuint16(1));
-  write_biff_rec(ba, 128, write_Guts([0, 0]));
-  write_biff_rec(ba, 131, writebool(false));
-  write_biff_rec(ba, 132, writebool(false));
-  if (b8) write_ws_cols_biff8(ba, ws["!cols"]);
-  write_biff_rec(ba, 512, write_Dimensions(range, opts));
-  var date1904 = (((wb || {}).Workbook || {}).WBProps || {}).date1904;
-  if (b8) ws["!links"] = [];
-  for (var C = range.s.c; C <= range.e.c; ++C) cols[C] = encode_col(C);
-  var comments = [];
-  var row = [];
-  for (var R = range.s.r; R <= range.e.r; ++R) {
-    if (dense) row = ws["!data"][R] || [];
-    rr = encode_row(R);
-    for (C = range.s.c; C <= range.e.c; ++C) {
-      var cell = dense ? row[C] : ws[cols[C] + rr];
-      if (!cell) continue;
-      write_ws_biff8_cell(ba, cell, R, C, opts, date1904);
-      if (b8 && cell.l) ws["!links"].push([cols[C] + rr, cell.l]);
-      if (cell.c) comments.push([cell.c, R, C]);
-    }
-  }
-  var cname = _sheet.CodeName || _sheet.name || s2;
-  if (b8) write_comments_biff8(ba, comments);
-  else write_comments_biff2(ba, comments);
-  if (b8) write_biff_rec(ba, 574, write_Window2((_WB.Views || [])[0]));
-  if (b8 && (ws["!merges"] || []).length) write_biff_rec(ba, 229, write_MergeCells(ws["!merges"]));
-  if (b8) write_ws_biff8_hlinks(ba, ws);
-  write_biff_rec(ba, 442, write_XLUnicodeString(cname, opts));
-  if (b8) write_FEAT(ba, ws);
-  write_biff_rec(
-    ba,
-    10
-    /* EOF */
-  );
-  return ba.end();
-}
-function write_biff8_global(wb, bufs, opts) {
-  var A2 = buf_array();
-  var _WB = (wb || {}).Workbook || {};
-  var _sheets = _WB.Sheets || [];
-  var _wb = (
-    /*::((*/
-    _WB.WBProps || {
-      /*::CodeName:"ThisWorkbook"*/
-    }
-  );
-  var b8 = opts.biff == 8, b5 = opts.biff == 5;
-  write_biff_rec(A2, 2057, write_BOF(wb, 5, opts));
-  if (opts.bookType == "xla") write_biff_rec(
-    A2,
-    135
-    /* Addin */
-  );
-  write_biff_rec(A2, 225, b8 ? writeuint16(1200) : null);
-  write_biff_rec(A2, 193, writezeroes(2));
-  if (b5) write_biff_rec(
-    A2,
-    191
-    /* ToolbarHdr */
-  );
-  if (b5) write_biff_rec(
-    A2,
-    192
-    /* ToolbarEnd */
-  );
-  write_biff_rec(
-    A2,
-    226
-    /* InterfaceEnd */
-  );
-  write_biff_rec(A2, 92, write_WriteAccess("SheetJS", opts));
-  write_biff_rec(A2, 66, writeuint16(b8 ? 1200 : 1252));
-  if (b8) write_biff_rec(A2, 353, writeuint16(0));
-  if (b8) write_biff_rec(
-    A2,
-    448
-    /* Excel9File */
-  );
-  write_biff_rec(A2, 317, write_RRTabId(wb.SheetNames.length));
-  if (b8 && wb.vbaraw) write_biff_rec(
-    A2,
-    211
-    /* ObProj */
-  );
-  if (b8 && wb.vbaraw) {
-    var cname = _wb.CodeName || "ThisWorkbook";
-    write_biff_rec(A2, 442, write_XLUnicodeString(cname, opts));
-  }
-  write_biff_rec(A2, 156, writeuint16(17));
-  write_biff_rec(A2, 25, writebool(false));
-  write_biff_rec(A2, 18, writebool(false));
-  write_biff_rec(A2, 19, writeuint16(0));
-  if (b8) write_biff_rec(A2, 431, writebool(false));
-  if (b8) write_biff_rec(A2, 444, writeuint16(0));
-  write_biff_rec(A2, 61, write_Window1(opts));
-  write_biff_rec(A2, 64, writebool(false));
-  write_biff_rec(A2, 141, writeuint16(0));
-  write_biff_rec(A2, 34, writebool(safe1904(wb) == "true"));
-  write_biff_rec(A2, 14, writebool(true));
-  if (b8) write_biff_rec(A2, 439, writebool(false));
-  write_biff_rec(A2, 218, writeuint16(0));
-  write_FONTS_biff8(A2, wb, opts);
-  write_FMTS_biff8(A2, wb.SSF, opts);
-  write_CELLXFS_biff8(A2, opts);
-  if (b8) write_biff_rec(A2, 352, writebool(false));
-  var a = A2.end();
-  var C = buf_array();
-  if (b8) write_biff_rec(C, 140, write_Country());
-  if (b8 && b8ocnts.length) write_biff_rec(C, 235, write_MsoDrawingGroup());
-  if (b8 && opts.Strings) write_biff_continue(C, 252, write_SST(opts.Strings, opts));
-  write_biff_rec(
-    C,
-    10
-    /* EOF */
-  );
-  var c = C.end();
-  var B = buf_array();
-  var blen = 0, j = 0;
-  for (j = 0; j < wb.SheetNames.length; ++j) blen += (b8 ? 12 : 11) + (b8 ? 2 : 1) * wb.SheetNames[j].length;
-  var start = a.length + blen + c.length;
-  for (j = 0; j < wb.SheetNames.length; ++j) {
-    var _sheet = _sheets[j] || {};
-    write_biff_rec(B, 133, write_BoundSheet8({ pos: start, hs: _sheet.Hidden || 0, dt: 0, name: wb.SheetNames[j] }, opts));
-    start += bufs[j].length;
-  }
-  var b = B.end();
-  if (blen != b.length) throw new Error("BS8 " + blen + " != " + b.length);
-  var out = [];
-  if (a.length) out.push(a);
-  if (b.length) out.push(b);
-  if (c.length) out.push(c);
-  return bconcat(out);
-}
-function write_biff8_buf(wb, opts) {
-  var o = opts || {};
-  var bufs = [];
-  if (wb && !wb.SSF) {
-    wb.SSF = dup(table_fmt);
-  }
-  if (wb && wb.SSF) {
-    make_ssf();
-    SSF_load_table(wb.SSF);
-    o.revssf = evert_num(wb.SSF);
-    o.revssf[wb.SSF[65535]] = 0;
-    o.ssf = wb.SSF;
-  }
-  b8oid = 1;
-  b8ocnts = [];
-  o.Strings = /*::((*/
-  [];
-  o.Strings.Count = 0;
-  o.Strings.Unique = 0;
-  fix_write_opts(o);
-  o.cellXfs = [];
-  get_cell_style(o.cellXfs, {}, { revssf: { "General": 0 } });
-  if (!wb.Props) wb.Props = {};
-  for (var i2 = 0; i2 < wb.SheetNames.length; ++i2) bufs[bufs.length] = write_ws_biff8(i2, o, wb);
-  bufs.unshift(write_biff8_global(wb, bufs, o));
-  return bconcat(bufs);
-}
-function write_biff_buf(wb, opts) {
-  for (var i2 = 0; i2 <= wb.SheetNames.length; ++i2) {
-    var ws = wb.Sheets[wb.SheetNames[i2]];
-    if (!ws || !ws["!ref"]) continue;
-    var range = decode_range(ws["!ref"]);
-    if (range.e.c > 255) {
-      if (typeof console != "undefined" && console.error) console.error("Worksheet '" + wb.SheetNames[i2] + "' extends beyond column IV (255).  Data may be lost.");
-    }
-    if (range.e.r > 65535) {
-      if (typeof console != "undefined" && console.error) console.error("Worksheet '" + wb.SheetNames[i2] + "' extends beyond row 65536.  Data may be lost.");
-    }
-  }
-  var o = opts || {};
-  switch (o.biff || 2) {
-    case 8:
-    case 5:
-      return write_biff8_buf(wb, opts);
-    case 4:
-    case 3:
-    case 2:
-      return write_biff2_buf(wb, opts);
-  }
-  throw new Error("invalid type " + o.bookType + " for BIFF");
-}
 function html_to_sheet(str, _opts) {
   var opts = _opts || {};
   var dense = opts.dense != null ? opts.dense : DENSE;
@@ -137826,561 +121677,6 @@ function parse_fods(data, opts) {
   wb.bookType = "fods";
   return wb;
 }
-var write_styles_ods = /* @__PURE__ */ (function() {
-  var master_styles = [
-    "<office:master-styles>",
-    '<style:master-page style:name="mp1" style:page-layout-name="mp1">',
-    "<style:header/>",
-    '<style:header-left style:display="false"/>',
-    "<style:footer/>",
-    '<style:footer-left style:display="false"/>',
-    "</style:master-page>",
-    "</office:master-styles>"
-  ].join("");
-  var payload = "<office:document-styles " + wxt_helper({
-    "xmlns:office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
-    "xmlns:table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
-    "xmlns:style": "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
-    "xmlns:text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
-    "xmlns:draw": "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
-    "xmlns:fo": "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
-    "xmlns:xlink": "http://www.w3.org/1999/xlink",
-    "xmlns:dc": "http://purl.org/dc/elements/1.1/",
-    "xmlns:number": "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
-    "xmlns:svg": "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
-    "xmlns:of": "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
-    "office:version": "1.2"
-  }) + ">" + master_styles + "</office:document-styles>";
-  return function wso() {
-    return XML_HEADER + payload;
-  };
-})();
-function write_number_format_ods(nf, nfidx) {
-  var type = "number", payload = "", nopts = { "style:name": nfidx }, c = "", i2 = 0;
-  nf = nf.replace(/"[$]"/g, "$");
-  j: {
-    if (nf.indexOf(";") > -1) {
-      console.error("Unsupported ODS Style Map exported.  Using first branch of " + nf);
-      nf = nf.slice(0, nf.indexOf(";"));
-    }
-    if (nf == "@") {
-      type = "text";
-      payload = "<number:text-content/>";
-      break j;
-    }
-    if (nf.indexOf(/\$/) > -1) {
-      type = "currency";
-    }
-    if (nf[i2] == '"') {
-      c = "";
-      while (nf[++i2] != '"' || nf[++i2] == '"') c += nf[i2];
-      --i2;
-      if (nf[i2 + 1] == "*") {
-        i2++;
-        payload += "<number:fill-character>" + escapexml(c.replace(/""/g, '"')) + "</number:fill-character>";
-      } else {
-        payload += "<number:text>" + escapexml(c.replace(/""/g, '"')) + "</number:text>";
-      }
-      nf = nf.slice(i2 + 1);
-      i2 = 0;
-    }
-    var t2 = nf.match(/# (\?+)\/(\?+)/);
-    if (t2) {
-      payload += writextag("number:fraction", null, { "number:min-integer-digits": 0, "number:min-numerator-digits": t2[1].length, "number:max-denominator-value": Math.max(+t2[1].replace(/./g, "9"), +t2[2].replace(/./g, "9")) });
-      break j;
-    }
-    if (t2 = nf.match(/# (\?+)\/(\d+)/)) {
-      payload += writextag("number:fraction", null, { "number:min-integer-digits": 0, "number:min-numerator-digits": t2[1].length, "number:denominator-value": +t2[2] });
-      break j;
-    }
-    if (t2 = nf.match(/\b(\d+)(|\.\d+)%/)) {
-      type = "percentage";
-      payload += writextag("number:number", null, { "number:decimal-places": t2[2] && t2.length - 1 || 0, "number:min-decimal-places": t2[2] && t2.length - 1 || 0, "number:min-integer-digits": t2[1].length }) + "<number:text>%</number:text>";
-      break j;
-    }
-    var has_time = false;
-    if (["y", "m", "d"].indexOf(nf[0]) > -1) {
-      type = "date";
-      k: for (; i2 < nf.length; ++i2) switch (c = nf[i2].toLowerCase()) {
-        case "h":
-        case "s":
-          has_time = true;
-          --i2;
-          break k;
-        case "m":
-          l: for (var h2 = i2 + 1; h2 < nf.length; ++h2) switch (nf[h2]) {
-            case "y":
-            case "d":
-              break l;
-            case "h":
-            case "s":
-              has_time = true;
-              --i2;
-              break k;
-          }
-        /* falls through */
-        case "y":
-        case "d":
-          while ((nf[++i2] || "").toLowerCase() == c[0]) c += c[0];
-          --i2;
-          switch (c) {
-            case "y":
-            case "yy":
-              payload += "<number:year/>";
-              break;
-            case "yyy":
-            case "yyyy":
-              payload += '<number:year number:style="long"/>';
-              break;
-            case "mmmmm":
-              console.error("ODS has no equivalent of format |mmmmm|");
-            /* falls through */
-            case "m":
-            case "mm":
-            case "mmm":
-            case "mmmm":
-              payload += '<number:month number:style="' + (c.length % 2 ? "short" : "long") + '" number:textual="' + (c.length >= 3 ? "true" : "false") + '"/>';
-              break;
-            case "d":
-            case "dd":
-              payload += '<number:day number:style="' + (c.length % 2 ? "short" : "long") + '"/>';
-              break;
-            case "ddd":
-            case "dddd":
-              payload += '<number:day-of-week number:style="' + (c.length % 2 ? "short" : "long") + '"/>';
-              break;
-          }
-          break;
-        case '"':
-          while (nf[++i2] != '"' || nf[++i2] == '"') c += nf[i2];
-          --i2;
-          payload += "<number:text>" + escapexml(c.slice(1).replace(/""/g, '"')) + "</number:text>";
-          break;
-        case "\\":
-          c = nf[++i2];
-          payload += "<number:text>" + escapexml(c) + "</number:text>";
-          break;
-        case "/":
-        case ":":
-          payload += "<number:text>" + escapexml(c) + "</number:text>";
-          break;
-        default:
-          console.error("unrecognized character " + c + " in ODF format " + nf);
-      }
-      if (!has_time) break j;
-      nf = nf.slice(i2 + 1);
-      i2 = 0;
-    }
-    if (nf.match(/^\[?[hms]/)) {
-      if (type == "number") type = "time";
-      if (nf.match(/\[/)) {
-        nf = nf.replace(/[\[\]]/g, "");
-        nopts["number:truncate-on-overflow"] = "false";
-      }
-      for (; i2 < nf.length; ++i2) switch (c = nf[i2].toLowerCase()) {
-        case "h":
-        case "m":
-        case "s":
-          while ((nf[++i2] || "").toLowerCase() == c[0]) c += c[0];
-          --i2;
-          switch (c) {
-            case "h":
-            case "hh":
-              payload += '<number:hours number:style="' + (c.length % 2 ? "short" : "long") + '"/>';
-              break;
-            case "m":
-            case "mm":
-              payload += '<number:minutes number:style="' + (c.length % 2 ? "short" : "long") + '"/>';
-              break;
-            case "s":
-            case "ss":
-              if (nf[i2 + 1] == ".") do {
-                c += nf[i2 + 1];
-                ++i2;
-              } while (nf[i2 + 1] == "0");
-              payload += '<number:seconds number:style="' + (c.match("ss") ? "long" : "short") + '"' + (c.match(/\./) ? ' number:decimal-places="' + (c.match(/0+/) || [""])[0].length + '"' : "") + "/>";
-              break;
-          }
-          break;
-        case '"':
-          while (nf[++i2] != '"' || nf[++i2] == '"') c += nf[i2];
-          --i2;
-          payload += "<number:text>" + escapexml(c.slice(1).replace(/""/g, '"')) + "</number:text>";
-          break;
-        case "/":
-        case ":":
-          payload += "<number:text>" + escapexml(c) + "</number:text>";
-          break;
-        case "a":
-          if (nf.slice(i2, i2 + 3).toLowerCase() == "a/p") {
-            payload += "<number:am-pm/>";
-            i2 += 2;
-            break;
-          }
-          if (nf.slice(i2, i2 + 5).toLowerCase() == "am/pm") {
-            payload += "<number:am-pm/>";
-            i2 += 4;
-            break;
-          }
-        /* falls through */
-        default:
-          console.error("unrecognized character " + c + " in ODF format " + nf);
-      }
-      break j;
-    }
-    if (nf.indexOf(/\$/) > -1) {
-      type = "currency";
-    }
-    if (nf[0] == "$") {
-      payload += '<number:currency-symbol number:language="en" number:country="US">$</number:currency-symbol>';
-      nf = nf.slice(1);
-      i2 = 0;
-    }
-    i2 = 0;
-    if (nf[i2] == '"') {
-      while (nf[++i2] != '"' || nf[++i2] == '"') c += nf[i2];
-      --i2;
-      if (nf[i2 + 1] == "*") {
-        i2++;
-        payload += "<number:fill-character>" + escapexml(c.replace(/""/g, '"')) + "</number:fill-character>";
-      } else {
-        payload += "<number:text>" + escapexml(c.replace(/""/g, '"')) + "</number:text>";
-      }
-      nf = nf.slice(i2 + 1);
-      i2 = 0;
-    }
-    var np = nf.match(/([#0][0#,]*)(\.[0#]*|)(E[+]?0*|)/i);
-    if (!np || !np[0]) console.error("Could not find numeric part of " + nf);
-    else {
-      var base = np[1].replace(/,/g, "");
-      payload += "<number:" + (np[3] ? "scientific-" : "") + 'number number:min-integer-digits="' + (base.indexOf("0") == -1 ? "0" : base.length - base.indexOf("0")) + '"' + (np[0].indexOf(",") > -1 ? ' number:grouping="true"' : "") + (np[2] && ' number:decimal-places="' + (np[2].length - 1) + '"' || ' number:decimal-places="0"') + (np[3] && np[3].indexOf("+") > -1 ? ' number:forced-exponent-sign="true"' : "") + (np[3] ? ' number:min-exponent-digits="' + np[3].match(/0+/)[0].length + '"' : "") + "></number:" + (np[3] ? "scientific-" : "") + "number>";
-      i2 = np.index + np[0].length;
-    }
-    if (nf[i2] == '"') {
-      c = "";
-      while (nf[++i2] != '"' || nf[++i2] == '"') c += nf[i2];
-      --i2;
-      payload += "<number:text>" + escapexml(c.replace(/""/g, '"')) + "</number:text>";
-    }
-  }
-  if (!payload) {
-    console.error("Could not generate ODS number format for |" + nf + "|");
-    return "";
-  }
-  return writextag("number:" + type + "-style", payload, nopts);
-}
-function write_names_ods(Names, SheetNames, idx) {
-  var scoped = [];
-  for (var namei = 0; namei < Names.length; ++namei) {
-    var name = Names[namei];
-    if (!name) continue;
-    if (name.Sheet == (idx == -1 ? null : idx)) scoped.push(name);
-  }
-  if (!scoped.length) return "";
-  return "      <table:named-expressions>\n" + scoped.map(function(name2) {
-    var odsref = (idx == -1 ? "$" : "") + csf_to_ods_3D(name2.Ref);
-    return "        " + writextag("table:named-range", null, {
-      "table:name": name2.Name,
-      "table:cell-range-address": odsref,
-      "table:base-cell-address": odsref.replace(/[\.][^\.]*$/, ".$A$1")
-    });
-  }).join("\n") + "\n      </table:named-expressions>\n";
-}
-var write_content_ods = /* @__PURE__ */ (function() {
-  var write_text_p = function(text, span) {
-    return escapexml(text).replace(/  +/g, function($$) {
-      return '<text:s text:c="' + $$.length + '"/>';
-    }).replace(/\t/g, "<text:tab/>").replace(/\n/g, span ? "<text:line-break/>" : "</text:p><text:p>").replace(/^ /, "<text:s/>").replace(/ $/, "<text:s/>");
-  };
-  var null_cell_xml = "          <table:table-cell />\n";
-  var write_ws = function(ws, wb, i2, opts, nfs, date1904) {
-    var o = [];
-    o.push('      <table:table table:name="' + escapexml(wb.SheetNames[i2]) + '" table:style-name="ta1">\n');
-    var R = 0, C = 0, range = decode_range(ws["!ref"] || "A1");
-    var marr = ws["!merges"] || [], mi = 0;
-    var dense = ws["!data"] != null;
-    if (ws["!cols"]) {
-      for (C = 0; C <= range.e.c; ++C) o.push("        <table:table-column" + (ws["!cols"][C] ? ' table:style-name="co' + ws["!cols"][C].ods + '"' : "") + "></table:table-column>\n");
-    }
-    var H = "", ROWS = ws["!rows"] || [];
-    for (R = 0; R < range.s.r; ++R) {
-      H = ROWS[R] ? ' table:style-name="ro' + ROWS[R].ods + '"' : "";
-      o.push("        <table:table-row" + H + "></table:table-row>\n");
-    }
-    for (; R <= range.e.r; ++R) {
-      H = ROWS[R] ? ' table:style-name="ro' + ROWS[R].ods + '"' : "";
-      o.push("        <table:table-row" + H + ">\n");
-      for (C = 0; C < range.s.c; ++C) o.push(null_cell_xml);
-      for (; C <= range.e.c; ++C) {
-        var skip = false, ct = {}, textp = "";
-        for (mi = 0; mi != marr.length; ++mi) {
-          if (marr[mi].s.c > C) continue;
-          if (marr[mi].s.r > R) continue;
-          if (marr[mi].e.c < C) continue;
-          if (marr[mi].e.r < R) continue;
-          if (marr[mi].s.c != C || marr[mi].s.r != R) skip = true;
-          ct["table:number-columns-spanned"] = marr[mi].e.c - marr[mi].s.c + 1;
-          ct["table:number-rows-spanned"] = marr[mi].e.r - marr[mi].s.r + 1;
-          break;
-        }
-        if (skip) {
-          o.push("          <table:covered-table-cell/>\n");
-          continue;
-        }
-        var ref = encode_cell({ r: R, c: C }), cell = dense ? (ws["!data"][R] || [])[C] : ws[ref];
-        if (cell && cell.f) {
-          ct["table:formula"] = escapexml(csf_to_ods_formula(cell.f));
-          if (cell.F) {
-            if (cell.F.slice(0, ref.length) == ref) {
-              var _Fref = decode_range(cell.F);
-              ct["table:number-matrix-columns-spanned"] = _Fref.e.c - _Fref.s.c + 1;
-              ct["table:number-matrix-rows-spanned"] = _Fref.e.r - _Fref.s.r + 1;
-            }
-          }
-        }
-        if (!cell) {
-          o.push(null_cell_xml);
-          continue;
-        }
-        switch (cell.t) {
-          case "b":
-            textp = cell.v ? "TRUE" : "FALSE";
-            ct["office:value-type"] = "boolean";
-            ct["office:boolean-value"] = cell.v ? "true" : "false";
-            break;
-          case "n":
-            if (!isFinite(cell.v)) {
-              if (isNaN(cell.v)) {
-                textp = "#NUM!";
-                ct["table:formula"] = "of:=#NUM!";
-              } else {
-                textp = "#DIV/0!";
-                ct["table:formula"] = "of:=" + (cell.v < 0 ? "-" : "") + "1/0";
-              }
-              ct["office:string-value"] = "";
-              ct["office:value-type"] = "string";
-              ct["calcext:value-type"] = "error";
-            } else {
-              textp = cell.w || String(cell.v || 0);
-              ct["office:value-type"] = "float";
-              ct["office:value"] = cell.v || 0;
-            }
-            break;
-          case "s":
-          case "str":
-            textp = cell.v == null ? "" : cell.v;
-            ct["office:value-type"] = "string";
-            break;
-          case "d":
-            textp = cell.w || parseDate(cell.v, date1904).toISOString();
-            ct["office:value-type"] = "date";
-            ct["office:date-value"] = parseDate(cell.v, date1904).toISOString();
-            ct["table:style-name"] = "ce1";
-            break;
-          //case 'e': // TODO: translate to ODS errors
-          default:
-            o.push(null_cell_xml);
-            continue;
-        }
-        var text_p = write_text_p(textp);
-        if (cell.l && cell.l.Target) {
-          var _tgt = cell.l.Target;
-          _tgt = _tgt.charAt(0) == "#" ? "#" + csf_to_ods_3D(_tgt.slice(1)) : _tgt;
-          if (_tgt.charAt(0) != "#" && !_tgt.match(/^\w+:/)) _tgt = "../" + _tgt;
-          text_p = writextag("text:a", text_p, { "xlink:href": _tgt.replace(/&/g, "&amp;") });
-        }
-        if (nfs[cell.z]) ct["table:style-name"] = "ce" + nfs[cell.z].slice(1);
-        var payload = writextag("text:p", text_p, {});
-        if (cell.c) {
-          var acreator = "", apayload = "", aprops = {};
-          for (var ci = 0; ci < cell.c.length; ++ci) {
-            if (!acreator && cell.c[ci].a) acreator = cell.c[ci].a;
-            apayload += "<text:p>" + write_text_p(cell.c[ci].t) + "</text:p>";
-          }
-          if (!cell.c.hidden) aprops["office:display"] = true;
-          payload = writextag("office:annotation", apayload, aprops) + payload;
-        }
-        o.push("          " + writextag("table:table-cell", payload, ct) + "\n");
-      }
-      o.push("        </table:table-row>\n");
-    }
-    if ((wb.Workbook || {}).Names) o.push(write_names_ods(wb.Workbook.Names, wb.SheetNames, i2));
-    o.push("      </table:table>\n");
-    return o.join("");
-  };
-  var write_automatic_styles_ods = function(o, wb) {
-    o.push(" <office:automatic-styles>\n");
-    var cidx = 0;
-    wb.SheetNames.map(function(n) {
-      return wb.Sheets[n];
-    }).forEach(function(ws) {
-      if (!ws) return;
-      if (ws["!cols"]) {
-        for (var C = 0; C < ws["!cols"].length; ++C) if (ws["!cols"][C]) {
-          var colobj = ws["!cols"][C];
-          if (colobj.width == null && colobj.wpx == null && colobj.wch == null) continue;
-          process_col(colobj);
-          colobj.ods = cidx;
-          var w = ws["!cols"][C].wpx + "px";
-          o.push('  <style:style style:name="co' + cidx + '" style:family="table-column">\n');
-          o.push('   <style:table-column-properties fo:break-before="auto" style:column-width="' + w + '"/>\n');
-          o.push("  </style:style>\n");
-          ++cidx;
-        }
-      }
-    });
-    var ridx = 0;
-    wb.SheetNames.map(function(n) {
-      return wb.Sheets[n];
-    }).forEach(function(ws) {
-      if (!ws) return;
-      if (ws["!rows"]) {
-        for (var R = 0; R < ws["!rows"].length; ++R) if (ws["!rows"][R]) {
-          ws["!rows"][R].ods = ridx;
-          var h2 = ws["!rows"][R].hpx + "px";
-          o.push('  <style:style style:name="ro' + ridx + '" style:family="table-row">\n');
-          o.push('   <style:table-row-properties fo:break-before="auto" style:row-height="' + h2 + '"/>\n');
-          o.push("  </style:style>\n");
-          ++ridx;
-        }
-      }
-    });
-    o.push('  <style:style style:name="ta1" style:family="table" style:master-page-name="mp1">\n');
-    o.push('   <style:table-properties table:display="true" style:writing-mode="lr-tb"/>\n');
-    o.push("  </style:style>\n");
-    o.push('  <number:date-style style:name="N37" number:automatic-order="true">\n');
-    o.push('   <number:month number:style="long"/>\n');
-    o.push("   <number:text>/</number:text>\n");
-    o.push('   <number:day number:style="long"/>\n');
-    o.push("   <number:text>/</number:text>\n");
-    o.push("   <number:year/>\n");
-    o.push("  </number:date-style>\n");
-    var nfs = {};
-    var nfi = 69;
-    wb.SheetNames.map(function(n) {
-      return wb.Sheets[n];
-    }).forEach(function(ws) {
-      if (!ws) return;
-      var dense = ws["!data"] != null;
-      if (!ws["!ref"]) return;
-      var range = decode_range(ws["!ref"]);
-      for (var R = 0; R <= range.e.r; ++R) for (var C = 0; C <= range.e.c; ++C) {
-        var c = dense ? (ws["!data"][R] || [])[C] : ws[encode_cell({ r: R, c: C })];
-        if (!c || !c.z || c.z.toLowerCase() == "general") continue;
-        if (!nfs[c.z]) {
-          var out = write_number_format_ods(c.z, "N" + nfi);
-          if (out) {
-            nfs[c.z] = "N" + nfi;
-            ++nfi;
-            o.push(out + "\n");
-          }
-        }
-      }
-    });
-    o.push('  <style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N37"/>\n');
-    keys(nfs).forEach(function(nf) {
-      o.push('<style:style style:name="ce' + nfs[nf].slice(1) + '" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="' + nfs[nf] + '"/>\n');
-    });
-    o.push(" </office:automatic-styles>\n");
-    return nfs;
-  };
-  return function wcx(wb, opts) {
-    var o = [XML_HEADER];
-    var attr = wxt_helper({
-      "xmlns:office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
-      "xmlns:table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
-      "xmlns:style": "urn:oasis:names:tc:opendocument:xmlns:style:1.0",
-      "xmlns:text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0",
-      "xmlns:draw": "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0",
-      "xmlns:fo": "urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0",
-      "xmlns:xlink": "http://www.w3.org/1999/xlink",
-      "xmlns:dc": "http://purl.org/dc/elements/1.1/",
-      "xmlns:meta": "urn:oasis:names:tc:opendocument:xmlns:meta:1.0",
-      "xmlns:number": "urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0",
-      "xmlns:presentation": "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0",
-      "xmlns:svg": "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0",
-      "xmlns:chart": "urn:oasis:names:tc:opendocument:xmlns:chart:1.0",
-      "xmlns:dr3d": "urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0",
-      "xmlns:math": "http://www.w3.org/1998/Math/MathML",
-      "xmlns:form": "urn:oasis:names:tc:opendocument:xmlns:form:1.0",
-      "xmlns:script": "urn:oasis:names:tc:opendocument:xmlns:script:1.0",
-      "xmlns:ooo": "http://openoffice.org/2004/office",
-      "xmlns:ooow": "http://openoffice.org/2004/writer",
-      "xmlns:oooc": "http://openoffice.org/2004/calc",
-      "xmlns:dom": "http://www.w3.org/2001/xml-events",
-      "xmlns:xforms": "http://www.w3.org/2002/xforms",
-      "xmlns:xsd": "http://www.w3.org/2001/XMLSchema",
-      "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
-      "xmlns:sheet": "urn:oasis:names:tc:opendocument:sh33tjs:1.0",
-      "xmlns:rpt": "http://openoffice.org/2005/report",
-      "xmlns:of": "urn:oasis:names:tc:opendocument:xmlns:of:1.2",
-      "xmlns:xhtml": "http://www.w3.org/1999/xhtml",
-      "xmlns:grddl": "http://www.w3.org/2003/g/data-view#",
-      "xmlns:tableooo": "http://openoffice.org/2009/table",
-      "xmlns:drawooo": "http://openoffice.org/2010/draw",
-      "xmlns:calcext": "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0",
-      "xmlns:loext": "urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0",
-      "xmlns:field": "urn:openoffice:names:experimental:ooo-ms-interop:xmlns:field:1.0",
-      "xmlns:formx": "urn:openoffice:names:experimental:ooxml-odf-interop:xmlns:form:1.0",
-      "xmlns:css3t": "http://www.w3.org/TR/css3-text/",
-      "office:version": "1.2"
-    });
-    var fods = wxt_helper({
-      "xmlns:config": "urn:oasis:names:tc:opendocument:xmlns:config:1.0",
-      "office:mimetype": "application/vnd.oasis.opendocument.spreadsheet"
-    });
-    if (opts.bookType == "fods") {
-      o.push("<office:document" + attr + fods + ">\n");
-      o.push(write_meta_ods().replace(/<office:document-meta[^<>]*?>/, "").replace(/<\/office:document-meta>/, "") + "\n");
-    } else o.push("<office:document-content" + attr + ">\n");
-    var nfs = write_automatic_styles_ods(o, wb);
-    o.push("  <office:body>\n");
-    o.push("    <office:spreadsheet>\n");
-    if (((wb.Workbook || {}).WBProps || {}).date1904) o.push('      <table:calculation-settings table:case-sensitive="false" table:search-criteria-must-apply-to-whole-cell="true" table:use-wildcards="true" table:use-regular-expressions="false" table:automatic-find-labels="false">\n        <table:null-date table:date-value="1904-01-01"/>\n      </table:calculation-settings>\n');
-    for (var i2 = 0; i2 != wb.SheetNames.length; ++i2) o.push(write_ws(wb.Sheets[wb.SheetNames[i2]], wb, i2, opts, nfs, ((wb.Workbook || {}).WBProps || {}).date1904));
-    if ((wb.Workbook || {}).Names) o.push(write_names_ods(wb.Workbook.Names, wb.SheetNames, -1));
-    o.push("    </office:spreadsheet>\n");
-    o.push("  </office:body>\n");
-    if (opts.bookType == "fods") o.push("</office:document>");
-    else o.push("</office:document-content>");
-    return o.join("");
-  };
-})();
-function write_ods(wb, opts) {
-  if (opts.bookType == "fods") return write_content_ods(wb, opts);
-  var zip = zip_new();
-  var f3 = "";
-  var manifest = [];
-  var rdf = [];
-  f3 = "mimetype";
-  zip_add_file(zip, f3, "application/vnd.oasis.opendocument.spreadsheet");
-  f3 = "content.xml";
-  zip_add_file(zip, f3, write_content_ods(wb, opts));
-  manifest.push([f3, "text/xml"]);
-  rdf.push([f3, "ContentFile"]);
-  f3 = "styles.xml";
-  zip_add_file(zip, f3, write_styles_ods(wb, opts));
-  manifest.push([f3, "text/xml"]);
-  rdf.push([f3, "StylesFile"]);
-  f3 = "meta.xml";
-  zip_add_file(zip, f3, XML_HEADER + write_meta_ods(
-    /*::wb, opts*/
-  ));
-  manifest.push([f3, "text/xml"]);
-  rdf.push([f3, "MetadataFile"]);
-  f3 = "manifest.rdf";
-  zip_add_file(zip, f3, write_rdf(
-    rdf
-    /*, opts*/
-  ));
-  manifest.push([f3, "application/rdf+xml"]);
-  f3 = "META-INF/manifest.xml";
-  zip_add_file(zip, f3, write_manifest(
-    manifest
-    /*, opts*/
-  ));
-  return zip;
-}
 var subarray = (function() {
   try {
     if (typeof Uint8Array == "undefined")
@@ -138404,9 +121700,6 @@ function u8_to_dataview(array) {
 }
 function u8str(u8) {
   return typeof TextDecoder != "undefined" ? new TextDecoder().decode(u8) : utf8read(a2s(u8));
-}
-function stru8(str) {
-  return typeof TextEncoder != "undefined" ? new TextEncoder().encode(str) : s2a(utf8write(str));
 }
 function u8concat(u8a) {
   var len = 0;
@@ -138438,15 +121731,6 @@ function readDecimal128LE(buf, offset) {
     mantissa = mantissa * 256 + buf[j];
   return (buf[offset + 15] & 128 ? -mantissa : mantissa) * Math.pow(10, exp - 6176);
 }
-function writeDecimal128LE(buf, offset, value) {
-  var exp = Math.floor(value == 0 ? 0 : Math.LOG10E * Math.log(Math.abs(value))) + 6176 - 16;
-  var mantissa = value / Math.pow(10, exp - 6176);
-  buf[offset + 15] |= exp >> 7;
-  buf[offset + 14] |= (exp & 127) << 1;
-  for (var i2 = 0; mantissa >= 1; ++i2, mantissa /= 256)
-    buf[offset + i2] = mantissa & 255;
-  buf[offset + 15] |= value >= 0 ? 0 : 128;
-}
 function parse_varint49(buf, ptr) {
   var l = ptr.l;
   var usz = buf[l] & 127;
@@ -138476,55 +121760,6 @@ function parse_varint49(buf, ptr) {
     }
   ptr.l = l;
   return usz;
-}
-function write_varint49(v) {
-  var usz = new Uint8Array(7);
-  usz[0] = v & 127;
-  var L = 1;
-  sz:
-    if (v > 127) {
-      usz[L - 1] |= 128;
-      usz[L] = v >> 7 & 127;
-      ++L;
-      if (v <= 16383)
-        break sz;
-      usz[L - 1] |= 128;
-      usz[L] = v >> 14 & 127;
-      ++L;
-      if (v <= 2097151)
-        break sz;
-      usz[L - 1] |= 128;
-      usz[L] = v >> 21 & 127;
-      ++L;
-      if (v <= 268435455)
-        break sz;
-      usz[L - 1] |= 128;
-      usz[L] = v / 256 >>> 21 & 127;
-      ++L;
-      if (v <= 34359738367)
-        break sz;
-      usz[L - 1] |= 128;
-      usz[L] = v / 65536 >>> 21 & 127;
-      ++L;
-      if (v <= 4398046511103)
-        break sz;
-      usz[L - 1] |= 128;
-      usz[L] = v / 16777216 >>> 21 & 127;
-      ++L;
-    }
-  return usz[subarray](0, L);
-}
-function parse_packed_varints(buf) {
-  var ptr = { l: 0 };
-  var out = [];
-  while (ptr.l < buf.length)
-    out.push(parse_varint49(buf, ptr));
-  return out;
-}
-function write_packed_varints(nums) {
-  return u8concat(nums.map(function(x2) {
-    return write_varint49(x2);
-  }));
 }
 function varint_to_i32(buf) {
   var l = 0, i32 = buf[l] & 127;
@@ -138589,22 +121824,6 @@ function parse_shallow(buf) {
   }
   return out;
 }
-function write_shallow(proto) {
-  var out = [];
-  proto.forEach(function(field, idx) {
-    if (idx == 0)
-      return;
-    field.forEach(function(item) {
-      if (!item.data)
-        return;
-      out.push(write_varint49(idx * 8 + item.type));
-      if (item.type == 2)
-        out.push(write_varint49(item.data.length));
-      out.push(item.data);
-    });
-  });
-  return u8concat(out);
-}
 function mappa(data, cb) {
   return (data == null ? void 0 : data.map(function(d) {
     return cb(d.data);
@@ -138635,31 +121854,6 @@ function parse_iwa_file(buf) {
     out.push(res);
   }
   return out;
-}
-function write_iwa_file(ias) {
-  var bufs = [];
-  ias.forEach(function(ia) {
-    var ai2 = [
-      [],
-      [{ data: write_varint49(ia.id), type: 0 }],
-      []
-    ];
-    if (ia.merge != null)
-      ai2[3] = [{ data: write_varint49(+!!ia.merge), type: 0 }];
-    var midata = [];
-    ia.messages.forEach(function(mi) {
-      midata.push(mi.data);
-      mi.meta[3] = [{ type: 0, data: write_varint49(mi.data.length) }];
-      ai2[2].push({ data: write_shallow(mi.meta), type: 2 });
-    });
-    var aipayload = write_shallow(ai2);
-    bufs.push(write_varint49(aipayload.length));
-    bufs.push(aipayload);
-    midata.forEach(function(mid) {
-      return bufs.push(mid);
-    });
-  });
-  return u8concat(bufs);
 }
 function parse_snappy_chunk(type, buf) {
   if (type != 0)
@@ -138761,42 +121955,6 @@ function decompress_iwa_file(buf) {
   if (l !== buf.length)
     throw new Error("data is not a valid framed stream!");
   return out.length == 1 ? out[0] : u8concat(out);
-}
-function compress_iwa_file(buf) {
-  var out = [];
-  var l = 0;
-  while (l < buf.length) {
-    var c = Math.min(buf.length - l, 268435455);
-    var frame = new Uint8Array(4);
-    out.push(frame);
-    var usz = write_varint49(c);
-    var L = usz.length;
-    out.push(usz);
-    if (c <= 60) {
-      L++;
-      out.push(new Uint8Array([c - 1 << 2]));
-    } else if (c <= 256) {
-      L += 2;
-      out.push(new Uint8Array([240, c - 1 & 255]));
-    } else if (c <= 65536) {
-      L += 3;
-      out.push(new Uint8Array([244, c - 1 & 255, c - 1 >> 8 & 255]));
-    } else if (c <= 16777216) {
-      L += 4;
-      out.push(new Uint8Array([248, c - 1 & 255, c - 1 >> 8 & 255, c - 1 >> 16 & 255]));
-    } else if (c <= 4294967296) {
-      L += 5;
-      out.push(new Uint8Array([252, c - 1 & 255, c - 1 >> 8 & 255, c - 1 >> 16 & 255, c - 1 >>> 24 & 255]));
-    }
-    out.push(buf[subarray](l, l + c));
-    L += c;
-    frame[0] = 0;
-    frame[1] = L & 255;
-    frame[2] = L >> 8 & 255;
-    frame[3] = L >> 16 & 255;
-    l += c;
-  }
-  return u8concat(out);
 }
 var numbers_lut_new = function() {
   return { sst: [], rsst: [], ofmt: [], nfmt: [], fmla: [], ferr: [], cmnt: [] };
@@ -139098,159 +122256,6 @@ function parse_new_storage(buf, lut, opts) {
     ret.v /= 86400;
   return ret;
 }
-function write_new_storage(cell, lut) {
-  var out = new Uint8Array(32), dv = u8_to_dataview(out), l = 12, fields = 0;
-  out[0] = 5;
-  switch (cell.t) {
-    case "n":
-      if (cell.z && fmt_is_date(cell.z)) {
-        out[1] = 5;
-        dv.setFloat64(l, (numdate(cell.v + 1462).getTime() - Date.UTC(2001, 0, 1)) / 1e3, true);
-        fields |= 4;
-        l += 8;
-        break;
-      } else {
-        out[1] = 2;
-        writeDecimal128LE(out, l, cell.v);
-        fields |= 1;
-        l += 16;
-      }
-      break;
-    case "b":
-      out[1] = 6;
-      dv.setFloat64(l, cell.v ? 1 : 0, true);
-      fields |= 2;
-      l += 8;
-      break;
-    case "s":
-      {
-        var s2 = cell.v == null ? "" : String(cell.v);
-        if (cell.l) {
-          var irsst = lut.rsst.findIndex(function(v) {
-            var _a2;
-            return v.v == s2 && v.l == ((_a2 = cell.l) == null ? void 0 : _a2.Target);
-          });
-          if (irsst == -1)
-            lut.rsst[irsst = lut.rsst.length] = { v: s2, l: cell.l.Target };
-          out[1] = 9;
-          dv.setUint32(l, irsst, true);
-          fields |= 16;
-          l += 4;
-        } else {
-          var isst = lut.sst.indexOf(s2);
-          if (isst == -1)
-            lut.sst[isst = lut.sst.length] = s2;
-          out[1] = 3;
-          dv.setUint32(l, isst, true);
-          fields |= 8;
-          l += 4;
-        }
-      }
-      break;
-    case "d":
-      out[1] = 5;
-      dv.setFloat64(l, (cell.v.getTime() - Date.UTC(2001, 0, 1)) / 1e3, true);
-      fields |= 4;
-      l += 8;
-      break;
-    case "z":
-      out[1] = 0;
-      break;
-    default:
-      throw "unsupported cell type " + cell.t;
-  }
-  if (cell.c) {
-    lut.cmnt.push(s5s_to_iwa_comment(cell.c));
-    dv.setUint32(l, lut.cmnt.length - 1, true);
-    fields |= 524288;
-    l += 4;
-  }
-  dv.setUint32(8, fields, true);
-  return out[subarray](0, l);
-}
-function write_old_storage(cell, lut) {
-  var out = new Uint8Array(32), dv = u8_to_dataview(out), l = 12, fields = 0, s2 = "";
-  out[0] = 4;
-  switch (cell.t) {
-    case "n":
-      break;
-    case "b":
-      break;
-    case "s":
-      {
-        s2 = cell.v == null ? "" : String(cell.v);
-        if (cell.l) {
-          var irsst = lut.rsst.findIndex(function(v) {
-            var _a2;
-            return v.v == s2 && v.l == ((_a2 = cell.l) == null ? void 0 : _a2.Target);
-          });
-          if (irsst == -1)
-            lut.rsst[irsst = lut.rsst.length] = { v: s2, l: cell.l.Target };
-          out[1] = 9;
-          dv.setUint32(l, irsst, true);
-          fields |= 512;
-          l += 4;
-        } else {
-        }
-      }
-      break;
-    case "d":
-      break;
-    case "e":
-      break;
-    case "z":
-      break;
-    default:
-      throw "unsupported cell type " + cell.t;
-  }
-  if (cell.c) {
-    dv.setUint32(l, lut.cmnt.length - 1, true);
-    fields |= 4096;
-    l += 4;
-  }
-  switch (cell.t) {
-    case "n":
-      out[1] = 2;
-      dv.setFloat64(l, cell.v, true);
-      fields |= 32;
-      l += 8;
-      break;
-    case "b":
-      out[1] = 6;
-      dv.setFloat64(l, cell.v ? 1 : 0, true);
-      fields |= 32;
-      l += 8;
-      break;
-    case "s":
-      {
-        s2 = cell.v == null ? "" : String(cell.v);
-        if (cell.l) {
-        } else {
-          var isst = lut.sst.indexOf(s2);
-          if (isst == -1)
-            lut.sst[isst = lut.sst.length] = s2;
-          out[1] = 3;
-          dv.setUint32(l, isst, true);
-          fields |= 16;
-          l += 4;
-        }
-      }
-      break;
-    case "d":
-      out[1] = 5;
-      dv.setFloat64(l, (cell.v.getTime() - Date.UTC(2001, 0, 1)) / 1e3, true);
-      fields |= 64;
-      l += 8;
-      break;
-    case "z":
-      out[1] = 0;
-      break;
-    default:
-      throw "unsupported cell type " + cell.t;
-  }
-  dv.setUint32(8, fields, true);
-  return out[subarray](0, l);
-}
 function parse_cell_storage(buf, lut, opts) {
   switch (buf[0]) {
     case 0:
@@ -139268,28 +122273,6 @@ function parse_cell_storage(buf, lut, opts) {
 function parse_TSP_Reference(buf) {
   var pb = parse_shallow(buf);
   return varint_to_i32(pb[1][0].data);
-}
-function write_TSP_Reference(idx) {
-  return write_shallow([
-    [],
-    [{ type: 0, data: write_varint49(idx) }]
-  ]);
-}
-function numbers_add_oref(iwa, ref) {
-  var _a2;
-  var orefs = ((_a2 = iwa.messages[0].meta[5]) == null ? void 0 : _a2[0]) ? parse_packed_varints(iwa.messages[0].meta[5][0].data) : [];
-  var orefidx = orefs.indexOf(ref);
-  if (orefidx == -1) {
-    orefs.push(ref);
-    iwa.messages[0].meta[5] = [{ type: 2, data: write_packed_varints(orefs) }];
-  }
-}
-function numbers_del_oref(iwa, ref) {
-  var _a2;
-  var orefs = ((_a2 = iwa.messages[0].meta[5]) == null ? void 0 : _a2[0]) ? parse_packed_varints(iwa.messages[0].meta[5][0].data) : [];
-  iwa.messages[0].meta[5] = [{ type: 2, data: write_packed_varints(orefs.filter(function(r2) {
-    return r2 != ref;
-  })) }];
 }
 function parse_TST_TableDataList(M, root) {
   var pb = parse_shallow(root.data);
@@ -139451,18 +122434,6 @@ function iwa_to_s5s_comment(iwa) {
     iwa.replies.forEach(function(reply) {
       out.push({ t: reply.t || "", a: reply.a, T: true });
     });
-  return out;
-}
-function s5s_to_iwa_comment(s5s) {
-  var out = { a: "", t: "", replies: [] };
-  for (var i2 = 0; i2 < s5s.length; ++i2) {
-    if (i2 == 0) {
-      out.a = s5s[i2].a;
-      out.t = s5s[i2].t;
-    } else {
-      out.replies.push({ a: s5s[i2].a, t: s5s[i2].t });
-    }
-  }
   return out;
 }
 function parse_TST_TableModelArchive(M, root, ws, opts) {
@@ -139681,968 +122652,6 @@ function parse_numbers_iwa(cfb, opts) {
     throw new Error("Cannot find Document root");
   return parse_TN_DocumentArchive(M, docroot, opts);
 }
-function write_TST_TileRowInfo(data, lut, wide) {
-  var _a2, _b, _c;
-  var tri = [
-    [],
-    [{ type: 0, data: write_varint49(0) }],
-    [{ type: 0, data: write_varint49(0) }],
-    [{ type: 2, data: new Uint8Array([]) }],
-    [{ type: 2, data: new Uint8Array(Array.from({ length: 510 }, function() {
-      return 255;
-    })) }],
-    [{ type: 0, data: write_varint49(5) }],
-    [{ type: 2, data: new Uint8Array([]) }],
-    [{ type: 2, data: new Uint8Array(Array.from({ length: 510 }, function() {
-      return 255;
-    })) }],
-    [{ type: 0, data: write_varint49(1) }]
-  ];
-  if (!((_a2 = tri[6]) == null ? void 0 : _a2[0]) || !((_b = tri[7]) == null ? void 0 : _b[0]))
-    throw "Mutation only works on post-BNC storages!";
-  var cnt = 0;
-  if (tri[7][0].data.length < 2 * data.length) {
-    var new_7 = new Uint8Array(2 * data.length);
-    new_7.set(tri[7][0].data);
-    tri[7][0].data = new_7;
-  }
-  if (tri[4][0].data.length < 2 * data.length) {
-    var new_4 = new Uint8Array(2 * data.length);
-    new_4.set(tri[4][0].data);
-    tri[4][0].data = new_4;
-  }
-  var dv = u8_to_dataview(tri[7][0].data), last_offset = 0, cell_storage = [];
-  var _dv = u8_to_dataview(tri[4][0].data), _last_offset = 0, _cell_storage = [];
-  var width = wide ? 4 : 1;
-  for (var C = 0; C < data.length; ++C) {
-    if (data[C] == null || data[C].t == "z" && !((_c = data[C].c) == null ? void 0 : _c.length) || data[C].t == "e") {
-      dv.setUint16(C * 2, 65535, true);
-      _dv.setUint16(C * 2, 65535);
-      continue;
-    }
-    dv.setUint16(C * 2, last_offset / width, true);
-    _dv.setUint16(C * 2, _last_offset / width, true);
-    var celload, _celload;
-    switch (data[C].t) {
-      case "d":
-        if (data[C].v instanceof Date) {
-          celload = write_new_storage(data[C], lut);
-          _celload = write_old_storage(data[C], lut);
-          break;
-        }
-        celload = write_new_storage(data[C], lut);
-        _celload = write_old_storage(data[C], lut);
-        break;
-      case "s":
-      case "n":
-      case "b":
-      case "z":
-        celload = write_new_storage(data[C], lut);
-        _celload = write_old_storage(data[C], lut);
-        break;
-      default:
-        throw new Error("Unsupported value " + data[C]);
-    }
-    cell_storage.push(celload);
-    last_offset += celload.length;
-    {
-      _cell_storage.push(_celload);
-      _last_offset += _celload.length;
-    }
-    ++cnt;
-  }
-  tri[2][0].data = write_varint49(cnt);
-  tri[5][0].data = write_varint49(5);
-  for (; C < tri[7][0].data.length / 2; ++C) {
-    dv.setUint16(C * 2, 65535, true);
-    _dv.setUint16(C * 2, 65535, true);
-  }
-  tri[6][0].data = u8concat(cell_storage);
-  tri[3][0].data = u8concat(_cell_storage);
-  tri[8] = [{ type: 0, data: write_varint49(wide ? 1 : 0) }];
-  return tri;
-}
-function write_iwam(type, payload) {
-  return {
-    meta: [
-      [],
-      [{ type: 0, data: write_varint49(type) }]
-    ],
-    data: payload
-  };
-}
-function get_unique_msgid(dep, dependents) {
-  if (!dependents.last)
-    dependents.last = 927262;
-  for (var i2 = dependents.last; i2 < 2e6; ++i2)
-    if (!dependents[i2]) {
-      dependents[dependents.last = i2] = dep;
-      return i2;
-    }
-  throw new Error("Too many messages");
-}
-function build_numbers_deps(cfb) {
-  var dependents = {};
-  var indices = [];
-  cfb.FileIndex.map(function(fi, idx) {
-    return [fi, cfb.FullPaths[idx]];
-  }).forEach(function(row) {
-    var fi = row[0], fp = row[1];
-    if (fi.type != 2)
-      return;
-    if (!fi.name.match(/\.iwa/))
-      return;
-    if (fi.content[0] != 0)
-      return;
-    parse_iwa_file(decompress_iwa_file(fi.content)).forEach(function(packet) {
-      indices.push(packet.id);
-      dependents[packet.id] = { deps: [], location: fp, type: varint_to_i32(packet.messages[0].meta[1][0].data) };
-    });
-  });
-  cfb.FileIndex.forEach(function(fi) {
-    if (!fi.name.match(/\.iwa/))
-      return;
-    if (fi.content[0] != 0)
-      return;
-    parse_iwa_file(decompress_iwa_file(fi.content)).forEach(function(ia) {
-      ia.messages.forEach(function(mess) {
-        [5, 6].forEach(function(f3) {
-          if (!mess.meta[f3])
-            return;
-          mess.meta[f3].forEach(function(x2) {
-            dependents[ia.id].deps.push(varint_to_i32(x2.data));
-          });
-        });
-      });
-    });
-  });
-  return dependents;
-}
-function write_TSP_Color_RGB(r2, g, b) {
-  return write_shallow([
-    [],
-    [{ type: 0, data: write_varint49(1) }],
-    [],
-    [{ type: 5, data: new Uint8Array(Float32Array.from([r2 / 255]).buffer) }],
-    [{ type: 5, data: new Uint8Array(Float32Array.from([g / 255]).buffer) }],
-    [{ type: 5, data: new Uint8Array(Float32Array.from([b / 255]).buffer) }],
-    [{ type: 5, data: new Uint8Array(Float32Array.from([1]).buffer) }],
-    [],
-    [],
-    [],
-    [],
-    [],
-    [{ type: 0, data: write_varint49(1) }]
-  ]);
-}
-function get_author_color(n) {
-  switch (n) {
-    case 0:
-      return write_TSP_Color_RGB(99, 222, 171);
-    case 1:
-      return write_TSP_Color_RGB(162, 197, 240);
-    case 2:
-      return write_TSP_Color_RGB(255, 189, 189);
-  }
-  return write_TSP_Color_RGB(Math.random() * 255, Math.random() * 255, Math.random() * 255);
-}
-function write_numbers_iwa(wb, opts) {
-  if (!opts || !opts.numbers)
-    throw new Error("Must pass a `numbers` option -- check the README");
-  var cfb = CFB.read(opts.numbers, { type: "base64" });
-  var deps = build_numbers_deps(cfb);
-  var docroot = numbers_iwa_find(cfb, deps, 1);
-  if (docroot == null)
-    throw "Could not find message ".concat(1, " in Numbers template");
-  var sheetrefs = mappa(parse_shallow(docroot.messages[0].data)[1], parse_TSP_Reference);
-  if (sheetrefs.length > 1)
-    throw new Error("Template NUMBERS file must have exactly one sheet");
-  wb.SheetNames.forEach(function(name, idx) {
-    if (idx >= 1) {
-      numbers_add_ws(cfb, deps, idx + 1);
-      docroot = numbers_iwa_find(cfb, deps, 1);
-      sheetrefs = mappa(parse_shallow(docroot.messages[0].data)[1], parse_TSP_Reference);
-    }
-    write_numbers_ws(cfb, deps, wb.Sheets[name], name, idx, sheetrefs[idx]);
-  });
-  return cfb;
-}
-function numbers_iwa_doit(cfb, deps, id, cb) {
-  var entry = CFB.find(cfb, deps[id].location);
-  if (!entry)
-    throw "Could not find ".concat(deps[id].location, " in Numbers template");
-  var x2 = parse_iwa_file(decompress_iwa_file(entry.content));
-  var ainfo = x2.find(function(packet) {
-    return packet.id == id;
-  });
-  cb(ainfo, x2);
-  entry.content = compress_iwa_file(write_iwa_file(x2));
-  entry.size = entry.content.length;
-}
-function numbers_iwa_find(cfb, deps, id) {
-  var entry = CFB.find(cfb, deps[id].location);
-  if (!entry)
-    throw "Could not find ".concat(deps[id].location, " in Numbers template");
-  var x2 = parse_iwa_file(decompress_iwa_file(entry.content));
-  var ainfo = x2.find(function(packet) {
-    return packet.id == id;
-  });
-  return ainfo;
-}
-function numbers_add_meta(mlist, newid, newloc) {
-  mlist[3].push({ type: 2, data: write_shallow([
-    [],
-    [{ type: 0, data: write_varint49(newid) }],
-    [{ type: 2, data: stru8(newloc.replace(/-[\s\S]*$/, "")) }],
-    [{ type: 2, data: stru8(newloc) }],
-    [{ type: 2, data: new Uint8Array([2, 0, 0]) }],
-    [{ type: 2, data: new Uint8Array([2, 0, 0]) }],
-    [],
-    [],
-    [],
-    [],
-    [{ type: 0, data: write_varint49(0) }],
-    [],
-    [{ type: 0, data: write_varint49(0) }]
-  ]) });
-  mlist[1] = [{ type: 0, data: write_varint49(Math.max(newid + 1, varint_to_i32(mlist[1][0].data))) }];
-}
-function numbers_add_msg(cfb, type, msg, path3, deps, id) {
-  if (!id)
-    id = get_unique_msgid({ deps: [], location: "", type }, deps);
-  var loc = "".concat(path3, "-").concat(id, ".iwa");
-  deps[id].location = "Root Entry" + loc;
-  CFB.utils.cfb_add(cfb, loc, compress_iwa_file(write_iwa_file([{
-    id,
-    messages: [write_iwam(type, write_shallow(msg))]
-  }])));
-  var newloc = loc.replace(/^[\/]/, "").replace(/^Index\//, "").replace(/\.iwa$/, "");
-  numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-    var mlist = parse_shallow(ai2.messages[0].data);
-    numbers_add_meta(mlist, id || 0, newloc);
-    ai2.messages[0].data = write_shallow(mlist);
-  });
-  return id;
-}
-function numbers_meta_add_dep(mlist, deps, id, dep) {
-  var loc = deps[id].location.replace(/^Root Entry\//, "").replace(/^Index\//, "").replace(/\.iwa$/, "");
-  var parentidx = mlist[3].findIndex(function(m2) {
-    var _a2, _b;
-    var mm = parse_shallow(m2.data);
-    if ((_a2 = mm[3]) == null ? void 0 : _a2[0])
-      return u8str(mm[3][0].data) == loc;
-    if (((_b = mm[2]) == null ? void 0 : _b[0]) && u8str(mm[2][0].data) == loc)
-      return true;
-    return false;
-  });
-  var parent = parse_shallow(mlist[3][parentidx].data);
-  if (!parent[6])
-    parent[6] = [];
-  (Array.isArray(dep) ? dep : [dep]).forEach(function(dep2) {
-    parent[6].push({
-      type: 2,
-      data: write_shallow([
-        [],
-        [{ type: 0, data: write_varint49(dep2) }]
-      ])
-    });
-  });
-  mlist[3][parentidx].data = write_shallow(parent);
-}
-function numbers_meta_del_dep(mlist, deps, id, dep) {
-  var loc = deps[id].location.replace(/^Root Entry\//, "").replace(/^Index\//, "").replace(/\.iwa$/, "");
-  var parentidx = mlist[3].findIndex(function(m2) {
-    var _a2, _b;
-    var mm = parse_shallow(m2.data);
-    if ((_a2 = mm[3]) == null ? void 0 : _a2[0])
-      return u8str(mm[3][0].data) == loc;
-    if (((_b = mm[2]) == null ? void 0 : _b[0]) && u8str(mm[2][0].data) == loc)
-      return true;
-    return false;
-  });
-  var parent = parse_shallow(mlist[3][parentidx].data);
-  if (!parent[6])
-    parent[6] = [];
-  parent[6] = parent[6].filter(function(m2) {
-    return varint_to_i32(parse_shallow(m2.data)[1][0].data) != dep;
-  });
-  mlist[3][parentidx].data = write_shallow(parent);
-}
-function numbers_add_ws(cfb, deps, wsidx) {
-  var sheetref = -1, newsheetref = -1;
-  var remap = {};
-  numbers_iwa_doit(cfb, deps, 1, function(docroot, arch) {
-    var doc = parse_shallow(docroot.messages[0].data);
-    sheetref = parse_TSP_Reference(parse_shallow(docroot.messages[0].data)[1][0].data);
-    newsheetref = get_unique_msgid({ deps: [1], location: deps[sheetref].location, type: 2 }, deps);
-    remap[sheetref] = newsheetref;
-    numbers_add_oref(docroot, newsheetref);
-    doc[1].push({ type: 2, data: write_TSP_Reference(newsheetref) });
-    var sheet = numbers_iwa_find(cfb, deps, sheetref);
-    sheet.id = newsheetref;
-    if (deps[1].location == deps[newsheetref].location)
-      arch.push(sheet);
-    else
-      numbers_iwa_doit(cfb, deps, newsheetref, function(_, x2) {
-        return x2.push(sheet);
-      });
-    docroot.messages[0].data = write_shallow(doc);
-  });
-  var tiaref = -1;
-  numbers_iwa_doit(cfb, deps, newsheetref, function(sheetroot, arch) {
-    var sa = parse_shallow(sheetroot.messages[0].data);
-    for (var i2 = 3; i2 <= 69; ++i2)
-      delete sa[i2];
-    var drawables = mappa(sa[2], parse_TSP_Reference);
-    drawables.forEach(function(n) {
-      return numbers_del_oref(sheetroot, n);
-    });
-    tiaref = get_unique_msgid({ deps: [newsheetref], location: deps[drawables[0]].location, type: deps[drawables[0]].type }, deps);
-    numbers_add_oref(sheetroot, tiaref);
-    remap[drawables[0]] = tiaref;
-    sa[2] = [{ type: 2, data: write_TSP_Reference(tiaref) }];
-    var tia = numbers_iwa_find(cfb, deps, drawables[0]);
-    tia.id = tiaref;
-    if (deps[drawables[0]].location == deps[newsheetref].location)
-      arch.push(tia);
-    else {
-      numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-        var mlist = parse_shallow(ai2.messages[0].data);
-        numbers_meta_add_dep(mlist, deps, newsheetref, tiaref);
-        ai2.messages[0].data = write_shallow(mlist);
-      });
-      numbers_iwa_doit(cfb, deps, tiaref, function(_, x2) {
-        return x2.push(tia);
-      });
-    }
-    sheetroot.messages[0].data = write_shallow(sa);
-  });
-  var tmaref = -1;
-  numbers_iwa_doit(cfb, deps, tiaref, function(tiaroot, arch) {
-    var tia = parse_shallow(tiaroot.messages[0].data);
-    var da = parse_shallow(tia[1][0].data);
-    for (var i2 = 3; i2 <= 69; ++i2)
-      delete da[i2];
-    var dap = parse_TSP_Reference(da[2][0].data);
-    da[2][0].data = write_TSP_Reference(remap[dap]);
-    tia[1][0].data = write_shallow(da);
-    var oldtmaref = parse_TSP_Reference(tia[2][0].data);
-    numbers_del_oref(tiaroot, oldtmaref);
-    tmaref = get_unique_msgid({ deps: [tiaref], location: deps[oldtmaref].location, type: deps[oldtmaref].type }, deps);
-    numbers_add_oref(tiaroot, tmaref);
-    remap[oldtmaref] = tmaref;
-    tia[2][0].data = write_TSP_Reference(tmaref);
-    var tma = numbers_iwa_find(cfb, deps, oldtmaref);
-    tma.id = tmaref;
-    if (deps[tiaref].location == deps[tmaref].location)
-      arch.push(tma);
-    else
-      numbers_iwa_doit(cfb, deps, tmaref, function(_, x2) {
-        return x2.push(tma);
-      });
-    tiaroot.messages[0].data = write_shallow(tia);
-  });
-  numbers_iwa_doit(cfb, deps, tmaref, function(tmaroot, arch) {
-    var _a2, _b;
-    var tma = parse_shallow(tmaroot.messages[0].data);
-    var uuid = u8str(tma[1][0].data), new_uuid = uuid.replace(/-[A-Z0-9]*/, "-".concat(("0000" + wsidx.toString(16)).slice(-4)));
-    tma[1][0].data = stru8(new_uuid);
-    [12, 13, 29, 31, 32, 33, 39, 44, 47, 81, 82, 84].forEach(function(n) {
-      return delete tma[n];
-    });
-    if (tma[45]) {
-      var srrta = parse_shallow(tma[45][0].data);
-      var ref = parse_TSP_Reference(srrta[1][0].data);
-      numbers_del_oref(tmaroot, ref);
-      delete tma[45];
-    }
-    if (tma[70]) {
-      var hsoa = parse_shallow(tma[70][0].data);
-      (_a2 = hsoa[2]) == null ? void 0 : _a2.forEach(function(item) {
-        var hsa = parse_shallow(item.data);
-        [2, 3].map(function(n) {
-          return hsa[n][0];
-        }).forEach(function(hseadata) {
-          var hsea = parse_shallow(hseadata.data);
-          if (!hsea[8])
-            return;
-          var ref2 = parse_TSP_Reference(hsea[8][0].data);
-          numbers_del_oref(tmaroot, ref2);
-        });
-      });
-      delete tma[70];
-    }
-    [
-      46,
-      30,
-      34,
-      35,
-      36,
-      38,
-      48,
-      49,
-      60,
-      61,
-      62,
-      63,
-      64,
-      71,
-      72,
-      73,
-      74,
-      75,
-      85,
-      86,
-      87,
-      88,
-      89
-    ].forEach(function(n) {
-      if (!tma[n])
-        return;
-      var ref2 = parse_TSP_Reference(tma[n][0].data);
-      delete tma[n];
-      numbers_del_oref(tmaroot, ref2);
-    });
-    var store = parse_shallow(tma[4][0].data);
-    {
-      [2, 4, 5, 6, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22].forEach(function(n) {
-        var _a22;
-        if (!((_a22 = store[n]) == null ? void 0 : _a22[0]))
-          return;
-        var oldref = parse_TSP_Reference(store[n][0].data);
-        var newref = get_unique_msgid({ deps: [tmaref], location: deps[oldref].location, type: deps[oldref].type }, deps);
-        numbers_del_oref(tmaroot, oldref);
-        numbers_add_oref(tmaroot, newref);
-        remap[oldref] = newref;
-        var msg = numbers_iwa_find(cfb, deps, oldref);
-        msg.id = newref;
-        if (deps[oldref].location == deps[tmaref].location)
-          arch.push(msg);
-        else {
-          deps[newref].location = deps[oldref].location.replace(oldref.toString(), newref.toString());
-          if (deps[newref].location == deps[oldref].location)
-            deps[newref].location = deps[newref].location.replace(/\.iwa/, "-".concat(newref, ".iwa"));
-          CFB.utils.cfb_add(cfb, deps[newref].location, compress_iwa_file(write_iwa_file([msg])));
-          var newloc = deps[newref].location.replace(/^Root Entry\//, "").replace(/^Index\//, "").replace(/\.iwa$/, "");
-          numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-            var mlist = parse_shallow(ai2.messages[0].data);
-            numbers_add_meta(mlist, newref, newloc);
-            numbers_meta_add_dep(mlist, deps, tmaref, newref);
-            ai2.messages[0].data = write_shallow(mlist);
-          });
-        }
-        store[n][0].data = write_TSP_Reference(newref);
-      });
-      var row_headers = parse_shallow(store[1][0].data);
-      {
-        (_b = row_headers[2]) == null ? void 0 : _b.forEach(function(tspref) {
-          var oldref = parse_TSP_Reference(tspref.data);
-          var newref = get_unique_msgid({ deps: [tmaref], location: deps[oldref].location, type: deps[oldref].type }, deps);
-          numbers_del_oref(tmaroot, oldref);
-          numbers_add_oref(tmaroot, newref);
-          remap[oldref] = newref;
-          var msg = numbers_iwa_find(cfb, deps, oldref);
-          msg.id = newref;
-          if (deps[oldref].location == deps[tmaref].location) {
-            arch.push(msg);
-          } else {
-            deps[newref].location = deps[oldref].location.replace(oldref.toString(), newref.toString());
-            if (deps[newref].location == deps[oldref].location)
-              deps[newref].location = deps[newref].location.replace(/\.iwa/, "-".concat(newref, ".iwa"));
-            CFB.utils.cfb_add(cfb, deps[newref].location, compress_iwa_file(write_iwa_file([msg])));
-            var newloc = deps[newref].location.replace(/^Root Entry\//, "").replace(/^Index\//, "").replace(/\.iwa$/, "");
-            numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-              var mlist = parse_shallow(ai2.messages[0].data);
-              numbers_add_meta(mlist, newref, newloc);
-              numbers_meta_add_dep(mlist, deps, tmaref, newref);
-              ai2.messages[0].data = write_shallow(mlist);
-            });
-          }
-          tspref.data = write_TSP_Reference(newref);
-        });
-      }
-      store[1][0].data = write_shallow(row_headers);
-      var tiles = parse_shallow(store[3][0].data);
-      {
-        tiles[1].forEach(function(t2) {
-          var tst = parse_shallow(t2.data);
-          var oldtileref = parse_TSP_Reference(tst[2][0].data);
-          var newtileref = remap[oldtileref];
-          if (!remap[oldtileref]) {
-            newtileref = get_unique_msgid({ deps: [tmaref], location: "", type: deps[oldtileref].type }, deps);
-            deps[newtileref].location = "Root Entry/Index/Tables/Tile-".concat(newtileref, ".iwa");
-            remap[oldtileref] = newtileref;
-            var oldtile = numbers_iwa_find(cfb, deps, oldtileref);
-            oldtile.id = newtileref;
-            numbers_del_oref(tmaroot, oldtileref);
-            numbers_add_oref(tmaroot, newtileref);
-            CFB.utils.cfb_add(cfb, "/Index/Tables/Tile-".concat(newtileref, ".iwa"), compress_iwa_file(write_iwa_file([oldtile])));
-            numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-              var mlist = parse_shallow(ai2.messages[0].data);
-              mlist[3].push({ type: 2, data: write_shallow([
-                [],
-                [{ type: 0, data: write_varint49(newtileref) }],
-                [{ type: 2, data: stru8("Tables/Tile") }],
-                [{ type: 2, data: stru8("Tables/Tile-".concat(newtileref)) }],
-                [{ type: 2, data: new Uint8Array([2, 0, 0]) }],
-                [{ type: 2, data: new Uint8Array([2, 0, 0]) }],
-                [],
-                [],
-                [],
-                [],
-                [{ type: 0, data: write_varint49(0) }],
-                [],
-                [{ type: 0, data: write_varint49(0) }]
-              ]) });
-              mlist[1] = [{ type: 0, data: write_varint49(Math.max(newtileref + 1, varint_to_i32(mlist[1][0].data))) }];
-              numbers_meta_add_dep(mlist, deps, tmaref, newtileref);
-              ai2.messages[0].data = write_shallow(mlist);
-            });
-          }
-          tst[2][0].data = write_TSP_Reference(newtileref);
-          t2.data = write_shallow(tst);
-        });
-      }
-      store[3][0].data = write_shallow(tiles);
-    }
-    tma[4][0].data = write_shallow(store);
-    tmaroot.messages[0].data = write_shallow(tma);
-  });
-}
-function write_numbers_ws(cfb, deps, ws, wsname, sheetidx, rootref) {
-  var drawables = [];
-  numbers_iwa_doit(cfb, deps, rootref, function(docroot) {
-    var sheetref = parse_shallow(docroot.messages[0].data);
-    {
-      sheetref[1] = [{ type: 2, data: stru8(wsname) }];
-      drawables = mappa(sheetref[2], parse_TSP_Reference);
-    }
-    docroot.messages[0].data = write_shallow(sheetref);
-  });
-  var tia = numbers_iwa_find(cfb, deps, drawables[0]);
-  var tmaref = parse_TSP_Reference(parse_shallow(tia.messages[0].data)[2][0].data);
-  numbers_iwa_doit(cfb, deps, tmaref, function(docroot, x2) {
-    return write_numbers_tma(cfb, deps, ws, docroot, x2, tmaref);
-  });
-}
-var USE_WIDE_ROWS = true;
-function write_numbers_tma(cfb, deps, ws, tmaroot, tmafile, tmaref) {
-  if (!ws["!ref"])
-    throw new Error("Cannot export empty sheet to NUMBERS");
-  var range = decode_range(ws["!ref"]);
-  range.s.r = range.s.c = 0;
-  var trunc = false;
-  if (range.e.c > 999) {
-    trunc = true;
-    range.e.c = 999;
-  }
-  if (range.e.r > 999999) {
-    trunc = true;
-    range.e.r = 999999;
-  }
-  if (trunc)
-    console.error("Truncating to ".concat(encode_range(range)));
-  var data = [];
-  if (ws["!data"])
-    data = ws["!data"];
-  else {
-    var colstr = [];
-    for (var _C = 0; _C <= range.e.c; ++_C)
-      colstr[_C] = encode_col(_C);
-    for (var R_ = 0; R_ <= range.e.r; ++R_) {
-      data[R_] = [];
-      var _R = "" + (R_ + 1);
-      for (_C = 0; _C <= range.e.c; ++_C) {
-        var _cell = ws[colstr[_C] + _R];
-        if (!_cell)
-          continue;
-        data[R_][_C] = _cell;
-      }
-    }
-  }
-  var LUT = {
-    cmnt: [{ a: "~54ee77S~", t: "... the people who are crazy enough to think they can change the world, are the ones who do." }],
-    ferr: [],
-    fmla: [],
-    nfmt: [],
-    ofmt: [],
-    rsst: [{ v: "~54ee77S~", l: "https://sheetjs.com/" }],
-    sst: ["~Sh33tJ5~"]
-  };
-  var pb = parse_shallow(tmaroot.messages[0].data);
-  {
-    pb[6][0].data = write_varint49(range.e.r + 1);
-    pb[7][0].data = write_varint49(range.e.c + 1);
-    delete pb[46];
-    var store = parse_shallow(pb[4][0].data);
-    {
-      var row_header_ref = parse_TSP_Reference(parse_shallow(store[1][0].data)[2][0].data);
-      numbers_iwa_doit(cfb, deps, row_header_ref, function(rowhead, _x) {
-        var _a2;
-        var base_bucket = parse_shallow(rowhead.messages[0].data);
-        if ((_a2 = base_bucket == null ? void 0 : base_bucket[2]) == null ? void 0 : _a2[0])
-          for (var R2 = 0; R2 < data.length; ++R2) {
-            var _bucket = parse_shallow(base_bucket[2][0].data);
-            _bucket[1][0].data = write_varint49(R2);
-            _bucket[4][0].data = write_varint49(data[R2].length);
-            base_bucket[2][R2] = { type: base_bucket[2][0].type, data: write_shallow(_bucket) };
-          }
-        rowhead.messages[0].data = write_shallow(base_bucket);
-      });
-      var col_header_ref = parse_TSP_Reference(store[2][0].data);
-      numbers_iwa_doit(cfb, deps, col_header_ref, function(colhead, _x) {
-        var base_bucket = parse_shallow(colhead.messages[0].data);
-        for (var C = 0; C <= range.e.c; ++C) {
-          var _bucket = parse_shallow(base_bucket[2][0].data);
-          _bucket[1][0].data = write_varint49(C);
-          _bucket[4][0].data = write_varint49(range.e.r + 1);
-          base_bucket[2][C] = { type: base_bucket[2][0].type, data: write_shallow(_bucket) };
-        }
-        colhead.messages[0].data = write_shallow(base_bucket);
-      });
-      var rbtree = parse_shallow(store[9][0].data);
-      rbtree[1] = [];
-      var tilestore = parse_shallow(store[3][0].data);
-      {
-        var tstride = 256;
-        tilestore[2] = [{ type: 0, data: write_varint49(tstride) }];
-        var tileref = parse_TSP_Reference(parse_shallow(tilestore[1][0].data)[2][0].data);
-        var save_token = (function() {
-          var metadata = numbers_iwa_find(cfb, deps, 2);
-          var mlist = parse_shallow(metadata.messages[0].data);
-          var mlst = mlist[3].filter(function(m2) {
-            return varint_to_i32(parse_shallow(m2.data)[1][0].data) == tileref;
-          });
-          return (mlst == null ? void 0 : mlst.length) ? varint_to_i32(parse_shallow(mlst[0].data)[12][0].data) : 0;
-        })();
-        {
-          CFB.utils.cfb_del(cfb, deps[tileref].location);
-          numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-            var mlist = parse_shallow(ai2.messages[0].data);
-            mlist[3] = mlist[3].filter(function(m2) {
-              return varint_to_i32(parse_shallow(m2.data)[1][0].data) != tileref;
-            });
-            numbers_meta_del_dep(mlist, deps, tmaref, tileref);
-            ai2.messages[0].data = write_shallow(mlist);
-          });
-          numbers_del_oref(tmaroot, tileref);
-        }
-        tilestore[1] = [];
-        var ntiles = Math.ceil((range.e.r + 1) / tstride);
-        for (var tidx = 0; tidx < ntiles; ++tidx) {
-          var newtileid = get_unique_msgid({
-            deps: [],
-            location: "",
-            type: 6002
-          }, deps);
-          deps[newtileid].location = "Root Entry/Index/Tables/Tile-".concat(newtileid, ".iwa");
-          var tiledata = [
-            [],
-            [{ type: 0, data: write_varint49(0) }],
-            [{ type: 0, data: write_varint49(Math.min(range.e.r + 1, (tidx + 1) * tstride)) }],
-            [{ type: 0, data: write_varint49(0) }],
-            [{ type: 0, data: write_varint49(Math.min((tidx + 1) * tstride, range.e.r + 1) - tidx * tstride) }],
-            [],
-            [{ type: 0, data: write_varint49(5) }],
-            [{ type: 0, data: write_varint49(1) }],
-            [{ type: 0, data: write_varint49(USE_WIDE_ROWS ? 1 : 0) }]
-          ];
-          for (var R = tidx * tstride; R <= Math.min(range.e.r, (tidx + 1) * tstride - 1); ++R) {
-            var tilerow = write_TST_TileRowInfo(data[R], LUT, USE_WIDE_ROWS);
-            tilerow[1][0].data = write_varint49(R - tidx * tstride);
-            tiledata[5].push({ data: write_shallow(tilerow), type: 2 });
-          }
-          tilestore[1].push({ type: 2, data: write_shallow([
-            [],
-            [{ type: 0, data: write_varint49(tidx) }],
-            [{ type: 2, data: write_TSP_Reference(newtileid) }]
-          ]) });
-          var newtile = {
-            id: newtileid,
-            messages: [write_iwam(6002, write_shallow(tiledata))]
-          };
-          var tilecontent = compress_iwa_file(write_iwa_file([newtile]));
-          CFB.utils.cfb_add(cfb, "/Index/Tables/Tile-".concat(newtileid, ".iwa"), tilecontent);
-          numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-            var mlist = parse_shallow(ai2.messages[0].data);
-            mlist[3].push({ type: 2, data: write_shallow([
-              [],
-              [{ type: 0, data: write_varint49(newtileid) }],
-              [{ type: 2, data: stru8("Tables/Tile") }],
-              [{ type: 2, data: stru8("Tables/Tile-".concat(newtileid)) }],
-              [{ type: 2, data: new Uint8Array([2, 0, 0]) }],
-              [{ type: 2, data: new Uint8Array([2, 0, 0]) }],
-              [],
-              [],
-              [],
-              [],
-              [{ type: 0, data: write_varint49(0) }],
-              [],
-              [{ type: 0, data: write_varint49(save_token) }]
-            ]) });
-            mlist[1] = [{ type: 0, data: write_varint49(Math.max(newtileid + 1, varint_to_i32(mlist[1][0].data))) }];
-            numbers_meta_add_dep(mlist, deps, tmaref, newtileid);
-            ai2.messages[0].data = write_shallow(mlist);
-          });
-          numbers_add_oref(tmaroot, newtileid);
-          rbtree[1].push({ type: 2, data: write_shallow([
-            [],
-            [{ type: 0, data: write_varint49(tidx * tstride) }],
-            [{ type: 0, data: write_varint49(tidx) }]
-          ]) });
-        }
-      }
-      store[3][0].data = write_shallow(tilestore);
-      store[9][0].data = write_shallow(rbtree);
-      store[10] = [{ type: 2, data: new Uint8Array([]) }];
-      if (ws["!merges"]) {
-        var mergeid = get_unique_msgid({
-          type: 6144,
-          deps: [tmaref],
-          location: deps[tmaref].location
-        }, deps);
-        tmafile.push({
-          id: mergeid,
-          messages: [write_iwam(6144, write_shallow([
-            [],
-            ws["!merges"].map(function(m2) {
-              return { type: 2, data: write_shallow([
-                [],
-                [{ type: 2, data: write_shallow([
-                  [],
-                  [{ type: 5, data: new Uint8Array(new Uint16Array([m2.s.r, m2.s.c]).buffer) }]
-                ]) }],
-                [{ type: 2, data: write_shallow([
-                  [],
-                  [{ type: 5, data: new Uint8Array(new Uint16Array([m2.e.r - m2.s.r + 1, m2.e.c - m2.s.c + 1]).buffer) }]
-                ]) }]
-              ]) };
-            })
-          ]))]
-        });
-        store[13] = [{ type: 2, data: write_TSP_Reference(mergeid) }];
-        numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-          var mlist = parse_shallow(ai2.messages[0].data);
-          numbers_meta_add_dep(mlist, deps, tmaref, mergeid);
-          ai2.messages[0].data = write_shallow(mlist);
-        });
-        numbers_add_oref(tmaroot, mergeid);
-      } else
-        delete store[13];
-      var sstref = parse_TSP_Reference(store[4][0].data);
-      numbers_iwa_doit(cfb, deps, sstref, function(sstroot) {
-        var sstdata = parse_shallow(sstroot.messages[0].data);
-        {
-          sstdata[3] = [];
-          LUT.sst.forEach(function(str, i2) {
-            if (i2 == 0)
-              return;
-            sstdata[3].push({ type: 2, data: write_shallow([
-              [],
-              [{ type: 0, data: write_varint49(i2) }],
-              [{ type: 0, data: write_varint49(1) }],
-              [{ type: 2, data: stru8(str) }]
-            ]) });
-          });
-        }
-        sstroot.messages[0].data = write_shallow(sstdata);
-      });
-      var rsstref = parse_TSP_Reference(store[17][0].data);
-      numbers_iwa_doit(cfb, deps, rsstref, function(rsstroot) {
-        var rsstdata = parse_shallow(rsstroot.messages[0].data);
-        rsstdata[3] = [];
-        var style_indices = [
-          904980,
-          903835,
-          903815,
-          903845
-        ];
-        LUT.rsst.forEach(function(rsst, i2) {
-          if (i2 == 0)
-            return;
-          var tswpsa = [
-            [],
-            [{ type: 0, data: new Uint8Array([5]) }],
-            [],
-            [{ type: 2, data: stru8(rsst.v) }]
-          ];
-          tswpsa[10] = [{ type: 0, data: new Uint8Array([1]) }];
-          tswpsa[19] = [{ type: 2, data: new Uint8Array([10, 6, 8, 0, 18, 2, 101, 110]) }];
-          tswpsa[5] = [{ type: 2, data: new Uint8Array([10, 8, 8, 0, 18, 4, 8, 155, 149, 55]) }];
-          tswpsa[2] = [{ type: 2, data: new Uint8Array([8, 148, 158, 55]) }];
-          tswpsa[6] = [{ type: 2, data: new Uint8Array([10, 6, 8, 0, 16, 0, 24, 0]) }];
-          tswpsa[7] = [{ type: 2, data: new Uint8Array([10, 8, 8, 0, 18, 4, 8, 135, 149, 55]) }];
-          tswpsa[8] = [{ type: 2, data: new Uint8Array([10, 8, 8, 0, 18, 4, 8, 165, 149, 55]) }];
-          tswpsa[14] = [{ type: 2, data: new Uint8Array([10, 6, 8, 0, 16, 0, 24, 0]) }];
-          tswpsa[24] = [{ type: 2, data: new Uint8Array([10, 6, 8, 0, 16, 0, 24, 0]) }];
-          var tswpsaid = get_unique_msgid({ deps: [], location: "", type: 2001 }, deps);
-          var tswpsarefs = [];
-          if (rsst.l) {
-            var newhlinkid = numbers_add_msg(cfb, 2032, [
-              [],
-              [],
-              [{ type: 2, data: stru8(rsst.l) }]
-            ], "/Index/Tables/DataList", deps);
-            tswpsa[11] = [];
-            var smartfield = [[], []];
-            if (!smartfield[1])
-              smartfield[1] = [];
-            smartfield[1].push({ type: 2, data: write_shallow([
-              [],
-              [{ type: 0, data: write_varint49(0) }],
-              [{ type: 2, data: write_TSP_Reference(newhlinkid) }]
-            ]) });
-            tswpsa[11][0] = { type: 2, data: write_shallow(smartfield) };
-            tswpsarefs.push(newhlinkid);
-          }
-          numbers_add_msg(cfb, 2001, tswpsa, "/Index/Tables/DataList", deps, tswpsaid);
-          numbers_iwa_doit(cfb, deps, tswpsaid, function(iwa) {
-            style_indices.forEach(function(ref) {
-              return numbers_add_oref(iwa, ref);
-            });
-            tswpsarefs.forEach(function(ref) {
-              return numbers_add_oref(iwa, ref);
-            });
-          });
-          var rtpaid = numbers_add_msg(cfb, 6218, [
-            [],
-            [{ type: 2, data: write_TSP_Reference(tswpsaid) }],
-            [],
-            [{ type: 2, data: new Uint8Array([13, 255, 255, 255, 0, 18, 10, 16, 255, 255, 1, 24, 255, 255, 255, 255, 7]) }]
-          ], "/Index/Tables/DataList", deps);
-          numbers_iwa_doit(cfb, deps, rtpaid, function(iwa) {
-            return numbers_add_oref(iwa, tswpsaid);
-          });
-          rsstdata[3].push({ type: 2, data: write_shallow([
-            [],
-            [{ type: 0, data: write_varint49(i2) }],
-            [{ type: 0, data: write_varint49(1) }],
-            [],
-            [],
-            [],
-            [],
-            [],
-            [],
-            [{ type: 2, data: write_TSP_Reference(rtpaid) }]
-          ]) });
-          numbers_add_oref(rsstroot, rtpaid);
-          numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-            var mlist = parse_shallow(ai2.messages[0].data);
-            numbers_meta_add_dep(mlist, deps, rsstref, rtpaid);
-            numbers_meta_add_dep(mlist, deps, rtpaid, tswpsaid);
-            numbers_meta_add_dep(mlist, deps, tswpsaid, tswpsarefs);
-            numbers_meta_add_dep(mlist, deps, tswpsaid, style_indices);
-            ai2.messages[0].data = write_shallow(mlist);
-          });
-        });
-        rsstroot.messages[0].data = write_shallow(rsstdata);
-      });
-      if (LUT.cmnt.length > 1) {
-        var cmntref = parse_TSP_Reference(store[19][0].data);
-        var authors = {}, iauthor = 0;
-        numbers_iwa_doit(cfb, deps, cmntref, function(cmntroot) {
-          var cmntdata = parse_shallow(cmntroot.messages[0].data);
-          {
-            cmntdata[3] = [];
-            LUT.cmnt.forEach(function(cc, i2) {
-              if (i2 == 0)
-                return;
-              var replies = [];
-              if (cc.replies)
-                cc.replies.forEach(function(c) {
-                  if (!authors[c.a || ""])
-                    authors[c.a || ""] = numbers_add_msg(cfb, 212, [
-                      [],
-                      [{ type: 2, data: stru8(c.a || "") }],
-                      [{ type: 2, data: get_author_color(++iauthor) }],
-                      [],
-                      [{ type: 0, data: write_varint49(0) }]
-                    ], "/Index/Tables/DataList", deps);
-                  var aaaid2 = authors[c.a || ""];
-                  var csaid2 = numbers_add_msg(cfb, 3056, [
-                    [],
-                    [{ type: 2, data: stru8(c.t || "") }],
-                    [{ type: 2, data: write_shallow([
-                      [],
-                      [{ type: 1, data: new Uint8Array([0, 0, 0, 128, 116, 109, 182, 65]) }]
-                    ]) }],
-                    [{ type: 2, data: write_TSP_Reference(aaaid2) }]
-                  ], "/Index/Tables/DataList", deps);
-                  numbers_iwa_doit(cfb, deps, csaid2, function(iwa) {
-                    return numbers_add_oref(iwa, aaaid2);
-                  });
-                  replies.push(csaid2);
-                  numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-                    var mlist = parse_shallow(ai2.messages[0].data);
-                    numbers_meta_add_dep(mlist, deps, csaid2, aaaid2);
-                    ai2.messages[0].data = write_shallow(mlist);
-                  });
-                });
-              if (!authors[cc.a || ""])
-                authors[cc.a || ""] = numbers_add_msg(cfb, 212, [
-                  [],
-                  [{ type: 2, data: stru8(cc.a || "") }],
-                  [{ type: 2, data: get_author_color(++iauthor) }],
-                  [],
-                  [{ type: 0, data: write_varint49(0) }]
-                ], "/Index/Tables/DataList", deps);
-              var aaaid = authors[cc.a || ""];
-              var csaid = numbers_add_msg(cfb, 3056, [
-                [],
-                [{ type: 2, data: stru8(cc.t || "") }],
-                [{ type: 2, data: write_shallow([
-                  [],
-                  [{ type: 1, data: new Uint8Array([0, 0, 0, 128, 116, 109, 182, 65]) }]
-                ]) }],
-                [{ type: 2, data: write_TSP_Reference(aaaid) }],
-                replies.map(function(r2) {
-                  return { type: 2, data: write_TSP_Reference(r2) };
-                }),
-                [{ type: 2, data: write_shallow([
-                  [],
-                  [{ type: 0, data: write_varint49(i2) }],
-                  [{ type: 0, data: write_varint49(0) }]
-                ]) }]
-              ], "/Index/Tables/DataList", deps);
-              numbers_iwa_doit(cfb, deps, csaid, function(iwa) {
-                numbers_add_oref(iwa, aaaid);
-                replies.forEach(function(r2) {
-                  return numbers_add_oref(iwa, r2);
-                });
-              });
-              cmntdata[3].push({ type: 2, data: write_shallow([
-                [],
-                [{ type: 0, data: write_varint49(i2) }],
-                [{ type: 0, data: write_varint49(1) }],
-                [],
-                [],
-                [],
-                [],
-                [],
-                [],
-                [],
-                [{ type: 2, data: write_TSP_Reference(csaid) }]
-              ]) });
-              numbers_add_oref(cmntroot, csaid);
-              numbers_iwa_doit(cfb, deps, 2, function(ai2) {
-                var mlist = parse_shallow(ai2.messages[0].data);
-                numbers_meta_add_dep(mlist, deps, cmntref, csaid);
-                numbers_meta_add_dep(mlist, deps, csaid, aaaid);
-                if (replies.length)
-                  numbers_meta_add_dep(mlist, deps, csaid, replies);
-                ai2.messages[0].data = write_shallow(mlist);
-              });
-            });
-          }
-          cmntdata[2][0].data = write_varint49(LUT.cmnt.length + 1);
-          cmntroot.messages[0].data = write_shallow(cmntdata);
-        });
-      }
-    }
-    pb[4][0].data = write_shallow(store);
-  }
-  tmaroot.messages[0].data = write_shallow(pb);
-}
 function fix_opts_func(defaults) {
   return function fix_opts(opts) {
     for (var i2 = 0; i2 != defaults.length; ++i2) {
@@ -140682,20 +122691,6 @@ function fix_read_opts(opts) {
     /* include vba raw data (vbaraw) */
     ["password", ""],
     /* password */
-    ["WTF", false]
-    /* WTF mode (throws errors) */
-  ])(opts);
-}
-function fix_write_opts(opts) {
-  fix_opts_func([
-    ["cellDates", false],
-    /* write date cells with type `d` */
-    ["bookSST", false],
-    /* Generate Shared String Table */
-    ["bookType", "xlsx"],
-    /* Type of workbook (xlsx/m/b) */
-    ["compression", false],
-    /* Use file compression */
     ["WTF", false]
     /* WTF mode (throws errors) */
   ])(opts);
@@ -141001,291 +122996,6 @@ function parse_xlsxcfb(cfb, _opts) {
   if (einfo[0] == 2 && typeof decrypt_std76 !== "undefined") return decrypt_std76(einfo[1], data.content, opts.password || "", opts);
   throw new Error("File is password-protected");
 }
-function write_zip_xlsb(wb, opts) {
-  if (wb && !wb.SSF) {
-    wb.SSF = dup(table_fmt);
-  }
-  if (wb && wb.SSF) {
-    make_ssf();
-    SSF_load_table(wb.SSF);
-    opts.revssf = evert_num(wb.SSF);
-    opts.revssf[wb.SSF[65535]] = 0;
-    opts.ssf = wb.SSF;
-  }
-  opts.rels = {};
-  opts.wbrels = {};
-  opts.Strings = /*::((*/
-  [];
-  opts.Strings.Count = 0;
-  opts.Strings.Unique = 0;
-  if (browser_has_Map) opts.revStrings = /* @__PURE__ */ new Map();
-  else {
-    opts.revStrings = {};
-    opts.revStrings.foo = [];
-    delete opts.revStrings.foo;
-  }
-  var wbext = "bin";
-  var vbafmt = true;
-  var ct = new_ct();
-  fix_write_opts(opts = opts || {});
-  var zip = zip_new();
-  var f3 = "", rId = 0;
-  opts.cellXfs = [];
-  get_cell_style(opts.cellXfs, {}, { revssf: { "General": 0 } });
-  if (!wb.Props) wb.Props = {};
-  f3 = "docProps/core.xml";
-  zip_add_file(zip, f3, write_core_props(wb.Props, opts));
-  ct.coreprops.push(f3);
-  add_rels(opts.rels, 2, f3, RELS.CORE_PROPS);
-  f3 = "docProps/app.xml";
-  if (wb.Props && wb.Props.SheetNames) {
-  } else if (!wb.Workbook || !wb.Workbook.Sheets) wb.Props.SheetNames = wb.SheetNames;
-  else {
-    var _sn = [];
-    for (var _i = 0; _i < wb.SheetNames.length; ++_i)
-      if ((wb.Workbook.Sheets[_i] || {}).Hidden != 2) _sn.push(wb.SheetNames[_i]);
-    wb.Props.SheetNames = _sn;
-  }
-  wb.Props.Worksheets = wb.Props.SheetNames.length;
-  zip_add_file(zip, f3, write_ext_props(wb.Props, opts));
-  ct.extprops.push(f3);
-  add_rels(opts.rels, 3, f3, RELS.EXT_PROPS);
-  if (wb.Custprops !== wb.Props && keys(wb.Custprops || {}).length > 0) {
-    f3 = "docProps/custom.xml";
-    zip_add_file(zip, f3, write_cust_props(wb.Custprops, opts));
-    ct.custprops.push(f3);
-    add_rels(opts.rels, 4, f3, RELS.CUST_PROPS);
-  }
-  var people = ["SheetJ5"];
-  opts.tcid = 0;
-  for (rId = 1; rId <= wb.SheetNames.length; ++rId) {
-    var wsrels = { "!id": {} };
-    var ws = wb.Sheets[wb.SheetNames[rId - 1]];
-    var _type = (ws || {})["!type"] || "sheet";
-    switch (_type) {
-      case "chart":
-      /* falls through */
-      default:
-        f3 = "xl/worksheets/sheet" + rId + "." + wbext;
-        zip_add_file(zip, f3, write_ws_bin(rId - 1, opts, wb, wsrels));
-        ct.sheets.push(f3);
-        add_rels(opts.wbrels, -1, "worksheets/sheet" + rId + "." + wbext, RELS.WS[0]);
-    }
-    if (ws) {
-      var comments = ws["!comments"];
-      var need_vml = false;
-      var cf = "";
-      if (comments && comments.length > 0) {
-        var needtc = false;
-        comments.forEach(function(carr) {
-          carr[1].forEach(function(c) {
-            if (c.T == true) needtc = true;
-          });
-        });
-        if (needtc) {
-          cf = "xl/threadedComments/threadedComment" + rId + ".xml";
-          zip_add_file(zip, cf, write_tcmnt_xml(comments, people, opts));
-          ct.threadedcomments.push(cf);
-          add_rels(wsrels, -1, "../threadedComments/threadedComment" + rId + ".xml", RELS.TCMNT);
-        }
-        cf = "xl/comments" + rId + "." + wbext;
-        zip_add_file(zip, cf, write_comments_bin(comments, opts));
-        ct.comments.push(cf);
-        add_rels(wsrels, -1, "../comments" + rId + "." + wbext, RELS.CMNT);
-        need_vml = true;
-      }
-      if (ws["!legacy"]) {
-        if (need_vml) zip_add_file(zip, "xl/drawings/vmlDrawing" + rId + ".vml", write_vml(rId, ws["!comments"]));
-      }
-      delete ws["!comments"];
-      delete ws["!legacy"];
-    }
-    if (wsrels["!id"].rId1) zip_add_file(zip, get_rels_path(f3), write_rels(wsrels));
-  }
-  if (opts.Strings != null && opts.Strings.length > 0) {
-    f3 = "xl/sharedStrings." + wbext;
-    zip_add_file(zip, f3, write_sst_bin(opts.Strings, opts));
-    ct.strs.push(f3);
-    add_rels(opts.wbrels, -1, "sharedStrings." + wbext, RELS.SST);
-  }
-  f3 = "xl/workbook." + wbext;
-  zip_add_file(zip, f3, write_wb_bin(wb, opts));
-  ct.workbooks.push(f3);
-  add_rels(opts.rels, 1, f3, RELS.WB);
-  f3 = "xl/theme/theme1.xml";
-  var ww = write_theme(wb.Themes, opts);
-  zip_add_file(zip, f3, ww);
-  ct.themes.push(f3);
-  add_rels(opts.wbrels, -1, "theme/theme1.xml", RELS.THEME);
-  f3 = "xl/styles." + wbext;
-  zip_add_file(zip, f3, write_sty_bin(wb, opts));
-  ct.styles.push(f3);
-  add_rels(opts.wbrels, -1, "styles." + wbext, RELS.STY);
-  if (wb.vbaraw && vbafmt) {
-    f3 = "xl/vbaProject.bin";
-    zip_add_file(zip, f3, wb.vbaraw);
-    ct.vba.push(f3);
-    add_rels(opts.wbrels, -1, "vbaProject.bin", RELS.VBA);
-  }
-  f3 = "xl/metadata." + wbext;
-  zip_add_file(zip, f3, write_xlmeta_bin());
-  ct.metadata.push(f3);
-  add_rels(opts.wbrels, -1, "metadata." + wbext, RELS.XLMETA);
-  if (people.length > 1) {
-    f3 = "xl/persons/person.xml";
-    zip_add_file(zip, f3, write_people_xml(people, opts));
-    ct.people.push(f3);
-    add_rels(opts.wbrels, -1, "persons/person.xml", RELS.PEOPLE);
-  }
-  zip_add_file(zip, "[Content_Types].xml", write_ct(ct, opts));
-  zip_add_file(zip, "_rels/.rels", write_rels(opts.rels));
-  zip_add_file(zip, "xl/_rels/workbook." + wbext + ".rels", write_rels(opts.wbrels));
-  delete opts.revssf;
-  delete opts.ssf;
-  return zip;
-}
-function write_zip_xlsx(wb, opts) {
-  if (wb && !wb.SSF) {
-    wb.SSF = dup(table_fmt);
-  }
-  if (wb && wb.SSF) {
-    make_ssf();
-    SSF_load_table(wb.SSF);
-    opts.revssf = evert_num(wb.SSF);
-    opts.revssf[wb.SSF[65535]] = 0;
-    opts.ssf = wb.SSF;
-  }
-  opts.rels = {};
-  opts.wbrels = {};
-  opts.Strings = /*::((*/
-  [];
-  opts.Strings.Count = 0;
-  opts.Strings.Unique = 0;
-  if (browser_has_Map) opts.revStrings = /* @__PURE__ */ new Map();
-  else {
-    opts.revStrings = {};
-    opts.revStrings.foo = [];
-    delete opts.revStrings.foo;
-  }
-  var wbext = "xml";
-  var vbafmt = VBAFMTS.indexOf(opts.bookType) > -1;
-  var ct = new_ct();
-  fix_write_opts(opts = opts || {});
-  var zip = zip_new();
-  var f3 = "", rId = 0;
-  opts.cellXfs = [];
-  get_cell_style(opts.cellXfs, {}, { revssf: { "General": 0 } });
-  if (!wb.Props) wb.Props = {};
-  f3 = "docProps/core.xml";
-  zip_add_file(zip, f3, write_core_props(wb.Props, opts));
-  ct.coreprops.push(f3);
-  add_rels(opts.rels, 2, f3, RELS.CORE_PROPS);
-  f3 = "docProps/app.xml";
-  if (wb.Props && wb.Props.SheetNames) {
-  } else if (!wb.Workbook || !wb.Workbook.Sheets) wb.Props.SheetNames = wb.SheetNames;
-  else {
-    var _sn = [];
-    for (var _i = 0; _i < wb.SheetNames.length; ++_i)
-      if ((wb.Workbook.Sheets[_i] || {}).Hidden != 2) _sn.push(wb.SheetNames[_i]);
-    wb.Props.SheetNames = _sn;
-  }
-  wb.Props.Worksheets = wb.Props.SheetNames.length;
-  zip_add_file(zip, f3, write_ext_props(wb.Props, opts));
-  ct.extprops.push(f3);
-  add_rels(opts.rels, 3, f3, RELS.EXT_PROPS);
-  if (wb.Custprops !== wb.Props && keys(wb.Custprops || {}).length > 0) {
-    f3 = "docProps/custom.xml";
-    zip_add_file(zip, f3, write_cust_props(wb.Custprops, opts));
-    ct.custprops.push(f3);
-    add_rels(opts.rels, 4, f3, RELS.CUST_PROPS);
-  }
-  var people = ["SheetJ5"];
-  opts.tcid = 0;
-  for (rId = 1; rId <= wb.SheetNames.length; ++rId) {
-    var wsrels = { "!id": {} };
-    var ws = wb.Sheets[wb.SheetNames[rId - 1]];
-    var _type = (ws || {})["!type"] || "sheet";
-    switch (_type) {
-      case "chart":
-      /* falls through */
-      default:
-        f3 = "xl/worksheets/sheet" + rId + "." + wbext;
-        zip_add_file(zip, f3, write_ws_xml(rId - 1, opts, wb, wsrels));
-        ct.sheets.push(f3);
-        add_rels(opts.wbrels, -1, "worksheets/sheet" + rId + "." + wbext, RELS.WS[0]);
-    }
-    if (ws) {
-      var comments = ws["!comments"];
-      var need_vml = false;
-      var cf = "";
-      if (comments && comments.length > 0) {
-        var needtc = false;
-        comments.forEach(function(carr) {
-          carr[1].forEach(function(c) {
-            if (c.T == true) needtc = true;
-          });
-        });
-        if (needtc) {
-          cf = "xl/threadedComments/threadedComment" + rId + ".xml";
-          zip_add_file(zip, cf, write_tcmnt_xml(comments, people, opts));
-          ct.threadedcomments.push(cf);
-          add_rels(wsrels, -1, "../threadedComments/threadedComment" + rId + ".xml", RELS.TCMNT);
-        }
-        cf = "xl/comments" + rId + "." + wbext;
-        zip_add_file(zip, cf, write_comments_xml(comments, opts));
-        ct.comments.push(cf);
-        add_rels(wsrels, -1, "../comments" + rId + "." + wbext, RELS.CMNT);
-        need_vml = true;
-      }
-      if (ws["!legacy"]) {
-        if (need_vml) zip_add_file(zip, "xl/drawings/vmlDrawing" + rId + ".vml", write_vml(rId, ws["!comments"]));
-      }
-      delete ws["!comments"];
-      delete ws["!legacy"];
-    }
-    if (wsrels["!id"].rId1) zip_add_file(zip, get_rels_path(f3), write_rels(wsrels));
-  }
-  if (opts.Strings != null && opts.Strings.length > 0) {
-    f3 = "xl/sharedStrings." + wbext;
-    zip_add_file(zip, f3, write_sst_xml(opts.Strings, opts));
-    ct.strs.push(f3);
-    add_rels(opts.wbrels, -1, "sharedStrings." + wbext, RELS.SST);
-  }
-  f3 = "xl/workbook." + wbext;
-  zip_add_file(zip, f3, write_wb_xml(wb, opts));
-  ct.workbooks.push(f3);
-  add_rels(opts.rels, 1, f3, RELS.WB);
-  f3 = "xl/theme/theme1.xml";
-  zip_add_file(zip, f3, write_theme(wb.Themes, opts));
-  ct.themes.push(f3);
-  add_rels(opts.wbrels, -1, "theme/theme1.xml", RELS.THEME);
-  f3 = "xl/styles." + wbext;
-  zip_add_file(zip, f3, write_sty_xml(wb, opts));
-  ct.styles.push(f3);
-  add_rels(opts.wbrels, -1, "styles." + wbext, RELS.STY);
-  if (wb.vbaraw && vbafmt) {
-    f3 = "xl/vbaProject.bin";
-    zip_add_file(zip, f3, wb.vbaraw);
-    ct.vba.push(f3);
-    add_rels(opts.wbrels, -1, "vbaProject.bin", RELS.VBA);
-  }
-  f3 = "xl/metadata." + wbext;
-  zip_add_file(zip, f3, write_xlmeta_xml());
-  ct.metadata.push(f3);
-  add_rels(opts.wbrels, -1, "metadata." + wbext, RELS.XLMETA);
-  if (people.length > 1) {
-    f3 = "xl/persons/person.xml";
-    zip_add_file(zip, f3, write_people_xml(people, opts));
-    ct.people.push(f3);
-    add_rels(opts.wbrels, -1, "persons/person.xml", RELS.PEOPLE);
-  }
-  zip_add_file(zip, "[Content_Types].xml", write_ct(ct, opts));
-  zip_add_file(zip, "_rels/.rels", write_rels(opts.rels));
-  zip_add_file(zip, "xl/_rels/workbook." + wbext + ".rels", write_rels(opts.wbrels));
-  delete opts.revssf;
-  delete opts.ssf;
-  return zip;
-}
 function firstbyte(f3, o) {
   var x2 = "";
   switch ((o || {}).type || "base64") {
@@ -141461,221 +123171,6 @@ function readSync(data, opts) {
   }
   if (DBF_SUPPORTED_VERSIONS.indexOf(n[0]) > -1 && n[2] <= 12 && n[3] <= 31) return DBF.to_workbook(d, o);
   return read_prn(data, d, o, str);
-}
-function write_cfb_ctr(cfb, o) {
-  switch (o.type) {
-    case "base64":
-    case "binary":
-      break;
-    case "buffer":
-    case "array":
-      o.type = "";
-      break;
-    case "file":
-      return write_dl(o.file, CFB.write(cfb, { type: has_buf ? "buffer" : "" }));
-    case "string":
-      throw new Error("'string' output type invalid for '" + o.bookType + "' files");
-    default:
-      throw new Error("Unrecognized type " + o.type);
-  }
-  return CFB.write(cfb, o);
-}
-function write_zip(wb, opts) {
-  switch (opts.bookType) {
-    case "ods":
-      return write_ods(wb, opts);
-    case "numbers":
-      return write_numbers_iwa(wb, opts);
-    case "xlsb":
-      return write_zip_xlsb(wb, opts);
-    default:
-      return write_zip_xlsx(wb, opts);
-  }
-}
-function write_zip_type(wb, opts) {
-  var o = dup(opts || {});
-  var z = write_zip(wb, o);
-  return write_zip_denouement(z, o);
-}
-function write_zip_denouement(z, o) {
-  var oopts = {};
-  var ftype = has_buf ? "nodebuffer" : typeof Uint8Array !== "undefined" ? "array" : "string";
-  if (o.compression) oopts.compression = "DEFLATE";
-  if (o.password) oopts.type = ftype;
-  else switch (o.type) {
-    case "base64":
-      oopts.type = "base64";
-      break;
-    case "binary":
-      oopts.type = "string";
-      break;
-    case "string":
-      throw new Error("'string' output type invalid for '" + o.bookType + "' files");
-    case "buffer":
-    case "file":
-      oopts.type = ftype;
-      break;
-    default:
-      throw new Error("Unrecognized type " + o.type);
-  }
-  var out = z.FullPaths ? CFB.write(z, { fileType: "zip", type: (
-    /*::(*/
-    { "nodebuffer": "buffer", "string": "binary" }[oopts.type] || oopts.type
-  ), compression: !!o.compression }) : z.generate(oopts);
-  if (typeof Deno !== "undefined") {
-    if (typeof out == "string") {
-      if (o.type == "binary" || o.type == "base64") return out;
-      out = new Uint8Array(s2ab(out));
-    }
-  }
-  if (o.password && typeof encrypt_agile !== "undefined") return write_cfb_ctr(encrypt_agile(out, o.password), o);
-  if (o.type === "file") return write_dl(o.file, out);
-  return o.type == "string" ? utf8read(
-    /*::(*/
-    out
-    /*:: :any)*/
-  ) : out;
-}
-function write_cfb_type(wb, opts) {
-  var o = opts || {};
-  var cfb = write_xlscfb(wb, o);
-  return write_cfb_ctr(cfb, o);
-}
-function write_string_type(out, opts, bom) {
-  if (!bom) bom = "";
-  var o = bom + out;
-  switch (opts.type) {
-    case "base64":
-      return Base64_encode(utf8write(o));
-    case "binary":
-      return utf8write(o);
-    case "string":
-      return out;
-    case "file":
-      return write_dl(opts.file, o, "utf8");
-    case "buffer": {
-      if (has_buf) return Buffer_from(o, "utf8");
-      else if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(o);
-      else return write_string_type(o, { type: "binary" }).split("").map(function(c) {
-        return c.charCodeAt(0);
-      });
-    }
-  }
-  throw new Error("Unrecognized type " + opts.type);
-}
-function write_stxt_type(out, opts) {
-  switch (opts.type) {
-    case "base64":
-      return Base64_encode_pass(out);
-    case "binary":
-      return out;
-    case "string":
-      return out;
-    /* override in sheet_to_txt */
-    case "file":
-      return write_dl(opts.file, out, "binary");
-    case "buffer": {
-      if (has_buf) return Buffer_from(out, "binary");
-      else return out.split("").map(function(c) {
-        return c.charCodeAt(0);
-      });
-    }
-  }
-  throw new Error("Unrecognized type " + opts.type);
-}
-function write_binary_type(out, opts) {
-  switch (opts.type) {
-    case "string":
-    case "base64":
-    case "binary":
-      var bstr = "";
-      for (var i2 = 0; i2 < out.length; ++i2) bstr += String.fromCharCode(out[i2]);
-      return opts.type == "base64" ? Base64_encode(bstr) : opts.type == "string" ? utf8read(bstr) : bstr;
-    case "file":
-      return write_dl(opts.file, out);
-    case "buffer":
-      return out;
-    default:
-      throw new Error("Unrecognized type " + opts.type);
-  }
-}
-function writeSync(wb, opts) {
-  reset_cp();
-  check_wb(wb);
-  var o = dup(opts || {});
-  if (o.cellStyles) {
-    o.cellNF = true;
-    o.sheetStubs = true;
-  }
-  if (o.type == "array") {
-    o.type = "binary";
-    var out = writeSync(wb, o);
-    o.type = "array";
-    return s2ab(out);
-  }
-  var idx = 0;
-  if (o.sheet) {
-    if (typeof o.sheet == "number") idx = o.sheet;
-    else idx = wb.SheetNames.indexOf(o.sheet);
-    if (!wb.SheetNames[idx]) throw new Error("Sheet not found: " + o.sheet + " : " + typeof o.sheet);
-  }
-  switch (o.bookType || "xlsb") {
-    case "xml":
-    case "xlml":
-      return write_string_type(write_xlml(wb, o), o);
-    case "slk":
-    case "sylk":
-      return write_string_type(SYLK.from_sheet(wb.Sheets[wb.SheetNames[idx]], o, wb), o);
-    case "htm":
-    case "html":
-      return write_string_type(sheet_to_html(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "txt":
-      return write_stxt_type(sheet_to_txt(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "csv":
-      return write_string_type(sheet_to_csv(wb.Sheets[wb.SheetNames[idx]], o), o, "\uFEFF");
-    case "dif":
-      return write_string_type(DIF.from_sheet(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "dbf":
-      return write_binary_type(DBF.from_sheet(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "prn":
-      return write_string_type(PRN.from_sheet(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "rtf":
-      return write_string_type(sheet_to_rtf(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "eth":
-      return write_string_type(ETH.from_sheet(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "fods":
-      return write_string_type(write_ods(wb, o), o);
-    case "wk1":
-      return write_binary_type(WK_.sheet_to_wk1(wb.Sheets[wb.SheetNames[idx]], o), o);
-    case "wk3":
-      return write_binary_type(WK_.book_to_wk3(wb, o), o);
-    case "biff2":
-      if (!o.biff) o.biff = 2;
-    /* falls through */
-    case "biff3":
-      if (!o.biff) o.biff = 3;
-    /* falls through */
-    case "biff4":
-      if (!o.biff) o.biff = 4;
-      return write_binary_type(write_biff_buf(wb, o), o);
-    case "biff5":
-      if (!o.biff) o.biff = 5;
-    /* falls through */
-    case "biff8":
-    case "xla":
-    case "xls":
-      if (!o.biff) o.biff = 8;
-      return write_cfb_type(wb, o);
-    case "xlsx":
-    case "xlsm":
-    case "xlam":
-    case "xlsb":
-    case "numbers":
-    case "ods":
-      return write_zip_type(wb, o);
-    default:
-      throw new Error("Unrecognized bookType |" + o.bookType + "|");
-  }
 }
 function make_json_row(sheet, r2, R, cols, header, hdr, o) {
   var rr = encode_row(R);
@@ -142184,38 +123679,6 @@ function parseWorkbookFromBuffer(buffer) {
   }
   return { data, summary: { collections, commentWeeks, commentEntries, ignoredSheets } };
 }
-function buildFullDatabaseWorkbook(payload) {
-  const workbook = utils.book_new();
-  const addSheet = (name, rows) => {
-    const sheet = utils.json_to_sheet(rows && rows.length > 0 ? rows : [{}]);
-    utils.book_append_sheet(workbook, sheet, name.slice(0, 31));
-  };
-  addSheet("digital_marketing", payload.digital_marketing || []);
-  addSheet("kol_koc", payload.kol_koc || []);
-  addSheet("btl_trade", payload.btl_trade || []);
-  addSheet("monthly_ooh_pr", payload.monthly_ooh_pr || []);
-  addSheet("btl_trade_monthly", payload.btl_trade_monthly || []);
-  if (payload.comments) {
-    const commentRows = [];
-    Object.entries(payload.comments).forEach(([week, byBrand]) => {
-      Object.entries(byBrand || {}).forEach(([brand, c]) => {
-        commentRows.push({ week, brand, field: "evaluation", value: c?.evaluation || "" });
-        commentRows.push({ week, brand, field: "proposals", value: c?.proposals || "" });
-        Object.entries(c?.categories || {}).forEach(([cat, value]) => {
-          commentRows.push({ week, brand, field: `category_${cat}`, value: value || "" });
-        });
-      });
-    });
-    addSheet("comments", commentRows);
-  }
-  if (payload.users) {
-    addSheet(
-      "users",
-      payload.users.map((u) => ({ username: u.username, name: u.name, role: u.role }))
-    );
-  }
-  return workbook;
-}
 
 // src/server/spreadsheetSync.ts
 var EMPTY_CONFIG = {
@@ -142382,36 +123845,6 @@ function requireAuth(minRole = "Viewer") {
   };
 }
 
-// src/server/backupMailer.ts
-var import_nodemailer = __toESM(require_nodemailer(), 1);
-function buildBackupAttachmentBuffer(payload) {
-  const workbook = buildFullDatabaseWorkbook(payload);
-  return writeSync(workbook, { type: "buffer", bookType: "xlsx" });
-}
-async function sendBackupEmail(config, attachmentBuffer, filename) {
-  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
-    throw new Error("Ch\u01B0a c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7 SMTP (host / user / m\u1EADt kh\u1EA9u) \u2014 v\xE0o m\u1EE5c Sao L\u01B0u T\u1EF1 \u0110\u1ED9ng \u0111\u1EC3 thi\u1EBFt l\u1EADp.");
-  }
-  if (!config.notification_email) {
-    throw new Error("Ch\u01B0a c\u1EA5u h\xECnh email nh\u1EADn backup.");
-  }
-  const port = Number(config.smtp_port) || 587;
-  const transporter = import_nodemailer.default.createTransport({
-    host: config.smtp_host,
-    port,
-    secure: port === 465,
-    auth: { user: config.smtp_user, pass: config.smtp_pass }
-  });
-  const todayLabel = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  await transporter.sendMail({
-    from: config.smtp_user,
-    to: config.notification_email,
-    subject: `[Marketing Report] Backup d\u1EEF li\u1EC7u t\u1EF1 \u0111\u1ED9ng \u2014 ${todayLabel}`,
-    text: "\u0110\xEDnh k\xE8m l\xE0 b\u1EA3n backup Excel \u0111\u1EA7y \u0111\u1EE7 c\u1EE7a c\u01A1 s\u1EDF d\u1EEF li\u1EC7u B\xE1o C\xE1o Marketing (Livotec & Karofi), bao g\u1ED3m digital_marketing, kol_koc, btl_trade, monthly_ooh_pr, btl_trade_monthly, nh\u1EADn \u0111\u1ECBnh v\xE0 danh s\xE1ch t\xE0i kho\u1EA3n.\n\nEmail n\xE0y \u0111\u01B0\u1EE3c g\u1EEDi t\u1EF1 \u0111\u1ED9ng v\xE0o 17:00 th\u1EE9 S\xE1u h\xE0ng tu\u1EA7n.",
-    attachments: [{ filename, content: attachmentBuffer }]
-  });
-}
-
 // src/server/crypto.ts
 var import_crypto4 = __toESM(require("crypto"), 1);
 var ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
@@ -142491,6 +123924,8 @@ async function upsertFbPage(input) {
       token_expires_at: null,
       token_data_access_expires_at: null,
       token_checked_at: null,
+      expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
       created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
     };
     const rest = fb_pages.filter((p) => p.page_id !== input.page_id);
@@ -142507,7 +123942,9 @@ async function upsertFbPage(input) {
       token_expired: false,
       token_expires_at: null,
       token_data_access_expires_at: null,
-      token_checked_at: null
+      token_checked_at: null,
+      expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null
     },
     { onConflict: "page_id" }
   );
@@ -142852,7 +124289,9 @@ async function readLocalCollections2() {
   return {
     store,
     ads_performance: Array.isArray(store.ads_performance) ? store.ads_performance : [],
-    fb_ad_accounts: Array.isArray(store.fb_ad_accounts) ? store.fb_ad_accounts : []
+    fb_ad_accounts: Array.isArray(store.fb_ad_accounts) ? store.fb_ad_accounts : [],
+    google_ads_accounts: Array.isArray(store.google_ads_accounts) ? store.google_ads_accounts : [],
+    tiktok_ads_accounts: Array.isArray(store.tiktok_ads_accounts) ? store.tiktok_ads_accounts : []
   };
 }
 async function writeLocalCollections2(store, updates) {
@@ -142961,6 +124400,142 @@ async function setFbAdAccountSyncStatus(adAccountId, status) {
   }
   const { error } = await supabase.from("fb_ad_accounts").update(status).eq("ad_account_id", adAccountId);
   if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 Ad Account: ${error.message}`);
+}
+async function getGoogleAdsAccounts() {
+  if (!isSupabaseConfigured) {
+    const { google_ads_accounts } = await readLocalCollections2();
+    return google_ads_accounts;
+  }
+  const { data, error } = await supabase.from("google_ads_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch Google Ads Account: ${error.message}`);
+  return data || [];
+}
+async function upsertGoogleAdsAccount(input) {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections2();
+    const existing = google_ads_accounts.find((a) => a.customer_id === input.customer_id);
+    const next = {
+      customer_id: input.customer_id,
+      account_name: input.account_name,
+      brand: input.brand !== void 0 ? input.brand : existing?.brand ?? null,
+      login_customer_id: input.login_customer_id !== void 0 ? input.login_customer_id : existing?.login_customer_id ?? null,
+      access_token_encrypted: input.access_token_encrypted,
+      refresh_token_encrypted: input.refresh_token_encrypted,
+      access_token_expires_at: input.access_token_expires_at ?? existing?.access_token_expires_at ?? null,
+      is_active: input.is_active !== void 0 ? input.is_active : existing?.is_active !== false,
+      last_synced_at: existing?.last_synced_at || null,
+      last_sync_error: existing?.last_sync_error || null,
+      token_expired: existing?.token_expired || false,
+      created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await writeLocalCollections2(store, {
+      google_ads_accounts: [...google_ads_accounts.filter((a) => a.customer_id !== input.customer_id), next]
+    });
+    return;
+  }
+  const { error } = await supabase.from("google_ads_accounts").upsert(
+    {
+      customer_id: input.customer_id,
+      account_name: input.account_name,
+      brand: input.brand !== void 0 ? input.brand : null,
+      login_customer_id: input.login_customer_id !== void 0 ? input.login_customer_id : null,
+      access_token_encrypted: input.access_token_encrypted,
+      refresh_token_encrypted: input.refresh_token_encrypted,
+      access_token_expires_at: input.access_token_expires_at ?? null,
+      is_active: input.is_active !== void 0 ? input.is_active : true
+    },
+    { onConflict: "customer_id" }
+  );
+  if (error) throw new Error(`L\u1ED7i l\u01B0u c\u1EA5u h\xECnh Google Ads Account: ${error.message}`);
+}
+async function deleteGoogleAdsAccount(customerId) {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections2();
+    await writeLocalCollections2(store, { google_ads_accounts: google_ads_accounts.filter((a) => a.customer_id !== customerId) });
+    return;
+  }
+  const { error } = await supabase.from("google_ads_accounts").delete().eq("customer_id", customerId);
+  if (error) throw new Error(`L\u1ED7i x\xF3a c\u1EA5u h\xECnh Google Ads Account: ${error.message}`);
+}
+async function updateGoogleAdsAccountTokens(customerId, tokens) {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections2();
+    const next = google_ads_accounts.map((a) => a.customer_id === customerId ? { ...a, ...tokens } : a);
+    await writeLocalCollections2(store, { google_ads_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("google_ads_accounts").update(tokens).eq("customer_id", customerId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt token Google Ads: ${error.message}`);
+}
+async function setGoogleAdsAccountSyncStatus(customerId, status) {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections2();
+    const next = google_ads_accounts.map((a) => a.customer_id === customerId ? { ...a, ...status } : a);
+    await writeLocalCollections2(store, { google_ads_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("google_ads_accounts").update(status).eq("customer_id", customerId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 Google Ads: ${error.message}`);
+}
+async function getTiktokAdsAccounts() {
+  if (!isSupabaseConfigured) {
+    const { tiktok_ads_accounts } = await readLocalCollections2();
+    return tiktok_ads_accounts;
+  }
+  const { data, error } = await supabase.from("tiktok_ads_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch TikTok Ads Account: ${error.message}`);
+  return data || [];
+}
+async function upsertTiktokAdsAccount(input) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections2();
+    const existing = tiktok_ads_accounts.find((a) => a.advertiser_id === input.advertiser_id);
+    const next = {
+      advertiser_id: input.advertiser_id,
+      account_name: input.account_name,
+      brand: input.brand !== void 0 ? input.brand : existing?.brand ?? null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== void 0 ? input.is_active : existing?.is_active !== false,
+      last_synced_at: existing?.last_synced_at || null,
+      last_sync_error: existing?.last_sync_error || null,
+      token_expired: existing?.token_expired || false,
+      created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await writeLocalCollections2(store, {
+      tiktok_ads_accounts: [...tiktok_ads_accounts.filter((a) => a.advertiser_id !== input.advertiser_id), next]
+    });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_ads_accounts").upsert(
+    {
+      advertiser_id: input.advertiser_id,
+      account_name: input.account_name,
+      brand: input.brand !== void 0 ? input.brand : null,
+      access_token_encrypted: input.access_token_encrypted,
+      is_active: input.is_active !== void 0 ? input.is_active : true
+    },
+    { onConflict: "advertiser_id" }
+  );
+  if (error) throw new Error(`L\u1ED7i l\u01B0u c\u1EA5u h\xECnh TikTok Ads Account: ${error.message}`);
+}
+async function deleteTiktokAdsAccount(advertiserId) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections2();
+    await writeLocalCollections2(store, { tiktok_ads_accounts: tiktok_ads_accounts.filter((a) => a.advertiser_id !== advertiserId) });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_ads_accounts").delete().eq("advertiser_id", advertiserId);
+  if (error) throw new Error(`L\u1ED7i x\xF3a c\u1EA5u h\xECnh TikTok Ads Account: ${error.message}`);
+}
+async function setTiktokAdsAccountSyncStatus(advertiserId, status) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections2();
+    const next = tiktok_ads_accounts.map((a) => a.advertiser_id === advertiserId ? { ...a, ...status } : a);
+    await writeLocalCollections2(store, { tiktok_ads_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_ads_accounts").update(status).eq("advertiser_id", advertiserId);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 TikTok Ads: ${error.message}`);
 }
 
 // src/server/facebookAdsSync.ts
@@ -143092,6 +124667,288 @@ async function runFacebookAdsSync(overrides) {
       }
     })
   );
+}
+
+// src/server/paidAdsApiSync.ts
+var ADS_BACKFILL_DAYS2 = 30;
+var GOOGLE_ADS_API_VERSION = "v25";
+var GOOGLE_ADS_TOKEN_URL = "https://oauth2.googleapis.com/token";
+var GOOGLE_ADS_API_BASE = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
+var TIKTOK_BUSINESS_API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
+var GOOGLE_ADS_CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID || "";
+var GOOGLE_ADS_CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET || "";
+var GOOGLE_ADS_REDIRECT_URI = process.env.GOOGLE_ADS_REDIRECT_URI || "";
+var GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
+var GOOGLE_ADS_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+var GOOGLE_ADS_SCOPES = ["https://www.googleapis.com/auth/adwords"];
+var isGoogleAdsConfigured = Boolean(
+  GOOGLE_ADS_CLIENT_ID && GOOGLE_ADS_CLIENT_SECRET && GOOGLE_ADS_REDIRECT_URI && GOOGLE_ADS_DEVELOPER_TOKEN
+);
+var MAX_GOOGLE_CHUNK_DAYS = 90;
+var MAX_TIKTOK_CHUNK_DAYS = 30;
+function stripCustomerId(id) {
+  return id.replace(/[^0-9]/g, "");
+}
+function dateRangeChunks2(since, until, maxDays) {
+  const chunks = [];
+  let chunkStart = /* @__PURE__ */ new Date(`${since}T00:00:00Z`);
+  const end = /* @__PURE__ */ new Date(`${until}T00:00:00Z`);
+  while (chunkStart <= end) {
+    const chunkEnd = new Date(chunkStart.getTime() + (maxDays - 1) * 24 * 60 * 60 * 1e3);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+    chunks.push({ since: toDateStr(chunkStart), until: toDateStr(chunkEnd) });
+    chunkStart = new Date(chunkEnd.getTime() + 24 * 60 * 60 * 1e3);
+  }
+  return chunks;
+}
+function extractGoogleAdsApiError(body, fallback) {
+  const error = Array.isArray(body) ? body.find((item) => item?.error)?.error : body?.error;
+  if (!error) return fallback;
+  const failure = Array.isArray(error.details) ? error.details.find((d) => d?.["@type"]?.includes("google.ads.googleads") || d?.["@type"] === "type.googleapis.com/google.rpc.ErrorInfo") : null;
+  const firstGoogleAdsError = failure?.errors?.[0];
+  const code = firstGoogleAdsError?.errorCode?.authorizationError || firstGoogleAdsError?.errorCode?.queryError || firstGoogleAdsError?.errorCode?.requestError || failure?.reason || error.status;
+  const activationUrl = failure?.metadata?.activationUrl ? ` Enable t\u1EA1i: ${failure.metadata.activationUrl}` : "";
+  const requestId = failure?.requestId ? ` Request ID: ${failure.requestId}` : "";
+  return `${firstGoogleAdsError?.message || error.message || fallback}${code ? ` (${code})` : ""}${activationUrl}${requestId}`;
+}
+async function readResponseBody(res) {
+  const text = await res.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.slice(0, 500) };
+  }
+}
+async function postGoogleToken(params) {
+  const res = await fetch(GOOGLE_ADS_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params).toString()
+  });
+  const body = await readResponseBody(res);
+  if (!res.ok || body?.error) {
+    throw new Error(body?.error_description || body?.error || `Google OAuth tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`);
+  }
+  return body;
+}
+async function exchangeGoogleAdsCode(code, redirectUri) {
+  return postGoogleToken({
+    client_id: GOOGLE_ADS_CLIENT_ID,
+    client_secret: GOOGLE_ADS_CLIENT_SECRET,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri
+  });
+}
+async function refreshGoogleAdsToken(refreshToken) {
+  return postGoogleToken({
+    client_id: GOOGLE_ADS_CLIENT_ID,
+    client_secret: GOOGLE_ADS_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
+}
+async function fetchGoogleAdsRows(customerId, loginCustomerId, accessToken, since, until, brand) {
+  const cleanCustomerId = stripCustomerId(customerId);
+  const query = `
+    SELECT
+      segments.date,
+      campaign.name,
+      campaign.advertising_channel_type,
+      ad_group.name,
+      ad_group_ad.ad.id,
+      ad_group_ad.ad.name,
+      metrics.cost_micros,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.conversions,
+      metrics.video_trueview_views
+    FROM ad_group_ad
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND campaign.status != 'REMOVED'
+      AND ad_group.status != 'REMOVED'
+      AND ad_group_ad.status != 'REMOVED'
+  `;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    "developer-token": GOOGLE_ADS_DEVELOPER_TOKEN
+  };
+  if (loginCustomerId) headers["login-customer-id"] = stripCustomerId(loginCustomerId);
+  const res = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${cleanCustomerId}/googleAds:searchStream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query })
+  });
+  const body = await readResponseBody(res);
+  if (!res.ok || body?.error) {
+    throw new Error(extractGoogleAdsApiError(body, `Google Ads API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`));
+  }
+  const batches = Array.isArray(body) ? body : [];
+  const rows = [];
+  for (const batch of batches) {
+    for (const result of batch.results || []) {
+      const date = result.segments?.date;
+      const campaignName = result.campaign?.name;
+      if (!date || !campaignName) continue;
+      rows.push({
+        channel: "google",
+        brand,
+        campaign_name: campaignName,
+        ad_group_name: result.adGroup?.name || "",
+        ad_name: result.adGroupAd?.ad?.name || String(result.adGroupAd?.ad?.id || ""),
+        date,
+        spend: result.metrics?.costMicros != null ? Number(result.metrics.costMicros) / 1e6 : null,
+        impressions: result.metrics?.impressions != null ? Number(result.metrics.impressions) : null,
+        clicks: result.metrics?.clicks != null ? Number(result.metrics.clicks) : null,
+        reach: null,
+        frequency: null,
+        video_views: result.metrics?.videoTrueviewViews != null ? Number(result.metrics.videoTrueviewViews) : null,
+        conversions: result.metrics?.conversions != null ? Math.round(Number(result.metrics.conversions)) : null,
+        extra: {
+          customer_id: customerId,
+          campaign_type: result.campaign?.advertisingChannelType || null
+        }
+      });
+    }
+  }
+  return rows;
+}
+function tiktokNumber(raw) {
+  if (raw === null || raw === void 0 || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+async function fetchTiktokAdsRows(advertiserId, accessToken, since, until, brand) {
+  const params = new URLSearchParams({
+    advertiser_id: advertiserId,
+    service_type: "AUCTION",
+    report_type: "BASIC",
+    data_level: "AUCTION_AD",
+    dimensions: JSON.stringify(["ad_id", "stat_time_day"]),
+    metrics: JSON.stringify([
+      "campaign_name",
+      "adgroup_name",
+      "ad_name",
+      "spend",
+      "impressions",
+      "clicks",
+      "reach",
+      "frequency",
+      "conversion",
+      "video_watched_6s"
+    ]),
+    start_date: since,
+    end_date: until,
+    page_size: "1000"
+  });
+  const rows = [];
+  let page = 1;
+  while (true) {
+    params.set("page", String(page));
+    const res = await fetch(`${TIKTOK_BUSINESS_API_BASE}/report/integrated/get/?${params.toString()}`, {
+      headers: { "Access-Token": accessToken }
+    });
+    const body = await res.json();
+    if (!res.ok || body?.code !== 0) {
+      throw new Error(body?.message || `TikTok Business API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`);
+    }
+    for (const item of body?.data?.list || []) {
+      const metrics = item.metrics || {};
+      const dimensions = item.dimensions || {};
+      const date = String(dimensions.stat_time_day || "").slice(0, 10);
+      const campaignName = metrics.campaign_name || dimensions.campaign_id || "(unknown campaign)";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      rows.push({
+        channel: "tiktok",
+        brand,
+        campaign_name: String(campaignName),
+        ad_group_name: String(metrics.adgroup_name || dimensions.adgroup_id || ""),
+        ad_name: String(metrics.ad_name || dimensions.ad_id || ""),
+        date,
+        spend: tiktokNumber(metrics.spend),
+        impressions: tiktokNumber(metrics.impressions),
+        clicks: tiktokNumber(metrics.clicks),
+        reach: tiktokNumber(metrics.reach),
+        frequency: tiktokNumber(metrics.frequency),
+        video_views: tiktokNumber(metrics.video_watched_6s),
+        conversions: tiktokNumber(metrics.conversion),
+        extra: { advertiser_id: advertiserId }
+      });
+    }
+    const pageInfo = body?.data?.page_info;
+    if (!pageInfo || page >= Number(pageInfo.total_page || 1)) break;
+    page += 1;
+  }
+  return rows;
+}
+async function runGoogleAdsSync(overrides) {
+  if (!isGoogleAdsConfigured) {
+    throw new Error("GOOGLE_ADS_CLIENT_ID / SECRET / REDIRECT_URI / DEVELOPER_TOKEN ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  }
+  const accounts = (await getGoogleAdsAccounts()).filter((a) => a.is_active);
+  const now = /* @__PURE__ */ new Date();
+  const until = overrides?.until || toDateStr(now);
+  const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS2 * 24 * 60 * 60 * 1e3));
+  const chunks = dateRangeChunks2(since, until, MAX_GOOGLE_CHUNK_DAYS);
+  return Promise.all(accounts.map(async (account) => {
+    let rowsSynced = 0;
+    try {
+      let accessToken = decrypt(account.access_token_encrypted);
+      if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+      const accessExpiresAt = account.access_token_expires_at ? new Date(account.access_token_expires_at).getTime() : 0;
+      if (Date.now() > accessExpiresAt - 5 * 60 * 1e3) {
+        const refreshToken = decrypt(account.refresh_token_encrypted);
+        if (!refreshToken) throw new Error("Refresh token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+        const refreshed = await refreshGoogleAdsToken(refreshToken);
+        accessToken = refreshed.access_token;
+        await updateGoogleAdsAccountTokens(account.customer_id, {
+          access_token_encrypted: encrypt(refreshed.access_token),
+          refresh_token_encrypted: refreshed.refresh_token ? encrypt(refreshed.refresh_token) : account.refresh_token_encrypted,
+          access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString()
+        });
+      }
+      for (const chunk of chunks) {
+        const rows = await fetchGoogleAdsRows(account.customer_id, account.login_customer_id, accessToken, chunk.since, chunk.until, account.brand);
+        if (rows.length > 0) await upsertAdsPerformance(rows);
+        rowsSynced += rows.length;
+      }
+      await setGoogleAdsAccountSyncStatus(account.customer_id, { last_synced_at: (/* @__PURE__ */ new Date()).toISOString(), last_sync_error: null, token_expired: false });
+      return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+    } catch (err) {
+      const message = err?.message || String(err);
+      await setGoogleAdsAccountSyncStatus(account.customer_id, { last_sync_error: message, token_expired: /invalid_grant|invalid_token/i.test(message) }).catch(() => {
+      });
+      return { account_id: account.customer_id, account_name: account.account_name, ok: false, rows_synced: rowsSynced, error: message };
+    }
+  }));
+}
+async function runTiktokAdsSync(overrides) {
+  const accounts = (await getTiktokAdsAccounts()).filter((a) => a.is_active);
+  const now = /* @__PURE__ */ new Date();
+  const until = overrides?.until || toDateStr(now);
+  const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS2 * 24 * 60 * 60 * 1e3));
+  const chunks = dateRangeChunks2(since, until, MAX_TIKTOK_CHUNK_DAYS);
+  return Promise.all(accounts.map(async (account) => {
+    let rowsSynced = 0;
+    try {
+      const accessToken = decrypt(account.access_token_encrypted);
+      if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+      for (const chunk of chunks) {
+        const rows = await fetchTiktokAdsRows(account.advertiser_id, accessToken, chunk.since, chunk.until, account.brand);
+        if (rows.length > 0) await upsertAdsPerformance(rows);
+        rowsSynced += rows.length;
+      }
+      await setTiktokAdsAccountSyncStatus(account.advertiser_id, { last_synced_at: (/* @__PURE__ */ new Date()).toISOString(), last_sync_error: null, token_expired: false });
+      return { account_id: account.advertiser_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+    } catch (err) {
+      const message = err?.message || String(err);
+      await setTiktokAdsAccountSyncStatus(account.advertiser_id, { last_sync_error: message, token_expired: /access token|invalid token|unauthorized/i.test(message) }).catch(() => {
+      });
+      return { account_id: account.advertiser_id, account_name: account.account_name, ok: false, rows_synced: rowsSynced, error: message };
+    }
+  }));
 }
 
 // src/server/tiktokStore.ts
@@ -143666,6 +125523,650 @@ async function runYoutubeSync() {
   return results;
 }
 
+// src/server/googleWebsiteStore.ts
+async function readLocalCollections5() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    google_website_accounts: Array.isArray(store.google_website_accounts) ? store.google_website_accounts : [],
+    ga4_insights_daily: Array.isArray(store.ga4_insights_daily) ? store.ga4_insights_daily : [],
+    search_console_insights_daily: Array.isArray(store.search_console_insights_daily) ? store.search_console_insights_daily : []
+  };
+}
+async function writeLocalCollections5(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+async function getGoogleWebsiteAccounts() {
+  if (!isSupabaseConfigured) {
+    const { google_website_accounts } = await readLocalCollections5();
+    return google_website_accounts;
+  }
+  const { data, error } = await supabase.from("google_website_accounts").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch k\u1EBFt n\u1ED1i Website: ${error.message}`);
+  return data || [];
+}
+async function upsertGoogleWebsiteAccount(account) {
+  if (!isSupabaseConfigured) {
+    const { store, google_website_accounts } = await readLocalCollections5();
+    const rest = google_website_accounts.filter((a) => a.id !== account.id);
+    await writeLocalCollections5(store, { google_website_accounts: [...rest, account] });
+    return;
+  }
+  const { error } = await supabase.from("google_website_accounts").upsert(account, { onConflict: "id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u k\u1EBFt n\u1ED1i Website: ${error.message}`);
+}
+async function patchGoogleWebsiteAccount(id, patch) {
+  if (!isSupabaseConfigured) {
+    const { store, google_website_accounts } = await readLocalCollections5();
+    const next = google_website_accounts.map((a) => a.id === id ? { ...a, ...patch } : a);
+    await writeLocalCollections5(store, { google_website_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("google_website_accounts").update(patch).eq("id", id);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt k\u1EBFt n\u1ED1i Website: ${error.message}`);
+}
+async function deleteGoogleWebsiteAccount(id) {
+  if (!isSupabaseConfigured) {
+    const { store, google_website_accounts, ga4_insights_daily, search_console_insights_daily } = await readLocalCollections5();
+    await writeLocalCollections5(store, {
+      google_website_accounts: google_website_accounts.filter((a) => a.id !== id),
+      ga4_insights_daily: ga4_insights_daily.filter((r2) => r2.account_id !== id),
+      search_console_insights_daily: search_console_insights_daily.filter((r2) => r2.account_id !== id)
+    });
+    return;
+  }
+  const { error } = await supabase.from("google_website_accounts").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i x\xF3a k\u1EBFt n\u1ED1i Website: ${error.message}`);
+}
+async function upsertGa4InsightsDaily(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, ga4_insights_daily } = await readLocalCollections5();
+    const key = (r2) => `${r2.account_id}|${r2.date}`;
+    const byKey = new Map(ga4_insights_daily.map((r2) => [key(r2), r2]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections5(store, { ga4_insights_daily: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("ga4_insights_daily").upsert(rows, { onConflict: "account_id,date" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u GA4: ${error.message}`);
+}
+async function getGa4InsightsDaily(accountIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { ga4_insights_daily } = await readLocalCollections5();
+    return ga4_insights_daily.filter((r2) => accountIds.includes(r2.account_id) && r2.date >= since && r2.date <= until);
+  }
+  const { data, error } = await supabase.from("ga4_insights_daily").select("*").in("account_id", accountIds).gte("date", since).lte("date", until).order("date", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u GA4: ${error.message}`);
+  return data || [];
+}
+async function upsertSearchConsoleInsightsDaily(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, search_console_insights_daily } = await readLocalCollections5();
+    const key = (r2) => `${r2.account_id}|${r2.date}`;
+    const byKey = new Map(search_console_insights_daily.map((r2) => [key(r2), r2]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections5(store, { search_console_insights_daily: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("search_console_insights_daily").upsert(rows, { onConflict: "account_id,date" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u Search Console: ${error.message}`);
+}
+async function getSearchConsoleInsightsDaily(accountIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { search_console_insights_daily } = await readLocalCollections5();
+    return search_console_insights_daily.filter((r2) => accountIds.includes(r2.account_id) && r2.date >= since && r2.date <= until);
+  }
+  const { data, error } = await supabase.from("search_console_insights_daily").select("*").in("account_id", accountIds).gte("date", since).lte("date", until).order("date", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u Search Console: ${error.message}`);
+  return data || [];
+}
+
+// src/server/googleWebsiteSync.ts
+var GA4_ADMIN_API_BASE = "https://analyticsadmin.googleapis.com/v1beta";
+var GA4_DATA_API_BASE = "https://analyticsdata.googleapis.com/v1beta";
+var SEARCH_CONSOLE_API_BASE = "https://www.googleapis.com/webmasters/v3";
+var GOOGLE_WEBSITE_AUTHORIZE_URL = YOUTUBE_AUTHORIZE_URL;
+var GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+var YOUTUBE_CLIENT_SECRET2 = process.env.YOUTUBE_CLIENT_SECRET || "";
+var GOOGLE_WEBSITE_REDIRECT_URI = process.env.GOOGLE_WEBSITE_REDIRECT_URI || "";
+var isGoogleWebsiteConfigured = Boolean(YOUTUBE_CLIENT_ID && YOUTUBE_CLIENT_SECRET2 && GOOGLE_WEBSITE_REDIRECT_URI);
+var GOOGLE_WEBSITE_SCOPES = [
+  "https://www.googleapis.com/auth/analytics.readonly",
+  "https://www.googleapis.com/auth/webmasters.readonly"
+];
+var GoogleWebsiteApiError = class extends Error {
+  constructor(message, status, reason) {
+    super(message);
+    this.status = status;
+    this.reason = reason;
+  }
+};
+function isRefreshTokenInvalidError3(err) {
+  return err instanceof GoogleWebsiteApiError && (err.reason === "invalid_grant" || err.status === 400);
+}
+async function postTokenEndpoint3(params) {
+  const res = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params).toString()
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error_description || body?.error || `Google token endpoint tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error);
+  }
+  return body;
+}
+async function exchangeGoogleWebsiteCode(code, redirectUri) {
+  return postTokenEndpoint3({
+    client_id: YOUTUBE_CLIENT_ID,
+    client_secret: YOUTUBE_CLIENT_SECRET2,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri
+  });
+}
+async function refreshGoogleWebsiteToken(refreshToken) {
+  return postTokenEndpoint3({
+    client_id: YOUTUBE_CLIENT_ID,
+    client_secret: YOUTUBE_CLIENT_SECRET2,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
+}
+function decodeIdToken(idToken) {
+  const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64url").toString("utf8"));
+  return { sub: payload.sub, email: payload.email || null };
+}
+async function listGa4Properties(accessToken) {
+  const res = await fetch(`${GA4_ADMIN_API_BASE}/accountSummaries?pageSize=200`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `GA4 accountSummaries.list tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  const properties = [];
+  for (const account of body?.accountSummaries || []) {
+    for (const p of account.propertySummaries || []) {
+      properties.push({ id: p.property, name: p.displayName || p.property });
+    }
+  }
+  return properties;
+}
+async function listSearchConsoleSites(accessToken) {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console sites.list tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.siteEntry || []).map((s2) => s2.siteUrl);
+}
+function toDateStr4(d) {
+  return d.toISOString().slice(0, 10);
+}
+async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
+  const res = await fetch(`${GA4_DATA_API_BASE}/${propertyId}:runReport`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dateRanges: [{ startDate: since, endDate: until }],
+      dimensions: [{ name: "date" }],
+      metrics: [
+        { name: "sessions" },
+        { name: "activeUsers" },
+        { name: "newUsers" },
+        { name: "engagedSessions" },
+        { name: "averageSessionDuration" },
+        { name: "conversions" },
+        { name: "bounceRate" }
+      ]
+    })
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `GA4 runReport tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row) => {
+    const raw = row.dimensionValues?.[0]?.value || "";
+    const date = raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw;
+    const [sessions, activeUsers, newUsers, engagedSessions, avgSessionDuration, conversions, bounceRate] = (row.metricValues || []).map(
+      (m2) => Number(m2.value)
+    );
+    return {
+      date,
+      sessions: sessions ?? null,
+      active_users: activeUsers ?? null,
+      new_users: newUsers ?? null,
+      engaged_sessions: engagedSessions ?? null,
+      avg_engagement_time_seconds: avgSessionDuration ?? null,
+      conversions: conversions ?? null,
+      bounce_rate: bounceRate ?? null
+    };
+  });
+}
+async function fetchSearchConsoleDailyMetrics(accessToken, siteUrl, since, until) {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      startDate: since,
+      endDate: until,
+      dimensions: ["date"],
+      rowLimit: 1e3
+    })
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row) => ({
+    date: row.keys?.[0],
+    clicks: row.clicks ?? null,
+    impressions: row.impressions ?? null,
+    ctr: row.ctr ?? null,
+    position: row.position ?? null
+  }));
+}
+async function runGoogleWebsiteSync() {
+  if (!isGoogleWebsiteConfigured) {
+    throw new Error("GOOGLE_WEBSITE_REDIRECT_URI (ho\u1EB7c YOUTUBE_CLIENT_ID/SECRET) ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7.");
+  }
+  const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active);
+  const results = [];
+  const until = toDateStr4(new Date(Date.now() - 3 * 24 * 60 * 60 * 1e3));
+  const since = toDateStr4(new Date(Date.now() - 33 * 24 * 60 * 60 * 1e3));
+  for (const account of accounts) {
+    let refreshTokenInvalid = false;
+    try {
+      let accessToken = decrypt(account.access_token_encrypted);
+      if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+      const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
+      if (Date.now() > accessExpiresAt - 5 * 60 * 1e3) {
+        const refreshToken = decrypt(account.refresh_token_encrypted);
+        try {
+          const refreshed = await refreshGoogleWebsiteToken(refreshToken);
+          accessToken = refreshed.access_token;
+          await patchGoogleWebsiteAccount(account.id, {
+            access_token_encrypted: encrypt(refreshed.access_token),
+            access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString()
+          });
+        } catch (err) {
+          if (isRefreshTokenInvalidError3(err)) refreshTokenInvalid = true;
+          throw err;
+        }
+      }
+      let ga4RowsSynced = 0;
+      if (account.ga4_property_id) {
+        const ga4Rows = await fetchGa4DailyMetrics(accessToken, account.ga4_property_id, since, until);
+        const rows = ga4Rows.map((r2) => ({ account_id: account.id, ...r2 }));
+        await upsertGa4InsightsDaily(rows);
+        ga4RowsSynced = rows.length;
+      }
+      let gscRowsSynced = 0;
+      if (account.gsc_site_url) {
+        const gscRows = await fetchSearchConsoleDailyMetrics(accessToken, account.gsc_site_url, since, until);
+        const rows = gscRows.map((r2) => ({ account_id: account.id, ...r2 }));
+        await upsertSearchConsoleInsightsDaily(rows);
+        gscRowsSynced = rows.length;
+      }
+      await patchGoogleWebsiteAccount(account.id, {
+        last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
+        last_sync_error: null,
+        token_expired: false
+      });
+      results.push({ account_id: account.id, brand: account.brand, ok: true, ga4_rows_synced: ga4RowsSynced, gsc_rows_synced: gscRowsSynced });
+    } catch (err) {
+      const message = err?.message || String(err);
+      console.error(`\u0110\u1ED3ng b\u1ED9 Website (GA4/Search Console) th\u1EA5t b\u1EA1i cho ${account.id}:`, message);
+      await patchGoogleWebsiteAccount(account.id, { last_sync_error: message, token_expired: refreshTokenInvalid }).catch(() => {
+      });
+      results.push({ account_id: account.id, brand: account.brand, ok: false, error: message });
+    }
+  }
+  return results;
+}
+
+// src/server/telegramNotifier.ts
+var TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+var TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "";
+var isTelegramConfigured = Boolean(TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID);
+async function sendTelegramMessage(text) {
+  if (!isTelegramConfigured) {
+    throw new Error("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  }
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true
+    })
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok || !body?.ok) {
+    throw new Error(`G\u1EEDi Telegram th\u1EA5t b\u1EA1i: ${body?.description || `HTTP ${res.status}`}`);
+  }
+}
+
+// src/server/expiryNotifier.ts
+var FACEBOOK_WARN_WITHIN_DAYS = 7;
+var TIKTOK_WARN_WITHIN_DAYS = 30;
+var YOUTUBE_WARN_WITHIN_DAYS = 2;
+var URGENT_WARN_WITHIN_DAYS = 1;
+function daysUntil(iso) {
+  if (!iso) return null;
+  const t2 = new Date(iso).getTime();
+  if (Number.isNaN(t2)) return null;
+  return Math.ceil((t2 - Date.now()) / 864e5);
+}
+function facebookDaysUntil(p) {
+  const times = [p.token_expires_at, p.token_data_access_expires_at].filter((v) => !!v).map((v) => new Date(v).getTime()).filter((t2) => !Number.isNaN(t2));
+  if (times.length === 0) return null;
+  return Math.ceil((Math.min(...times) - Date.now()) / 864e5);
+}
+function pickTier(days2, warnWithinDays, standardAlreadySent, urgentAlreadySent) {
+  if (days2 === null) return null;
+  if (days2 <= URGENT_WARN_WITHIN_DAYS && !urgentAlreadySent) return "urgent";
+  if (days2 <= warnWithinDays && !standardAlreadySent) return "standard";
+  return null;
+}
+async function collectExpiring() {
+  const items = [];
+  const pages = await getFbPages();
+  for (const p of pages) {
+    if (!p.is_active || p.token_expired) continue;
+    const days2 = facebookDaysUntil(p);
+    const tier = pickTier(days2, FACEBOOK_WARN_WITHIN_DAYS, !!p.expiry_alert_sent_at, !!p.urgent_alert_sent_at);
+    if (!tier || days2 === null) continue;
+    items.push({
+      tier,
+      emoji: "\u{1F535}",
+      platform: "Facebook",
+      label: p.page_name,
+      brand: p.brand,
+      days: days2,
+      markNotified: () => setFbPageSyncStatus(p.page_id, {
+        [tier === "urgent" ? "urgent_alert_sent_at" : "expiry_alert_sent_at"]: (/* @__PURE__ */ new Date()).toISOString()
+      })
+    });
+  }
+  const tiktokAccounts = await getTiktokAccounts();
+  for (const a of tiktokAccounts) {
+    if (!a.is_active || a.token_expired) continue;
+    const days2 = daysUntil(a.refresh_token_expires_at);
+    const tier = pickTier(days2, TIKTOK_WARN_WITHIN_DAYS, !!a.expiry_alert_sent_at, !!a.urgent_alert_sent_at);
+    if (!tier || days2 === null) continue;
+    items.push({
+      tier,
+      emoji: "\u26AB",
+      platform: "TikTok",
+      label: a.display_name || a.username || a.open_id,
+      brand: a.brand,
+      days: days2,
+      markNotified: () => setTiktokAccountSyncStatus(a.open_id, {
+        [tier === "urgent" ? "urgent_alert_sent_at" : "expiry_alert_sent_at"]: (/* @__PURE__ */ new Date()).toISOString()
+      })
+    });
+  }
+  const youtubeAccounts = await getYoutubeAccounts();
+  for (const a of youtubeAccounts) {
+    if (!a.is_active || a.token_expired) continue;
+    const days2 = daysUntil(a.refresh_token_expires_at);
+    const tier = pickTier(days2, YOUTUBE_WARN_WITHIN_DAYS, !!a.expiry_alert_sent_at, !!a.urgent_alert_sent_at);
+    if (!tier || days2 === null) continue;
+    items.push({
+      tier,
+      emoji: "\u{1F534}",
+      platform: "YouTube",
+      label: a.channel_title || a.channel_id,
+      brand: a.brand,
+      days: days2,
+      markNotified: () => setYoutubeAccountSyncStatus(a.channel_id, {
+        [tier === "urgent" ? "urgent_alert_sent_at" : "expiry_alert_sent_at"]: (/* @__PURE__ */ new Date()).toISOString()
+      })
+    });
+  }
+  return items;
+}
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function formatLine(it) {
+  const prefix = it.tier === "urgent" ? "\u{1F6A8} <b>KH\u1EA8N C\u1EA4P</b>" : it.emoji;
+  const daysText = it.days <= 0 ? "h\xF4m nay ho\u1EB7c \u0111\xE3 qu\xE1 h\u1EA1n" : `c\xF2n <b>${it.days} ng\xE0y</b>`;
+  return `${prefix} <b>${escapeHtml(it.platform)}</b> \u2014 ${escapeHtml(it.label)}${it.brand ? ` (${escapeHtml(it.brand)})` : ""}: ${daysText}`;
+}
+async function checkExpiringConnectionsAndNotify() {
+  const expiring = await collectExpiring();
+  if (expiring.length === 0) {
+    return { checked: true, expiringCount: 0, notified: false };
+  }
+  if (!isTelegramConfigured) {
+    console.warn(
+      `expiryNotifier: ${expiring.length} k\u1EBFt n\u1ED1i s\u1EAFp h\u1EBFt h\u1EA1n nh\u01B0ng TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID ch\u01B0a c\u1EA5u h\xECnh \u2014 kh\xF4ng g\u1EEDi \u0111\u01B0\u1EE3c c\u1EA3nh b\xE1o.`
+    );
+    return { checked: true, expiringCount: expiring.length, notified: false, error: "Telegram ch\u01B0a c\u1EA5u h\xECnh" };
+  }
+  const sorted = [...expiring].sort((a, b) => {
+    if (a.tier !== b.tier) return a.tier === "urgent" ? -1 : 1;
+    return a.days - b.days;
+  });
+  const lines = sorted.map(formatLine);
+  const text = `\u26A0\uFE0F <b>C\u1EA3nh b\xE1o k\u1EBFt n\u1ED1i s\u1EAFp h\u1EBFt h\u1EA1n</b>
+
+${lines.join("\n")}
+
+V\xE0o Control Panel \u2192 "K\u1EBFt n\u1ED1i n\u1EC1n t\u1EA3ng" \u0111\u1EC3 c\u1EA5p l\u1EA1i token/k\u1EBFt n\u1ED1i l\u1EA1i tr\u01B0\u1EDBc khi h\u1EBFt h\u1EA1n.`;
+  try {
+    await sendTelegramMessage(text);
+  } catch (err) {
+    console.error("expiryNotifier: g\u1EEDi Telegram th\u1EA5t b\u1EA1i:", err.message);
+    return { checked: true, expiringCount: expiring.length, notified: false, error: err.message };
+  }
+  await Promise.all(expiring.map((it) => it.markNotified().catch((err) => console.error("expiryNotifier: markNotified l\u1ED7i:", err.message))));
+  return { checked: true, expiringCount: expiring.length, notified: true };
+}
+
+// src/server/driveBackup.ts
+var DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
+var DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";
+var DRIVE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+var DRIVE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+var USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+var GOOGLE_DRIVE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID || "";
+var GOOGLE_DRIVE_CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET || "";
+var GOOGLE_DRIVE_REDIRECT_URI = process.env.GOOGLE_DRIVE_REDIRECT_URI || "";
+var isDriveBackupConfigured = Boolean(GOOGLE_DRIVE_CLIENT_ID && GOOGLE_DRIVE_CLIENT_SECRET && GOOGLE_DRIVE_REDIRECT_URI);
+var DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/userinfo.email"];
+var DEFAULT_DRIVE_BACKUP_CONFIG = {
+  enabled: false,
+  connected_email: null,
+  access_token_encrypted: null,
+  refresh_token_encrypted: null,
+  access_token_expires_at: null,
+  folder_id: null,
+  retention_days: 30,
+  last_backup_at: null,
+  last_backup_error: null
+};
+async function getDriveBackupConfig() {
+  const store = await getDatabaseData();
+  return { ...DEFAULT_DRIVE_BACKUP_CONFIG, ...store.drive_backup_config || {} };
+}
+async function saveDriveBackupConfig(patch) {
+  const store = await getDatabaseData();
+  const next = { ...DEFAULT_DRIVE_BACKUP_CONFIG, ...store.drive_backup_config || {}, ...patch };
+  store.drive_backup_config = next;
+  await saveDatabaseData(store);
+  return next;
+}
+var DriveApiError = class extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+};
+async function postTokenEndpoint4(params) {
+  const res = await fetch(DRIVE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(params).toString()
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new DriveApiError(body?.error_description || body?.error || `Google token endpoint tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status);
+  }
+  return body;
+}
+async function exchangeDriveCode(code, redirectUri) {
+  return postTokenEndpoint4({
+    client_id: GOOGLE_DRIVE_CLIENT_ID,
+    client_secret: GOOGLE_DRIVE_CLIENT_SECRET,
+    code,
+    grant_type: "authorization_code",
+    redirect_uri: redirectUri
+  });
+}
+async function refreshDriveToken(refreshToken) {
+  return postTokenEndpoint4({
+    client_id: GOOGLE_DRIVE_CLIENT_ID,
+    client_secret: GOOGLE_DRIVE_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
+}
+async function fetchGoogleEmail(accessToken) {
+  const res = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) return null;
+  const body = await res.json();
+  return body?.email || null;
+}
+async function getValidAccessToken(config) {
+  if (!config.refresh_token_encrypted) throw new Error("Ch\u01B0a k\u1EBFt n\u1ED1i Google Drive.");
+  const expiresAt = config.access_token_expires_at ? new Date(config.access_token_expires_at).getTime() : 0;
+  if (config.access_token_encrypted && Date.now() < expiresAt - 5 * 60 * 1e3) {
+    return decrypt(config.access_token_encrypted);
+  }
+  const refreshToken = decrypt(config.refresh_token_encrypted);
+  const refreshed = await refreshDriveToken(refreshToken);
+  await saveDriveBackupConfig({
+    access_token_encrypted: encrypt(refreshed.access_token),
+    access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString()
+  });
+  return refreshed.access_token;
+}
+async function uploadJsonToDrive(accessToken, filename, jsonContent, folderId) {
+  const boundary = `drive_backup_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const metadata = { name: filename, mimeType: "application/json" };
+  if (folderId) metadata.parents = [folderId];
+  const body = `--${boundary}\r
+Content-Type: application/json; charset=UTF-8\r
+\r
+${JSON.stringify(metadata)}\r
+--${boundary}\r
+Content-Type: application/json\r
+\r
+${jsonContent}\r
+--${boundary}--`;
+  const res = await fetch(`${DRIVE_UPLOAD_URL}?uploadType=multipart`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+    body
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new DriveApiError(errBody?.error?.message || `Drive upload tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status);
+  }
+}
+async function listBackupFiles(accessToken, folderId) {
+  const q = [
+    "name contains 'marketing_report_v2_backup_'",
+    "trashed = false",
+    folderId ? `'${folderId}' in parents` : null
+  ].filter(Boolean).join(" and ");
+  const params = new URLSearchParams({ q, fields: "files(id,name,createdTime)", pageSize: "1000" });
+  const res = await fetch(`${DRIVE_FILES_URL}?${params.toString()}`, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new DriveApiError(errBody?.error?.message || `Drive files.list tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status);
+  }
+  const body = await res.json();
+  return body?.files || [];
+}
+async function deleteBackupFile(accessToken, fileId) {
+  const res = await fetch(`${DRIVE_FILES_URL}/${fileId}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!res.ok && res.status !== 404) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new DriveApiError(errBody?.error?.message || `Drive files.delete tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status);
+  }
+}
+var RELATIONAL_TABLES = [
+  "login_attempts",
+  "login_logs",
+  "action_logs",
+  "fb_pages",
+  "fb_insights_daily",
+  "fb_posts",
+  "fb_ad_accounts",
+  "google_ads_accounts",
+  "tiktok_ads_accounts",
+  "ads_performance",
+  "tiktok_accounts",
+  "tiktok_insights_daily",
+  "tiktok_posts",
+  "youtube_accounts",
+  "youtube_insights_daily",
+  "youtube_videos"
+];
+async function runDriveBackup() {
+  if (!isDriveBackupConfigured) {
+    throw new Error("GOOGLE_DRIVE_CLIENT_ID / GOOGLE_DRIVE_CLIENT_SECRET / GOOGLE_DRIVE_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  }
+  if (!isSupabaseConfigured) {
+    throw new Error("Sao l\u01B0u Google Drive ch\u1EC9 ch\u1EA1y tr\xEAn production (Supabase) \u2014 kh\xF4ng \xE1p d\u1EE5ng cho local dev.");
+  }
+  const config = await getDriveBackupConfig();
+  if (!config.refresh_token_encrypted) {
+    throw new Error("Ch\u01B0a k\u1EBFt n\u1ED1i Google Drive \u2014 v\xE0o Control Panel \u2192 Sao L\u01B0u T\u1EF1 \u0110\u1ED9ng \u0111\u1EC3 k\u1EBFt n\u1ED1i.");
+  }
+  try {
+    const accessToken = await getValidAccessToken(config);
+    const appState = await getDatabaseData();
+    const dump = { app_state: appState };
+    const tableCounts = {};
+    for (const table of RELATIONAL_TABLES) {
+      const { data, error } = await supabase.from(table).select("*");
+      if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc b\u1EA3ng ${table}: ${error.message}`);
+      dump[table] = data || [];
+      tableCounts[table] = (data || []).length;
+    }
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const filename = `marketing_report_v2_backup_${timestamp}.json`;
+    await uploadJsonToDrive(accessToken, filename, JSON.stringify(dump), config.folder_id);
+    try {
+      const files = await listBackupFiles(accessToken, config.folder_id);
+      const cutoff = Date.now() - config.retention_days * 24 * 60 * 60 * 1e3;
+      const stale = files.filter((f3) => new Date(f3.createdTime).getTime() < cutoff);
+      for (const f3 of stale) await deleteBackupFile(accessToken, f3.id).catch(() => {
+      });
+    } catch (err) {
+      console.error("Drive backup retention cleanup l\u1ED7i (kh\xF4ng ch\u1EB7n backup):", err.message || err);
+    }
+    await saveDriveBackupConfig({ last_backup_at: (/* @__PURE__ */ new Date()).toISOString(), last_backup_error: null });
+    return { filename, tables: tableCounts };
+  } catch (err) {
+    await saveDriveBackupConfig({ last_backup_error: err.message || String(err) }).catch(() => {
+    });
+    throw err;
+  }
+}
+
 // src/server/app.ts
 import_dotenv2.default.config({ path: ".env.local", quiet: true });
 import_dotenv2.default.config({ quiet: true });
@@ -143965,105 +126466,142 @@ C\u1EA5u tr\xFAc JSON ph\u1EA3n h\u1ED3i b\u1EAFt bu\u1ED9c ph\u1EA3i \u0111\xFA
     return res.status(500).json({ error: error.message || "L\u1ED7i x\u1EED l\xFD ph\xE2n t\xEDch AI" });
   }
 });
-app.get("/api/get-mail-config", requireAuth("Admin"), async (req, res) => {
+app.get("/api/backup/drive/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isDriveBackupConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "GOOGLE_DRIVE_CLIENT_ID / GOOGLE_DRIVE_CLIENT_SECRET / GOOGLE_DRIVE_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
+    });
+  }
+  const state = signOAuthState({ username: req.session.username });
+  const params = new URLSearchParams({
+    client_id: GOOGLE_DRIVE_CLIENT_ID,
+    redirect_uri: GOOGLE_DRIVE_REDIRECT_URI,
+    response_type: "code",
+    scope: DRIVE_SCOPES.join(" "),
+    state,
+    access_type: "offline",
+    prompt: "consent"
+  });
+  res.json({ success: true, authorizeUrl: `${DRIVE_AUTHORIZE_URL}?${params.toString()}` });
+});
+app.get("/api/backup/drive/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError) {
+    return res.status(400).send(`K\u1EBFt n\u1ED1i Google Drive b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${oauthError}`);
+  }
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c Google Drive kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i t\u1EEB Control Panel.");
+  }
   try {
-    const store = await getDatabaseData();
-    const config = store.mail_config || {};
-    const decryptedPass = config.smtp_pass ? decrypt(config.smtp_pass) : "";
+    const tokens = await exchangeDriveCode(code, GOOGLE_DRIVE_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google kh\xF4ng tr\u1EA3 v\u1EC1 refresh_token \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i (\u0111\u1EA3m b\u1EA3o m\xE0n h\xECnh xin quy\u1EC1n hi\u1EC7n ra \u0111\u1EA7y \u0111\u1EE7, kh\xF4ng b\u1ECB b\u1ECF qua).");
+    }
+    const email = await fetchGoogleEmail(tokens.access_token);
+    await saveDriveBackupConfig({
+      connected_email: email,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+      enabled: true,
+      last_backup_error: null
+    });
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-drive-backup", `K\u1EBFt n\u1ED1i Google Drive backup (${email || "?"})`);
+    res.redirect(302, "/?driveBackupConnected=1");
+  } catch (err) {
+    console.error("GET /api/backup/drive/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i Google Drive th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.get("/api/backup/drive/status", requireAuth("Admin"), async (req, res) => {
+  try {
+    const config = await getDriveBackupConfig();
     res.json({
       success: true,
-      config: {
-        smtp_host: config.smtp_host || "",
-        smtp_port: config.smtp_port || "587",
-        smtp_user: config.smtp_user || "",
-        smtp_pass: decryptedPass,
-        notification_email: config.notification_email || "ntkdung1206@gmail.com",
-        enabled: config.enabled !== void 0 ? config.enabled : true
-      }
+      configured: isDriveBackupConfigured,
+      connected: Boolean(config.refresh_token_encrypted),
+      connected_email: config.connected_email,
+      enabled: config.enabled,
+      folder_id: config.folder_id,
+      retention_days: config.retention_days,
+      last_backup_at: config.last_backup_at,
+      last_backup_error: config.last_backup_error
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-app.post("/api/save-mail-config", requireAuth("Admin"), async (req, res) => {
+app.post("/api/backup/drive/config", requireAuth("Admin"), async (req, res) => {
   try {
-    const { smtp_host, smtp_port, smtp_user, smtp_pass, notification_email, enabled } = req.body;
-    const store = await getDatabaseData();
-    const encryptedPass = smtp_pass ? encrypt(smtp_pass) : "";
-    store.mail_config = {
-      smtp_host: smtp_host || "",
-      smtp_port: smtp_port || "587",
-      smtp_user: smtp_user || "",
-      smtp_pass: encryptedPass,
-      notification_email: notification_email || "",
-      enabled: enabled === true
-    };
-    await saveDatabaseData(store);
-    await logAction(req.session, req, "save-mail-config", "C\u1EADp nh\u1EADt c\u1EA5u h\xECnh g\u1EEDi mail SMTP");
-    res.json({ success: true, message: "C\u1EA5u h\xECnh g\u1EEDi mail t\u1EF1 \u0111\u1ED9ng \u0111\xE3 \u0111\u01B0\u1EE3c l\u01B0u v\xE0 m\xE3 h\xF3a b\u1EA3o m\u1EADt!" });
+    const { folder_id, retention_days, enabled } = req.body || {};
+    const patch = {};
+    if (folder_id !== void 0) patch.folder_id = typeof folder_id === "string" && folder_id.trim() ? folder_id.trim() : null;
+    if (retention_days !== void 0) {
+      const n = Number(retention_days);
+      patch.retention_days = Number.isFinite(n) && n > 0 ? Math.round(n) : 30;
+    }
+    if (enabled !== void 0) patch.enabled = Boolean(enabled);
+    const config = await saveDriveBackupConfig(patch);
+    await logAction(req.session, req, "save-drive-backup-config", "C\u1EADp nh\u1EADt c\u1EA5u h\xECnh sao l\u01B0u Google Drive");
+    res.json({ success: true, config: { folder_id: config.folder_id, retention_days: config.retention_days, enabled: config.enabled } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-async function runDatabaseBackupEmail() {
-  const store = await getDatabaseData();
-  const config = store.mail_config || {};
-  const normalized = normalizeMarketingData(store);
-  const safeUsers = (Array.isArray(store.users) ? store.users : []).map((u) => ({
-    username: u.username,
-    name: u.name,
-    role: u.role
-  }));
-  const buffer = buildBackupAttachmentBuffer({
-    ...normalized,
-    comments: store.comments || {},
-    users: safeUsers
-  });
-  await sendBackupEmail(
-    {
-      smtp_host: config.smtp_host || "",
-      smtp_port: config.smtp_port || "587",
-      smtp_user: config.smtp_user || "",
-      smtp_pass: config.smtp_pass ? decrypt(config.smtp_pass) : "",
-      notification_email: config.notification_email || "",
-      enabled: config.enabled !== false
-    },
-    buffer,
-    `marketing_backup_${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.xlsx`
-  );
-}
-app.post("/api/send-backup-now", requireAuth("Admin"), async (req, res) => {
+app.delete("/api/backup/drive/disconnect", requireAuth("Admin"), async (req, res) => {
   try {
-    await runDatabaseBackupEmail();
-    await logAction(req.session, req, "send-backup-now", "G\u1EEDi th\u1EED email backup database");
-    return res.json({ success: true });
+    await saveDriveBackupConfig({
+      connected_email: null,
+      access_token_encrypted: null,
+      refresh_token_encrypted: null,
+      access_token_expires_at: null,
+      enabled: false
+    });
+    await logAction(req.session, req, "disconnect-drive-backup", "Ng\u1EAFt k\u1EBFt n\u1ED1i Google Drive backup");
+    res.json({ success: true });
   } catch (err) {
-    console.error("POST /api/send-backup-now error:", err);
-    return res.status(500).json({ error: err.message || "L\u1ED7i g\u1EEDi email backup." });
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/backup/drive/run-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const result = await runDriveBackup();
+    await logAction(req.session, req, "run-drive-backup", `Sao l\u01B0u Google Drive th\u1EE7 c\xF4ng: ${result.filename}`);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 function isValidCronRequest(req) {
   const expected = process.env.CRON_SECRET;
   const provided = req.headers.authorization;
   if (!expected || !provided) return false;
-  const expectedDigest = import_crypto9.default.createHash("sha256").update(`Bearer ${expected}`).digest();
-  const providedDigest = import_crypto9.default.createHash("sha256").update(provided).digest();
-  return import_crypto9.default.timingSafeEqual(expectedDigest, providedDigest);
+  const expectedDigest = import_crypto12.default.createHash("sha256").update(`Bearer ${expected}`).digest();
+  const providedDigest = import_crypto12.default.createHash("sha256").update(provided).digest();
+  return import_crypto12.default.timingSafeEqual(expectedDigest, providedDigest);
 }
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const store = await getDatabaseData();
-    if (store.mail_config?.enabled === false) {
-      return res.json({ success: true, skipped: true, reason: "G\u1EEDi mail t\u1EF1 \u0111\u1ED9ng \u0111ang t\u1EAFt (enabled=false)." });
+    let drive = { skipped: true, reason: "Ch\u01B0a c\u1EA5u h\xECnh ho\u1EB7c ch\u01B0a k\u1EBFt n\u1ED1i Google Drive." };
+    const driveConfig = await getDriveBackupConfig();
+    if (isDriveBackupConfigured && driveConfig.enabled && driveConfig.refresh_token_encrypted) {
+      try {
+        const result = await runDriveBackup();
+        drive = { skipped: false, filename: result.filename };
+      } catch (err) {
+        console.error("GET /api/cron/weekly-backup (drive) error:", err);
+        drive = { skipped: true, reason: err.message };
+      }
     }
-    await runDatabaseBackupEmail();
-    return res.json({ success: true });
+    return res.json({ success: true, drive });
   } catch (err) {
     console.error("GET /api/cron/weekly-backup error:", err);
-    return res.status(500).json({ error: err.message || "L\u1ED7i g\u1EEDi email backup \u0111\u1ECBnh k\u1EF3." });
+    return res.status(500).json({ error: err.message || "L\u1ED7i backup \u0111\u1ECBnh k\u1EF3." });
   }
 });
 var REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads"];
@@ -144416,13 +126954,21 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const [pageResults, adsResults, tiktokResults, youtubeResults] = await Promise.all([
+    const [pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, googleWebsiteResults] = await Promise.all([
       runFacebookSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (page insights) error:", err);
         return [];
       }),
       runFacebookAdsSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (ads) error:", err);
+        return [];
+      }),
+      isGoogleAdsConfigured ? runGoogleAdsSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (google ads) error:", err);
+        return [];
+      }) : Promise.resolve([]),
+      runTiktokAdsSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (tiktok ads) error:", err);
         return [];
       }),
       // TikTok organic insights piggybacks on this same cron for the same
@@ -144435,9 +126981,20 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       isYoutubeConfigured ? runYoutubeSync().catch((err) => {
         console.error("GET /api/cron/facebook-sync (youtube) error:", err);
         return [];
+      }) : Promise.resolve([]),
+      // Website Report (GA4 + Search Console) piggybacks on this same cron
+      // for the same reason TikTok/YouTube organic insights do — same daily
+      // cadence, see this route's header comment.
+      isGoogleWebsiteConfigured ? runGoogleWebsiteSync().catch((err) => {
+        console.error("GET /api/cron/facebook-sync (google website) error:", err);
+        return [];
       }) : Promise.resolve([])
     ]);
-    res.json({ success: true, results: pageResults, adsResults, tiktokResults, youtubeResults });
+    const expiryCheck = await checkExpiringConnectionsAndNotify().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (expiry check) error:", err);
+      return { checked: false, expiringCount: 0, notified: false, error: err.message };
+    });
+    res.json({ success: true, results: pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, googleWebsiteResults, expiryCheck });
   } catch (err) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "L\u1ED7i \u0111\u1ED3ng b\u1ED9 Facebook \u0111\u1ECBnh k\u1EF3." });
@@ -144574,6 +127131,187 @@ app.post("/api/fb-ads/sync-now", requireAuth("Admin"), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+function getAdsSyncOverrides(body) {
+  const { since, until } = body || {};
+  return typeof since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(since) ? { since, until: typeof until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(until) ? until : void 0 } : void 0;
+}
+app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
+  try {
+    if (!isGoogleAdsConfigured) {
+      return res.status(400).json({
+        success: false,
+        error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
+      });
+    }
+    const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.replace(/\D/g, "") : "";
+    const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
+    if (!customerId || !accountName) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu Customer ID ho\u1EB7c t\xEAn Google Ads Account." });
+    }
+    if (customerId.length !== 10) {
+      return res.status(400).json({ success: false, error: "Customer ID Google Ads ph\u1EA3i g\u1ED3m 10 ch\u1EEF s\u1ED1." });
+    }
+    const loginCustomerId = typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim() ? req.query.login_customer_id.replace(/\D/g, "") : null;
+    if (loginCustomerId && loginCustomerId.length !== 10) {
+      return res.status(400).json({ success: false, error: "Manager ID ph\u1EA3i g\u1ED3m 10 ch\u1EEF s\u1ED1, kh\xF4ng t\xEDnh d\u1EA5u g\u1EA1ch ngang." });
+    }
+    const payload = {
+      customerId,
+      accountName,
+      brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
+      loginCustomerId,
+      username: req.session.username
+    };
+    const params = new URLSearchParams({
+      client_id: GOOGLE_ADS_CLIENT_ID,
+      redirect_uri: GOOGLE_ADS_REDIRECT_URI,
+      response_type: "code",
+      scope: GOOGLE_ADS_SCOPES.join(" "),
+      state: signOAuthState(payload),
+      access_type: "offline",
+      prompt: "select_account consent"
+    });
+    console.info("Google Ads OAuth start", {
+      clientId: GOOGLE_ADS_CLIENT_ID,
+      redirectUri: GOOGLE_ADS_REDIRECT_URI,
+      customerId,
+      loginCustomerId: payload.loginCustomerId
+    });
+    res.json({ success: true, authorizeUrl: `${GOOGLE_ADS_AUTHORIZE_URL}?${params.toString()}` });
+  } catch (err) {
+    console.error("GET /api/google-ads/oauth/start error:", err);
+    res.status(500).json({
+      success: false,
+      error: err?.message || "Kh\xF4ng t\u1EA1o \u0111\u01B0\u1EE3c li\xEAn k\u1EBFt Google Ads OAuth."
+    });
+  }
+});
+app.get("/api/google-ads/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError) return res.status(400).send(`K\u1EBFt n\u1ED1i Google Ads b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${oauthError}`);
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c Google Ads kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED l\u1EA1i t\u1EEB Control Panel.");
+  }
+  try {
+    const tokens = await exchangeGoogleAdsCode(code, GOOGLE_ADS_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google kh\xF4ng tr\u1EA3 v\u1EC1 refresh_token \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i v\xE0 duy\u1EC7t \u0111\u1EA7y \u0111\u1EE7 m\xE0n h\xECnh xin quy\u1EC1n.");
+    }
+    await upsertGoogleAdsAccount({
+      customer_id: payload.customerId,
+      account_name: payload.accountName,
+      brand: payload.brand,
+      login_customer_id: payload.loginCustomerId,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+      is_active: true
+    });
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-google-ads-account", `K\u1EBFt n\u1ED1i Google Ads ${payload.accountName}`);
+    res.redirect(302, "/?googleAdsConnected=1");
+  } catch (err) {
+    console.error("GET /api/google-ads/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i Google Ads th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.get("/api/google-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getGoogleAdsAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        account_id: a.customer_id,
+        account_name: a.account_name,
+        brand: a.brand,
+        login_customer_id: a.login_customer_id,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired
+      })),
+      googleAdsConfigured: isGoogleAdsConfigured
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/google-ads/accounts/:customer_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteGoogleAdsAccount(req.params.customer_id);
+    await logAction(req.session, req, "delete-google-ads-account", `X\xF3a Google Ads Account ${req.params.customer_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/google-ads/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const overrides = getAdsSyncOverrides(req.body);
+    const results = await runGoogleAdsSync(overrides);
+    await logAction(req.session, req, "sync-google-ads", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} Google Ads Account`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/tiktok-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getTiktokAdsAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        account_id: a.advertiser_id,
+        account_name: a.account_name,
+        brand: a.brand,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/tiktok-ads/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { advertiser_id, account_name, brand, access_token, is_active } = req.body;
+    if (!advertiser_id || !account_name || !access_token) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu advertiser_id, account_name ho\u1EB7c access_token." });
+    }
+    await upsertTiktokAdsAccount({
+      advertiser_id: String(advertiser_id).trim(),
+      account_name: String(account_name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      access_token_encrypted: encrypt(String(access_token).trim()),
+      is_active: is_active !== void 0 ? Boolean(is_active) : void 0
+    });
+    await logAction(req.session, req, "save-tiktok-ads-account", `C\u1EADp nh\u1EADt TikTok Ads Advertiser ${advertiser_id}`);
+    res.json({ success: true, message: "\u0110\xE3 l\u01B0u c\u1EA5u h\xECnh TikTok Ads." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/tiktok-ads/accounts/:advertiser_id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteTiktokAdsAccount(req.params.advertiser_id);
+    await logAction(req.session, req, "delete-tiktok-ads-account", `X\xF3a TikTok Ads Advertiser ${req.params.advertiser_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/tiktok-ads/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const overrides = getAdsSyncOverrides(req.body);
+    const results = await runTiktokAdsSync(overrides);
+    await logAction(req.session, req, "sync-tiktok-ads", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} TikTok Ads Advertiser`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
   if (!isTiktokConfigured) {
     return res.status(400).json({
@@ -144582,8 +127320,8 @@ app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
     });
   }
   const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const codeVerifier = import_crypto9.default.randomBytes(48).toString("base64url");
-  const codeChallenge = import_crypto9.default.createHash("sha256").update(codeVerifier).digest("base64url");
+  const codeVerifier = import_crypto12.default.randomBytes(48).toString("base64url");
+  const codeChallenge = import_crypto12.default.createHash("sha256").update(codeVerifier).digest("base64url");
   const state = signOAuthState({ brand, username: req.session.username, codeVerifier });
   const params = new URLSearchParams({
     client_key: TIKTOK_CLIENT_KEY,
@@ -144633,6 +127371,8 @@ app.get("/api/tiktok/oauth/callback", async (req, res) => {
       last_synced_at: null,
       last_sync_error: null,
       token_expired: false,
+      expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
       created_at: (/* @__PURE__ */ new Date()).toISOString()
     });
     await logAction(
@@ -144776,6 +127516,8 @@ app.get("/api/youtube/oauth/callback", async (req, res) => {
       last_synced_at: null,
       last_sync_error: null,
       token_expired: false,
+      expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
       created_at: (/* @__PURE__ */ new Date()).toISOString()
     });
     await logAction(
@@ -144846,6 +127588,185 @@ app.get("/api/youtube/insights", requireAuth(), async (req, res) => {
       accounts: allAccounts.map((a) => ({ channel_id: a.channel_id, channel_title: a.channel_title, brand: a.brand, is_active: a.is_active })),
       daily,
       videos
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/google-website/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isGoogleWebsiteConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: "GOOGLE_WEBSITE_REDIRECT_URI (ho\u1EB7c YOUTUBE_CLIENT_ID/SECRET) ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
+    });
+  }
+  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
+  const state = signOAuthState({ brand, username: req.session.username });
+  const params = new URLSearchParams({
+    client_id: YOUTUBE_CLIENT_ID,
+    redirect_uri: GOOGLE_WEBSITE_REDIRECT_URI,
+    response_type: "code",
+    scope: GOOGLE_WEBSITE_SCOPES.join(" "),
+    state,
+    access_type: "offline",
+    // Same reasoning as the YouTube oauth/start route above — let Google
+    // surface an account chooser rather than silently reusing whatever
+    // Google Account is already active in the browser.
+    prompt: "select_account consent"
+  });
+  res.json({ success: true, authorizeUrl: `${GOOGLE_WEBSITE_AUTHORIZE_URL}?${params.toString()}` });
+});
+app.get("/api/google-website/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError } = req.query;
+  if (oauthError) {
+    return res.status(400).send(`K\u1EBFt n\u1ED1i Website (GA4/Search Console) b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${oauthError}`);
+  }
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c Google kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i t\u1EEB Control Panel.");
+  }
+  try {
+    const tokens = await exchangeGoogleWebsiteCode(code, GOOGLE_WEBSITE_REDIRECT_URI);
+    if (!tokens.refresh_token) {
+      throw new Error("Google kh\xF4ng tr\u1EA3 v\u1EC1 refresh_token \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i (\u0111\u1EA3m b\u1EA3o m\xE0n h\xECnh xin quy\u1EC1n hi\u1EC7n ra \u0111\u1EA7y \u0111\u1EE7, kh\xF4ng b\u1ECB b\u1ECF qua).");
+    }
+    if (!tokens.id_token) {
+      throw new Error("Google kh\xF4ng tr\u1EA3 v\u1EC1 id_token \u2014 kh\xF4ng x\xE1c \u0111\u1ECBnh \u0111\u01B0\u1EE3c t\xE0i kho\u1EA3n Google \u0111\u1EC3 l\u01B0u k\u1EBFt n\u1ED1i.");
+    }
+    const { sub, email } = decodeIdToken(tokens.id_token);
+    const [properties, sites] = await Promise.all([
+      listGa4Properties(tokens.access_token),
+      listSearchConsoleSites(tokens.access_token)
+    ]);
+    const needsSelection = properties.length !== 1 || sites.length !== 1;
+    await upsertGoogleWebsiteAccount({
+      id: sub,
+      google_account_email: email,
+      brand: payload.brand,
+      ga4_property_id: needsSelection ? null : properties[0].id,
+      ga4_property_name: needsSelection ? null : properties[0].name,
+      ga4_available_properties: needsSelection ? properties : null,
+      gsc_site_url: needsSelection ? null : sites[0],
+      gsc_available_sites: needsSelection ? sites : null,
+      access_token_encrypted: encrypt(tokens.access_token),
+      refresh_token_encrypted: encrypt(tokens.refresh_token),
+      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+      // Conservative estimate, not a real Google-reported deadline — see
+      // GoogleWebsiteAccountConfig's comment in googleWebsiteStore.ts.
+      refresh_token_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1e3).toISOString(),
+      is_active: !needsSelection,
+      last_synced_at: null,
+      last_sync_error: null,
+      token_expired: false,
+      expiry_alert_sent_at: null,
+      urgent_alert_sent_at: null,
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    });
+    await logAction(
+      { username: payload.username, role: "Admin" },
+      req,
+      "connect-google-website-account",
+      `K\u1EBFt n\u1ED1i Website (GA4/Search Console) ${email || sub}`
+    );
+    res.redirect(302, needsSelection ? "/?googleWebsiteConnected=pending" : "/?googleWebsiteConnected=1");
+  } catch (err) {
+    console.error("GET /api/google-website/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i Website th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.get("/api/google-website/accounts", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getGoogleWebsiteAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((a) => ({
+        id: a.id,
+        google_account_email: a.google_account_email,
+        brand: a.brand,
+        ga4_property_id: a.ga4_property_id,
+        ga4_property_name: a.ga4_property_name,
+        ga4_available_properties: a.ga4_available_properties,
+        gsc_site_url: a.gsc_site_url,
+        gsc_available_sites: a.gsc_available_sites,
+        is_active: a.is_active,
+        last_synced_at: a.last_synced_at,
+        last_sync_error: a.last_sync_error,
+        token_expired: a.token_expired,
+        refresh_token_expires_at: a.refresh_token_expires_at ?? null
+      })),
+      googleWebsiteConfigured: isGoogleWebsiteConfigured
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/google-website/accounts/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { ga4_property_id, gsc_site_url } = req.body || {};
+    const accounts = await getGoogleWebsiteAccounts();
+    const account = accounts.find((a) => a.id === req.params.id);
+    if (!account) return res.status(404).json({ success: false, error: "Kh\xF4ng t\xECm th\u1EA5y k\u1EBFt n\u1ED1i." });
+    const chosenProperty = (account.ga4_available_properties || []).find((p) => p.id === ga4_property_id);
+    const chosenSite = (account.gsc_available_sites || []).includes(gsc_site_url) ? gsc_site_url : null;
+    if (account.ga4_available_properties && account.ga4_available_properties.length > 0 && !chosenProperty) {
+      return res.status(400).json({ success: false, error: "GA4 property kh\xF4ng h\u1EE3p l\u1EC7." });
+    }
+    if (account.gsc_available_sites && account.gsc_available_sites.length > 0 && !chosenSite) {
+      return res.status(400).json({ success: false, error: "Search Console site kh\xF4ng h\u1EE3p l\u1EC7." });
+    }
+    await patchGoogleWebsiteAccount(account.id, {
+      ga4_property_id: chosenProperty ? chosenProperty.id : account.ga4_property_id,
+      ga4_property_name: chosenProperty ? chosenProperty.name : account.ga4_property_name,
+      ga4_available_properties: null,
+      gsc_site_url: chosenSite || account.gsc_site_url,
+      gsc_available_sites: null,
+      is_active: true
+    });
+    await logAction(req.session, req, "complete-google-website-setup", `Ho\xE0n t\u1EA5t thi\u1EBFt l\u1EADp Website ${account.google_account_email || account.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/google-website/accounts/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteGoogleWebsiteAccount(req.params.id);
+    await logAction(req.session, req, "delete-google-website-account", `X\xF3a k\u1EBFt n\u1ED1i Website ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/google-website/sync-now", requireAuth("Admin"), async (req, res) => {
+  try {
+    const results = await runGoogleWebsiteSync();
+    await logAction(req.session, req, "sync-google-website", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} k\u1EBFt n\u1ED1i Website`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getGoogleWebsiteAccounts();
+    const requestedIds = typeof req.query.accounts === "string" && req.query.accounts.length > 0 ? req.query.accounts.split(",").map((s2) => s2.trim()) : allAccounts.map((a) => a.id);
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const [ga4Daily, gscDaily] = await Promise.all([
+      getGa4InsightsDaily(requestedIds, since, until),
+      getSearchConsoleInsightsDaily(requestedIds, since, until)
+    ]);
+    res.json({
+      success: true,
+      accounts: allAccounts.map((a) => ({
+        id: a.id,
+        brand: a.brand,
+        ga4_property_name: a.ga4_property_name,
+        gsc_site_url: a.gsc_site_url,
+        is_active: a.is_active
+      })),
+      ga4Daily,
+      gscDaily
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

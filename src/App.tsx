@@ -27,6 +27,8 @@ import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
 import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
 import DriveBackupAdmin from "./components/DriveBackupAdmin";
 import PaidAdsApiAccountsAdmin from "./components/PaidAdsApiAccountsAdmin";
+import GoogleWebsiteAccountsAdmin from "./components/GoogleWebsiteAccountsAdmin";
+import WebsiteReport from "./components/WebsiteReport";
 import {
   TrendingUp,
   Award,
@@ -515,7 +517,7 @@ export default function App() {
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
 
   // Navigation & Brand States
-  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads">(() =>
+  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads" | "website-report">(() =>
     isAdminPath(window.location.pathname) ? "control-panel" : "dashboard"
   );
 
@@ -608,6 +610,14 @@ export default function App() {
       setControlPanelSection("platform-connections");
       setPlatformSubTab("google");
       window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("googleWebsiteConnected") === "1" || params.get("googleWebsiteConnected") === "pending") {
+      // Same full-page-redirect problem as YouTube's OAuth callback above.
+      // The Website (GA4/Search Console) connection UI also lives inside
+      // the merged "google" sub-tab.
+      setActiveTab("control-panel");
+      setControlPanelSection("platform-connections");
+      setPlatformSubTab("google");
+      window.history.replaceState({}, "", window.location.pathname);
     } else if (params.get("driveBackupConnected") === "1") {
       // Same OAuth-redirect problem, this time for the Drive backup
       // connection under "Sao Lưu Tự Động" rather than "Kết nối nền tảng".
@@ -641,11 +651,12 @@ export default function App() {
   // Quản trị người dùng → Phân quyền xem báo cáo, see reportPermissions
   // state below) and defaults to "everyone sees everything" until an Admin
   // explicitly restricts it, matching this app's prior (unrestricted) behavior.
-  type ReportCategoryId = "dashboard" | "fb-insights" | "digital-ads";
+  type ReportCategoryId = "dashboard" | "fb-insights" | "digital-ads" | "website-report";
   const REPORT_CATEGORIES: { id: ReportCategoryId; label: string; icon: typeof FileSpreadsheet }[] = [
     { id: "dashboard", label: "Báo Cáo", icon: FileSpreadsheet },
     { id: "fb-insights", label: "Social Report", icon: Share2 },
     { id: "digital-ads", label: "Digital Ads Report", icon: Megaphone },
+    { id: "website-report", label: "Website Report", icon: Globe },
   ];
   const DEFAULT_REPORT_PERMISSIONS: Record<"Editor" | "Viewer", ReportCategoryId[]> = {
     Editor: REPORT_CATEGORIES.map((c) => c.id),
@@ -3195,6 +3206,20 @@ export default function App() {
               Digital Ads Report
             </button>
           )}
+          {canViewReportCategory("website-report") && (
+            <button
+              id="report_nav_website_report"
+              onClick={() => setActiveTab("website-report")}
+              className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                activeTab === "website-report"
+                  ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                  : "border-transparent text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Globe className={`h-4 w-4 ${activeTab === "website-report" ? "text-indigo-600" : "text-slate-400"}`} />
+              Website Report
+            </button>
+          )}
 
           {/* Admin action, not a report type — pinned to the bottom of the
               menu, separate from the report-type buttons above. Editor also
@@ -4607,6 +4632,8 @@ export default function App() {
           <SocialReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : activeTab === "digital-ads" ? (
           <DigitalAdsReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
+        ) : activeTab === "website-report" ? (
+          <WebsiteReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : (
           /* ------------------------------------------------------------
               GIAO DIỆN CONTROL PANEL (BẢNG ĐIỀU KHIỂN RIÊNG BIỆT)
@@ -6142,6 +6169,7 @@ export default function App() {
             {controlPanelSection === "platform-connections" && platformSubTab === "google" && (
               <div className="space-y-6">
                 {currentUser && currentUser.role === "Admin" && <YoutubeAccountsAdmin />}
+                {currentUser && currentUser.role === "Admin" && <GoogleWebsiteAccountsAdmin />}
                 {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="google" />}
                 <AdsUploadAdmin channel="google" />
               </div>
