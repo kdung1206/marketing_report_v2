@@ -508,6 +508,14 @@ export default function App() {
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  // Whether the logged-out "/" view shows the login form yet, or the public
+  // landing content first. Google's OAuth consent screen review requires the
+  // registered home page URL to be viewable — with a purpose description —
+  // without logging in first (see public/about.html for the same content
+  // served as a static page); this makes "/" itself satisfy that too,
+  // regardless of which URL ends up registered as "Application home page"
+  // in Google Cloud Console.
+  const [showLoginForm, setShowLoginForm] = useState(false);
 
   // User Manager states (Add/Edit User Form)
   const [managerUsername, setManagerUsername] = useState("");
@@ -2885,10 +2893,74 @@ export default function App() {
     });
   };
 
+  if (!currentUser && !showLoginForm) {
+    // Public landing content — shown at "/" before any login, so this URL
+    // satisfies Google's OAuth consent screen review requirements (home page
+    // must be viewable without logging in, and must explain the app's
+    // purpose under the same name configured on the consent screen) no
+    // matter which exact URL ends up registered as "Application home page"
+    // in Google Cloud Console. Same copy as public/about.html; kept as its
+    // own static page too since that one is reachable even if this SPA
+    // bundle ever fails to load.
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8 font-sans">
+        <div className="w-full max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="flex items-center gap-4">
+            <img src="/logo-128.png" alt="MetricAdPro logo" className="h-14 w-14 rounded-2xl shadow-sm" />
+            <div>
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">MetricAdPro</h1>
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+                Internal marketing reporting console for Livotec &amp; Karofi
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-sm leading-relaxed text-slate-600">
+            <p>
+              MetricAdPro consolidates marketing performance data from the advertising, social, and website
+              analytics platforms Livotec and Karofi use — Facebook Ads &amp; Page Insights, Google Ads, TikTok
+              Ads &amp; organic insights, YouTube channel analytics, and website analytics via Google Analytics 4
+              and Google Search Console — into a single internal reporting dashboard.
+            </p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Reads read-only performance metrics from platform accounts an authorized administrator explicitly connects.</li>
+              <li>Builds weekly/monthly internal reports comparing performance by brand (Livotec, Karofi) and channel.</li>
+              <li>Never posts, edits, or deletes anything on a connected account — every integration uses read-only API scopes.</li>
+            </ul>
+            <p>
+              This is an internal tool for Livotec and Karofi's own marketing team, not a public consumer product.
+              Access requires a staff account issued by an administrator.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 pt-2">
+            <button
+              type="button"
+              id="landing_login_btn"
+              onClick={() => setShowLoginForm(true)}
+              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-indigo-700"
+            >
+              Đăng nhập / Sign in →
+            </button>
+            <a href="/privacy" className="text-xs font-semibold text-indigo-600 hover:underline">Privacy Policy</a>
+            <a href="/terms" className="text-xs font-semibold text-indigo-600 hover:underline">Terms of Service</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8 font-sans">
         <div className="w-full max-w-md space-y-8 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+          <button
+            type="button"
+            onClick={() => setShowLoginForm(false)}
+            className="text-xs font-semibold text-slate-400 hover:text-indigo-600"
+          >
+            ← Quay lại
+          </button>
           <div className="text-center space-y-2">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md">
               <Shield className="h-6 w-6" />
