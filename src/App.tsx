@@ -2906,9 +2906,9 @@ export default function App() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8 font-sans">
         <div className="w-full max-w-2xl space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
           <div className="flex items-center gap-4">
-            <img src="/logo-128.png" alt="MetricAdPro logo" className="h-14 w-14 rounded-2xl shadow-sm" />
+            <img src="/logo-128.png" alt="Livotec & Karofi Analytical Hub logo" className="h-14 w-14 rounded-2xl shadow-sm" />
             <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">MetricAdPro</h1>
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Livotec & Karofi Analytical Hub</h1>
               <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">
                 Internal marketing reporting console for Livotec &amp; Karofi
               </p>
@@ -2917,7 +2917,7 @@ export default function App() {
 
           <div className="space-y-3 text-sm leading-relaxed text-slate-600">
             <p>
-              MetricAdPro consolidates marketing performance data from the advertising, social, and website
+              Livotec & Karofi Analytical Hub consolidates marketing performance data from the advertising, social, and website
               analytics platforms Livotec and Karofi use — Facebook Ads &amp; Page Insights, Google Ads, TikTok
               Ads &amp; organic insights, YouTube channel analytics, and website analytics via Google Analytics 4
               and Google Search Console — into a single internal reporting dashboard.
