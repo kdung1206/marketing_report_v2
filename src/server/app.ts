@@ -39,6 +39,7 @@ import {
 import { runFacebookSync, fetchTokenExpiry } from "./facebookSync";
 import {
   getAdsPerformance,
+  getAdsPerformanceByPostIds,
   upsertAdsPerformance,
   getFbAdAccounts,
   upsertFbAdAccount,
@@ -1330,11 +1331,32 @@ app.get("/api/fb/insights", requireAuth(), async (req, res) => {
       getFbPosts(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`),
     ]);
 
+    // Combine organic + paid for whichever of these posts were also boosted
+    // as ads (see facebookAdsSync.ts's fetchAdPostMap / getAdsPerformanceByPostIds)
+    // — a proof-of-concept for the "1 post, 2 data sources" idea: a post's
+    // spend/reach here is 100% from ads_performance, everything else on the
+    // row is 100% organic, nothing is double-counted. Widen the ads date
+    // window a few days past `until` since a post published near the end of
+    // the range may have kept accumulating ad spend after `until`.
+    const postIds = posts.map((p) => p.post_id);
+    const adsUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const adsForPosts = await getAdsPerformanceByPostIds(postIds, since, adsUntil);
+    const adsByPostId = new Map<string, { ads_spend: number; ads_impressions: number; ads_reach: number }>();
+    for (const row of adsForPosts) {
+      if (!row.post_id) continue;
+      const existing = adsByPostId.get(row.post_id) || { ads_spend: 0, ads_impressions: 0, ads_reach: 0 };
+      existing.ads_spend += row.spend || 0;
+      existing.ads_impressions += row.impressions || 0;
+      existing.ads_reach += row.reach || 0;
+      adsByPostId.set(row.post_id, existing);
+    }
+    const postsWithAds = posts.map((p) => ({ ...p, ads: adsByPostId.get(p.post_id) || null }));
+
     res.json({
       success: true,
       pages: allPages.map((p) => ({ page_id: p.page_id, page_name: p.page_name, brand: p.brand, is_active: p.is_active })),
       daily,
-      posts,
+      posts: postsWithAds,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

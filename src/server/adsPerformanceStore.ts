@@ -32,6 +32,12 @@ export interface AdsPerformanceRow {
   frequency: number | null; // null for Google
   video_views: number | null; // TrueView views / video plays at 50% / 6s views — approximate, not identical across channels
   conversions: number | null; // Leads (FB) / Conversions (TikTok, Google)
+  // Set only for Facebook ads boosting an existing Page post — same
+  // "{page_id}_{post_id}" format as fb_posts.post_id, joinable to combine
+  // that post's organic + paid performance (see facebookAdsSync.ts's
+  // fetchAdPostMap, getAdsPerformanceByPostIds below). null for dedicated-
+  // creative ads and all Google/TikTok rows.
+  post_id?: string | null;
   extra: Record<string, unknown>; // channel-specific leftovers (campaign_type, post_engagements, ...)
 }
 
@@ -154,6 +160,35 @@ export async function getAdsPerformance(params: {
     return query.order("date", { ascending: true }).range(from, to);
   }).catch((err: any) => {
     throw new Error(`Lỗi đọc số liệu quảng cáo: ${err.message}`);
+  });
+  return rows;
+}
+
+// Rows whose ad boosts one of these organic posts (post_id = the same
+// "{page_id}_{post_id}" string fb_posts uses) — lets a caller combine each
+// post's organic reach/engagement with what was spent promoting it. Always
+// channel='facebook' since only Facebook rows ever get a post_id (see
+// facebookAdsSync.ts's fetchAdPostMap) — Google/TikTok never set it.
+export async function getAdsPerformanceByPostIds(postIds: string[], since: string, until: string): Promise<AdsPerformanceRow[]> {
+  if (postIds.length === 0) return [];
+
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections();
+    const idSet = new Set(postIds);
+    return ads_performance.filter((r) => r.channel === "facebook" && r.post_id && idSet.has(r.post_id) && r.date >= since && r.date <= until);
+  }
+
+  const rows = await fetchAllRows<AdsPerformanceRow>((from, to) =>
+    supabase
+      .from("ads_performance")
+      .select("*")
+      .eq("channel", "facebook")
+      .in("post_id", postIds)
+      .gte("date", since)
+      .lte("date", until)
+      .range(from, to)
+  ).catch((err: any) => {
+    throw new Error(`Lỗi đọc số liệu quảng cáo theo post: ${err.message}`);
   });
   return rows;
 }

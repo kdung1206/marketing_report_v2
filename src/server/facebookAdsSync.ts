@@ -54,6 +54,7 @@ function dateRangeChunks(since: string, until: string): { since: string; until: 
 }
 
 const INSIGHTS_FIELDS = [
+  "ad_id",
   "campaign_name",
   "adset_name",
   "ad_name",
@@ -84,13 +85,51 @@ function sumAllActionValues(actions: Array<{ value: string }> | undefined): numb
   return actions.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
 }
 
+// Maps ad_id -> the underlying Page post ID ("{page_id}_{post_id}", same
+// format facebookSync.ts's fetchRecentPosts stores in fb_posts.post_id) for
+// every ad in the account whose creative is a "boosted" existing post
+// (object_story_id/effective_object_story_id set). Ads built from a
+// dedicated creative — not tied to any organic post — simply have no entry
+// here, which is correct: there's nothing organic to combine them with.
+// Fetched once per account per sync (not per date-chunk) since it barely
+// changes day to day and every chunk would otherwise refetch it.
+async function fetchAdPostMap(adAccountId: string, accessToken: string, tokenStatus: TokenStatus): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let body: any;
+  try {
+    body = await graphGet(`/${adAccountId}/ads?fields=id,creative{effective_object_story_id}&limit=500`, accessToken);
+  } catch (err: any) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    console.error(`Facebook Ads → post map (${adAccountId}) lỗi:`, err.message || err);
+    return map; // non-fatal — sync continues, rows just won't have post_id
+  }
+
+  while (body) {
+    for (const item of body.data || []) {
+      const postId = item.creative?.effective_object_story_id;
+      if (item.id && postId) map.set(item.id, postId);
+    }
+    const nextUrl = body.paging?.next;
+    if (!nextUrl) break;
+    try {
+      const res = await fetch(nextUrl);
+      body = await res.json();
+      if (!res.ok || body?.error) break;
+    } catch {
+      break;
+    }
+  }
+  return map;
+}
+
 async function fetchAdAccountInsights(
   adAccountId: string,
   accessToken: string,
   since: string,
   until: string,
   brand: string | null,
-  tokenStatus: TokenStatus
+  tokenStatus: TokenStatus,
+  adPostMap: Map<string, string>
 ): Promise<AdsPerformanceRow[]> {
   const rows: AdsPerformanceRow[] = [];
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
@@ -126,6 +165,11 @@ async function fetchAdAccountInsights(
         frequency: item.frequency != null ? Number(item.frequency) : null,
         video_views: item.video_play_actions ? sumAllActionValues(item.video_play_actions) : null,
         conversions: sumActionValues(item.actions, CONVERSION_ACTION_TYPES),
+        // Only set when this ad boosts an existing Page post — see
+        // fetchAdPostMap above. Lets the same post's paid spend/reach be
+        // joined against its organic row in fb_posts (post_id there is the
+        // same "{page_id}_{post_id}" string).
+        post_id: item.ad_id ? adPostMap.get(item.ad_id) || null : null,
         extra: {},
       });
     }
@@ -180,6 +224,10 @@ export async function runFacebookAdsSync(overrides?: { since?: string; until?: s
         const accessToken = decrypt(account.access_token_encrypted);
         if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
 
+        // Fetched once per account, reused across every date-chunk below —
+        // barely changes day to day, no reason to re-fetch it per chunk.
+        const adPostMap = await fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus);
+
         // Chunks for one account stay sequential — each is saved as soon as
         // it's fetched, so a failure on a later chunk (rate limit, transient
         // API error) still keeps everything fetched so far instead of losing
@@ -191,7 +239,8 @@ export async function runFacebookAdsSync(overrides?: { since?: string; until?: s
             chunk.since,
             chunk.until,
             account.brand,
-            tokenStatus
+            tokenStatus,
+            adPostMap
           );
           if (rows.length > 0) await upsertAdsPerformance(rows);
           rowsSynced += rows.length;

@@ -59,6 +59,10 @@ interface FbPostRow {
   angers: number | null;
   comments: number | null;
   shares: number | null;
+  // Set only when this post was also boosted as a Facebook ad (server joins
+  // by post_id — see GET /api/fb/insights, facebookAdsSync.ts's
+  // fetchAdPostMap). null means organic-only, not "no ads ever" elsewhere.
+  ads: { ads_spend: number; ads_impressions: number; ads_reach: number } | null;
 }
 
 const PAGE_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#06b6d4"];
@@ -447,6 +451,7 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
                 <thead className="bg-slate-50 text-slate-500">
                   <tr>
                     <th className="px-3 py-2 text-left">Nội dung</th>
+                    <th className="px-3 py-2 text-right">Ads (nếu có boost)</th>
                     <th className="px-3 py-2 text-right">Clicks</th>
                     <th className="px-3 py-2 text-right">Likes</th>
                     <th className="px-3 py-2 text-right">Loves</th>
@@ -470,6 +475,18 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
                           post.message || "(không có nội dung)"
                         )}
                       </td>
+                      <td className="px-3 py-2 text-right">
+                        {post.ads ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700"
+                            title="Số liệu từ ads_performance (Marketing API), post_id khớp bài đăng này — không cộng gộp vào cột organic bên phải."
+                          >
+                            💰 {fmt(post.ads.ads_spend)}đ · Reach {fmtCompact(post.ads.ads_reach)}
+                          </span>
+                        ) : (
+                          <span className="text-slate-300">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-right">{fmt(n(post.clicks))}</td>
                       <td className="px-3 py-2 text-right">{fmt(n(post.likes))}</td>
                       <td className="px-3 py-2 text-right">{fmt(n(post.loves))}</td>
@@ -483,7 +500,7 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
                   ))}
                   {sortedPosts.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-3 py-6 text-center text-slate-400">
+                      <td colSpan={10} className="px-3 py-6 text-center text-slate-400">
                         Chưa có bài đăng nào trong khoảng thời gian đã chọn.
                       </td>
                     </tr>

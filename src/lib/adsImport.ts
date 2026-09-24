@@ -30,6 +30,13 @@ export interface AdsPerformanceRow {
   frequency: number | null;
   video_views: number | null;
   conversions: number | null;
+  // Set only for Facebook ads that boost an existing Page post (creative's
+  // effective_object_story_id) — same "{page_id}_{post_id}" format as
+  // fb_posts.post_id, so the two can be joined to combine organic + paid
+  // performance for that one post. null for everything else: dedicated-
+  // creative ads, and all Google/TikTok rows (Excel upload has no such
+  // concept). See facebookAdsSync.ts's fetchAdPostMap.
+  post_id?: string | null;
   extra: Record<string, unknown>;
 }
 

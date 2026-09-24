@@ -310,6 +310,12 @@ create table if not exists ads_performance (
   frequency numeric, -- null for Google
   video_views bigint, -- TrueView views / video plays at 50% / 6s views — approximate, not identical definitions across channels
   conversions int, -- Leads (FB) / Conversions (TikTok, Google)
+  -- Set only for Facebook ads boosting an existing Page post (creative's
+  -- effective_object_story_id, see facebookAdsSync.ts's fetchAdPostMap) —
+  -- same "{page_id}_{post_id}" format as fb_posts.post_id, joinable to
+  -- combine that post's organic + paid performance. null for dedicated-
+  -- creative ads and all Google/TikTok rows.
+  post_id text,
   extra jsonb not null default '{}'::jsonb, -- channel-specific leftovers (campaign_type, post_engagements, ...)
   updated_at timestamptz not null default now(),
   primary key (channel, campaign_name, ad_group_name, ad_name, date)
@@ -317,6 +323,10 @@ create table if not exists ads_performance (
 
 create index if not exists ads_performance_channel_date_idx on ads_performance (channel, date);
 create index if not exists ads_performance_brand_date_idx on ads_performance (brand, date);
+create index if not exists ads_performance_post_id_idx on ads_performance (post_id);
+
+-- Existing projects created before organic+paid post combining shipped.
+alter table ads_performance add column if not exists post_id text;
 
 alter table ads_performance enable row level security;
 
