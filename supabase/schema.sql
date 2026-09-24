@@ -321,12 +321,16 @@ create table if not exists ads_performance (
   primary key (channel, campaign_name, ad_group_name, ad_name, date)
 );
 
+-- Existing projects created before organic+paid post combining shipped.
+-- Must run before the index below: on a project where this table already
+-- existed (pre-dating post_id), the index create would otherwise fail with
+-- "column post_id does not exist" since create table if not exists is a
+-- no-op there.
+alter table ads_performance add column if not exists post_id text;
+
 create index if not exists ads_performance_channel_date_idx on ads_performance (channel, date);
 create index if not exists ads_performance_brand_date_idx on ads_performance (brand, date);
 create index if not exists ads_performance_post_id_idx on ads_performance (post_id);
-
--- Existing projects created before organic+paid post combining shipped.
-alter table ads_performance add column if not exists post_id text;
 
 alter table ads_performance enable row level security;
 
