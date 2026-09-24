@@ -22,6 +22,7 @@ import {
   Target,
   RefreshCw,
   AlertCircle,
+  ChevronRight,
 } from "lucide-react";
 import { safeFetchJson } from "../App";
 import { AdsPerformanceRow, AdsChannel } from "../lib/adsImport";
@@ -58,8 +59,11 @@ function safeDiv(a: number, b: number): number {
 }
 
 // Sums the metrics that make sense to sum across a set of rows — used both
-// for whole-tab KPI totals and for per-campaign/per-date aggregation.
-function sumRows(rows: AdsPerformanceRow[]) {
+// for whole-tab KPI totals and for per-campaign/per-date aggregation. Typed
+// to only the numeric fields it reads (not the full AdsPerformanceRow) so it
+// can also re-sum already-aggregated rows (e.g. AdsDrilldownTable grouping
+// per-ad totals back up into ad-set/campaign totals).
+function sumRows(rows: Pick<AdsPerformanceRow, "spend" | "impressions" | "clicks" | "reach" | "video_views" | "conversions">[]) {
   return rows.reduce(
     (t, r) => ({
       spend: t.spend + n(r.spend),
@@ -153,36 +157,118 @@ function ChartCard({ title, children, height = "h-80" }: { title: string; childr
   );
 }
 
-const CAMPAIGN_TABLE_PAGE_SIZE = 50;
+const ADS_DRILLDOWN_PAGE_SIZE = 30;
 
-function CampaignTable({
+type AdsDrilldownRow = ReturnType<typeof aggregateByCampaign>[number];
+
+interface AdGroupNode {
+  ad_group_name: string;
+  ads: AdsDrilldownRow[];
+  totals: ReturnType<typeof sumRows>;
+}
+
+interface CampaignNode {
+  channel: AdsChannel;
+  campaign_name: string;
+  adGroups: AdGroupNode[];
+  totals: ReturnType<typeof sumRows>;
+}
+
+// Groups the already-per-ad-aggregated rows (aggregateByCampaign — one row
+// per channel+campaign+ad_group+ad, summed across the selected date range)
+// into a 3-level tree: campaign -> ad group -> ad. No new data fetch/shape
+// needed — this is purely a client-side regroup of the same rows the old
+// flat CampaignTable rendered one-per-ad.
+function buildCampaignTree(rows: AdsDrilldownRow[]): CampaignNode[] {
+  const byCampaign = new Map<string, { channel: AdsChannel; campaign_name: string; byAdGroup: Map<string, AdsDrilldownRow[]> }>();
+  for (const r of rows) {
+    const cKey = `${r.channel}|${r.campaign_name}`;
+    let c = byCampaign.get(cKey);
+    if (!c) {
+      c = { channel: r.channel, campaign_name: r.campaign_name, byAdGroup: new Map() };
+      byCampaign.set(cKey, c);
+    }
+    const ads = c.byAdGroup.get(r.ad_group_name) || [];
+    ads.push(r);
+    c.byAdGroup.set(r.ad_group_name, ads);
+  }
+
+  const campaigns: CampaignNode[] = Array.from(byCampaign.values()).map((c) => {
+    const adGroups: AdGroupNode[] = Array.from(c.byAdGroup.entries())
+      .map(([ad_group_name, ads]) => ({
+        ad_group_name,
+        ads: ads.slice().sort((a, b) => b.spend - a.spend),
+        totals: sumRows(ads),
+      }))
+      .sort((a, b) => b.totals.spend - a.totals.spend);
+    return { channel: c.channel, campaign_name: c.campaign_name, adGroups, totals: sumRows(adGroups.flatMap((ag) => ag.ads)) };
+  });
+
+  return campaigns.sort((a, b) => b.totals.spend - a.totals.spend);
+}
+
+function metricCells(m: ReturnType<typeof sumRows>, extraColumns?: { label: string; render: (r: ReturnType<typeof sumRows>) => React.ReactNode }[]) {
+  return (
+    <>
+      <td className="px-3 py-2 text-right">{fmt(m.spend)}</td>
+      <td className="px-3 py-2 text-right">{fmt(m.impressions)}</td>
+      <td className="px-3 py-2 text-right">{fmt(m.clicks)}</td>
+      <td className="px-3 py-2 text-right">{fmtPct(safeDiv(m.clicks, m.impressions))}</td>
+      {extraColumns?.map((col) => (
+        <td key={col.label} className="px-3 py-2 text-right">
+          {col.render(m)}
+        </td>
+      ))}
+    </>
+  );
+}
+
+// Campaign → Ad set → Ad drilldown table — click a Campaign row to expand
+// its ad groups, click an ad group to expand its individual ads, so a
+// campaign with many ads doesn't force one flat row per ad (the old
+// CampaignTable's shape) when most of the time only the campaign-level
+// total is needed. See the approved demo artifact for the interaction this
+// mirrors.
+function AdsDrilldownTable({
   rows,
   showChannel,
   extraColumns,
 }: {
-  rows: ReturnType<typeof aggregateByCampaign>;
+  rows: AdsDrilldownRow[];
   showChannel?: boolean;
-  extraColumns?: { label: string; render: (r: ReturnType<typeof aggregateByCampaign>[number]) => React.ReactNode }[];
+  extraColumns?: { label: string; render: (r: ReturnType<typeof sumRows>) => React.ReactNode }[];
 }) {
+  const campaigns = useMemo(() => buildCampaignTree(rows), [rows]);
+
+  const [openCampaigns, setOpenCampaigns] = useState<Set<string>>(new Set());
+  const [openAdGroups, setOpenAdGroups] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   // Reset to page 1 whenever the underlying data set changes (new date
   // range/channel/brand) — otherwise a page number from a previous, longer
   // result set could point past the end of a shorter one.
   useEffect(() => setPage(1), [rows]);
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / CAMPAIGN_TABLE_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(campaigns.length / ADS_DRILLDOWN_PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const startIdx = (currentPage - 1) * CAMPAIGN_TABLE_PAGE_SIZE;
-  const pageRows = rows.slice(startIdx, startIdx + CAMPAIGN_TABLE_PAGE_SIZE);
+  const startIdx = (currentPage - 1) * ADS_DRILLDOWN_PAGE_SIZE;
+  const pageCampaigns = campaigns.slice(startIdx, startIdx + ADS_DRILLDOWN_PAGE_SIZE);
+
+  function toggle(set: Set<string>, setSet: (s: Set<string>) => void, key: string) {
+    const next = new Set(set);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setSet(next);
+  }
+
+  const colCount = (showChannel ? 1 : 0) + 5 + (extraColumns?.length || 0);
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
       <table className="w-full min-w-[720px] text-xs">
         <thead className="bg-slate-50 text-slate-500">
           <tr>
+            <th className="px-3 py-2 text-left">Campaign / Ad set / Ad</th>
             {showChannel && <th className="px-3 py-2 text-left">Kênh</th>}
-            <th className="px-3 py-2 text-left">Campaign</th>
-            <th className="px-3 py-2 text-left">Ad group</th>
             <th className="px-3 py-2 text-right">Chi phí</th>
             <th className="px-3 py-2 text-right">Impressions</th>
             <th className="px-3 py-2 text-right">Clicks</th>
@@ -195,49 +281,96 @@ function CampaignTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {rows.length === 0 ? (
+          {campaigns.length === 0 ? (
             <tr>
-              <td colSpan={(showChannel ? 7 : 6) + (extraColumns?.length || 0)} className="px-3 py-6 text-center text-slate-400">
+              <td colSpan={colCount} className="px-3 py-6 text-center text-slate-400">
                 Chưa có dữ liệu trong khoảng thời gian đã chọn.
               </td>
             </tr>
           ) : (
-            pageRows.map((r, i) => (
-              <tr key={startIdx + i}>
-                {showChannel && (
-                  <td className="px-3 py-2">
-                    <span
-                      className="rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
-                      style={{ backgroundColor: CHANNEL_COLORS[r.channel] }}
-                    >
-                      {CHANNEL_LABELS[r.channel]}
-                    </span>
-                  </td>
-                )}
-                <td className="max-w-[240px] truncate px-3 py-2 font-medium text-slate-700" title={r.campaign_name}>
-                  {r.campaign_name || "(không có tên)"}
-                </td>
-                <td className="max-w-[180px] truncate px-3 py-2 text-slate-500" title={r.ad_group_name}>
-                  {r.ad_group_name || "—"}
-                </td>
-                <td className="px-3 py-2 text-right">{fmt(r.spend)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.impressions)}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.clicks)}</td>
-                <td className="px-3 py-2 text-right">{fmtPct(safeDiv(r.clicks, r.impressions))}</td>
-                {extraColumns?.map((col) => (
-                  <td key={col.label} className="px-3 py-2 text-right">
-                    {col.render(r)}
-                  </td>
-                ))}
-              </tr>
-            ))
+            pageCampaigns.map((c) => {
+              const cKey = `${c.channel}|${c.campaign_name}`;
+              const cOpen = openCampaigns.has(cKey);
+              return (
+                <React.Fragment key={cKey}>
+                  <tr
+                    className="cursor-pointer bg-white hover:bg-slate-50"
+                    onClick={() => toggle(openCampaigns, setOpenCampaigns, cKey)}
+                  >
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${cOpen ? "rotate-90" : ""}`} />
+                        <span className="max-w-[280px] truncate font-medium text-slate-700" title={c.campaign_name}>
+                          {c.campaign_name || "(không có tên)"}
+                        </span>
+                        <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                          {c.adGroups.length} ad set{c.adGroups.length > 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    </td>
+                    {showChannel && (
+                      <td className="px-3 py-2">
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
+                          style={{ backgroundColor: CHANNEL_COLORS[c.channel] }}
+                        >
+                          {CHANNEL_LABELS[c.channel]}
+                        </span>
+                      </td>
+                    )}
+                    {metricCells(c.totals, extraColumns)}
+                  </tr>
+
+                  {cOpen &&
+                    c.adGroups.map((ag) => {
+                      const agKey = `${cKey}|${ag.ad_group_name}`;
+                      const agOpen = openAdGroups.has(agKey);
+                      return (
+                        <React.Fragment key={agKey}>
+                          <tr
+                            className="cursor-pointer bg-slate-50/60 hover:bg-slate-100"
+                            onClick={() => toggle(openAdGroups, setOpenAdGroups, agKey)}
+                          >
+                            <td className="py-2 pl-8 pr-3">
+                              <div className="flex items-center gap-1.5">
+                                <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${agOpen ? "rotate-90" : ""}`} />
+                                <span className="max-w-[240px] truncate text-slate-600" title={ag.ad_group_name}>
+                                  {ag.ad_group_name || "—"}
+                                </span>
+                                <span className="shrink-0 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+                                  {ag.ads.length} ad{ag.ads.length > 1 ? "s" : ""}
+                                </span>
+                              </div>
+                            </td>
+                            {showChannel && <td className="px-3 py-2 text-slate-300">—</td>}
+                            {metricCells(ag.totals, extraColumns)}
+                          </tr>
+
+                          {agOpen &&
+                            ag.ads.map((ad, i) => (
+                              <tr key={`${agKey}|${i}`} className="bg-white">
+                                <td className="py-2 pl-16 pr-3">
+                                  <span className="block max-w-[220px] truncate text-slate-600" title={ad.ad_name}>
+                                    {ad.ad_name || "(không có tên)"}
+                                  </span>
+                                </td>
+                                {showChannel && <td className="px-3 py-2 text-slate-300">—</td>}
+                                {metricCells(ad, extraColumns)}
+                              </tr>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+                </React.Fragment>
+              );
+            })
           )}
         </tbody>
       </table>
-      {rows.length > CAMPAIGN_TABLE_PAGE_SIZE && (
+      {campaigns.length > ADS_DRILLDOWN_PAGE_SIZE && (
         <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
           <span>
-            Dòng {startIdx + 1}–{Math.min(startIdx + CAMPAIGN_TABLE_PAGE_SIZE, rows.length)} / {rows.length}
+            Campaign {startIdx + 1}–{Math.min(startIdx + ADS_DRILLDOWN_PAGE_SIZE, campaigns.length)} / {campaigns.length}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -475,7 +608,7 @@ function AllChannelTab({
         </ChartCard>
       </div>
 
-      <CampaignTable rows={byCampaign} showChannel />
+      <AdsDrilldownTable rows={byCampaign} showChannel />
     </div>
   );
 }
@@ -549,7 +682,7 @@ function FacebookTab({
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
-        <CampaignTable
+        <AdsDrilldownTable
           rows={byCampaign}
           extraColumns={[
             { label: "Reach", render: (r) => fmt(r.reach) },
@@ -637,7 +770,7 @@ function GoogleTab({
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
-        <CampaignTable rows={byCampaign} extraColumns={[{ label: "Avg. CPC", render: (r) => fmt(safeDiv(r.spend, r.clicks)) }]} />
+        <AdsDrilldownTable rows={byCampaign} extraColumns={[{ label: "Avg. CPC", render: (r) => fmt(safeDiv(r.spend, r.clicks)) }]} />
       </div>
     </div>
   );
@@ -718,7 +851,7 @@ function TiktokTab({
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
-        <CampaignTable
+        <AdsDrilldownTable
           rows={byCampaign}
           extraColumns={[
             { label: "Reach", render: (r) => fmt(r.reach) },
