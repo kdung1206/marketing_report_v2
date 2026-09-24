@@ -6,6 +6,7 @@ import {
   MarketingReportData,
   BrandComments,
   CategoryComments,
+  DigitalMarketingRow,
   normalizeMarketingData,
 } from "./data";
 import {
@@ -18,6 +19,7 @@ import {
 } from "./lib/export";
 import { mergeCommentTrees } from "./lib/comments";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
+import { AdsPerformanceRow } from "./lib/adsImport";
 import SocialReport from "./components/SocialReport";
 import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
 import DigitalAdsReport from "./components/DigitalAdsReport";
@@ -29,6 +31,7 @@ import DriveBackupAdmin from "./components/DriveBackupAdmin";
 import PaidAdsApiAccountsAdmin from "./components/PaidAdsApiAccountsAdmin";
 import GoogleWebsiteAccountsAdmin from "./components/GoogleWebsiteAccountsAdmin";
 import WebsiteReport from "./components/WebsiteReport";
+import CampaignManagement from "./components/CampaignManagement";
 import {
   TrendingUp,
   Award,
@@ -283,6 +286,46 @@ export function getBtlReportMonth(weekStr: string): { month: number; year: numbe
   return { month: endInfo.month, year: endInfo.year };
 }
 
+// Mirrors getEndOfWeekDate above, but reads the FIRST date in the range
+// ("19/06-25/06/2026" → 19/06). That half of the string has no year of its
+// own, so it borrows the end date's year — the only case this gets wrong is
+// a week straddling a year boundary (e.g. 29/12-04/01), which this report's
+// data has never actually contained.
+export function getStartOfWeekDate(weekStr: string): { day: number; month: number; year: number } {
+  let str = weekStr || "";
+  const TIMELINE_LABELS_MAP: { [key: string]: string } = {
+    "week4": "19/06 - 25/06/2026",
+    "week3": "12/06 - 18/06/2026",
+    "week2": "05/06 - 11/06/2026",
+    "week1": "01/06 - 04/06/2026",
+  };
+  if (TIMELINE_LABELS_MAP[str]) {
+    str = TIMELINE_LABELS_MAP[str];
+  }
+
+  const { year } = getEndOfWeekDate(weekStr);
+  const parts = str.split(/-|\s+-\s+/);
+  const startDateStr = (parts[0] || "").trim();
+  const cleaned = startDateStr.replace(/[^0-9/]/g, "");
+  const dateParts = cleaned.split("/");
+  if (dateParts.length >= 2) {
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10);
+    return { day, month, year: dateParts.length === 3 ? parseInt(dateParts[2], 10) : year };
+  }
+  return { day: 19, month: 6, year: 2026 };
+}
+
+// "19/06-25/06/2026" -> {since: "2026-06-19", until: "2026-06-25"}, for
+// querying APIs that take an ISO date range (e.g. GET /api/ads-performance).
+export function getWeekDateRange(weekStr: string): { since: string; until: string } {
+  const start = getStartOfWeekDate(weekStr);
+  const end = getEndOfWeekDate(weekStr);
+  const iso = (d: { day: number; month: number; year: number }) =>
+    `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+  return { since: iso(start), until: iso(end) };
+}
+
 export function getBtlRowDataValues(row: any) {
   if (!row) {
     return {
@@ -525,7 +568,7 @@ export default function App() {
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
 
   // Navigation & Brand States
-  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads" | "website-report">(() =>
+  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads" | "website-report" | "campaign">(() =>
     isAdminPath(window.location.pathname) ? "control-panel" : "dashboard"
   );
 
@@ -659,12 +702,13 @@ export default function App() {
   // Quản trị người dùng → Phân quyền xem báo cáo, see reportPermissions
   // state below) and defaults to "everyone sees everything" until an Admin
   // explicitly restricts it, matching this app's prior (unrestricted) behavior.
-  type ReportCategoryId = "dashboard" | "fb-insights" | "digital-ads" | "website-report";
+  type ReportCategoryId = "dashboard" | "fb-insights" | "digital-ads" | "website-report" | "campaign";
   const REPORT_CATEGORIES: { id: ReportCategoryId; label: string; icon: typeof FileSpreadsheet }[] = [
     { id: "dashboard", label: "Báo Cáo", icon: FileSpreadsheet },
     { id: "fb-insights", label: "Social Report", icon: Share2 },
     { id: "digital-ads", label: "Digital Ads Report", icon: Megaphone },
     { id: "website-report", label: "Website Report", icon: Globe },
+    { id: "campaign", label: "Campaign Marketing", icon: Calendar },
   ];
   const DEFAULT_REPORT_PERMISSIONS: Record<"Editor" | "Viewer", ReportCategoryId[]> = {
     Editor: REPORT_CATEGORIES.map((c) => c.id),
@@ -756,6 +800,88 @@ export default function App() {
       setSelectedTimeline(timelines[0]);
     }
   }, [marketingData]);
+
+  // Real Facebook Ads spend/impressions/reach for the currently selected
+  // week+brand — already synced daily into `ads_performance` by
+  // /api/cron/facebook-sync (see facebookAdsSync.ts), so this is a read of
+  // already-stored data, not a live Facebook API call. Used to replace the
+  // manually-typed "facebook" row of the weekly report's Paid Ads scorecard
+  // with the real number wherever it's available (see mục 6 in the
+  // scorecard calculations below) — TikTok/YouTube Paid Ads rows stay
+  // manual since those aren't synced yet.
+  const [facebookAdsForWeek, setFacebookAdsForWeek] = useState<AdsPerformanceRow[] | null>(null);
+  useEffect(() => {
+    if (!currentUser) {
+      setFacebookAdsForWeek(null);
+      return;
+    }
+    let cancelled = false;
+    // Fetch from the start of the MONTH (not just the week) through the end
+    // of the selected week in one call — the weekly report needs both the
+    // week's own total and the month-to-date cumulative (mirrors how the
+    // manually-entered rows carry both `thực_tế_actual` and `tích_lũy_tháng`),
+    // and this range covers both without a second request.
+    const { month, year } = getEndOfWeekDate(selectedTimeline.id);
+    const { until } = getWeekDateRange(selectedTimeline.id);
+    const since = `${year}-${String(month).padStart(2, "0")}-01`;
+    (async () => {
+      try {
+        const result = await safeFetchJson(
+          `/api/ads-performance?channels=facebook&brand=${encodeURIComponent(selectedBrand)}&since=${since}&until=${until}`
+        );
+        if (!cancelled && result.success) setFacebookAdsForWeek(result.rows || []);
+      } catch {
+        // Non-critical — the weekly scorecard just falls back to the
+        // manually-entered "facebook" row below, same as before this existed.
+        if (!cancelled) setFacebookAdsForWeek(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, selectedBrand, selectedTimeline.id]);
+
+  // Same idea as facebookAdsForWeek above, for "SEO Website - Traffic
+  // Organic" (GA4 organic_sessions) / "Impressions Organic" (Search Console
+  // impressions — GSC only ever reports organic, no filtering needed there).
+  // Both already synced daily by /api/cron/facebook-sync's Website Report
+  // leg (googleWebsiteSync.ts) once an Admin connects GA4/Search Console in
+  // Control Panel → Kết nối nền tảng → Google Website; until then this stays
+  // null and the scorecard falls back to the manually-typed row, same as
+  // before this existed.
+  const [websiteInsightsForWeek, setWebsiteInsightsForWeek] = useState<{
+    ga4: { account_id: string; date: string; organic_sessions: number | null }[];
+    gsc: { account_id: string; date: string; impressions: number | null }[];
+  } | null>(null);
+  useEffect(() => {
+    if (!currentUser) {
+      setWebsiteInsightsForWeek(null);
+      return;
+    }
+    let cancelled = false;
+    const { month, year } = getEndOfWeekDate(selectedTimeline.id);
+    const { until } = getWeekDateRange(selectedTimeline.id);
+    const since = `${year}-${String(month).padStart(2, "0")}-01`;
+    (async () => {
+      try {
+        const result = await safeFetchJson(`/api/google-website/insights?since=${since}&until=${until}`);
+        if (!cancelled && result.success) {
+          const brandAccountIds = new Set(
+            (result.accounts || []).filter((a: any) => a.brand === selectedBrand).map((a: any) => a.id)
+          );
+          setWebsiteInsightsForWeek({
+            ga4: (result.ga4Daily || []).filter((r: any) => brandAccountIds.has(r.account_id)),
+            gsc: (result.gscDaily || []).filter((r: any) => brandAccountIds.has(r.account_id)),
+          });
+        }
+      } catch {
+        if (!cancelled) setWebsiteInsightsForWeek(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, selectedBrand, selectedTimeline.id]);
 
   const [publishedComments, setPublishedComments] = useState<{
     [weekId: string]: { Livotec: BrandComments; Karofi: BrandComments };
@@ -2342,6 +2468,10 @@ export default function App() {
     return week === selectedTimeline.id;
   };
 
+  // Date range of the selected week, used below to blend in auto-synced
+  // data (Facebook Ads, GA4/Search Console) for the metrics that have it.
+  const { since: selectedWeekSince, until: selectedWeekUntil } = getWeekDateRange(selectedTimeline.id);
+
   // Safe Fallback Lists
   const digitalMarketingList = marketingData?.digital_marketing || [];
   const btlTradeList = marketingData?.btl_trade || [];
@@ -2464,21 +2594,37 @@ export default function App() {
   const panoChartData = makeOohChartData(panoRows);
 
   // 4. SEO Organic Traffic Weekly & Monthly
+  //
+  // Auto-wired from GA4 (organic_sessions) / Search Console (impressions —
+  // GSC only ever reports organic, no channel filtering needed there) the
+  // same way Paid Ads is wired to Facebook below: whenever synced data
+  // exists for the selected brand, it replaces the manually-typed row;
+  // otherwise falls back to 100% manual exactly like before this existed.
+  // Target stays manual either way — there's no automated "target" concept.
+  const hasAutoGa4Traffic = !!websiteInsightsForWeek && websiteInsightsForWeek.ga4.length > 0;
+  const hasAutoGscImpressions = !!websiteInsightsForWeek && websiteInsightsForWeek.gsc.length > 0;
+  const ga4RowsInWeek = (websiteInsightsForWeek?.ga4 || []).filter((r) => r.date >= selectedWeekSince && r.date <= selectedWeekUntil);
+  const ga4AutoOrganicWeek = ga4RowsInWeek.reduce((sum, r) => sum + (r.organic_sessions || 0), 0);
+  const ga4AutoOrganicMTD = (websiteInsightsForWeek?.ga4 || []).reduce((sum, r) => sum + (r.organic_sessions || 0), 0);
+  const gscRowsInWeek = (websiteInsightsForWeek?.gsc || []).filter((r) => r.date >= selectedWeekSince && r.date <= selectedWeekUntil);
+  const gscAutoImpressionsWeek = gscRowsInWeek.reduce((sum, r) => sum + (r.impressions || 0), 0);
+  const gscAutoImpressionsMTD = (websiteInsightsForWeek?.gsc || []).reduce((sum, r) => sum + (r.impressions || 0), 0);
+
   const seoTrafficRow = brandDigital.find(
     (row) => row.hạng_mục === "SEO Website" && row.chỉ_số_metric === "Traffic Organic"
   );
   const seoTrafficWeeklyTarget = seoTrafficRow ? seoTrafficRow.mục_tiêu_target || 0 : 0;
-  const seoTrafficWeeklyActual = seoTrafficRow ? seoTrafficRow.thực_tế_actual || 0 : 0;
+  const seoTrafficWeeklyActual = hasAutoGa4Traffic ? ga4AutoOrganicWeek : seoTrafficRow ? seoTrafficRow.thực_tế_actual || 0 : 0;
   const seoTrafficMonthlyTarget = seoTrafficRow ? seoTrafficRow.target_tháng || 0 : 0;
-  const seoTrafficMonthlyActual = seoTrafficRow ? seoTrafficRow.tích_lũy_tháng || 0 : 0;
+  const seoTrafficMonthlyActual = hasAutoGa4Traffic ? ga4AutoOrganicMTD : seoTrafficRow ? seoTrafficRow.tích_lũy_tháng || 0 : 0;
 
   const seoImpressionsRow = brandDigital.find(
     (row) => row.hạng_mục === "SEO Website" && row.chỉ_số_metric === "Impressions Organic"
   );
   const seoImpressionsWeeklyTarget = seoImpressionsRow ? seoImpressionsRow.mục_tiêu_target || 0 : 0;
-  const seoImpressionsWeeklyActual = seoImpressionsRow ? seoImpressionsRow.thực_tế_actual || 0 : 0;
+  const seoImpressionsWeeklyActual = hasAutoGscImpressions ? gscAutoImpressionsWeek : seoImpressionsRow ? seoImpressionsRow.thực_tế_actual || 0 : 0;
   const seoImpressionsMonthlyTarget = seoImpressionsRow ? seoImpressionsRow.target_tháng || 0 : 0;
-  const seoImpressionsMonthlyActual = seoImpressionsRow ? seoImpressionsRow.tích_lũy_tháng || 0 : 0;
+  const seoImpressionsMonthlyActual = hasAutoGscImpressions ? gscAutoImpressionsMTD : seoImpressionsRow ? seoImpressionsRow.tích_lũy_tháng || 0 : 0;
 
   // 5. PR articles quantity (Conditional weekly scorecard / accumulated)
   const prQuantityRow = brandOohPr.find(
@@ -2502,47 +2648,77 @@ export default function App() {
   const totalKolKocTrongTuan = brandKolKoc.reduce((sum, r) => sum + (r.thực_tế_trong_tuần || 0), 0);
 
   // 6. Paid Ads Calculations (Spent, Impressions, Reach, Frequency)
+  //
+  // "facebook" is auto-wired from real synced data (facebookAdsForWeek,
+  // fetched above) whenever it has rows for the selected week/brand — the
+  // manually-typed "facebook" rows are excluded from the sums below in that
+  // case so the number isn't double-counted. TikTok/YouTube Paid Ads stay
+  // manual (not synced yet — TikTok Ads API needs a Control Panel token
+  // configured, Google/YouTube Ads is still awaiting API access, see
+  // HANDOFF.md §6). If the fetch failed or returned nothing, everything
+  // falls back to 100% manual exactly like before this existed.
+  const hasAutoFacebookAds = facebookAdsForWeek !== null && facebookAdsForWeek.length > 0;
+  const facebookAutoRowsMTD = facebookAdsForWeek || [];
+  const facebookAutoRowsInWeek = facebookAutoRowsMTD.filter((r) => r.date >= selectedWeekSince && r.date <= selectedWeekUntil);
+  const sumField = (rows: AdsPerformanceRow[], field: "spend" | "impressions" | "reach") =>
+    rows.reduce((sum, r) => sum + (r[field] || 0), 0);
+  const facebookAutoSpendWeek = sumField(facebookAutoRowsInWeek, "spend");
+  const facebookAutoSpendMTD = sumField(facebookAutoRowsMTD, "spend");
+  const facebookAutoImpressionsWeek = sumField(facebookAutoRowsInWeek, "impressions");
+  const facebookAutoImpressionsMTD = sumField(facebookAutoRowsMTD, "impressions");
+  const facebookAutoReachWeek = sumField(facebookAutoRowsInWeek, "reach");
+  const facebookAutoReachMTD = sumField(facebookAutoRowsMTD, "reach");
+  const facebookAutoFrequencyMTD = facebookAutoReachMTD > 0 ? facebookAutoImpressionsMTD / facebookAutoReachMTD : 0;
+
+  const isManualNonFacebookRow = (row: DigitalMarketingRow) => !hasAutoFacebookAds || (row.kênh_channel || "").toLowerCase() !== "facebook";
+
   const adsSpentRows = brandDigital.filter(
-    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Amount spent (VNĐ)"
+    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Amount spent (VNĐ)" && isManualNonFacebookRow(row)
   );
   const adsImpressionRows = brandDigital.filter(
-    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Impressions"
+    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Impressions" && isManualNonFacebookRow(row)
   );
   const adsReachRows = brandDigital.filter(
-    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Reach"
+    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Reach" && isManualNonFacebookRow(row)
   );
   const adsFreqRows = brandDigital.filter(
-    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Frequency"
+    (row) => row.hạng_mục === "Paid Ads" && row.chỉ_số_metric === "Frequency" && isManualNonFacebookRow(row)
   );
 
   // Weekly sums (since they represent the active week)
   // If some rows are MTD in database, we only sum non-null actual or check row is weekly
-  const weeklyAdsSpent = adsSpentRows
-    .filter((r) => r.phân_loại_thời_gian === "Weekly" || r.thực_tế_actual !== null)
-    .reduce((sum, r) => sum + (r.thực_tế_actual || 0), 0);
-    
-  const monthlyAdsSpent = adsSpentRows.reduce((sum, r) => sum + (r.tích_lũy_tháng || 0), 0);
+  const weeklyAdsSpent =
+    adsSpentRows
+      .filter((r) => r.phân_loại_thời_gian === "Weekly" || r.thực_tế_actual !== null)
+      .reduce((sum, r) => sum + (r.thực_tế_actual || 0), 0) + (hasAutoFacebookAds ? facebookAutoSpendWeek : 0);
+
+  const monthlyAdsSpent = adsSpentRows.reduce((sum, r) => sum + (r.tích_lũy_tháng || 0), 0) + (hasAutoFacebookAds ? facebookAutoSpendMTD : 0);
   const monthlyAdsSpentTarget = adsSpentRows.reduce((sum, r) => sum + (r.target_tháng || 0), 0);
 
-  const weeklyAdsImpressions = adsImpressionRows
-    .filter((r) => r.phân_loại_thời_gian === "Weekly" || r.thực_tế_actual !== null)
-    .reduce((sum, r) => sum + (r.thực_tế_actual || r.tích_lũy_tháng || 0), 0);
-    
-  const monthlyAdsImpressions = adsImpressionRows.reduce((sum, r) => sum + (r.tích_lũy_tháng || 0), 0);
+  const weeklyAdsImpressions =
+    adsImpressionRows
+      .filter((r) => r.phân_loại_thời_gian === "Weekly" || r.thực_tế_actual !== null)
+      .reduce((sum, r) => sum + (r.thực_tế_actual || r.tích_lũy_tháng || 0), 0) + (hasAutoFacebookAds ? facebookAutoImpressionsWeek : 0);
+
+  const monthlyAdsImpressions =
+    adsImpressionRows.reduce((sum, r) => sum + (r.tích_lũy_tháng || 0), 0) + (hasAutoFacebookAds ? facebookAutoImpressionsMTD : 0);
   const monthlyAdsImpressionsTarget = adsImpressionRows.reduce((sum, r) => sum + (r.target_tháng || 0), 0);
 
-  const weeklyAdsReach = adsReachRows
-    .filter((r) => r.phân_loại_thời_gian === "Weekly" || r.thực_tế_actual !== null)
-    .reduce((sum, r) => sum + (r.thực_tế_actual || r.tích_lũy_tháng || 0), 0);
-    
-  const monthlyAdsReach = adsReachRows.reduce((sum, r) => sum + (r.tích_lũy_tháng || 0), 0);
+  const weeklyAdsReach =
+    adsReachRows
+      .filter((r) => r.phân_loại_thời_gian === "Weekly" || r.thực_tế_actual !== null)
+      .reduce((sum, r) => sum + (r.thực_tế_actual || r.tích_lũy_tháng || 0), 0) + (hasAutoFacebookAds ? facebookAutoReachWeek : 0);
+
+  const monthlyAdsReach = adsReachRows.reduce((sum, r) => sum + (r.tích_lũy_tháng || 0), 0) + (hasAutoFacebookAds ? facebookAutoReachMTD : 0);
   const monthlyAdsReachTarget = adsReachRows.reduce((sum, r) => sum + (r.target_tháng || 0), 0);
 
-  // Average frequency
+  // Average frequency — facebook's auto frequency (impressions/reach, MTD)
+  // joins the average as one more data point alongside the other channels'
+  // manually-entered frequency rows.
   const activeFreqRows = adsFreqRows.filter((r) => r.thực_tế_actual !== null || r.tích_lũy_tháng !== null);
-  const avgAdsFrequency = activeFreqRows.length > 0 
-    ? activeFreqRows.reduce((sum, r) => sum + (r.thực_tế_actual || r.tích_lũy_tháng || 0), 0) / activeFreqRows.length
-    : 0;
+  const manualFreqSum = activeFreqRows.reduce((sum, r) => sum + (r.thực_tế_actual || r.tích_lũy_tháng || 0), 0);
+  const freqDataPoints = activeFreqRows.length + (hasAutoFacebookAds && facebookAutoFrequencyMTD > 0 ? 1 : 0);
+  const avgAdsFrequency = freqDataPoints > 0 ? (manualFreqSum + (hasAutoFacebookAds ? facebookAutoFrequencyMTD : 0)) / freqDataPoints : 0;
 
   // Tab data presence checking
   const hasSovData = sovPercentage > 0;
@@ -2551,10 +2727,11 @@ export default function App() {
   const hasTvcData = tvcGrpsRows.length > 0;
   const hasPrData = prQuantityRows.length > 0 || prViewsRows.length > 0;
   const hasOohData = oohRows.length > 0;
-  const hasAdsData = brandDigital.some((row) => row.hạng_mục === "Paid Ads");
-  const hasSeoData = brandDigital.some(
-    (row) => row.hạng_mục === "SEO Website" || row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page"
-  );
+  const hasAdsData = brandDigital.some((row) => row.hạng_mục === "Paid Ads") || hasAutoFacebookAds;
+  const hasSeoData =
+    brandDigital.some((row) => row.hạng_mục === "SEO Website" || row.hạng_mục === "SEO Content" || row.hạng_mục === "Product Page") ||
+    hasAutoGa4Traffic ||
+    hasAutoGscImpressions;
   const hasBtlData = true; // Keep BTL tab always active to avoid confusion
 
   const tabsStatus: { [key: string]: boolean } = {
@@ -2634,7 +2811,7 @@ export default function App() {
       id: "seo",
       title: "SEO Organic Traffic",
       value: seoTrafficWeeklyActual.toLocaleString(),
-      targetLabel: `Target: ${seoTrafficWeeklyTarget.toLocaleString()}`,
+      targetLabel: `Target: ${seoTrafficWeeklyTarget.toLocaleString()}${hasAutoGa4Traffic ? " · GA4: tự động" : ""}`,
       percent: Math.round((seoTrafficWeeklyActual / seoTrafficWeeklyTarget) * 100),
       icon: Globe,
       color: "text-emerald-600 border-emerald-100",
@@ -2691,13 +2868,18 @@ export default function App() {
     });
   }
 
+  // "facebook" trong số này đã tự động (xem hasAutoFacebookAds ở mục 6) —
+  // gắn thêm 1 dòng chú thích ngắn vào targetLabel để không ai thắc mắc vì
+  // sao số khác với Excel đang nhập cho riêng kênh Facebook.
+  const autoAdsNote = hasAutoFacebookAds ? " · Facebook: tự động" : "";
+
   // Card 5: Ads Amount Spent
   if (weeklyAdsSpent > 0 || monthlyAdsSpent > 0) {
     scorecards.push({
       id: "ads_spent",
       title: "Ads. Amount Spent",
       value: `${(weeklyAdsSpent / 1000000).toFixed(1)}M Đ`,
-      targetLabel: "Chi tiêu lũy kế tháng",
+      targetLabel: `Chi tiêu lũy kế tháng${autoAdsNote}`,
       targetVal: `${(monthlyAdsSpent / 1000000).toFixed(0)}M/${(monthlyAdsSpentTarget / 1000000).toFixed(0)}M`,
       percent: Math.round((monthlyAdsSpent / monthlyAdsSpentTarget) * 100),
       icon: DollarSign,
@@ -2711,10 +2893,10 @@ export default function App() {
     scorecards.push({
       id: "ads_impression",
       title: "Ads. Impressions",
-      value: weeklyAdsImpressions > 1000000 
+      value: weeklyAdsImpressions > 1000000
         ? `${(weeklyAdsImpressions / 1000000).toFixed(2)}M`
         : weeklyAdsImpressions.toLocaleString(),
-      targetLabel: "Lũy kế tháng",
+      targetLabel: `Lũy kế tháng${autoAdsNote}`,
       targetVal: `${(monthlyAdsImpressions / 1000000).toFixed(1)}M`,
       icon: Award,
       color: "text-sky-600 border-sky-100",
@@ -2728,7 +2910,7 @@ export default function App() {
       id: "ads_frequency",
       title: "Ads. Frequency",
       value: `${avgAdsFrequency.toFixed(2)}x`,
-      targetLabel: "Tần suất lặp trung bình",
+      targetLabel: `Tần suất lặp trung bình${autoAdsNote}`,
       targetVal: `Target ~2.5x`,
       icon: RefreshCw,
       color: "text-orange-600 border-orange-100",
@@ -2741,10 +2923,10 @@ export default function App() {
     scorecards.push({
       id: "ads_reach",
       title: "Ads. Reach (Bổ sung)",
-      value: weeklyAdsReach > 1000000 
+      value: weeklyAdsReach > 1000000
         ? `${(weeklyAdsReach / 1000000).toFixed(2)}M`
         : weeklyAdsReach.toLocaleString(),
-      targetLabel: "Lũy kế tháng",
+      targetLabel: `Lũy kế tháng${autoAdsNote}`,
       targetVal: `${(monthlyAdsReach / 1000000).toFixed(1)}M`,
       icon: Users,
       color: "text-blue-600 border-blue-100",
@@ -3290,6 +3472,20 @@ export default function App() {
             >
               <Globe className={`h-4 w-4 ${activeTab === "website-report" ? "text-indigo-600" : "text-slate-400"}`} />
               Website Report
+            </button>
+          )}
+          {canViewReportCategory("campaign") && (
+            <button
+              id="report_nav_campaign"
+              onClick={() => setActiveTab("campaign")}
+              className={`flex w-full shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-all ${
+                activeTab === "campaign"
+                  ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                  : "border-transparent text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <Calendar className={`h-4 w-4 ${activeTab === "campaign" ? "text-indigo-600" : "text-slate-400"}`} />
+              Campaign Marketing
             </button>
           )}
 
@@ -4706,6 +4902,8 @@ export default function App() {
           <DigitalAdsReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : activeTab === "website-report" ? (
           <WebsiteReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
+        ) : activeTab === "campaign" ? (
+          <CampaignManagement currentUser={currentUser} />
         ) : (
           /* ------------------------------------------------------------
               GIAO DIỆN CONTROL PANEL (BẢNG ĐIỀU KHIỂN RIÊNG BIỆT)

@@ -503,6 +503,11 @@ create table if not exists ga4_insights_daily (
   account_id text not null references google_website_accounts(id) on delete cascade,
   date date not null,
   sessions int,
+  -- Sessions from the "Organic Search" default channel group only (a second,
+  -- filtered GA4 report — see fetchGa4DailyMetrics in googleWebsiteSync.ts).
+  -- `sessions` above stays every channel combined; this is what the weekly
+  -- report's manually-typed "Traffic Organic" metric actually means.
+  organic_sessions int,
   active_users int,
   new_users int,
   engaged_sessions int,
@@ -513,6 +518,9 @@ create table if not exists ga4_insights_daily (
 );
 
 alter table ga4_insights_daily enable row level security;
+
+-- Existing projects created before organic-only sessions shipped.
+alter table ga4_insights_daily add column if not exists organic_sessions int;
 
 -- Search Console's Search Analytics API has a ~2-3 day reporting lag — see
 -- googleWebsiteSync.ts's fetchSearchConsoleDailyMetrics comment.
@@ -527,3 +535,145 @@ create table if not exists search_console_insights_daily (
 );
 
 alter table search_console_insights_daily enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Campaign Calendar & Campaign Task module (src/server/campaignStore.ts,
+-- src/components/CampaignManagement.tsx). Phase 1 (MVP) only — Activities
+-- (Key Activities) and Asset Library land in a later phase; the `activity_id`
+-- column on tasks already exists so Phase 2 doesn't need a migration.
+--
+-- No `auth.users`/UUID here on purpose: this app has no Supabase Auth, only
+-- the custom username/role accounts in app_state.users (see
+-- src/lib/defaultUsers.ts) — every "who" column below is the plain
+-- lower-cased `username` string, same as login_logs/action_logs above.
+--
+-- Per-campaign edit permission (only users listed in campaign_members may
+-- edit that campaign or its tasks) is enforced in src/server/app.ts, not via
+-- RLS — same "service role key bypasses RLS, it's defense in depth only"
+-- model as every other table in this file.
+-- ---------------------------------------------------------------------------
+
+-- Ngành hàng, theo brand — configurable (Admin can add rows), not a hardcoded
+-- enum, so a new product line never needs a code change.
+create table if not exists categories (
+  id          uuid primary key default gen_random_uuid(),
+  brand       text not null check (brand in ('Livotec', 'Karofi')),
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  unique (brand, name)
+);
+
+alter table categories enable row level security;
+
+create table if not exists campaigns (
+  id                  uuid primary key default gen_random_uuid(),
+  name                text not null,
+  type                text,
+  brand               text not null check (brand in ('Livotec', 'Karofi')),
+  category_id         uuid references categories(id),
+  channel             text,
+  status              text not null default 'Planned' check (status in ('Planned', 'Live', 'Done')),
+  -- timestamptz (not date) — campaign start/end are recorded down to the
+  -- second (e.g. a launch that goes live at an exact hour), not just the day.
+  start_date          timestamptz not null,
+  end_date            timestamptz not null,
+  budget              numeric,
+  pic_username        text,
+  visual_gallery_url  text,
+  visual_urls         text[] not null default '{}',
+  created_by          text not null,
+  updated_by          text,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+
+create index if not exists campaigns_brand_idx on campaigns (brand);
+create index if not exists campaigns_category_id_idx on campaigns (category_id);
+create index if not exists campaigns_status_idx on campaigns (status);
+
+alter table campaigns enable row level security;
+
+-- Existing projects created before start/end moved from `date` to
+-- `timestamptz` — safe to run even if already timestamptz (no-op cast).
+alter table campaigns alter column start_date type timestamptz using start_date::timestamptz;
+alter table campaigns alter column end_date type timestamptz using end_date::timestamptz;
+
+-- Who (besides Admin, who always can) is allowed to edit a given campaign and
+-- its campaign-scoped tasks. Managed by Admin only (POST/DELETE
+-- /api/campaigns/:id/members) — see mục 10 câu 2 in
+-- tong-hop-campaign-calendar-task.md.
+create table if not exists campaign_members (
+  campaign_id  uuid not null references campaigns(id) on delete cascade,
+  username     text not null,
+  added_by     text not null,
+  added_at     timestamptz not null default now(),
+  primary key (campaign_id, username)
+);
+
+alter table campaign_members enable row level security;
+
+create table if not exists tasks (
+  id                       uuid primary key default gen_random_uuid(),
+  title                    text not null,
+  task_type                text not null check (task_type in ('campaign', 'alwayson', 'adhoc')),
+  campaign_id              uuid references campaigns(id) on delete set null,
+  activity_id              uuid,   -- Phase 2: references activities(id) once that table exists
+  assignee_username        text,
+  start_date               date,
+  end_date                 date,
+  priority                 text not null default 'Medium' check (priority in ('Low', 'Medium', 'High')),
+  status                   text not null default 'To do' check (status in ('To do', 'In progress', 'Blocked', 'Done')),
+  blocked_reason           text,
+  due_soon_threshold_days  int not null default 2,
+  recurrence               jsonb,
+  parent_recurring_id      uuid references tasks(id),
+  -- Lightweight "main task / related task" link for AlwaysOn and Ad-hoc
+  -- tasks, which have no Campaign/Activity to organize under — a task can
+  -- point at one other task as its "main task". Deliberately not a full
+  -- subtask/checklist system (no cascading status, no cycle detection
+  -- beyond "can't be its own parent") — see createTask/updateTask in
+  -- campaignStore.ts.
+  parent_task_id           uuid references tasks(id) on delete set null,
+  created_by               text not null,
+  updated_at               timestamptz not null default now(),
+  created_at               timestamptz not null default now()
+);
+
+create index if not exists tasks_campaign_id_status_idx on tasks (campaign_id, status);
+create index if not exists tasks_assignee_username_status_idx on tasks (assignee_username, status);
+create index if not exists tasks_end_date_idx on tasks (end_date);
+create index if not exists tasks_parent_task_id_idx on tasks (parent_task_id);
+
+alter table tasks enable row level security;
+
+-- Existing projects created before task linking shipped.
+alter table tasks add column if not exists parent_task_id uuid references tasks(id) on delete set null;
+
+create table if not exists task_activity_log (
+  id          uuid primary key default gen_random_uuid(),
+  task_id     uuid not null references tasks(id) on delete cascade,
+  type        text not null check (type in
+              ('created', 'status_change', 'edited', 'linked_activity', 'moved_campaign', 'note')),
+  text        text,
+  actor_username  text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists task_activity_log_task_id_created_at_idx on task_activity_log (task_id, created_at);
+
+alter table task_activity_log enable row level security;
+
+-- Asset Library on the Campaign Calendar screen — shared brand asset links
+-- (Google Docs/SharePoint/Drive...), grouped into 3 fixed columns. Brought
+-- forward from Phase 3 in the original roadmap because the reference UI
+-- (KAROFI PH DM Cockpit) shows it directly under the Gantt chart.
+create table if not exists asset_links (
+  id          uuid primary key default gen_random_uuid(),
+  group_key   text not null check (group_key in ('Branding', 'Performance', 'Project')),
+  label       text not null,
+  url         text not null,
+  created_by  text not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table asset_links enable row level security;

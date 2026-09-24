@@ -156,11 +156,36 @@ function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, since: string, until: string): Promise<Ga4InsightsDailyRow[]> {
+// GA4's date dimension comes back as "YYYYMMDD", not ISO — reformat to match
+// this codebase's YYYY-MM-DD convention everywhere else.
+function formatGa4Date(raw: string): string {
+  return raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw;
+}
+
+async function runGa4Report(accessToken: string, propertyId: string, body: Record<string, unknown>): Promise<any[]> {
   const res = await fetch(`${GA4_DATA_API_BASE}/${propertyId}:runReport`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify(body),
+  });
+  const parsed = await res.json();
+  if (!res.ok || parsed?.error) {
+    throw new GoogleWebsiteApiError(parsed?.error?.message || `GA4 runReport trả về lỗi HTTP ${res.status}`, res.status, parsed?.error?.status);
+  }
+  return parsed?.rows || [];
+}
+
+async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, since: string, until: string): Promise<Ga4InsightsDailyRow[]> {
+  // Two separate reports run in parallel rather than adding
+  // `sessionDefaultChannelGroup` as an output dimension on the report below:
+  // GA4 would then return one row per date *per channel group*, and
+  // `averageSessionDuration`/`bounceRate` can't just be summed back together
+  // across those rows (they're averages, not counts) without re-deriving a
+  // session-weighted mean. A second, session-count-only report filtered to
+  // Organic Search sidesteps that entirely — same report shape as before,
+  // one extra cheap call.
+  const [totalRows, organicRows] = await Promise.all([
+    runGa4Report(accessToken, propertyId, {
       dateRanges: [{ startDate: since, endDate: until }],
       dimensions: [{ name: "date" }],
       metrics: [
@@ -173,22 +198,34 @@ async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, sin
         { name: "bounceRate" },
       ],
     }),
-  });
-  const body = await res.json();
-  if (!res.ok || body?.error) {
-    throw new GoogleWebsiteApiError(body?.error?.message || `GA4 runReport trả về lỗi HTTP ${res.status}`, res.status, body?.error?.status);
+    runGa4Report(accessToken, propertyId, {
+      dateRanges: [{ startDate: since, endDate: until }],
+      dimensions: [{ name: "date" }],
+      metrics: [{ name: "sessions" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "sessionDefaultChannelGroup",
+          stringFilter: { matchType: "EXACT", value: "Organic Search" },
+        },
+      },
+    }),
+  ]);
+
+  const organicByDate = new Map<string, number>();
+  for (const row of organicRows) {
+    const date = formatGa4Date(row.dimensionValues?.[0]?.value || "");
+    organicByDate.set(date, Number(row.metricValues?.[0]?.value) || 0);
   }
-  return (body?.rows || []).map((row: any) => {
-    // GA4 returns date dimension as "YYYYMMDD", not ISO — reformat to match
-    // this codebase's YYYY-MM-DD convention everywhere else.
-    const raw = row.dimensionValues?.[0]?.value || "";
-    const date = raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw;
+
+  return totalRows.map((row: any) => {
+    const date = formatGa4Date(row.dimensionValues?.[0]?.value || "");
     const [sessions, activeUsers, newUsers, engagedSessions, avgSessionDuration, conversions, bounceRate] = (row.metricValues || []).map(
       (m: any) => Number(m.value)
     );
     return {
       date,
       sessions: sessions ?? null,
+      organic_sessions: organicByDate.has(date) ? organicByDate.get(date)! : null,
       active_users: activeUsers ?? null,
       new_users: newUsers ?? null,
       engaged_sessions: engagedSessions ?? null,

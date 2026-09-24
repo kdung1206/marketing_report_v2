@@ -45,6 +45,11 @@ export interface Ga4InsightsDailyRow {
   account_id: string;
   date: string; // YYYY-MM-DD
   sessions: number | null;
+  // Sessions from GA4's "Organic Search" default channel group only —
+  // `sessions` above is every channel combined (paid, direct, referral...).
+  // This is what the weekly report's manually-typed "Traffic Organic" number
+  // means (see googleWebsiteSync.ts's fetchGa4DailyMetrics).
+  organic_sessions: number | null;
   active_users: number | null;
   new_users: number | null;
   engaged_sessions: number | null;

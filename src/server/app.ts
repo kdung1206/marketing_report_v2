@@ -12,6 +12,30 @@ import { runSpreadsheetAutoSync, getSpreadsheetSyncConfig, saveSpreadsheetSyncCo
 import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
 import { encrypt, decrypt } from "./crypto";
 import { getFbPages, upsertFbPage, deleteFbPage, setFbPageSyncStatus, getFbInsightsDaily, getFbPosts } from "./facebookStore";
+import {
+  getCategories,
+  createCategory,
+  getCampaigns,
+  getCampaign,
+  createCampaign,
+  updateCampaign,
+  deleteCampaign,
+  getCampaignMembers,
+  isCampaignMember,
+  addCampaignMember,
+  removeCampaignMember,
+  getTasks,
+  getTask,
+  createTask,
+  updateTask,
+  deleteTask,
+  getTaskActivityLog,
+  appendTaskLog,
+  getAssetLinks,
+  createAssetLink,
+  deleteAssetLink,
+  Task,
+} from "./campaignStore";
 import { runFacebookSync, fetchTokenExpiry } from "./facebookSync";
 import {
   getAdsPerformance,
@@ -708,7 +732,13 @@ app.get("/api/cron/weekly-backup", async (req, res) => {
 
 // Which "Loại Báo Cáo" sidebar entries (App.tsx) a role below Admin may see.
 // Admin always sees all of them — never restricted, never stored here.
-export const REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads"] as const;
+// Must be kept in sync with App.tsx's REPORT_CATEGORIES — this list was
+// missing "website-report" (added in an earlier session) and "campaign"
+// (Campaign Calendar & Campaign Task) until now; sanitizeRole below silently
+// drops any id not in this list, so an out-of-sync entry here means Admin
+// can tick the box in Control Panel and it never actually takes effect for
+// Editor/Viewer.
+export const REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads", "website-report", "campaign"] as const;
 export type ReportCategoryId = (typeof REPORT_CATEGORY_IDS)[number];
 const DEFAULT_REPORT_PERMISSIONS: Record<"Editor" | "Viewer", ReportCategoryId[]> = {
   Editor: [...REPORT_CATEGORY_IDS],
@@ -2286,6 +2316,289 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Campaign Calendar & Campaign Task module (Phase 1 — MVP). See
+// `task cần làm/campaign task/tong-hop-campaign-calendar-task.md` for the
+// full spec. Storage: src/server/campaignStore.ts (categories/campaigns/
+// campaign_members/tasks/task_activity_log — dual local-blob/Supabase path
+// same as every other module here).
+//
+// Permission model (mục 10 câu 2 in the spec doc): any logged-in user can
+// view; Editor/Admin can create; editing/deleting a specific campaign (or a
+// "campaign"-type task under it) additionally requires either the Admin role
+// or campaign membership (campaign_members) — checked here, not via
+// Postgres RLS (this app's RLS is defense-in-depth only, see schema.sql).
+// AlwaysOn/Ad-hoc tasks have no campaign to scope to, so their edit
+// permission falls back to "assignee or creator" instead.
+// ---------------------------------------------------------------------------
+
+async function canEditCampaign(campaignId: string, session: { username: string; role: string }): Promise<boolean> {
+  if (session.role === "Admin") return true;
+  return isCampaignMember(campaignId, session.username);
+}
+
+async function canEditTask(task: Task, session: { username: string; role: string }): Promise<boolean> {
+  if (session.role === "Admin") return true;
+  if (task.task_type === "campaign") {
+    return task.campaign_id ? isCampaignMember(task.campaign_id, session.username) : false;
+  }
+  const username = session.username.toLowerCase();
+  return (task.assignee_username || "").toLowerCase() === username || task.created_by.toLowerCase() === username;
+}
+
+app.get("/api/campaign/categories", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, categories: await getCategories() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/campaign/categories", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand, name } = req.body || {};
+    if (!brand || !name) return res.status(400).json({ error: "Thiếu brand hoặc tên ngành hàng." });
+    const category = await createCategory({ brand, name });
+    await logAction((req as any).session, req, "campaign-create-category", `Tạo ngành hàng "${name}" (${brand})`);
+    res.json({ success: true, category });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Lightweight user picker for assignee/PIC dropdowns — Editor+ (not Admin
+// only, unlike GET /api/get-users) since anyone creating a task needs to see
+// who they can assign it to. Only username/name, never passwordHash/salt.
+app.get("/api/campaign/users/basic", requireAuth("Editor"), async (req, res) => {
+  try {
+    const store = await getDatabaseData();
+    const users: UserAccount[] = Array.isArray(store.users) ? store.users : [];
+    res.json({ success: true, users: users.map(({ username, name }) => ({ username, name })) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/campaign/campaigns", requireAuth(), async (req, res) => {
+  try {
+    const { brand, category_id, status } = req.query;
+    const session = (req as any).session;
+    const campaigns = await getCampaigns({
+      brand: typeof brand === "string" && brand ? (brand as any) : undefined,
+      categoryId: typeof category_id === "string" && category_id ? category_id : undefined,
+      status: typeof status === "string" && status ? (status as any) : undefined,
+    });
+    // can_edit computed here (not left to the client) so the UI can hide
+    // Sửa/Xoá per row without a separate /members round-trip per campaign.
+    const withPermission = await Promise.all(
+      campaigns.map(async (c) => ({ ...c, can_edit: await canEditCampaign(c.id, session) }))
+    );
+    res.json({ success: true, campaigns: withPermission });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/campaign/campaigns", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { name, brand, start_date, end_date } = req.body || {};
+    if (!name || !brand || !start_date || !end_date) {
+      return res.status(400).json({ error: "Thiếu name, brand, start_date hoặc end_date." });
+    }
+    const session = (req as any).session;
+    const campaign = await createCampaign(req.body, session.username);
+    await logAction(session, req, "campaign-create", `Tạo campaign "${campaign.name}"`);
+    res.json({ success: true, campaign });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put("/api/campaign/campaigns/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const session = (req as any).session;
+    if (!(await canEditCampaign(req.params.id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền chỉnh sửa campaign này." });
+    }
+    const campaign = await updateCampaign(req.params.id, req.body || {}, session.username);
+    await logAction(session, req, "campaign-update", `Cập nhật campaign "${campaign.name}"`);
+    res.json({ success: true, campaign });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/campaign/campaigns/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const session = (req as any).session;
+    if (!(await canEditCampaign(req.params.id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền chỉnh sửa campaign này." });
+    }
+    await deleteCampaign(req.params.id);
+    await logAction(session, req, "campaign-delete", `Xoá campaign ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/campaign/campaigns/:id/members", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, members: await getCampaignMembers(req.params.id) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Managing who else can edit a campaign is Admin-only — see mục 10 câu 2:
+// the campaign's own members can edit its content, but not hand out that
+// permission to others themselves.
+app.post("/api/campaign/campaigns/:id/members", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ error: "Thiếu username." });
+    const session = (req as any).session;
+    await addCampaignMember(req.params.id, username, session.username);
+    await logAction(session, req, "campaign-add-member", `Gán quyền sửa campaign ${req.params.id} cho ${username}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/campaign/campaigns/:id/members/:username", requireAuth("Admin"), async (req, res) => {
+  try {
+    await removeCampaignMember(req.params.id, req.params.username);
+    await logAction((req as any).session, req, "campaign-remove-member", `Thu hồi quyền sửa campaign ${req.params.id} của ${req.params.username}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/campaign/tasks", requireAuth(), async (req, res) => {
+  try {
+    const { campaign_id, status, task_type, assignee, mine } = req.query;
+    const session = (req as any).session;
+    const tasks = await getTasks({
+      campaignId: typeof campaign_id === "string" && campaign_id ? campaign_id : undefined,
+      status: typeof status === "string" && status ? (status as any) : undefined,
+      taskType: typeof task_type === "string" && task_type ? (task_type as any) : undefined,
+      assigneeUsername: mine === "1" || mine === "true" ? session.username : typeof assignee === "string" && assignee ? assignee : undefined,
+    });
+    const withPermission = await Promise.all(tasks.map(async (t) => ({ ...t, can_edit: await canEditTask(t, session) })));
+    res.json({ success: true, tasks: withPermission });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/campaign/tasks", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { title, task_type } = req.body || {};
+    if (!title || !task_type) return res.status(400).json({ error: "Thiếu title hoặc task_type." });
+    const session = (req as any).session;
+    if (task_type === "campaign" && !(await canEditCampaign(req.body.campaign_id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền tạo task cho campaign này." });
+    }
+    const task = await createTask(req.body, session.username);
+    await logAction(session, req, "campaign-task-create", `Tạo task "${task.title}"`);
+    res.json({ success: true, task });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put("/api/campaign/tasks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy task." });
+    const session = (req as any).session;
+    if (!(await canEditTask(existing, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền chỉnh sửa task này." });
+    }
+    const task = await updateTask(req.params.id, req.body || {}, session.username);
+    await logAction(session, req, "campaign-task-update", `Cập nhật task "${task.title}"`);
+    res.json({ success: true, task });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/campaign/tasks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy task." });
+    const session = (req as any).session;
+    if (!(await canEditTask(existing, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền xoá task này." });
+    }
+    await deleteTask(req.params.id);
+    await logAction(session, req, "campaign-task-delete", `Xoá task "${existing.title}"`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/campaign/tasks/:id/log", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, log: await getTaskActivityLog(req.params.id) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/campaign/tasks/:id/notes", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text) return res.status(400).json({ error: "Thiếu nội dung ghi chú." });
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy task." });
+    const session = (req as any).session;
+    if (!(await canEditTask(existing, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền ghi chú task này." });
+    }
+    await appendTaskLog(req.params.id, "note", text, session.username);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Asset Library — shared brand asset links shown under the Gantt chart on
+// the Campaign Calendar screen (3 fixed columns: Branding/Performance/Project).
+app.get("/api/campaign/asset-links", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, links: await getAssetLinks() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/campaign/asset-links", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { group_key, label, url } = req.body || {};
+    if (!group_key || !label || !url) return res.status(400).json({ error: "Thiếu group_key, label hoặc url." });
+    const session = (req as any).session;
+    const link = await createAssetLink({ group_key, label, url }, session.username);
+    await logAction(session, req, "campaign-add-asset-link", `Thêm link "${label}" vào Asset Library (${group_key})`);
+    res.json({ success: true, link });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/campaign/asset-links/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await deleteAssetLink(req.params.id);
+    await logAction((req as any).session, req, "campaign-delete-asset-link", `Xoá link ${req.params.id} khỏi Asset Library`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
   }
 });
 
