@@ -74,6 +74,8 @@ import {
   ArrowLeft,
   Share2,
   Clock,
+  Menu,
+  ChevronDown,
 } from "lucide-react";
 import {
   PieChart,
@@ -572,6 +574,13 @@ export default function App() {
     isAdminPath(window.location.pathname) ? "control-panel" : "dashboard"
   );
 
+  // Below the lg breakpoint the left sidebar collapses into a "current tab"
+  // bar that expands into a dropdown on tap (see app_sidebar/app_report_sidebar
+  // below) instead of the always-visible vertical list shown on desktop — a
+  // horizontally-scrolling chip row was tried first but real users couldn't
+  // tell there were more tabs to swipe to, so this is now the only mobile nav.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   // Keep the URL and the Control Panel view in step, in both directions.
   //
   // Everything used to live at "/", so refreshing (or bookmarking, or opening
@@ -625,6 +634,12 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("marketing_control_panel_section", controlPanelSection);
   }, [controlPanelSection]);
+
+  // Auto-close the mobile nav dropdown once a tab/section is actually picked,
+  // rather than requiring a second tap to dismiss it.
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [activeTab, controlPanelSection]);
 
   // "Kết nối nền tảng" groups Facebook (API — Admin-only, has real credentials)
   // with the Google/TikTok manual upload flows (Editor+) under one menu, per
@@ -3244,7 +3259,7 @@ export default function App() {
   }
 
   return (
-    <div id="app_root" className="flex min-h-screen flex-col bg-slate-50/60 font-sans text-slate-800 lg:flex-row">
+    <div id="app_root" className="flex min-h-screen flex-col overflow-x-hidden bg-slate-50/60 font-sans text-slate-800 lg:flex-row lg:overflow-x-visible">
       {/* ------------------------------------------------------------
           LEFT SIDEBAR — contextual: Control Panel's own section menu while
           in Control Panel, or the 2-item report-type switcher (Báo Cáo /
@@ -3259,9 +3274,24 @@ export default function App() {
           <AppLogoMark />
         </div>
 
+        {/* Mobile-only: tap to expand the section list below as a dropdown.
+            Hidden at lg: and up, where the sidebar is always fully visible. */}
+        <button
+          id="mobile_nav_toggle_control_panel"
+          onClick={() => setMobileNavOpen((v) => !v)}
+          aria-expanded={mobileNavOpen}
+          className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 lg:hidden"
+        >
+          <span className="flex items-center gap-2">
+            <Menu className="h-4 w-4 text-slate-400" />
+            {CONTROL_PANEL_SECTIONS.find((s) => s.id === controlPanelSection)?.label || "Danh Mục Quản Trị"}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${mobileNavOpen ? "rotate-180" : ""}`} />
+        </button>
+
           <nav
             id="control_panel_sidebar"
-            className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
+            className={`${mobileNavOpen ? "flex" : "hidden"} flex-col gap-1 p-3 lg:flex lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible`}
           >
             <button
               id="control_panel_back_to_report"
@@ -3411,9 +3441,25 @@ export default function App() {
           <AppLogoMark />
         </div>
 
+        {/* Mobile-only: tap to expand the report-type list below as a
+            dropdown. Hidden at lg: and up, where the sidebar is always fully
+            visible. */}
+        <button
+          id="mobile_nav_toggle_report"
+          onClick={() => setMobileNavOpen((v) => !v)}
+          aria-expanded={mobileNavOpen}
+          className="flex w-full items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 lg:hidden"
+        >
+          <span className="flex items-center gap-2">
+            <Menu className="h-4 w-4 text-slate-400" />
+            {activeTab === "control-panel" ? "Control Panel" : REPORT_CATEGORIES.find((c) => c.id === activeTab)?.label || "Loại Báo Cáo"}
+          </span>
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${mobileNavOpen ? "rotate-180" : ""}`} />
+        </button>
+
         <nav
           id="report_type_sidebar"
-          className="flex gap-2 overflow-x-auto p-3 lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible"
+          className={`${mobileNavOpen ? "flex" : "hidden"} flex-col gap-1 p-3 lg:flex lg:flex-1 lg:flex-col lg:space-y-1 lg:gap-0 lg:overflow-visible`}
         >
           <p className="hidden px-2 pb-2 text-xs font-bold uppercase tracking-wider text-slate-400 lg:block">
             Loại Báo Cáo
@@ -3625,7 +3671,7 @@ export default function App() {
       {/* ------------------------------------------------------------
           MAIN APPLICATION STAGE
          ------------------------------------------------------------ */}
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden px-4 py-6 sm:px-6">
         {activeTab === "dashboard" ? (
           <div className="space-y-6">
             {/* ------------------------------------------------------------

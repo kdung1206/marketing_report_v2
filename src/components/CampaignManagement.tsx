@@ -741,9 +741,9 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
           <h1 className="text-sm font-bold uppercase tracking-wider text-slate-800">Campaign Marketing</h1>
-          <p className="text-[11px] text-slate-400">Livotec &amp; Karofi cùng 1 nơi — lọc theo Brand nếu cần, xem cột "Brand" trong bảng bên dưới</p>
+          <p className="min-w-0 text-[11px] text-slate-400">Livotec &amp; Karofi cùng 1 nơi — lọc theo Brand nếu cần, xem cột "Brand" trong bảng bên dưới</p>
         </div>
         <div className="flex rounded-lg bg-slate-100/80 border border-slate-200/50 p-0.5">
           <button
