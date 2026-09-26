@@ -23,6 +23,7 @@ import {
   RefreshCw,
   AlertCircle,
   ChevronRight,
+  Megaphone,
 } from "lucide-react";
 import { safeFetchJson } from "../App";
 import { AdsPerformanceRow, AdsChannel } from "../lib/adsImport";
@@ -220,6 +221,96 @@ function metricCells(m: ReturnType<typeof sumRows>, extraColumns?: { label: stri
         </td>
       ))}
     </>
+  );
+}
+
+const TOP_ADS_GALLERY_SIZE = 8;
+
+// A single ad as a card — thumbnail placeholder (channel-colored; Google/
+// TikTok ads have no creative image in this data model, and Facebook ads
+// aren't joined to their boosted post's thumbnail here) + campaign/ad-set
+// context + 2 metric rows. Row 2 is CTR/CPM/Video views instead of
+// Conversions/CPC (approved change from the original card demo) — Video
+// views is omitted entirely when the ad has none (most Facebook/Google ads
+// aren't video), rather than showing a misleading "0".
+const AdCard: React.FC<{ ad: AdsDrilldownRow }> = ({ ad }) => {
+  const ctr = safeDiv(ad.clicks, ad.impressions);
+  const cpm = safeDiv(ad.spend, ad.impressions) * 1000;
+  const row2 = [
+    { label: "CTR", value: fmtPct(ctr) },
+    ad.impressions > 0 ? { label: "CPM", value: fmt(cpm) } : null,
+    ad.video_views > 0 ? { label: "Video views", value: fmtCompact(ad.video_views) } : null,
+  ].filter((m): m is { label: string; value: string } => m !== null);
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
+      <div className="relative flex aspect-[16/11] shrink-0 items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <Megaphone className="h-8 w-8 text-slate-300" />
+        <span
+          className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
+          style={{ backgroundColor: CHANNEL_COLORS[ad.channel] }}
+        >
+          {CHANNEL_LABELS[ad.channel]}
+        </span>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <span className="truncate text-[10px] text-slate-400" title={`${ad.campaign_name} › ${ad.ad_group_name}`}>
+          {ad.campaign_name} › {ad.ad_group_name || "—"}
+        </span>
+        <p className="line-clamp-2 min-h-[2.6em] text-xs font-semibold text-slate-700" title={ad.ad_name}>
+          {ad.ad_name || "(không có tên)"}
+        </p>
+
+        <div className="grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2 text-center">
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmtCompact(ad.spend)}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Chi phí</span>
+          </div>
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmtCompact(ad.impressions)}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Impr.</span>
+          </div>
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(ad.clicks)}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Clicks</span>
+          </div>
+        </div>
+
+        {row2.length > 0 && (
+          <div className="grid gap-1.5 text-center" style={{ gridTemplateColumns: `repeat(${row2.length}, minmax(0, 1fr))` }}>
+            {row2.map((m) => (
+              <div key={m.label}>
+                <span className="block font-mono text-sm font-bold text-slate-900">{m.value}</span>
+                <span className="block text-[9px] uppercase tracking-wide text-slate-400">{m.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Gallery of the top-spending ads, shown by default above the full
+// Campaign/Ad set/Ad drilldown table (not a replacement for it — the table
+// is still how you browse/compare every ad; the gallery is a "what's
+// actually running" highlight reel).
+function TopAdsGallery({ rows }: { rows: AdsDrilldownRow[] }) {
+  const topAds = useMemo(() => [...rows].sort((a, b) => b.spend - a.spend).slice(0, TOP_ADS_GALLERY_SIZE), [rows]);
+  if (topAds.length === 0) return null;
+
+  return (
+    <div>
+      <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">
+        Top {topAds.length} Ads Theo Chi Phí
+      </span>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {topAds.map((ad, i) => (
+          <AdCard key={i} ad={ad} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -608,6 +699,8 @@ function AllChannelTab({
         </ChartCard>
       </div>
 
+      <TopAdsGallery rows={byCampaign} />
+
       <AdsDrilldownTable rows={byCampaign} showChannel />
     </div>
   );
@@ -679,6 +772,8 @@ function FacebookTab({
           </BarChart>
         </ChartCard>
       </div>
+
+      <TopAdsGallery rows={byCampaign} />
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
@@ -768,6 +863,8 @@ function GoogleTab({
         </ChartCard>
       </div>
 
+      <TopAdsGallery rows={byCampaign} />
+
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
         <AdsDrilldownTable rows={byCampaign} extraColumns={[{ label: "Avg. CPC", render: (r) => fmt(safeDiv(r.spend, r.clicks)) }]} />
@@ -848,6 +945,8 @@ function TiktokTab({
           </BarChart>
         </ChartCard>
       </div>
+
+      <TopAdsGallery rows={byCampaign} />
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>

@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Eye, Users, UserCheck, Heart, FileText, RefreshCw, AlertCircle } from "lucide-react";
+import { Eye, Users, UserCheck, Heart, FileText, RefreshCw, AlertCircle, ImageOff, ExternalLink } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 // Kept local (not imported from src/server/*) — that module also wires up
@@ -76,6 +76,90 @@ function todayStr(offsetDays = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
+// One post as a card (thumbnail + caption + 2 metric rows) instead of a
+// table row — a post is fundamentally one creative item, and a card grid
+// reads better than a table once you're scanning by thumbnail. Ref: the
+// approved card-layout demo (photo, date, caption, metrics, source link).
+const PostCard: React.FC<{ post: FbPostRow; reactions: number }> = ({ post, reactions }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  const caption = post.message || "(không có nội dung)";
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
+      <div className="relative aspect-[16/11] shrink-0 bg-gradient-to-br from-indigo-50 to-indigo-100">
+        {post.thumbnail_url && !imgFailed ? (
+          <img
+            src={post.thumbnail_url}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageOff className="h-8 w-8 text-indigo-300" />
+          </div>
+        )}
+        {post.ads && (
+          <span
+            className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 shadow-sm ring-1 ring-amber-200"
+            title="Bài này có chạy Ads boost — số liệu từ Marketing API, không cộng gộp vào chỉ số organic bên dưới."
+          >
+            💰 {fmtCompact(post.ads.ads_spend)}đ
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <span className="text-[10px] text-slate-400">{post.created_time.slice(0, 10)}</span>
+        <p className="line-clamp-2 min-h-[2.6em] text-xs font-semibold text-slate-700" title={caption}>
+          {caption}
+        </p>
+
+        <div className="grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2 text-center">
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmtCompact(reactions)}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Reactions</span>
+          </div>
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(n(post.comments))}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Comments</span>
+          </div>
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(n(post.shares))}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Shares</span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5 text-center">
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(n(post.clicks))}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Clicks</span>
+          </div>
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{post.ads ? fmtCompact(post.ads.ads_impressions) : "—"}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Ads Impr.</span>
+          </div>
+          <div>
+            <span className="block font-mono text-sm font-bold text-slate-900">{post.ads ? fmtCompact(post.ads.ads_reach) : "—"}</span>
+            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Ads Reach</span>
+          </div>
+        </div>
+
+        {post.permalink && (
+          <a
+            href={post.permalink}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-auto flex items-center gap-1 pt-1 text-[11px] font-semibold text-indigo-600 hover:underline"
+          >
+            Xem trên Facebook <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface FacebookInsightsProps {
   selectedBrand: "Livotec" | "Karofi";
   setSelectedBrand: (brand: "Livotec" | "Karofi") => void;
@@ -90,6 +174,7 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
   const [posts, setPosts] = useState<FbPostRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [postSort, setPostSort] = useState<"date" | "engagement" | "comments" | "shares">("date");
 
   // Same brand split as the weekly report (App.tsx's selectedBrand toggle) —
   // only this brand's configured pages are ever shown/queried.
@@ -221,29 +306,20 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
     }));
   }, [daily, pageNameById]);
 
-  const sortedPosts = useMemo(
-    () => [...posts].sort((a, b) => (a.created_time < b.created_time ? 1 : -1)),
-    [posts]
-  );
+  // Sum of all 6 reaction types — the "Reactions" tile on each post card.
+  // Not the same as Facebook's own "engaged_users" (a distinct, deduplicated
+  // Insights metric); this is just a display rollup of the reaction counts
+  // fb_posts already stores.
+  const reactionsOf = (p: FbPostRow) => n(p.likes) + n(p.loves) + n(p.wows) + n(p.hahas) + n(p.sorrys) + n(p.angers);
 
-  const postsTotal = useMemo(
-    () =>
-      sortedPosts.reduce(
-        (t, p) => ({
-          clicks: t.clicks + n(p.clicks),
-          likes: t.likes + n(p.likes),
-          loves: t.loves + n(p.loves),
-          wows: t.wows + n(p.wows),
-          hahas: t.hahas + n(p.hahas),
-          sorrys: t.sorrys + n(p.sorrys),
-          angers: t.angers + n(p.angers),
-          comments: t.comments + n(p.comments),
-          shares: t.shares + n(p.shares),
-        }),
-        { clicks: 0, likes: 0, loves: 0, wows: 0, hahas: 0, sorrys: 0, angers: 0, comments: 0, shares: 0 }
-      ),
-    [sortedPosts]
-  );
+  const sortedPosts = useMemo(() => {
+    const list = [...posts];
+    if (postSort === "engagement") list.sort((a, b) => reactionsOf(b) - reactionsOf(a));
+    else if (postSort === "comments") list.sort((a, b) => n(b.comments) - n(a.comments));
+    else if (postSort === "shares") list.sort((a, b) => n(b.shares) - n(a.shares));
+    else list.sort((a, b) => (a.created_time < b.created_time ? 1 : -1));
+    return list;
+  }, [posts, postSort]);
 
   const kpiCards = [
     { title: "Page Views", value: kpis.pageViews, icon: Eye, color: "border-amber-200 bg-amber-50 text-amber-600" },
@@ -440,90 +516,38 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
           </div>
 
           <div>
-            <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Recent Posts Performance</span>
-            <p className="mb-2 text-[11px] text-slate-400">
-              Đã bỏ tạm cột Page (đang lọc theo 1 thương hiệu) và cột Reach/Impressions — Facebook đã ngừng cấp 2 chỉ số này ở
-              cấp bài đăng (xác nhận bằng token thật: lỗi "#100 not a valid insights metric"), không phải lỗi hiển thị. Đã
-              thêm cột Clicks — chỉ số này vẫn còn dữ liệu thật.
-            </p>
-            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-              <table className="w-full min-w-[800px] text-xs">
-                <thead className="bg-slate-50 text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Nội dung</th>
-                    <th className="px-3 py-2 text-right">Ads (nếu có boost)</th>
-                    <th className="px-3 py-2 text-right">Clicks</th>
-                    <th className="px-3 py-2 text-right">Likes</th>
-                    <th className="px-3 py-2 text-right">Loves</th>
-                    <th className="px-3 py-2 text-right">Wows</th>
-                    <th className="px-3 py-2 text-right">Hahas</th>
-                    <th className="px-3 py-2 text-right">Sorrys</th>
-                    <th className="px-3 py-2 text-right">Angers</th>
-                    <th className="px-3 py-2 text-right">Comments</th>
-                    <th className="px-3 py-2 text-right">Shares</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedPosts.map((post) => (
-                    <tr key={post.post_id}>
-                      <td className="max-w-sm truncate px-3 py-2 text-slate-600" title={post.message || ""}>
-                        {post.permalink ? (
-                          <a href={post.permalink} target="_blank" rel="noreferrer" className="hover:underline">
-                            {post.message || "(không có nội dung)"}
-                          </a>
-                        ) : (
-                          post.message || "(không có nội dung)"
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        {post.ads ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-700"
-                            title="Số liệu từ ads_performance (Marketing API), post_id khớp bài đăng này — không cộng gộp vào cột organic bên phải."
-                          >
-                            💰 {fmt(post.ads.ads_spend)}đ · Reach {fmtCompact(post.ads.ads_reach)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.clicks))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.likes))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.loves))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.wows))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.hahas))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.sorrys))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.angers))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.comments))}</td>
-                      <td className="px-3 py-2 text-right">{fmt(n(post.shares))}</td>
-                    </tr>
-                  ))}
-                  {sortedPosts.length === 0 && (
-                    <tr>
-                      <td colSpan={10} className="px-3 py-6 text-center text-slate-400">
-                        Chưa có bài đăng nào trong khoảng thời gian đã chọn.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-                {sortedPosts.length > 0 && (
-                  <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-700">
-                    <tr>
-                      <td className="px-3 py-2">Grand total</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.clicks)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.likes)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.loves)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.wows)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.hahas)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.sorrys)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.angers)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.comments)}</td>
-                      <td className="px-3 py-2 text-right">{fmt(postsTotal.shares)}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Recent Posts Performance</span>
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Reactions/Comments/Shares/Clicks vẫn còn dữ liệu thật. Reach/Impressions cấp bài đăng đã bị Facebook khai tử
+                  (xác nhận bằng token thật: lỗi "#100 not a valid insights metric") — nếu bài có chạy Ads boost, số liệu
+                  Ads Impressions/Ads Reach hiển thị riêng (từ Marketing API), không cộng gộp vào cột organic.
+                </p>
+              </div>
+              <select
+                value={postSort}
+                onChange={(e) => setPostSort(e.target.value as typeof postSort)}
+                className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600"
+              >
+                <option value="date">Sắp xếp: Mới nhất</option>
+                <option value="engagement">Sắp xếp: Reactions cao nhất</option>
+                <option value="comments">Sắp xếp: Comments cao nhất</option>
+                <option value="shares">Sắp xếp: Shares cao nhất</option>
+              </select>
             </div>
+
+            {sortedPosts.length === 0 ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-400">
+                Chưa có bài đăng nào trong khoảng thời gian đã chọn.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {sortedPosts.map((post) => (
+                  <PostCard key={post.post_id} post={post} reactions={reactionsOf(post)} />
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
