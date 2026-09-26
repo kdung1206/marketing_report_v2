@@ -18,12 +18,15 @@ import {
   upsertGa4InsightsDaily,
   upsertSearchConsoleInsightsDaily,
   upsertGa4ChannelSessionsDaily,
+  replaceGa4PagesSummary,
+  replaceSearchConsolePagesSummary,
   patchGoogleWebsiteAccount,
   GoogleWebsiteAccountConfig,
   GoogleWebsiteAvailableProperty,
   Ga4InsightsDailyRow,
   SearchConsoleInsightsDailyRow,
   Ga4ChannelSessionsDailyRow,
+  Ga4PageSummaryRow,
 } from "./googleWebsiteStore";
 
 const GA4_ADMIN_API_BASE = "https://analyticsadmin.googleapis.com/v1beta";
@@ -288,6 +291,29 @@ async function fetchGa4ChannelSessionsDaily(accessToken: string, propertyId: str
   }));
 }
 
+// Rolling ~30-day per-page GA4 snapshot — one row per page, no date
+// dimension (see ga4_pages_summary's comment in supabase/schema.sql for why
+// this is a separate shape from the other fetch*/report functions above).
+// Powers the Website Report "Tổng hợp" tab's "Top pages" card, grouped by
+// page type client-side (Website Report redesign mục B). `limit` bounds the
+// report to the pages that actually matter — GA4 would otherwise return
+// every path ever hit, including one-off query-string noise.
+async function fetchGa4PageMetrics(accessToken: string, propertyId: string, since: string, until: string): Promise<Omit<Ga4PageSummaryRow, "account_id">[]> {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "pagePath" }],
+    metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }, { name: "userEngagementDuration" }],
+    orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+    limit: 500,
+  });
+  return rows.map((row: any) => ({
+    page_path: row.dimensionValues?.[0]?.value || "",
+    screen_page_views: Number(row.metricValues?.[0]?.value) || 0,
+    total_users: Number(row.metricValues?.[1]?.value) || 0,
+    user_engagement_duration: Number(row.metricValues?.[2]?.value) || 0,
+  }));
+}
+
 // Search Console's data has a ~2-3 day processing lag — querying "today"
 // always comes back empty/incomplete, unlike every other platform in this
 // codebase. Callers should bias `until` a few days into the past.
@@ -411,6 +437,9 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
         const channelRowsWithAccount: Ga4ChannelSessionsDailyRow[] = channelRows.map((r) => ({ account_id: account.id, ...r }));
         await upsertGa4ChannelSessionsDaily(channelRowsWithAccount);
         ga4ChannelRowsSynced = channelRowsWithAccount.length;
+
+        const pageRows = await fetchGa4PageMetrics(accessToken, account.ga4_property_id, since, until);
+        await replaceGa4PagesSummary(account.id, pageRows);
       }
 
       let gscRowsSynced = 0;
@@ -419,6 +448,9 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
         const rows: SearchConsoleInsightsDailyRow[] = gscRows.map((r) => ({ account_id: account.id, ...r }));
         await upsertSearchConsoleInsightsDaily(rows);
         gscRowsSynced = rows.length;
+
+        const gscPageRows = await listSearchConsoleTopPages(accessToken, account.gsc_site_url, since, until, 500);
+        await replaceSearchConsolePagesSummary(account.id, gscPageRows);
       }
 
       await patchGoogleWebsiteAccount(account.id, {

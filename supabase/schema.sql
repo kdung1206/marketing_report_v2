@@ -569,6 +569,40 @@ create table if not exists ga4_channel_sessions_daily (
 
 alter table ga4_channel_sessions_daily enable row level security;
 
+-- Rolling ~30-day snapshot of per-page metrics, one row per account per page
+-- — refreshed wholesale (delete-then-insert, not upsert) on every daily sync
+-- so pages that dropped out of the top set don't linger forever. Powers the
+-- Website Report "Tổng hợp" tab's "Top pages"/"Organic pages" cards, grouped
+-- client-side by page type (see classifyPageType in WebsiteReport.tsx —
+-- Website Report redesign mục B). Deliberately NOT a daily time series like
+-- ga4_insights_daily/ga4_channel_sessions_daily above: with ~250 URLs per
+-- site, a per-date-per-page table would multiply row count by the sync
+-- window for no feature that needs the day-by-day breakdown.
+create table if not exists ga4_pages_summary (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  page_path text not null,
+  screen_page_views int,
+  total_users int,
+  user_engagement_duration numeric,
+  updated_at timestamptz not null default now(),
+  primary key (account_id, page_path)
+);
+
+alter table ga4_pages_summary enable row level security;
+
+create table if not exists search_console_pages_summary (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  page text not null,
+  clicks int,
+  impressions int,
+  ctr numeric,
+  position numeric,
+  updated_at timestamptz not null default now(),
+  primary key (account_id, page)
+);
+
+alter table search_console_pages_summary enable row level security;
+
 -- ---------------------------------------------------------------------------
 -- Campaign Calendar & Campaign Task module (src/server/campaignStore.ts,
 -- src/components/CampaignManagement.tsx). Phase 1 (MVP) only — Activities

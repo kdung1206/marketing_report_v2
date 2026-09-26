@@ -94,6 +94,8 @@ import {
   getGa4InsightsDaily,
   getSearchConsoleInsightsDaily,
   getGa4ChannelSessionsDaily,
+  getGa4PagesSummary,
+  getSearchConsolePagesSummary,
 } from "./googleWebsiteStore";
 import {
   exchangeGoogleWebsiteCode,
@@ -2381,10 +2383,16 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       ? req.query.since
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const [ga4Daily, gscDaily, ga4ChannelDaily] = await Promise.all([
+    // ga4Pages/gscPages are a rolling ~30-day snapshot refreshed on each
+    // daily sync (see googleWebsiteSync.ts), independent of the since/until
+    // range above — same "reuse pages-preview's fetch, just store it now"
+    // shape as the Website Report redesign mục B spec calls for.
+    const [ga4Daily, gscDaily, ga4ChannelDaily, ga4Pages, gscPages] = await Promise.all([
       getGa4InsightsDaily(requestedIds, since, until),
       getSearchConsoleInsightsDaily(requestedIds, since, until),
       getGa4ChannelSessionsDaily(requestedIds, since, until),
+      getGa4PagesSummary(requestedIds),
+      getSearchConsolePagesSummary(requestedIds),
     ]);
 
     res.json({
@@ -2399,6 +2407,8 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       ga4Daily,
       gscDaily,
       ga4ChannelDaily,
+      ga4Pages,
+      gscPages,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

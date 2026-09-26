@@ -67,6 +67,28 @@ export interface SearchConsoleInsightsDailyRow {
   position: number | null;
 }
 
+// Rolling ~30-day per-page snapshot, refreshed wholesale on every daily
+// sync (see replaceGa4PagesSummary below) — one row per account per page,
+// no date dimension (see supabase/schema.sql's comment on this table for
+// why). Page-type grouping (Trang chủ/Sản phẩm/Bài viết/...) happens at
+// display time in WebsiteReport.tsx, not here.
+export interface Ga4PageSummaryRow {
+  account_id: string;
+  page_path: string;
+  screen_page_views: number | null;
+  total_users: number | null;
+  user_engagement_duration: number | null;
+}
+
+export interface SearchConsolePageSummaryRow {
+  account_id: string;
+  page: string;
+  clicks: number | null;
+  impressions: number | null;
+  ctr: number | null;
+  position: number | null;
+}
+
 // Sessions broken down by GA4's `sessionDefaultChannelGroup` (raw channel
 // names as GA4 reports them — "Organic Search", "Paid Search", "Direct",
 // "Organic Social", "Referral", "Paid Social", "Display", ... — bucketing the
@@ -87,6 +109,8 @@ async function readLocalCollections(): Promise<{
   ga4_insights_daily: Ga4InsightsDailyRow[];
   search_console_insights_daily: SearchConsoleInsightsDailyRow[];
   ga4_channel_sessions_daily: Ga4ChannelSessionsDailyRow[];
+  ga4_pages_summary: Ga4PageSummaryRow[];
+  search_console_pages_summary: SearchConsolePageSummaryRow[];
 }> {
   const store = await getDatabaseData();
   return {
@@ -95,6 +119,8 @@ async function readLocalCollections(): Promise<{
     ga4_insights_daily: Array.isArray(store.ga4_insights_daily) ? store.ga4_insights_daily : [],
     search_console_insights_daily: Array.isArray(store.search_console_insights_daily) ? store.search_console_insights_daily : [],
     ga4_channel_sessions_daily: Array.isArray(store.ga4_channel_sessions_daily) ? store.ga4_channel_sessions_daily : [],
+    ga4_pages_summary: Array.isArray(store.ga4_pages_summary) ? store.ga4_pages_summary : [],
+    search_console_pages_summary: Array.isArray(store.search_console_pages_summary) ? store.search_console_pages_summary : [],
   };
 }
 
@@ -105,6 +131,8 @@ async function writeLocalCollections(
     ga4_insights_daily: Ga4InsightsDailyRow[];
     search_console_insights_daily: SearchConsoleInsightsDailyRow[];
     ga4_channel_sessions_daily: Ga4ChannelSessionsDailyRow[];
+    ga4_pages_summary: Ga4PageSummaryRow[];
+    search_console_pages_summary: SearchConsolePageSummaryRow[];
   }>
 ): Promise<void> {
   await saveDatabaseData({ ...store, ...updates });
@@ -154,12 +182,22 @@ export async function patchGoogleWebsiteAccount(id: string, patch: Partial<Googl
 
 export async function deleteGoogleWebsiteAccount(id: string): Promise<void> {
   if (!isSupabaseConfigured) {
-    const { store, google_website_accounts, ga4_insights_daily, search_console_insights_daily, ga4_channel_sessions_daily } = await readLocalCollections();
+    const {
+      store,
+      google_website_accounts,
+      ga4_insights_daily,
+      search_console_insights_daily,
+      ga4_channel_sessions_daily,
+      ga4_pages_summary,
+      search_console_pages_summary,
+    } = await readLocalCollections();
     await writeLocalCollections(store, {
       google_website_accounts: google_website_accounts.filter((a) => a.id !== id),
       ga4_insights_daily: ga4_insights_daily.filter((r) => r.account_id !== id),
       search_console_insights_daily: search_console_insights_daily.filter((r) => r.account_id !== id),
       ga4_channel_sessions_daily: ga4_channel_sessions_daily.filter((r) => r.account_id !== id),
+      ga4_pages_summary: ga4_pages_summary.filter((r) => r.account_id !== id),
+      search_console_pages_summary: search_console_pages_summary.filter((r) => r.account_id !== id),
     });
     return;
   }
@@ -271,5 +309,66 @@ export async function getGa4ChannelSessionsDaily(accountIds: string[], since: st
     .lte("date", until)
     .order("date", { ascending: true });
   if (error) throw new Error(`Lỗi đọc số liệu GA4 theo kênh: ${error.message}`);
+  return data || [];
+}
+
+// -- Page summaries (rolling ~30-day snapshot, refreshed wholesale) ----------
+
+// Delete-then-insert rather than upsert: pages that fell out of the fetched
+// top set (e.g. a discontinued product page) must disappear from the
+// snapshot, not linger with stale numbers forever.
+export async function replaceGa4PagesSummary(accountId: string, rows: Omit<Ga4PageSummaryRow, "account_id">[]): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, ga4_pages_summary } = await readLocalCollections();
+    const rest = ga4_pages_summary.filter((r) => r.account_id !== accountId);
+    const next = rows.map((r) => ({ account_id: accountId, ...r }));
+    await writeLocalCollections(store, { ga4_pages_summary: [...rest, ...next] });
+    return;
+  }
+
+  const { error: deleteError } = await supabase.from("ga4_pages_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`Lỗi xóa dữ liệu trang GA4 cũ: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("ga4_pages_summary").insert(rows.map((r) => ({ account_id: accountId, ...r, updated_at: new Date().toISOString() })));
+  if (error) throw new Error(`Lỗi lưu dữ liệu trang GA4: ${error.message}`);
+}
+
+export async function getGa4PagesSummary(accountIds: string[]): Promise<Ga4PageSummaryRow[]> {
+  if (!isSupabaseConfigured) {
+    const { ga4_pages_summary } = await readLocalCollections();
+    return ga4_pages_summary.filter((r) => accountIds.includes(r.account_id));
+  }
+
+  const { data, error } = await supabase.from("ga4_pages_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`Lỗi đọc dữ liệu trang GA4: ${error.message}`);
+  return data || [];
+}
+
+export async function replaceSearchConsolePagesSummary(accountId: string, rows: Omit<SearchConsolePageSummaryRow, "account_id">[]): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, search_console_pages_summary } = await readLocalCollections();
+    const rest = search_console_pages_summary.filter((r) => r.account_id !== accountId);
+    const next = rows.map((r) => ({ account_id: accountId, ...r }));
+    await writeLocalCollections(store, { search_console_pages_summary: [...rest, ...next] });
+    return;
+  }
+
+  const { error: deleteError } = await supabase.from("search_console_pages_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`Lỗi xóa dữ liệu trang Search Console cũ: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase
+    .from("search_console_pages_summary")
+    .insert(rows.map((r) => ({ account_id: accountId, ...r, updated_at: new Date().toISOString() })));
+  if (error) throw new Error(`Lỗi lưu dữ liệu trang Search Console: ${error.message}`);
+}
+
+export async function getSearchConsolePagesSummary(accountIds: string[]): Promise<SearchConsolePageSummaryRow[]> {
+  if (!isSupabaseConfigured) {
+    const { search_console_pages_summary } = await readLocalCollections();
+    return search_console_pages_summary.filter((r) => accountIds.includes(r.account_id));
+  }
+
+  const { data, error } = await supabase.from("search_console_pages_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`Lỗi đọc dữ liệu trang Search Console: ${error.message}`);
   return data || [];
 }

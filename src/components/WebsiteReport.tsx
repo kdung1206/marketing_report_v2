@@ -4,8 +4,6 @@ import {
   Bar,
   LineChart,
   Line,
-  AreaChart,
-  Area,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -63,21 +61,63 @@ interface Ga4ChannelSessionsDailyRow {
 const NAMED_CHANNELS = ["Organic Search", "Paid Search", "Direct", "Organic Social", "Referral"] as const;
 const CHANNEL_ORDER = [...NAMED_CHANNELS, "Khác"] as const;
 const CHANNEL_COLORS: Record<string, string> = {
-  "Organic Search": "#6366f1",
-  "Paid Search": "#f59e0b",
-  Direct: "#10b981",
+  "Organic Search": "#059669",
+  "Paid Search": "#6366f1",
+  Direct: "#0ea5e9",
   "Organic Social": "#ec4899",
-  Referral: "#0ea5e9",
+  Referral: "#f59e0b",
   Khác: "#94a3b8",
 };
 function bucketChannel(raw: string): string {
   return (NAMED_CHANNELS as readonly string[]).includes(raw) ? raw : "Khác";
 }
 
+interface Ga4PageSummaryRow {
+  account_id: string;
+  page_path: string;
+  screen_page_views: number | null;
+  total_users: number | null;
+  user_engagement_duration: number | null;
+}
+
+interface SearchConsolePageSummaryRow {
+  account_id: string;
+  page: string;
+  clicks: number | null;
+  impressions: number | null;
+  ctr: number | null;
+  position: number | null;
+}
+
+// Page-type classification — CHỐT dựa trên 250 URL thật của karofi.com (xem
+// HANDOFF.md mục B). Áp dụng cho cả GA4 pagePath và Search Console page
+// (page là URL đầy đủ nên strip origin trước khi phân loại). Nếu Livotec
+// dùng nền tảng website khác (cấu trúc URL khác hẳn), quy tắc này CẦN kiểm
+// tra lại qua route "Xem URL thật" trước khi tin tưởng — chưa làm riêng cho
+// Livotec vì chưa có dữ liệu thật để đối chiếu.
+const PAGE_TYPE_ORDER = ["Trang chủ", "Trang tĩnh", "Bài viết", "Sản phẩm", "Danh mục"] as const;
+function classifyPageType(rawPath: string): string {
+  let path = rawPath;
+  try {
+    // Search Console's `page` dimension is a full URL; GA4's `pagePath` is
+    // already just a path — stripping an origin that isn't there is a no-op.
+    path = new URL(rawPath, "https://placeholder.invalid").pathname;
+  } catch {
+    // Keep rawPath as-is if it isn't a parseable URL/path.
+  }
+  if (path.startsWith("/en")) path = path.slice(3) || "/";
+  if (path === "" || path === "/") return "Trang chủ";
+  if (path.startsWith("/trang/")) return "Trang tĩnh";
+  if (/-bv\d+\.html$/i.test(path)) return "Bài viết";
+  if (path.toLowerCase().endsWith(".html")) return "Sản phẩm";
+  return "Danh mục";
+}
+
 const n = (v: number | null | undefined) => v || 0;
 const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(Math.round(v));
 const fmtCompact = (v: number) => new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(v);
 const fmtPercent = (v: number) => `${(v * 100).toFixed(1)}%`;
+const fmtPercent2 = (v: number) => `${(v * 100).toFixed(2)}%`;
 
 function todayStr(offsetDays = 0): string {
   const d = new Date();
@@ -106,6 +146,8 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const [ga4Daily, setGa4Daily] = useState<Ga4InsightsDailyRow[]>([]);
   const [gscDaily, setGscDaily] = useState<SearchConsoleInsightsDailyRow[]>([]);
   const [ga4ChannelDaily, setGa4ChannelDaily] = useState<Ga4ChannelSessionsDailyRow[]>([]);
+  const [ga4Pages, setGa4Pages] = useState<Ga4PageSummaryRow[]>([]);
+  const [gscPages, setGscPages] = useState<SearchConsolePageSummaryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +168,8 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
           setGa4Daily(result.ga4Daily || []);
           setGscDaily(result.gscDaily || []);
           setGa4ChannelDaily(result.ga4ChannelDaily || []);
+          setGa4Pages(result.ga4Pages || []);
+          setGscPages(result.gscPages || []);
         } else {
           setError(result.error || "Không tải được dữ liệu Website Report.");
         }
@@ -143,6 +187,8 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const ga4Scoped = useMemo(() => ga4Daily.filter((r) => accountIds.includes(r.account_id)), [ga4Daily, accountIds]);
   const gscScoped = useMemo(() => gscDaily.filter((r) => accountIds.includes(r.account_id)), [gscDaily, accountIds]);
   const channelScoped = useMemo(() => ga4ChannelDaily.filter((r) => accountIds.includes(r.account_id)), [ga4ChannelDaily, accountIds]);
+  const ga4PagesScoped = useMemo(() => ga4Pages.filter((r) => accountIds.includes(r.account_id)), [ga4Pages, accountIds]);
+  const gscPagesScoped = useMemo(() => gscPages.filter((r) => accountIds.includes(r.account_id)), [gscPages, accountIds]);
 
   const ga4ByDate = useMemo(() => {
     const byDate = new Map<string, { date: string; sessions: number; active_users: number; new_users: number; engaged_sessions: number }>();
@@ -206,42 +252,65 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const newUsersTotal = ga4Scoped.reduce((s, r) => s + n(r.new_users), 0);
   const clicksTotal = gscScoped.reduce((s, r) => s + n(r.clicks), 0);
   const impressionsTotal = gscScoped.reduce((s, r) => s + n(r.impressions), 0);
-  const avgCtr = gscScoped.length ? gscScoped.reduce((s, r) => s + n(r.ctr), 0) / gscScoped.length : 0;
-  const avgPosition = gscScoped.length ? gscScoped.reduce((s, r) => s + n(r.position), 0) / gscScoped.length : 0;
+  // Overall ratios, not a mean of daily ratios — clicksTotal/impressionsTotal
+  // (and position weighted by each day's impressions) is the mathematically
+  // correct way to combine per-day CTR/position into one period figure; a
+  // plain average of daily percentages skews toward low-traffic days.
+  const avgCtr = impressionsTotal ? clicksTotal / impressionsTotal : 0;
+  const avgPosition = impressionsTotal ? gscScoped.reduce((s, r) => s + n(r.position) * n(r.impressions), 0) / impressionsTotal : 0;
+  const periodWeeks = Math.max(1, Math.round((new Date(until).getTime() - new Date(since).getTime()) / (7 * 24 * 60 * 60 * 1000)));
 
-  // "Nhận định nhanh" narrative — a handful of sentences derived purely from
-  // data already on screen (no extra fetch): trend = average of the second
-  // half of the selected window vs the first half, for the two headline
-  // series (Sessions, Clicks). Split-in-half is a coarse trend read, good
-  // enough for a one-line callout — this isn't a forecasting feature.
-  const narrative = useMemo(() => {
-    const trendOf = (series: { value: number }[]) => {
-      if (series.length < 4) return null;
-      const mid = Math.floor(series.length / 2);
-      const firstAvg = series.slice(0, mid).reduce((s, r) => s + r.value, 0) / mid;
-      const secondAvg = series.slice(mid).reduce((s, r) => s + r.value, 0) / (series.length - mid);
-      if (firstAvg === 0) return null;
-      return ((secondAvg - firstAvg) / firstAvg) * 100;
-    };
-    const sessionsTrend = trendOf(ga4ByDate.map((r) => ({ value: r.sessions })));
-    const clicksTrend = trendOf(gscByDate.map((r) => ({ value: r.clicks })));
-    const organicShare = sessionsTotal ? (organicSessionsTotal / sessionsTotal) * 100 : 0;
-    const topChannel = channelTotals.filter((c) => c.channel !== "Khác").sort((a, b) => b.sessions - a.sessions)[0];
+  // GA4/Search Console pages grouped into the chốt page-type buckets (see
+  // classifyPageType) — powers the "Top pages"/"Organic pages" cards. These
+  // come from a fixed ~30-day rolling snapshot refreshed on each daily sync
+  // (see googleWebsiteSync.ts's fetchGa4PageMetrics/listSearchConsoleTopPages
+  // calls), independent of the KPI tiles' custom since/until range above.
+  const ga4PagesByType = useMemo(() => {
+    const totals = new Map<string, { views: number; users: number; engagement: number }>();
+    ga4PagesScoped.forEach((r) => {
+      const type = classifyPageType(r.page_path);
+      const entry = totals.get(type) || { views: 0, users: 0, engagement: 0 };
+      entry.views += n(r.screen_page_views);
+      entry.users += n(r.total_users);
+      entry.engagement += n(r.user_engagement_duration);
+      totals.set(type, entry);
+    });
+    return PAGE_TYPE_ORDER.map((type) => ({ type, ...(totals.get(type) || { views: 0, users: 0, engagement: 0 }) }));
+  }, [ga4PagesScoped]);
 
-    const describeTrend = (pct: number | null) => {
-      if (pct === null) return "chưa đủ dữ liệu để so sánh xu hướng";
-      if (Math.abs(pct) < 3) return "gần như đi ngang so với nửa đầu kỳ";
-      return `${pct > 0 ? "tăng" : "giảm"} khoảng ${Math.abs(pct).toFixed(0)}% so với nửa đầu kỳ`;
-    };
+  const gscPagesByType = useMemo(() => {
+    const totals = new Map<string, { clicks: number; impressions: number }>();
+    gscPagesScoped.forEach((r) => {
+      const type = classifyPageType(r.page);
+      const entry = totals.get(type) || { clicks: 0, impressions: 0 };
+      entry.clicks += n(r.clicks);
+      entry.impressions += n(r.impressions);
+      totals.set(type, entry);
+    });
+    return PAGE_TYPE_ORDER.map((type) => {
+      const t = totals.get(type) || { clicks: 0, impressions: 0 };
+      return { type, ...t, ctr: t.impressions ? t.clicks / t.impressions : 0 };
+    });
+  }, [gscPagesScoped]);
 
-    const sentences: string[] = [];
-    sentences.push(`Sessions ${describeTrend(sessionsTrend)}, đạt ${fmt(sessionsTotal)} sessions trong kỳ chọn, trong đó ${organicShare.toFixed(0)}% đến từ Organic Search.`);
-    if (topChannel && topChannel.sessions > 0) {
-      sentences.push(`Kênh mang lại nhiều session nhất là ${topChannel.channel} (${(topChannel.share * 100).toFixed(0)}% tổng sessions).`);
-    }
-    sentences.push(`Search Console: ${fmt(clicksTotal)} clicks (${describeTrend(clicksTrend)}), CTR trung bình ${fmtPercent(avgCtr)}, vị trí trung bình ${avgPosition.toFixed(1)}${avgPosition > 20 ? " — còn khá xa trang 1, cần cải thiện SEO on-page/nội dung" : avgPosition > 10 ? " — gần trang 1, còn dư địa cải thiện" : " — đã ở nhóm đầu kết quả tìm kiếm"}.`);
-    return sentences;
-  }, [ga4ByDate, gscByDate, sessionsTotal, organicSessionsTotal, clicksTotal, avgCtr, avgPosition, channelTotals]);
+  // "Nhận định nhanh" narrative — a handful of bullets derived purely from
+  // data already on screen (no extra fetch), key numbers bolded — matches
+  // the approved demo layout (see Website Report redesign mục A).
+  const organicShare = sessionsTotal ? (organicSessionsTotal / sessionsTotal) * 100 : 0;
+  const narrative = useMemo((): React.ReactNode[] => {
+    const B = (v: React.ReactNode) => <strong className="font-bold text-indigo-600">{v}</strong>;
+    const positionNote =
+      avgPosition > 20 ? " — còn khá xa trang 1, cần cải thiện SEO on-page/nội dung" : avgPosition > 10 ? " — gần trang 1, còn dư địa cải thiện" : avgPosition > 0 ? " — đã ở nhóm đầu kết quả tìm kiếm" : "";
+    return [
+      <>
+        Website nhận {B(`${fmt(sessionsTotal)} sessions`)} trong giai đoạn đã chọn, {B(`${organicShare.toFixed(2)}%`)} đến từ Organic Search.
+      </>,
+      <>
+        Search Console ghi nhận {B(`${fmt(clicksTotal)} clicks`)} tự nhiên trên {B(`${fmt(impressionsTotal)} impressions`)} — CTR trung bình {B(fmtPercent2(avgCtr))}, vị trí trung bình {B(avgPosition.toFixed(1))}
+        {positionNote}.
+      </>,
+    ];
+  }, [sessionsTotal, organicShare, clicksTotal, impressionsTotal, avgCtr, avgPosition]);
 
   const sections: { id: "overview" | "ga4" | "search-console"; label: string }[] = [
     { id: "overview", label: "Tổng hợp" },
@@ -316,20 +385,27 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
         <>
           {activeSection === "overview" && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                <PlatformStat icon={Users} label="Sessions" value={fmtCompact(sessionsTotal)} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
-                <PlatformStat icon={TrendingUp} label="Organic Sessions" value={fmtCompact(organicSessionsTotal)} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
-                <PlatformStat icon={Eye} label="GSC Impressions" value={fmtCompact(impressionsTotal)} color="text-sky-600 bg-sky-50 border-sky-200" />
-                <PlatformStat icon={MousePointerClick} label="GSC Clicks" value={fmtCompact(clicksTotal)} color="text-sky-600 bg-sky-50 border-sky-200" />
-                <PlatformStat icon={Search} label="CTR" value={fmtPercent(avgCtr)} color="text-sky-600 bg-sky-50 border-sky-200" />
-                <PlatformStat icon={Target} label="Avg Position" value={avgPosition.toFixed(1)} color="text-sky-600 bg-sky-50 border-sky-200" />
+              {/* 1. KPI tổng quan */}
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                <PlatformStat icon={Users} label="Sessions" value={fmtCompact(sessionsTotal)} sub={`${periodWeeks} tuần`} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
+                <PlatformStat
+                  icon={TrendingUp}
+                  label="Organic Sessions"
+                  value={fmtCompact(organicSessionsTotal)}
+                  sub={`${organicShare.toFixed(2)}% tổng sessions`}
+                  color="text-indigo-600 bg-indigo-50 border-indigo-200"
+                />
+                <PlatformStat icon={Eye} label="GSC Impressions" value={fmtCompact(impressionsTotal)} sub="Search Console" color="text-sky-600 bg-sky-50 border-sky-200" />
+                <PlatformStat icon={MousePointerClick} label="GSC Clicks" value={fmtCompact(clicksTotal)} sub={`CTR ${fmtPercent2(avgCtr)}`} color="text-sky-600 bg-sky-50 border-sky-200" />
+                <PlatformStat icon={Target} label="Avg Position" value={avgPosition ? avgPosition.toFixed(1) : "—"} sub="weighted theo impressions" color="text-sky-600 bg-sky-50 border-sky-200" />
               </div>
 
+              {/* 2. Nhận định nhanh */}
               <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
                 <div className="flex items-center gap-1.5 pb-2 text-xs font-bold uppercase tracking-wide text-indigo-500">
                   <Sparkles className="h-3.5 w-3.5" /> Nhận định nhanh
                 </div>
-                <ul className="space-y-1.5">
+                <ul className="list-disc space-y-1.5 pl-4">
                   {narrative.map((sentence, i) => (
                     <li key={i} className="text-xs leading-relaxed text-slate-700">
                       {sentence}
@@ -338,56 +414,108 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                 </ul>
               </div>
 
-              <div className="h-80 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Sessions theo kênh</span>
-                <ResponsiveContainer width="100%" height="85%">
-                  <AreaChart data={channelByDate}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tickFormatter={fmtCompact} />
-                    <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-                    <Legend />
-                    {CHANNEL_ORDER.map((channel) => (
-                      <Area
-                        key={channel}
-                        type="monotone"
-                        dataKey={channel}
-                        name={channel}
-                        stackId="channel"
-                        stroke={CHANNEL_COLORS[channel]}
-                        fill={CHANNEL_COLORS[channel]}
-                        fillOpacity={0.7}
-                      />
-                    ))}
-                  </AreaChart>
-                </ResponsiveContainer>
+              {/* 3. Sessions theo kênh + Nguồn traffic, cạnh nhau để so sánh trực tiếp */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+                <div className="h-80 rounded-xl border border-slate-100 bg-white p-4 shadow-sm lg:col-span-3">
+                  <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Sessions theo kênh</span>
+                  <ResponsiveContainer width="100%" height="85%">
+                    <BarChart data={channelByDate}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis tickFormatter={fmtCompact} />
+                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                      <Legend />
+                      {CHANNEL_ORDER.map((channel) => (
+                        <Bar key={channel} dataKey={channel} name={channel} stackId="channel" fill={CHANNEL_COLORS[channel]} />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm lg:col-span-2">
+                  <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Nguồn traffic (giai đoạn đã chọn)</span>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-slate-400">
+                        <th className="pb-2 font-medium">Kênh</th>
+                        <th className="pb-2 font-medium text-right">Sessions</th>
+                        <th className="pb-2 font-medium text-right">Tỉ trọng</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {channelTotals.map((row) => (
+                        <tr key={row.channel} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_COLORS[row.channel] }} />
+                              {row.channel}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right font-mono">{fmt(row.sessions)}</td>
+                          <td className="py-2 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="font-mono">{fmtPercent2(row.share)}</span>
+                              <span className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-100">
+                                <span className="block h-full rounded-full" style={{ width: `${(row.share * 100).toFixed(0)}%`, backgroundColor: CHANNEL_COLORS[row.channel] }} />
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Nguồn traffic</span>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-100 text-left text-slate-400">
-                      <th className="pb-2 font-medium">Kênh</th>
-                      <th className="pb-2 font-medium text-right">Sessions</th>
-                      <th className="pb-2 font-medium text-right">% tổng</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {channelTotals.map((row) => (
-                      <tr key={row.channel} className="border-b border-slate-50 last:border-0">
-                        <td className="py-2">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_COLORS[row.channel] }} />
-                            {row.channel}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right font-mono">{fmt(row.sessions)}</td>
-                        <td className="py-2 text-right font-mono">{fmtPercent(row.share)}</td>
+              {/* 4. Top pages (GA4) & Organic pages (Search Console), nhóm theo loại trang */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Top pages (GA4)</span>
+                  <span className="block pb-3 text-[11px] text-slate-400">Theo loại trang · 30 ngày gần nhất</span>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-slate-400">
+                        <th className="pb-2 font-medium">Loại trang</th>
+                        <th className="pb-2 font-medium text-right">Pageviews</th>
+                        <th className="pb-2 font-medium text-right">Users</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {ga4PagesByType.map((row) => (
+                        <tr key={row.type} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2">{row.type}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.views)}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.users)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Organic pages (Search Console)</span>
+                  <span className="block pb-3 text-[11px] text-slate-400">Theo loại trang · 30 ngày gần nhất</span>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-slate-400">
+                        <th className="pb-2 font-medium">Loại trang</th>
+                        <th className="pb-2 font-medium text-right">Clicks</th>
+                        <th className="pb-2 font-medium text-right">Impressions</th>
+                        <th className="pb-2 font-medium text-right">CTR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {gscPagesByType.map((row) => (
+                        <tr key={row.type} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2">{row.type}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                          <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
@@ -471,13 +599,14 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   );
 }
 
-function PlatformStat({ icon: Icon, label, value, color }: { icon: typeof Globe; label: string; value: string; color: string }) {
+function PlatformStat({ icon: Icon, label, value, color, sub }: { icon: typeof Globe; label: string; value: string; color: string; sub?: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <span className="block text-xs font-medium uppercase tracking-tight text-slate-400">{label}</span>
           <span className="block font-mono text-lg font-bold tracking-tight text-slate-900">{value}</span>
+          {sub && <span className="block text-[11px] text-slate-400">{sub}</span>}
         </div>
         <div className={`flex h-8 w-8 items-center justify-center rounded-lg border ${color}`}>
           <Icon className="h-4 w-4" />
