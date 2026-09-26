@@ -40,8 +40,17 @@ export const GOOGLE_WEBSITE_REDIRECT_URI = process.env.GOOGLE_WEBSITE_REDIRECT_U
 export const isGoogleWebsiteConfigured = Boolean(YOUTUBE_CLIENT_ID && YOUTUBE_CLIENT_SECRET && GOOGLE_WEBSITE_REDIRECT_URI);
 
 // Read-only scopes only — this integration never edits GA4/Search Console
-// settings, only reads reports.
+// settings, only reads reports. "openid" + userinfo.email are also required
+// even though this module never reads a profile per se: Google's token
+// endpoint only issues an id_token (this callback's sole source of a stable
+// per-account id — see decodeIdToken below) when the authorization request's
+// scope includes "openid" (OIDC spec); without it, tokens.id_token is simply
+// absent from the response, no matter what else is granted. Both are
+// non-sensitive default scopes, so this doesn't need anything new registered
+// on the OAuth consent screen in Google Cloud Console.
 export const GOOGLE_WEBSITE_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/analytics.readonly",
   "https://www.googleapis.com/auth/webmasters.readonly",
 ];
