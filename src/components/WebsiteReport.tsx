@@ -113,6 +113,31 @@ function classifyPageType(rawPath: string): string {
   return "Danh mục";
 }
 
+interface KeywordRow {
+  account_id: string;
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+// Brand vs Non-brand — CHỐT: query chứa "karofi"/"livotec" (không phân biệt
+// hoa thường) → Brand, còn lại → Non-brand (Website Report redesign mục C).
+function isBrandQuery(query: string): boolean {
+  const q = query.toLowerCase();
+  return q.includes("karofi") || q.includes("livotec");
+}
+
+// Position badge color — chỉ mang tính trực quan (xanh: gần top 5, cam:
+// 5-10, xám: xa hơn), không phải ngưỡng striking-distance (ngưỡng đó cấu
+// hình riêng ở ô nhập bên dưới).
+function positionBadgeColor(position: number): string {
+  if (position < 5) return "text-emerald-600 bg-emerald-50";
+  if (position <= 10) return "text-amber-600 bg-amber-50";
+  return "text-slate-500 bg-slate-100";
+}
+
 const n = (v: number | null | undefined) => v || 0;
 const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(Math.round(v));
 const fmtCompact = (v: number) => new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(v);
@@ -151,6 +176,16 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Striking-distance threshold — configurable on the UI, not hardcoded (see
+  // Website Report redesign mục C). Filtering happens client-side against
+  // `keywords` (already fetched in full), so changing these never re-fetches.
+  const [minPosition, setMinPosition] = useState(4);
+  const [maxPosition, setMaxPosition] = useState(20);
+  const [minImpressions, setMinImpressions] = useState(10);
+  const [keywords, setKeywords] = useState<KeywordRow[]>([]);
+  const [keywordsLoading, setKeywordsLoading] = useState(true);
+  const [keywordsError, setKeywordsError] = useState<string | null>(null);
+
   const brandAccounts = useMemo(() => accounts.filter((a) => a.brand === selectedBrand), [accounts, selectedBrand]);
   const accountIds = useMemo(() => brandAccounts.map((a) => a.id), [brandAccounts]);
 
@@ -184,11 +219,41 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
     };
   }, [since, until, selectedBrand]);
 
+  // Separate effect/loading state from the insights fetch above — this one
+  // hits the Search Console API live (no daily-sync table backs it, see
+  // mục C), so it shouldn't block the rest of the tab from rendering while
+  // it's in flight.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setKeywordsLoading(true);
+      setKeywordsError(null);
+      try {
+        const params = new URLSearchParams({ since, until });
+        const result = await safeFetchJson(`/api/google-website/keywords?${params.toString()}`);
+        if (cancelled) return;
+        if (result.success) {
+          setKeywords(result.keywords || []);
+        } else {
+          setKeywordsError(result.error || "Không tải được từ khoá Search Console.");
+        }
+      } catch (err: any) {
+        if (!cancelled) setKeywordsError(err.message || "Không tải được từ khoá Search Console.");
+      } finally {
+        if (!cancelled) setKeywordsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [since, until]);
+
   const ga4Scoped = useMemo(() => ga4Daily.filter((r) => accountIds.includes(r.account_id)), [ga4Daily, accountIds]);
   const gscScoped = useMemo(() => gscDaily.filter((r) => accountIds.includes(r.account_id)), [gscDaily, accountIds]);
   const channelScoped = useMemo(() => ga4ChannelDaily.filter((r) => accountIds.includes(r.account_id)), [ga4ChannelDaily, accountIds]);
   const ga4PagesScoped = useMemo(() => ga4Pages.filter((r) => accountIds.includes(r.account_id)), [ga4Pages, accountIds]);
   const gscPagesScoped = useMemo(() => gscPages.filter((r) => accountIds.includes(r.account_id)), [gscPages, accountIds]);
+  const keywordsScoped = useMemo(() => keywords.filter((r) => accountIds.includes(r.account_id)), [keywords, accountIds]);
 
   const ga4ByDate = useMemo(() => {
     const byDate = new Map<string, { date: string; sessions: number; active_users: number; new_users: number; engaged_sessions: number }>();
@@ -293,6 +358,34 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
     });
   }, [gscPagesScoped]);
 
+  // Brand vs Non-brand split — over every fetched keyword (not just the
+  // striking-distance subset below), so it represents the whole organic
+  // query mix (Website Report redesign mục C).
+  const brandSplit = useMemo(() => {
+    const totals = { brand: { clicks: 0, impressions: 0 }, nonBrand: { clicks: 0, impressions: 0 } };
+    keywordsScoped.forEach((r) => {
+      const bucket = isBrandQuery(r.query) ? totals.brand : totals.nonBrand;
+      bucket.clicks += n(r.clicks);
+      bucket.impressions += n(r.impressions);
+    });
+    const totalImpressions = totals.brand.impressions + totals.nonBrand.impressions;
+    return {
+      ...totals,
+      brandShare: totalImpressions ? totals.brand.impressions / totalImpressions : 0,
+      nonBrandShare: totalImpressions ? totals.nonBrand.impressions / totalImpressions : 0,
+    };
+  }, [keywordsScoped]);
+
+  // Striking-distance keywords — position within [minPosition, maxPosition]
+  // and at least minImpressions, both configurable on the UI (mục C: "PHẢI
+  // làm dạng cấu hình được", not hardcoded). Sorted by impressions so the
+  // biggest opportunities surface first.
+  const strikingDistanceKeywords = useMemo(() => {
+    return keywordsScoped
+      .filter((r) => r.position >= minPosition && r.position <= maxPosition && r.impressions >= minImpressions)
+      .sort((a, b) => b.impressions - a.impressions);
+  }, [keywordsScoped, minPosition, maxPosition, minImpressions]);
+
   // "Nhận định nhanh" narrative — a handful of bullets derived purely from
   // data already on screen (no extra fetch), key numbers bolded — matches
   // the approved demo layout (see Website Report redesign mục A).
@@ -301,7 +394,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
     const B = (v: React.ReactNode) => <strong className="font-bold text-indigo-600">{v}</strong>;
     const positionNote =
       avgPosition > 20 ? " — còn khá xa trang 1, cần cải thiện SEO on-page/nội dung" : avgPosition > 10 ? " — gần trang 1, còn dư địa cải thiện" : avgPosition > 0 ? " — đã ở nhóm đầu kết quả tìm kiếm" : "";
-    return [
+    const sentences: React.ReactNode[] = [
       <>
         Website nhận {B(`${fmt(sessionsTotal)} sessions`)} trong giai đoạn đã chọn, {B(`${organicShare.toFixed(2)}%`)} đến từ Organic Search.
       </>,
@@ -310,7 +403,16 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
         {positionNote}.
       </>,
     ];
-  }, [sessionsTotal, organicShare, clicksTotal, impressionsTotal, avgCtr, avgPosition]);
+    if (!keywordsLoading && strikingDistanceKeywords.length > 0) {
+      const keywordImpressions = strikingDistanceKeywords.reduce((s, r) => s + r.impressions, 0);
+      sentences.push(
+        <>
+          {B(`${strikingDistanceKeywords.length} từ khoá`)} đang ở vị trí {minPosition}–{maxPosition} với tổng {B(`${fmt(keywordImpressions)} impressions`)} — dư địa SEO gần nhất để đẩy lên top.
+        </>
+      );
+    }
+    return sentences;
+  }, [sessionsTotal, organicShare, clicksTotal, impressionsTotal, avgCtr, avgPosition, keywordsLoading, strikingDistanceKeywords, minPosition, maxPosition]);
 
   const sections: { id: "overview" | "ga4" | "search-console"; label: string }[] = [
     { id: "overview", label: "Tổng hợp" },
@@ -516,6 +618,88 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                     </tbody>
                   </table>
                 </div>
+              </div>
+
+              {/* 5. Từ khoá tiềm năng SEO (striking-distance) + Brand/Non-brand */}
+              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Từ khoá tiềm năng SEO (striking-distance keywords)</span>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                    <span>Vị trí</span>
+                    <input
+                      type="number"
+                      value={minPosition}
+                      onChange={(e) => setMinPosition(Number(e.target.value) || 0)}
+                      className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    />
+                    <span>–</span>
+                    <input
+                      type="number"
+                      value={maxPosition}
+                      onChange={(e) => setMaxPosition(Number(e.target.value) || 0)}
+                      className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    />
+                    <span>· Impressions tối thiểu</span>
+                    <input
+                      type="number"
+                      value={minImpressions}
+                      onChange={(e) => setMinImpressions(Number(e.target.value) || 0)}
+                      className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-3 flex items-center gap-2 text-[11px]">
+                  <span className="text-slate-400">Brand / Non-brand (impressions):</span>
+                  <span className="flex h-2 flex-1 max-w-xs overflow-hidden rounded-full bg-slate-100">
+                    <span className="block h-full bg-indigo-500" style={{ width: `${(brandSplit.brandShare * 100).toFixed(0)}%` }} />
+                    <span className="block h-full bg-sky-400" style={{ width: `${(brandSplit.nonBrandShare * 100).toFixed(0)}%` }} />
+                  </span>
+                  <span className="font-mono text-indigo-600">{fmtPercent(brandSplit.brandShare)} Brand</span>
+                  <span className="font-mono text-sky-600">{fmtPercent(brandSplit.nonBrandShare)} Non-brand</span>
+                </div>
+
+                {keywordsError && (
+                  <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2 text-[11px] text-rose-700">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {keywordsError}
+                  </div>
+                )}
+                {keywordsLoading ? (
+                  <div className="flex items-center gap-2 py-4 text-xs text-slate-400">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Đang tải từ khoá Search Console...
+                  </div>
+                ) : strikingDistanceKeywords.length === 0 ? (
+                  <p className="py-4 text-xs text-slate-400">
+                    Không có từ khoá nào ở vị trí {minPosition}–{maxPosition} với ≥{minImpressions} impressions trong giai đoạn đã chọn.
+                  </p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-slate-400">
+                        <th className="pb-2 font-medium">Query</th>
+                        <th className="pb-2 font-medium">Loại</th>
+                        <th className="pb-2 font-medium text-right">Impressions</th>
+                        <th className="pb-2 font-medium text-right">Clicks</th>
+                        <th className="pb-2 font-medium text-right">CTR</th>
+                        <th className="pb-2 font-medium text-right">Position</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {strikingDistanceKeywords.slice(0, 50).map((row) => (
+                        <tr key={row.query} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2 text-indigo-700">{row.query}</td>
+                          <td className="py-2 text-slate-400">{isBrandQuery(row.query) ? "Brand" : "Non-brand"}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                          <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                          <td className="py-2 text-right">
+                            <span className={`rounded-md px-1.5 py-0.5 font-mono font-bold ${positionBadgeColor(row.position)}`}>{row.position.toFixed(1)}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           )}

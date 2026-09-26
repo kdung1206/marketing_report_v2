@@ -104,6 +104,7 @@ import {
   listGa4Properties,
   listSearchConsoleSites,
   listSearchConsoleTopPages,
+  listSearchConsoleTopQueries,
   getFreshAccessToken,
   runGoogleWebsiteSync,
   isGoogleWebsiteConfigured,
@@ -2410,6 +2411,38 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       ga4Pages,
       gscPages,
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/google-website/keywords?since=&until= — live Search Console
+// query-level performance for the "Từ khoá tiềm năng SEO" card (Website
+// Report redesign mục C). Fetched fresh on every call, same as the
+// Admin-only pages-preview route, but open to any logged-in role since this
+// is a report feature, not a setup/discovery tool. Same shape/visibility
+// convention as GET /api/google-website/insights: returns every account's
+// rows tagged with account_id, brand-scoping happens client-side — the
+// striking-distance position range/impressions threshold is also filtered
+// client-side so the UI can adjust it without a re-fetch.
+app.get("/api/google-website/keywords", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getGoogleWebsiteAccounts();
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 33 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const accountsWithSite = allAccounts.filter((a) => a.is_active && a.gsc_site_url);
+    const perAccountRows = await Promise.all(
+      accountsWithSite.map(async (account) => {
+        const accessToken = await getFreshAccessToken(account);
+        const rows = await listSearchConsoleTopQueries(accessToken, account.gsc_site_url!, since, until, 1000);
+        return rows.map((r) => ({ account_id: account.id, ...r }));
+      })
+    );
+
+    res.json({ success: true, since, until, keywords: perAccountRows.flat() });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -404,6 +404,37 @@ export async function listSearchConsoleTopPages(
   }));
 }
 
+// Raw per-query Search Console performance, fetched live and never stored —
+// same "reuse the pages-preview pattern" shape as listSearchConsoleTopPages,
+// this time with dimension "query" for the "Từ khoá tiềm năng SEO"
+// (striking-distance keywords) card (Website Report redesign mục C). No
+// daily sync table: query-level data changes fast and this card's threshold
+// filter is meant to be adjusted live on the UI, not pre-aggregated.
+export async function listSearchConsoleTopQueries(
+  accessToken: string,
+  siteUrl: string,
+  since: string,
+  until: string,
+  rowLimit = 1000
+): Promise<{ query: string; clicks: number; impressions: number; ctr: number; position: number }[]> {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ startDate: since, endDate: until, dimensions: ["query"], rowLimit }),
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query trả về lỗi HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row: any) => ({
+    query: row.keys?.[0],
+    clicks: row.clicks ?? 0,
+    impressions: row.impressions ?? 0,
+    ctr: row.ctr ?? 0,
+    position: row.position ?? 0,
+  }));
+}
+
 export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]> {
   if (!isGoogleWebsiteConfigured) {
     throw new Error("GOOGLE_WEBSITE_REDIRECT_URI (hoặc YOUTUBE_CLIENT_ID/SECRET) chưa được cấu hình đầy đủ.");
