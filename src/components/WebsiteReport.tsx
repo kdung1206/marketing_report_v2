@@ -4,6 +4,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -11,7 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Globe, Search, Users, MousePointerClick, Eye, TrendingUp, RefreshCw, AlertCircle } from "lucide-react";
+import { Globe, Search, Users, MousePointerClick, Eye, TrendingUp, RefreshCw, AlertCircle, Sparkles, Target } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 // Local mirrors of the server row shapes (see src/server/googleWebsiteStore.ts)
@@ -46,6 +48,32 @@ interface SearchConsoleInsightsDailyRow {
   position: number | null;
 }
 
+interface Ga4ChannelSessionsDailyRow {
+  account_id: string;
+  date: string;
+  channel: string;
+  sessions: number | null;
+}
+
+// Named groups the "Tổng hợp" tab's channel chart/table show individually —
+// everything else GA4 reports (Paid Social, Display, Email, Affiliates,
+// (not set)...) is bucketed into "Khác" (decision from Website Report
+// redesign mục A: keep the chart readable rather than one line per GA4
+// channel, most of which carry near-zero sessions for these two sites).
+const NAMED_CHANNELS = ["Organic Search", "Paid Search", "Direct", "Organic Social", "Referral"] as const;
+const CHANNEL_ORDER = [...NAMED_CHANNELS, "Khác"] as const;
+const CHANNEL_COLORS: Record<string, string> = {
+  "Organic Search": "#6366f1",
+  "Paid Search": "#f59e0b",
+  Direct: "#10b981",
+  "Organic Social": "#ec4899",
+  Referral: "#0ea5e9",
+  Khác: "#94a3b8",
+};
+function bucketChannel(raw: string): string {
+  return (NAMED_CHANNELS as readonly string[]).includes(raw) ? raw : "Khác";
+}
+
 const n = (v: number | null | undefined) => v || 0;
 const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(Math.round(v));
 const fmtCompact = (v: number) => new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(v);
@@ -77,6 +105,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const [accounts, setAccounts] = useState<GoogleWebsiteAccountMeta[]>([]);
   const [ga4Daily, setGa4Daily] = useState<Ga4InsightsDailyRow[]>([]);
   const [gscDaily, setGscDaily] = useState<SearchConsoleInsightsDailyRow[]>([]);
+  const [ga4ChannelDaily, setGa4ChannelDaily] = useState<Ga4ChannelSessionsDailyRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +125,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
           setAccounts(result.accounts || []);
           setGa4Daily(result.ga4Daily || []);
           setGscDaily(result.gscDaily || []);
+          setGa4ChannelDaily(result.ga4ChannelDaily || []);
         } else {
           setError(result.error || "Không tải được dữ liệu Website Report.");
         }
@@ -112,6 +142,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
 
   const ga4Scoped = useMemo(() => ga4Daily.filter((r) => accountIds.includes(r.account_id)), [ga4Daily, accountIds]);
   const gscScoped = useMemo(() => gscDaily.filter((r) => accountIds.includes(r.account_id)), [gscDaily, accountIds]);
+  const channelScoped = useMemo(() => ga4ChannelDaily.filter((r) => accountIds.includes(r.account_id)), [ga4ChannelDaily, accountIds]);
 
   const ga4ByDate = useMemo(() => {
     const byDate = new Map<string, { date: string; sessions: number; active_users: number; new_users: number; engaged_sessions: number }>();
@@ -142,13 +173,75 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
       .sort((a, b) => (a.date < b.date ? -1 : 1));
   }, [gscScoped]);
 
+  // Per-channel sessions over time, one column per named group + "Khác" — for
+  // the "Sessions theo kênh" stacked chart. Channel totals (below) reuse the
+  // same rows so the chart and the "Nguồn traffic" table never disagree.
+  const channelByDate = useMemo(() => {
+    const byDate = new Map<string, Record<string, any>>();
+    channelScoped.forEach((r) => {
+      const bucket = bucketChannel(r.channel);
+      const entry = byDate.get(r.date) || Object.fromEntries([["date", r.date], ...CHANNEL_ORDER.map((c) => [c, 0])]);
+      entry[bucket] += n(r.sessions);
+      byDate.set(r.date, entry);
+    });
+    return Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
+  }, [channelScoped]);
+
+  const channelTotals = useMemo(() => {
+    const totals = new Map<string, number>(CHANNEL_ORDER.map((c) => [c, 0]));
+    channelScoped.forEach((r) => {
+      const bucket = bucketChannel(r.channel);
+      totals.set(bucket, (totals.get(bucket) || 0) + n(r.sessions));
+    });
+    const grandTotal = Array.from(totals.values()).reduce((s, v) => s + v, 0);
+    return CHANNEL_ORDER.map((channel) => {
+      const sessions = totals.get(channel) || 0;
+      return { channel, sessions, share: grandTotal ? sessions / grandTotal : 0 };
+    });
+  }, [channelScoped]);
+
   const sessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.sessions), 0);
+  const organicSessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.organic_sessions), 0);
   const activeUsersTotal = ga4Scoped.reduce((s, r) => s + n(r.active_users), 0);
   const newUsersTotal = ga4Scoped.reduce((s, r) => s + n(r.new_users), 0);
   const clicksTotal = gscScoped.reduce((s, r) => s + n(r.clicks), 0);
   const impressionsTotal = gscScoped.reduce((s, r) => s + n(r.impressions), 0);
   const avgCtr = gscScoped.length ? gscScoped.reduce((s, r) => s + n(r.ctr), 0) / gscScoped.length : 0;
   const avgPosition = gscScoped.length ? gscScoped.reduce((s, r) => s + n(r.position), 0) / gscScoped.length : 0;
+
+  // "Nhận định nhanh" narrative — a handful of sentences derived purely from
+  // data already on screen (no extra fetch): trend = average of the second
+  // half of the selected window vs the first half, for the two headline
+  // series (Sessions, Clicks). Split-in-half is a coarse trend read, good
+  // enough for a one-line callout — this isn't a forecasting feature.
+  const narrative = useMemo(() => {
+    const trendOf = (series: { value: number }[]) => {
+      if (series.length < 4) return null;
+      const mid = Math.floor(series.length / 2);
+      const firstAvg = series.slice(0, mid).reduce((s, r) => s + r.value, 0) / mid;
+      const secondAvg = series.slice(mid).reduce((s, r) => s + r.value, 0) / (series.length - mid);
+      if (firstAvg === 0) return null;
+      return ((secondAvg - firstAvg) / firstAvg) * 100;
+    };
+    const sessionsTrend = trendOf(ga4ByDate.map((r) => ({ value: r.sessions })));
+    const clicksTrend = trendOf(gscByDate.map((r) => ({ value: r.clicks })));
+    const organicShare = sessionsTotal ? (organicSessionsTotal / sessionsTotal) * 100 : 0;
+    const topChannel = channelTotals.filter((c) => c.channel !== "Khác").sort((a, b) => b.sessions - a.sessions)[0];
+
+    const describeTrend = (pct: number | null) => {
+      if (pct === null) return "chưa đủ dữ liệu để so sánh xu hướng";
+      if (Math.abs(pct) < 3) return "gần như đi ngang so với nửa đầu kỳ";
+      return `${pct > 0 ? "tăng" : "giảm"} khoảng ${Math.abs(pct).toFixed(0)}% so với nửa đầu kỳ`;
+    };
+
+    const sentences: string[] = [];
+    sentences.push(`Sessions ${describeTrend(sessionsTrend)}, đạt ${fmt(sessionsTotal)} sessions trong kỳ chọn, trong đó ${organicShare.toFixed(0)}% đến từ Organic Search.`);
+    if (topChannel && topChannel.sessions > 0) {
+      sentences.push(`Kênh mang lại nhiều session nhất là ${topChannel.channel} (${(topChannel.share * 100).toFixed(0)}% tổng sessions).`);
+    }
+    sentences.push(`Search Console: ${fmt(clicksTotal)} clicks (${describeTrend(clicksTrend)}), CTR trung bình ${fmtPercent(avgCtr)}, vị trí trung bình ${avgPosition.toFixed(1)}${avgPosition > 20 ? " — còn khá xa trang 1, cần cải thiện SEO on-page/nội dung" : avgPosition > 10 ? " — gần trang 1, còn dư địa cải thiện" : " — đã ở nhóm đầu kết quả tìm kiếm"}.`);
+    return sentences;
+  }, [ga4ByDate, gscByDate, sessionsTotal, organicSessionsTotal, clicksTotal, avgCtr, avgPosition, channelTotals]);
 
   const sections: { id: "overview" | "ga4" | "search-console"; label: string }[] = [
     { id: "overview", label: "Tổng hợp" },
@@ -223,26 +316,78 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
         <>
           {activeSection === "overview" && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <PlatformStat icon={Users} label="Sessions (GA4)" value={fmtCompact(sessionsTotal)} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
-                <PlatformStat icon={TrendingUp} label="Active Users (GA4)" value={fmtCompact(activeUsersTotal)} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
-                <PlatformStat icon={MousePointerClick} label="Clicks (Search Console)" value={fmtCompact(clicksTotal)} color="text-sky-600 bg-sky-50 border-sky-200" />
-                <PlatformStat icon={Eye} label="Impressions (Search Console)" value={fmtCompact(impressionsTotal)} color="text-sky-600 bg-sky-50 border-sky-200" />
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                <PlatformStat icon={Users} label="Sessions" value={fmtCompact(sessionsTotal)} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
+                <PlatformStat icon={TrendingUp} label="Organic Sessions" value={fmtCompact(organicSessionsTotal)} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
+                <PlatformStat icon={Eye} label="GSC Impressions" value={fmtCompact(impressionsTotal)} color="text-sky-600 bg-sky-50 border-sky-200" />
+                <PlatformStat icon={MousePointerClick} label="GSC Clicks" value={fmtCompact(clicksTotal)} color="text-sky-600 bg-sky-50 border-sky-200" />
+                <PlatformStat icon={Search} label="CTR" value={fmtPercent(avgCtr)} color="text-sky-600 bg-sky-50 border-sky-200" />
+                <PlatformStat icon={Target} label="Avg Position" value={avgPosition.toFixed(1)} color="text-sky-600 bg-sky-50 border-sky-200" />
+              </div>
+
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                <div className="flex items-center gap-1.5 pb-2 text-xs font-bold uppercase tracking-wide text-indigo-500">
+                  <Sparkles className="h-3.5 w-3.5" /> Nhận định nhanh
+                </div>
+                <ul className="space-y-1.5">
+                  {narrative.map((sentence, i) => (
+                    <li key={i} className="text-xs leading-relaxed text-slate-700">
+                      {sentence}
+                    </li>
+                  ))}
+                </ul>
               </div>
 
               <div className="h-80 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Sessions (GA4) vs Clicks (Search Console) theo ngày</span>
+                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Sessions theo kênh</span>
                 <ResponsiveContainer width="100%" height="85%">
-                  <LineChart data={mergeByDate(ga4ByDate, gscByDate)}>
+                  <AreaChart data={channelByDate}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tickFormatter={fmtCompact} domain={["auto", "auto"]} />
+                    <YAxis tickFormatter={fmtCompact} />
                     <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
                     <Legend />
-                    <Line type="monotone" dataKey="sessions" name="Sessions (GA4)" stroke="#6366f1" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="clicks" name="Clicks (Search Console)" stroke="#0ea5e9" strokeWidth={2} dot={false} />
-                  </LineChart>
+                    {CHANNEL_ORDER.map((channel) => (
+                      <Area
+                        key={channel}
+                        type="monotone"
+                        dataKey={channel}
+                        name={channel}
+                        stackId="channel"
+                        stroke={CHANNEL_COLORS[channel]}
+                        fill={CHANNEL_COLORS[channel]}
+                        fillOpacity={0.7}
+                      />
+                    ))}
+                  </AreaChart>
                 </ResponsiveContainer>
+              </div>
+
+              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Nguồn traffic</span>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-slate-400">
+                      <th className="pb-2 font-medium">Kênh</th>
+                      <th className="pb-2 font-medium text-right">Sessions</th>
+                      <th className="pb-2 font-medium text-right">% tổng</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {channelTotals.map((row) => (
+                      <tr key={row.channel} className="border-b border-slate-50 last:border-0">
+                        <td className="py-2">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_COLORS[row.channel] }} />
+                            {row.channel}
+                          </span>
+                        </td>
+                        <td className="py-2 text-right font-mono">{fmt(row.sessions)}</td>
+                        <td className="py-2 text-right font-mono">{fmtPercent(row.share)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -324,24 +469,6 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
       )}
     </div>
   );
-}
-
-function mergeByDate(
-  ga4: { date: string; sessions: number }[],
-  gsc: { date: string; clicks: number }[]
-): { date: string; sessions: number; clicks: number }[] {
-  const byDate = new Map<string, { date: string; sessions: number; clicks: number }>();
-  ga4.forEach((r) => {
-    const entry = byDate.get(r.date) || { date: r.date, sessions: 0, clicks: 0 };
-    entry.sessions = r.sessions;
-    byDate.set(r.date, entry);
-  });
-  gsc.forEach((r) => {
-    const entry = byDate.get(r.date) || { date: r.date, sessions: 0, clicks: 0 };
-    entry.clicks = r.clicks;
-    byDate.set(r.date, entry);
-  });
-  return Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
 function PlatformStat({ icon: Icon, label, value, color }: { icon: typeof Globe; label: string; value: string; color: string }) {

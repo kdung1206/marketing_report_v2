@@ -17,11 +17,13 @@ import {
   getGoogleWebsiteAccounts,
   upsertGa4InsightsDaily,
   upsertSearchConsoleInsightsDaily,
+  upsertGa4ChannelSessionsDaily,
   patchGoogleWebsiteAccount,
   GoogleWebsiteAccountConfig,
   GoogleWebsiteAvailableProperty,
   Ga4InsightsDailyRow,
   SearchConsoleInsightsDailyRow,
+  Ga4ChannelSessionsDailyRow,
 } from "./googleWebsiteStore";
 
 const GA4_ADMIN_API_BASE = "https://analyticsadmin.googleapis.com/v1beta";
@@ -264,6 +266,28 @@ async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, sin
   }) as any;
 }
 
+// Sessions by GA4 default channel group, one row per date per channel — for
+// the Website Report "Tổng hợp" tab's channel chart/traffic-source table
+// (Website Report redesign, mục A). A third, separate report call rather
+// than folding this into fetchGa4DailyMetrics's total-sessions report: adding
+// `sessionDefaultChannelGroup` as an output dimension there would return one
+// row per date *per channel*, which doesn't line up with that report's
+// per-date-only shape (and its other metrics are averages that can't be
+// re-derived from a per-channel split) — see that function's own comment for
+// the identical reasoning already applied once for organic-only sessions.
+async function fetchGa4ChannelSessionsDaily(accessToken: string, propertyId: string, since: string, until: string): Promise<Omit<Ga4ChannelSessionsDailyRow, "account_id">[]> {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "date" }, { name: "sessionDefaultChannelGroup" }],
+    metrics: [{ name: "sessions" }],
+  });
+  return rows.map((row: any) => ({
+    date: formatGa4Date(row.dimensionValues?.[0]?.value || ""),
+    channel: row.dimensionValues?.[1]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0,
+  }));
+}
+
 // Search Console's data has a ~2-3 day processing lag — querying "today"
 // always comes back empty/incomplete, unlike every other platform in this
 // codebase. Callers should bias `until` a few days into the past.
@@ -297,6 +321,7 @@ export interface GoogleWebsiteSyncResult {
   ok: boolean;
   ga4_rows_synced?: number;
   gsc_rows_synced?: number;
+  ga4_channel_rows_synced?: number;
   error?: string;
 }
 
@@ -375,11 +400,17 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
       });
 
       let ga4RowsSynced = 0;
+      let ga4ChannelRowsSynced = 0;
       if (account.ga4_property_id) {
         const ga4Rows = await fetchGa4DailyMetrics(accessToken, account.ga4_property_id, since, until);
         const rows: Ga4InsightsDailyRow[] = ga4Rows.map((r: any) => ({ account_id: account.id, ...r }));
         await upsertGa4InsightsDaily(rows);
         ga4RowsSynced = rows.length;
+
+        const channelRows = await fetchGa4ChannelSessionsDaily(accessToken, account.ga4_property_id, since, until);
+        const channelRowsWithAccount: Ga4ChannelSessionsDailyRow[] = channelRows.map((r) => ({ account_id: account.id, ...r }));
+        await upsertGa4ChannelSessionsDaily(channelRowsWithAccount);
+        ga4ChannelRowsSynced = channelRowsWithAccount.length;
       }
 
       let gscRowsSynced = 0;
@@ -395,7 +426,7 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
         last_sync_error: null,
         token_expired: false,
       });
-      results.push({ account_id: account.id, brand: account.brand, ok: true, ga4_rows_synced: ga4RowsSynced, gsc_rows_synced: gscRowsSynced });
+      results.push({ account_id: account.id, brand: account.brand, ok: true, ga4_rows_synced: ga4RowsSynced, gsc_rows_synced: gscRowsSynced, ga4_channel_rows_synced: ga4ChannelRowsSynced });
     } catch (err: any) {
       const message = err?.message || String(err);
       console.error(`Đồng bộ Website (GA4/Search Console) thất bại cho ${account.id}:`, message);

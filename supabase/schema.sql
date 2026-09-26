@@ -550,6 +550,25 @@ create table if not exists search_console_insights_daily (
 
 alter table search_console_insights_daily enable row level security;
 
+-- Sessions by GA4 default channel group (Organic Search/Paid Search/Direct/
+-- Organic Social/Referral/...), per account per day — powers the Website
+-- Report "Tổng hợp" tab's channel chart + traffic-source table (Website
+-- Report redesign, mục A). Deliberately a separate table from
+-- ga4_insights_daily rather than an extra dimension on it: that table's
+-- `sessions` row is one row per date already, and adding a channel dimension
+-- there would multiply rows per date, breaking its primary key and every
+-- existing query against it (see fetchGa4DailyMetrics's comment in
+-- googleWebsiteSync.ts for the same reasoning applied to organic_sessions).
+create table if not exists ga4_channel_sessions_daily (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  date date not null,
+  channel text not null,
+  sessions int,
+  primary key (account_id, date, channel)
+);
+
+alter table ga4_channel_sessions_daily enable row level security;
+
 -- ---------------------------------------------------------------------------
 -- Campaign Calendar & Campaign Task module (src/server/campaignStore.ts,
 -- src/components/CampaignManagement.tsx). Phase 1 (MVP) only — Activities

@@ -93,6 +93,7 @@ import {
   deleteGoogleWebsiteAccount,
   getGa4InsightsDaily,
   getSearchConsoleInsightsDaily,
+  getGa4ChannelSessionsDaily,
 } from "./googleWebsiteStore";
 import {
   exchangeGoogleWebsiteCode,
@@ -2380,9 +2381,10 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       ? req.query.since
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const [ga4Daily, gscDaily] = await Promise.all([
+    const [ga4Daily, gscDaily, ga4ChannelDaily] = await Promise.all([
       getGa4InsightsDaily(requestedIds, since, until),
       getSearchConsoleInsightsDaily(requestedIds, since, until),
+      getGa4ChannelSessionsDaily(requestedIds, since, until),
     ]);
 
     res.json({
@@ -2396,6 +2398,7 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       })),
       ga4Daily,
       gscDaily,
+      ga4ChannelDaily,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

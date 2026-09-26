@@ -67,6 +67,18 @@ export interface SearchConsoleInsightsDailyRow {
   position: number | null;
 }
 
+// Sessions broken down by GA4's `sessionDefaultChannelGroup` (raw channel
+// names as GA4 reports them — "Organic Search", "Paid Search", "Direct",
+// "Organic Social", "Referral", "Paid Social", "Display", ... — bucketing the
+// long tail into "Khác" is a display-time concern, done in WebsiteReport.tsx,
+// not here, so this table stays a faithful record of what GA4 actually said).
+export interface Ga4ChannelSessionsDailyRow {
+  account_id: string;
+  date: string; // YYYY-MM-DD
+  channel: string;
+  sessions: number | null;
+}
+
 // -- Local (src/db_store.json) helpers ---------------------------------------
 
 async function readLocalCollections(): Promise<{
@@ -74,6 +86,7 @@ async function readLocalCollections(): Promise<{
   google_website_accounts: GoogleWebsiteAccountConfig[];
   ga4_insights_daily: Ga4InsightsDailyRow[];
   search_console_insights_daily: SearchConsoleInsightsDailyRow[];
+  ga4_channel_sessions_daily: Ga4ChannelSessionsDailyRow[];
 }> {
   const store = await getDatabaseData();
   return {
@@ -81,6 +94,7 @@ async function readLocalCollections(): Promise<{
     google_website_accounts: Array.isArray(store.google_website_accounts) ? store.google_website_accounts : [],
     ga4_insights_daily: Array.isArray(store.ga4_insights_daily) ? store.ga4_insights_daily : [],
     search_console_insights_daily: Array.isArray(store.search_console_insights_daily) ? store.search_console_insights_daily : [],
+    ga4_channel_sessions_daily: Array.isArray(store.ga4_channel_sessions_daily) ? store.ga4_channel_sessions_daily : [],
   };
 }
 
@@ -90,6 +104,7 @@ async function writeLocalCollections(
     google_website_accounts: GoogleWebsiteAccountConfig[];
     ga4_insights_daily: Ga4InsightsDailyRow[];
     search_console_insights_daily: SearchConsoleInsightsDailyRow[];
+    ga4_channel_sessions_daily: Ga4ChannelSessionsDailyRow[];
   }>
 ): Promise<void> {
   await saveDatabaseData({ ...store, ...updates });
@@ -139,11 +154,12 @@ export async function patchGoogleWebsiteAccount(id: string, patch: Partial<Googl
 
 export async function deleteGoogleWebsiteAccount(id: string): Promise<void> {
   if (!isSupabaseConfigured) {
-    const { store, google_website_accounts, ga4_insights_daily, search_console_insights_daily } = await readLocalCollections();
+    const { store, google_website_accounts, ga4_insights_daily, search_console_insights_daily, ga4_channel_sessions_daily } = await readLocalCollections();
     await writeLocalCollections(store, {
       google_website_accounts: google_website_accounts.filter((a) => a.id !== id),
       ga4_insights_daily: ga4_insights_daily.filter((r) => r.account_id !== id),
       search_console_insights_daily: search_console_insights_daily.filter((r) => r.account_id !== id),
+      ga4_channel_sessions_daily: ga4_channel_sessions_daily.filter((r) => r.account_id !== id),
     });
     return;
   }
@@ -220,5 +236,40 @@ export async function getSearchConsoleInsightsDaily(accountIds: string[], since:
     .lte("date", until)
     .order("date", { ascending: true });
   if (error) throw new Error(`Lỗi đọc số liệu Search Console: ${error.message}`);
+  return data || [];
+}
+
+// -- GA4 channel (sessionDefaultChannelGroup) daily sessions ------------------
+
+export async function upsertGa4ChannelSessionsDaily(rows: Ga4ChannelSessionsDailyRow[]): Promise<void> {
+  if (rows.length === 0) return;
+
+  if (!isSupabaseConfigured) {
+    const { store, ga4_channel_sessions_daily } = await readLocalCollections();
+    const key = (r: { account_id: string; date: string; channel: string }) => `${r.account_id}|${r.date}|${r.channel}`;
+    const byKey = new Map(ga4_channel_sessions_daily.map((r) => [key(r), r]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections(store, { ga4_channel_sessions_daily: Array.from(byKey.values()) });
+    return;
+  }
+
+  const { error } = await supabase.from("ga4_channel_sessions_daily").upsert(rows, { onConflict: "account_id,date,channel" });
+  if (error) throw new Error(`Lỗi lưu số liệu GA4 theo kênh: ${error.message}`);
+}
+
+export async function getGa4ChannelSessionsDaily(accountIds: string[], since: string, until: string): Promise<Ga4ChannelSessionsDailyRow[]> {
+  if (!isSupabaseConfigured) {
+    const { ga4_channel_sessions_daily } = await readLocalCollections();
+    return ga4_channel_sessions_daily.filter((r) => accountIds.includes(r.account_id) && r.date >= since && r.date <= until);
+  }
+
+  const { data, error } = await supabase
+    .from("ga4_channel_sessions_daily")
+    .select("*")
+    .in("account_id", accountIds)
+    .gte("date", since)
+    .lte("date", until)
+    .order("date", { ascending: true });
+  if (error) throw new Error(`Lỗi đọc số liệu GA4 theo kênh: ${error.message}`);
   return data || [];
 }
