@@ -50,6 +50,8 @@ export default function GoogleWebsiteAccountsAdmin() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [configured, setConfigured] = useState(true);
   const [pendingChoice, setPendingChoice] = useState<Record<string, { ga4_property_id: string; gsc_site_url: string }>>({});
+  const [pagesPreview, setPagesPreview] = useState<{ accountId: string; site: string; since: string; until: string; pages: { page: string; clicks: number; impressions: number; ctr: number; position: number }[] } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   async function loadAccounts() {
     setIsLoading(true);
@@ -132,6 +134,24 @@ export default function GoogleWebsiteAccountsAdmin() {
       else setMessage({ type: "error", text: result.error || "Gán thương hiệu thất bại." });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Gán thương hiệu thất bại." });
+    }
+  }
+
+  async function handlePreviewPages(id: string) {
+    setIsLoadingPreview(true);
+    setPagesPreview(null);
+    setMessage(null);
+    try {
+      const result = await safeFetchJson(`/api/google-website/accounts/${encodeURIComponent(id)}/pages-preview`);
+      if (result.success) {
+        setPagesPreview({ accountId: id, site: result.site, since: result.since, until: result.until, pages: result.pages || [] });
+      } else {
+        setMessage({ type: "error", text: result.error || "Không lấy được danh sách URL." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Không lấy được danh sách URL." });
+    } finally {
+      setIsLoadingPreview(false);
     }
   }
 
@@ -311,9 +331,20 @@ export default function GoogleWebsiteAccountsAdmin() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    <button onClick={() => handleDelete(a.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-rose-600 hover:bg-rose-50">
-                      <Trash2 className="h-3 w-3" /> Xóa
-                    </button>
+                    <div className="flex justify-end gap-1.5">
+                      {a.is_active && a.gsc_site_url && (
+                        <button
+                          onClick={() => handlePreviewPages(a.id)}
+                          disabled={isLoadingPreview}
+                          className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-2 py-1 text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                        >
+                          🔍 Xem URL thật
+                        </button>
+                      )}
+                      <button onClick={() => handleDelete(a.id)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-rose-600 hover:bg-rose-50">
+                        <Trash2 className="h-3 w-3" /> Xóa
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -321,6 +352,51 @@ export default function GoogleWebsiteAccountsAdmin() {
           </tbody>
         </table>
       </div>
+
+      {isLoadingPreview && (
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Đang lấy danh sách URL thật từ Search Console...
+        </div>
+      )}
+
+      {pagesPreview && (
+        <div className="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50/40 p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-700">
+              {pagesPreview.pages.length} URL thật của {pagesPreview.site} ({pagesPreview.since} → {pagesPreview.until}) — dùng để bạn duyệt quy tắc nhóm "loại trang" trước khi tôi code phân loại, chưa lưu vào đâu.
+            </p>
+            <button onClick={() => setPagesPreview(null)} className="text-xs font-semibold text-slate-500 hover:text-slate-700">Đóng</button>
+          </div>
+          <div className="max-h-80 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-3 py-1.5 text-left">URL</th>
+                  <th className="px-3 py-1.5 text-right">Clicks</th>
+                  <th className="px-3 py-1.5 text-right">Impressions</th>
+                  <th className="px-3 py-1.5 text-right">CTR</th>
+                  <th className="px-3 py-1.5 text-right">Position</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pagesPreview.pages.length === 0 ? (
+                  <tr><td colSpan={5} className="px-3 py-4 text-center text-slate-400">Chưa có dữ liệu URL nào trong khoảng thời gian này.</td></tr>
+                ) : (
+                  pagesPreview.pages.map((p) => (
+                    <tr key={p.page}>
+                      <td className="max-w-md truncate px-3 py-1.5 text-slate-600" title={p.page}>{p.page}</td>
+                      <td className="px-3 py-1.5 text-right">{p.clicks}</td>
+                      <td className="px-3 py-1.5 text-right">{p.impressions}</td>
+                      <td className="px-3 py-1.5 text-right">{(p.ctr * 100).toFixed(2)}%</td>
+                      <td className="px-3 py-1.5 text-right">{p.position.toFixed(1)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <button

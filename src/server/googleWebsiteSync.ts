@@ -18,6 +18,7 @@ import {
   upsertGa4InsightsDaily,
   upsertSearchConsoleInsightsDaily,
   patchGoogleWebsiteAccount,
+  GoogleWebsiteAccountConfig,
   GoogleWebsiteAvailableProperty,
   Ga4InsightsDailyRow,
   SearchConsoleInsightsDailyRow,
@@ -299,6 +300,59 @@ export interface GoogleWebsiteSyncResult {
   error?: string;
 }
 
+// Shared by runGoogleWebsiteSync and the on-demand page-discovery endpoint —
+// decrypts the stored access token, transparently refreshing (and
+// persisting the new one) if it's within 5 minutes of expiring. Throws the
+// raw error on refresh failure so callers can still check
+// isRefreshTokenInvalidError themselves.
+export async function getFreshAccessToken(account: GoogleWebsiteAccountConfig): Promise<string> {
+  let accessToken = decrypt(account.access_token_encrypted);
+  if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
+
+  const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
+  if (Date.now() > accessExpiresAt - 5 * 60 * 1000) {
+    const refreshToken = decrypt(account.refresh_token_encrypted);
+    const refreshed = await refreshGoogleWebsiteToken(refreshToken);
+    accessToken = refreshed.access_token;
+    await patchGoogleWebsiteAccount(account.id, {
+      access_token_encrypted: encrypt(refreshed.access_token),
+      access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
+    });
+  }
+  return accessToken;
+}
+
+// Raw per-URL Search Console performance, unfiltered/uncategorized — used by
+// the Control Panel's "Xem trước URL" discovery button so an admin can see
+// what real URL patterns this site actually has before any page-type
+// grouping rule gets hardcoded (see WebsiteReport.tsx's planned "Organic
+// pages"/"Top pages" cards). Not part of the daily sync — fetched live,
+// nothing is stored.
+export async function listSearchConsoleTopPages(
+  accessToken: string,
+  siteUrl: string,
+  since: string,
+  until: string,
+  rowLimit = 250
+): Promise<{ page: string; clicks: number; impressions: number; ctr: number; position: number }[]> {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ startDate: since, endDate: until, dimensions: ["page"], rowLimit }),
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query trả về lỗi HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row: any) => ({
+    page: row.keys?.[0],
+    clicks: row.clicks ?? 0,
+    impressions: row.impressions ?? 0,
+    ctr: row.ctr ?? 0,
+    position: row.position ?? 0,
+  }));
+}
+
 export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]> {
   if (!isGoogleWebsiteConfigured) {
     throw new Error("GOOGLE_WEBSITE_REDIRECT_URI (hoặc YOUTUBE_CLIENT_ID/SECRET) chưa được cấu hình đầy đủ.");
@@ -315,24 +369,10 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
   for (const account of accounts) {
     let refreshTokenInvalid = false;
     try {
-      let accessToken = decrypt(account.access_token_encrypted);
-      if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
-
-      const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
-      if (Date.now() > accessExpiresAt - 5 * 60 * 1000) {
-        const refreshToken = decrypt(account.refresh_token_encrypted);
-        try {
-          const refreshed = await refreshGoogleWebsiteToken(refreshToken);
-          accessToken = refreshed.access_token;
-          await patchGoogleWebsiteAccount(account.id, {
-            access_token_encrypted: encrypt(refreshed.access_token),
-            access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000).toISOString(),
-          });
-        } catch (err: any) {
-          if (isRefreshTokenInvalidError(err)) refreshTokenInvalid = true;
-          throw err;
-        }
-      }
+      const accessToken = await getFreshAccessToken(account).catch((err) => {
+        if (isRefreshTokenInvalidError(err)) refreshTokenInvalid = true;
+        throw err;
+      });
 
       let ga4RowsSynced = 0;
       if (account.ga4_property_id) {

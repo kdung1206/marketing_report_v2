@@ -100,6 +100,8 @@ import {
   detectBrandFromName,
   listGa4Properties,
   listSearchConsoleSites,
+  listSearchConsoleTopPages,
+  getFreshAccessToken,
   runGoogleWebsiteSync,
   isGoogleWebsiteConfigured,
   GOOGLE_WEBSITE_AUTHORIZE_URL,
@@ -2314,6 +2316,28 @@ app.patch("/api/google-website/accounts/:id/brand", requireAuth("Admin"), async 
     await patchGoogleWebsiteAccount(account.id, { brand });
     await logAction((req as any).session, req, "set-google-website-brand", `Gán brand "${brand}" cho kết nối Website ${account.google_account_email || account.id}`);
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/google-website/accounts/:id/pages-preview — raw, uncategorized
+// per-URL Search Console performance (last 30 days), fetched live and never
+// stored. Lets an admin see this site's real URL patterns before any
+// page-type grouping rule ("Top pages"/"Organic pages" cards) gets built —
+// approve the categories first, don't guess them.
+app.get("/api/google-website/accounts/:id/pages-preview", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getGoogleWebsiteAccounts();
+    const account = accounts.find((a) => a.id === req.params.id);
+    if (!account) return res.status(404).json({ success: false, error: "Không tìm thấy kết nối." });
+    if (!account.gsc_site_url) return res.status(400).json({ success: false, error: "Kết nối này chưa có Search Console site." });
+
+    const accessToken = await getFreshAccessToken(account);
+    const until = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const since = new Date(Date.now() - 33 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const pages = await listSearchConsoleTopPages(accessToken, account.gsc_site_url, since, until, 250);
+    res.json({ success: true, site: account.gsc_site_url, since, until, pages });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
