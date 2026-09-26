@@ -115,6 +115,24 @@ async function refreshGoogleWebsiteToken(refreshToken: string): Promise<TokenRes
   });
 }
 
+// Auto-detects which brand a GA4 property / Search Console site belongs to,
+// so the admin never has to pick a brand before connecting — Google account
+// email, GA4 property name, and Search Console site URL (a domain) all
+// consistently contain "Livotec"/"Karofi" across every other integration in
+// this app (fb_pages, tiktok_accounts, youtube_accounts all follow the same
+// naming convention), so a simple case-insensitive substring match is
+// reliable in practice. Returns null when neither/both match — callers must
+// leave brand unset (not guess) so a wrongly-assigned account never silently
+// shows up under the wrong brand's Website Report tab.
+export function detectBrandFromName(...names: (string | null | undefined)[]): "Livotec" | "Karofi" | null {
+  const haystack = names.filter(Boolean).join(" ").toLowerCase();
+  const hasLivotec = haystack.includes("livotec");
+  const hasKarofi = haystack.includes("karofi");
+  if (hasLivotec && !hasKarofi) return "Livotec";
+  if (hasKarofi && !hasLivotec) return "Karofi";
+  return null;
+}
+
 // Minimal decode of the id_token's payload (no signature verification needed
 // — it came directly from Google's own token endpoint over HTTPS, not from
 // an untrusted client) just to read `sub`/`email` for a stable account id.

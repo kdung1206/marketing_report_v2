@@ -97,6 +97,7 @@ import {
 import {
   exchangeGoogleWebsiteCode,
   decodeIdToken,
+  detectBrandFromName,
   listGa4Properties,
   listSearchConsoleSites,
   runGoogleWebsiteSync,
@@ -2136,8 +2137,11 @@ app.get("/api/google-website/oauth/start", requireAuth("Admin"), (req, res) => {
       error: "GOOGLE_WEBSITE_REDIRECT_URI (hoặc YOUTUBE_CLIENT_ID/SECRET) chưa được cấu hình đầy đủ.",
     });
   }
-  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const state = signOAuthState({ brand, username: (req as any).session.username });
+  // No brand is collected here anymore — it's auto-detected from the GA4
+  // property name / Search Console site domain once we actually know them
+  // (see the callback below and POST .../complete), so the admin can just
+  // connect without picking a brand up front.
+  const state = signOAuthState({ username: (req as any).session.username });
   const params = new URLSearchParams({
     client_id: YOUTUBE_CLIENT_ID,
     redirect_uri: GOOGLE_WEBSITE_REDIRECT_URI,
@@ -2161,7 +2165,7 @@ app.get("/api/google-website/oauth/callback", async (req, res) => {
   if (oauthError) {
     return res.status(400).send(`Kết nối Website (GA4/Search Console) bị hủy hoặc lỗi: ${oauthError}`);
   }
-  const payload = verifyOAuthState<{ brand: string | null; username: string }>(state);
+  const payload = verifyOAuthState<{ username: string }>(state);
   if (!payload || typeof code !== "string") {
     return res.status(400).send("Liên kết xác thực Google không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
   }
@@ -2181,11 +2185,16 @@ app.get("/api/google-website/oauth/callback", async (req, res) => {
       listSearchConsoleSites(tokens.access_token),
     ]);
     const needsSelection = properties.length !== 1 || sites.length !== 1;
+    // Auto-detected from the GA4 property name + Search Console site domain
+    // (email included too, in case a brand-specific Google account is used)
+    // — only possible right now when there's exactly one property/site;
+    // otherwise POST .../complete detects it once the admin picks one.
+    const brand = needsSelection ? null : detectBrandFromName(properties[0].name, sites[0], email);
 
     await upsertGoogleWebsiteAccount({
       id: sub,
       google_account_email: email,
-      brand: payload.brand,
+      brand,
       ga4_property_id: needsSelection ? null : properties[0].id,
       ga4_property_name: needsSelection ? null : properties[0].name,
       ga4_available_properties: needsSelection ? properties : null,
@@ -2267,15 +2276,43 @@ app.post("/api/google-website/accounts/:id/complete", requireAuth("Admin"), asyn
       return res.status(400).json({ success: false, error: "Search Console site không hợp lệ." });
     }
 
+    const finalPropertyName = chosenProperty ? chosenProperty.name : account.ga4_property_name;
+    const finalSiteUrl = chosenSite || account.gsc_site_url;
     await patchGoogleWebsiteAccount(account.id, {
       ga4_property_id: chosenProperty ? chosenProperty.id : account.ga4_property_id,
-      ga4_property_name: chosenProperty ? chosenProperty.name : account.ga4_property_name,
+      ga4_property_name: finalPropertyName,
       ga4_available_properties: null,
-      gsc_site_url: chosenSite || account.gsc_site_url,
+      gsc_site_url: finalSiteUrl,
       gsc_available_sites: null,
       is_active: true,
+      // Only auto-detect here if OAuth callback time couldn't (brand was
+      // still null pending this exact choice) — never override a brand the
+      // admin already confirmed/corrected manually.
+      ...(account.brand ? {} : { brand: detectBrandFromName(finalPropertyName, finalSiteUrl, account.google_account_email) }),
     });
     await logAction((req as any).session, req, "complete-google-website-setup", `Hoàn tất thiết lập Website ${account.google_account_email || account.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/google-website/accounts/:id/brand — manual override, for when
+// auto-detection (see detectBrandFromName) came back null (ambiguous/no
+// match) or picked the wrong brand. The only way to change brand once set —
+// there's no re-run-detection button, just this direct correction.
+app.patch("/api/google-website/accounts/:id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand không hợp lệ (chỉ nhận Livotec, Karofi, hoặc null)." });
+    }
+    const accounts = await getGoogleWebsiteAccounts();
+    const account = accounts.find((a) => a.id === req.params.id);
+    if (!account) return res.status(404).json({ success: false, error: "Không tìm thấy kết nối." });
+
+    await patchGoogleWebsiteAccount(account.id, { brand });
+    await logAction((req as any).session, req, "set-google-website-brand", `Gán brand "${brand}" cho kết nối Website ${account.google_account_email || account.id}`);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

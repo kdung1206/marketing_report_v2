@@ -34,10 +34,13 @@ interface SyncResult {
 
 // Kết nối Website (GA4 + Search Console) cho tab "Website Report" — không
 // liên quan Google Ads (xem PaidAdsApiAccountsAdmin platform="google" cho
-// việc đó). OAuth-first như YoutubeAccountsAdmin: chọn brand rồi kết nối
-// qua Google, không cần nhập ID tay — nhưng vì 1 tài khoản Google có thể
-// quản lý nhiều GA4 property/Search Console site, sau OAuth có thể cần
-// thêm 1 bước "hoàn tất thiết lập" để chọn đúng property/site.
+// việc đó). OAuth-first như YoutubeAccountsAdmin: kết nối thẳng qua Google,
+// không cần chọn brand hay nhập ID tay — brand được tự nhận diện từ tên GA4
+// property / domain Search Console (xem detectBrandFromName trong
+// googleWebsiteSync.ts), với ô chọn tay để sửa nếu nhận diện sai/không ra.
+// Vì 1 tài khoản Google có thể quản lý nhiều GA4 property/Search Console
+// site, sau OAuth có thể cần thêm 1 bước "hoàn tất thiết lập" để chọn đúng
+// property/site.
 export default function GoogleWebsiteAccountsAdmin() {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,7 +49,6 @@ export default function GoogleWebsiteAccountsAdmin() {
   const [syncResults, setSyncResults] = useState<SyncResult[] | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [configured, setConfigured] = useState(true);
-  const [brand, setBrand] = useState<"Livotec" | "Karofi">("Livotec");
   const [pendingChoice, setPendingChoice] = useState<Record<string, { ga4_property_id: string; gsc_site_url: string }>>({});
 
   async function loadAccounts() {
@@ -82,8 +84,10 @@ export default function GoogleWebsiteAccountsAdmin() {
     setIsConnecting(true);
     setMessage(null);
     try {
-      const params = new URLSearchParams({ brand });
-      const result = await safeFetchJson(`/api/google-website/oauth/start?${params.toString()}`);
+      // No brand param — auto-detected server-side from the GA4 property
+      // name / Search Console site once known (see handleSetBrand for the
+      // manual-override fallback when detection is ambiguous or wrong).
+      const result = await safeFetchJson("/api/google-website/oauth/start");
       if (result.success && result.authorizeUrl) {
         window.location.href = result.authorizeUrl;
       } else {
@@ -114,6 +118,20 @@ export default function GoogleWebsiteAccountsAdmin() {
       }
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Hoàn tất thiết lập thất bại." });
+    }
+  }
+
+  async function handleSetBrand(id: string, brand: "Livotec" | "Karofi") {
+    try {
+      const result = await safeFetchJson(`/api/google-website/accounts/${encodeURIComponent(id)}/brand`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brand }),
+      });
+      if (result.success) await loadAccounts();
+      else setMessage({ type: "error", text: result.error || "Gán thương hiệu thất bại." });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Gán thương hiệu thất bại." });
     }
   }
 
@@ -186,17 +204,6 @@ export default function GoogleWebsiteAccountsAdmin() {
       )}
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Thương hiệu</label>
-          <select
-            value={brand}
-            onChange={(e) => setBrand(e.target.value as "Livotec" | "Karofi")}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          >
-            <option value="Livotec">Livotec</option>
-            <option value="Karofi">Karofi</option>
-          </select>
-        </div>
         <button
           type="button"
           onClick={handleConnect}
@@ -235,7 +242,20 @@ export default function GoogleWebsiteAccountsAdmin() {
                 <tr key={a.id}>
                   <td className="px-3 py-2 text-slate-700">{a.google_account_email || a.id}</td>
                   <td className="px-3 py-2">
-                    {a.brand ? <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{a.brand}</span> : <span className="text-amber-600">Chưa gán</span>}
+                    <select
+                      value={a.brand || ""}
+                      onChange={(e) => handleSetBrand(a.id, e.target.value as "Livotec" | "Karofi")}
+                      className={`rounded-lg border px-2 py-1 text-xs font-semibold ${
+                        a.brand ? "border-slate-200 bg-slate-100 text-slate-600" : "border-amber-300 bg-amber-50 text-amber-700"
+                      }`}
+                      title={a.brand ? "Đã tự nhận diện — chọn lại nếu sai" : "Không tự nhận diện được brand từ tên GA4 property / domain Search Console — chọn tay"}
+                    >
+                      <option value="" disabled>
+                        {a.brand ? a.brand : "Chưa xác định — chọn"}
+                      </option>
+                      <option value="Livotec">Livotec</option>
+                      <option value="Karofi">Karofi</option>
+                    </select>
                   </td>
                   {!a.is_active && (a.ga4_available_properties?.length || a.gsc_available_sites?.length) ? (
                     <td colSpan={2} className="px-3 py-2">
