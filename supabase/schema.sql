@@ -856,3 +856,190 @@ create table if not exists asset_links (
 );
 
 alter table asset_links enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Content Brief (SEO) — extra fields on `tasks`, only meaningful when
+-- work_stream = 'SEO'. See src/server/campaignStore.ts's Task interface and
+-- CampaignManagement.tsx's task form (shown only for work_stream = 'SEO').
+-- ---------------------------------------------------------------------------
+alter table tasks add column if not exists seo_search_intent text;
+alter table tasks add column if not exists seo_outline text;
+alter table tasks add column if not exists seo_word_count_target int;
+alter table tasks add column if not exists seo_published_url text;
+
+-- ---------------------------------------------------------------------------
+-- Keyword Rank Tracker + Brand SOV (search visibility) — src/server/
+-- serperClient.ts + seoToolsSync.ts, a new "SEO Tools" section in Website
+-- Report. Paid per serper.dev query (see seoToolsSync.ts's header comment
+-- for the weekly credit budget) — unlike every other integration in this
+-- app, this one costs real money per call, so it runs on its own explicit
+-- weekly cron rather than being pulled live on every report page load like
+-- GA4/Search Console.
+-- ---------------------------------------------------------------------------
+
+-- One row per tracked keyword. `brands` can hold more than one brand for a
+-- category term both brands compete on (e.g. "máy lọc nước gia đình" is
+-- relevant to both Karofi and Livotec) — a single serper.dev query's result
+-- set is checked for EVERY brand in this array, so a shared keyword costs
+-- exactly 1 credit total, not 1 per brand.
+create table if not exists keyword_rank_targets (
+  id          uuid primary key default gen_random_uuid(),
+  keyword     text not null unique,
+  category    text not null, -- free text, e.g. "Lọc nước" / "Lọc tổng" / "Điều hòa"
+  brands      text[] not null,
+  is_active   boolean not null default true,
+  created_by  text not null,
+  created_at  timestamptz not null default now()
+);
+
+alter table keyword_rank_targets enable row level security;
+
+create table if not exists keyword_rank_history (
+  id           uuid primary key default gen_random_uuid(),
+  target_id    uuid not null references keyword_rank_targets(id) on delete cascade,
+  brand        text not null check (brand in ('Livotec', 'Karofi')),
+  checked_at   date not null,
+  position     int,   -- null = not found in the top N organic results returned
+  ranking_url  text,  -- the exact URL that ranked, when position is not null
+  created_at   timestamptz not null default now(),
+  unique (target_id, brand, checked_at)
+);
+
+create index if not exists keyword_rank_history_target_brand_idx on keyword_rank_history (target_id, brand, checked_at);
+
+alter table keyword_rank_history enable row level security;
+
+-- Search-based "share of voice" — count of recent news results per brand
+-- name, a cheap proxy for online visibility. Deliberately a DIFFERENT
+-- number from the Dashboard's existing "Thị phần thảo luận" widget (a
+-- manually-entered figure from a different source) — shown as its own card,
+-- never silently conflated with or replacing that one.
+create table if not exists sov_mentions_history (
+  id             uuid primary key default gen_random_uuid(),
+  brand_name     text not null,
+  checked_at     date not null,
+  mention_count  int not null,
+  created_at     timestamptz not null default now(),
+  unique (brand_name, checked_at)
+);
+
+alter table sov_mentions_history enable row level security;
+
+-- Seed the keyword list already agreed on with the user (Website Report
+-- redesign follow-up, 2026-09) — ON CONFLICT DO NOTHING so re-running this
+-- file is safe and admin edits afterward are never clobbered.
+insert into keyword_rank_targets (keyword, category, brands, created_by) values
+  ('máy lọc nước', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('máy lọc nước gia đình', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('máy lọc nước RO', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('máy lọc nước nóng lạnh', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('máy lọc nước để gầm bếp', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('lõi lọc nước thay thế', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('máy lọc nước tốt nhất hiện nay', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('nên mua máy lọc nước nào', 'Lọc nước', array['Karofi','Livotec'], 'system-seed'),
+  ('máy lọc nước tổng', 'Lọc tổng', array['Karofi'], 'system-seed'),
+  ('hệ thống lọc nước đầu nguồn', 'Lọc tổng', array['Karofi'], 'system-seed'),
+  ('lọc nước sinh hoạt gia đình', 'Lọc tổng', array['Karofi'], 'system-seed'),
+  ('máy lọc nước tổng cho gia đình', 'Lọc tổng', array['Karofi'], 'system-seed'),
+  ('lọc tổng nước máy có cần thiết không', 'Lọc tổng', array['Karofi'], 'system-seed'),
+  ('giá máy lọc nước tổng', 'Lọc tổng', array['Karofi'], 'system-seed'),
+  ('điều hòa', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('máy lạnh', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('điều hòa inverter', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('máy lạnh 1.5 ngựa', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('điều hòa tiết kiệm điện', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('lắp đặt điều hòa', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('điều hòa nào tốt tiết kiệm điện', 'Điều hòa', array['Livotec'], 'system-seed'),
+  ('máy lạnh giá rẻ chính hãng', 'Điều hòa', array['Livotec'], 'system-seed')
+on conflict (keyword) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Backlink Tracker — src/server/backlinkStore.ts, "SEO Tools" section of
+-- Website Report. Verification (still live? still contains the link?) is
+-- free — a plain fetch() + substring check on a URL the admin already
+-- entered, run on the existing daily cron. No paid API involved here.
+-- ---------------------------------------------------------------------------
+create table if not exists backlinks (
+  id                  uuid primary key default gen_random_uuid(),
+  brand               text not null check (brand in ('Livotec', 'Karofi')),
+  source_platform     text not null, -- free text: "Reddit", "Blogspot", "Forum ABC", ...
+  target_url          text not null, -- own page being linked to
+  anchor_text         text,
+  backlink_url        text not null, -- the URL where the link actually lives
+  link_type           text not null default 'unknown' check (link_type in ('dofollow', 'nofollow', 'unknown')),
+  status              text not null default 'Submitted' check (status in ('Submitted', 'Pending Review', 'Live', 'Removed')),
+  assignee_username   text,
+  submitted_at        date,
+  last_checked_at     timestamptz,
+  last_check_result   text check (last_check_result in ('found', 'not_found', 'error')),
+  created_by          text not null,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+
+create index if not exists backlinks_brand_status_idx on backlinks (brand, status);
+
+alter table backlinks enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- Social Outreach (KOC/KOL) — src/server/outreachStore.ts. See
+-- `task cần làm/campaign task/phan-tich-social-outreach-campaign.md` for the
+-- full design discussion this was built from (platform feasibility per
+-- network, why outreach_post_metrics is a time series, etc.) — priority
+-- platforms per that doc's confirmed answers: TikTok and Facebook, manual
+-- metric entry (no reliable public API for either), weekly cadence, roster
+-- reused across campaigns, edit/delete permission gated (reuses the
+-- campaign_members mechanism campaigns already have).
+-- ---------------------------------------------------------------------------
+create table if not exists koc_kol_accounts (
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,
+  platform       text not null check (platform in ('Facebook', 'TikTok', 'Instagram', 'YouTube', 'Other')),
+  handle_or_url  text,
+  contact_info   text,
+  notes          text,
+  created_by     text not null,
+  created_at     timestamptz not null default now()
+);
+
+alter table koc_kol_accounts enable row level security;
+
+create table if not exists outreach_posts (
+  id            uuid primary key default gen_random_uuid(),
+  campaign_id   uuid not null references campaigns(id) on delete cascade,
+  koc_kol_id    uuid references koc_kol_accounts(id) on delete set null,
+  platform      text not null check (platform in ('Facebook', 'TikTok', 'Instagram', 'YouTube', 'Other')),
+  post_url      text not null,
+  external_id   text, -- e.g. YouTube video id, parsed from the URL, for a future API sync
+  published_at  date,
+  status        text not null default 'Live' check (status in ('Scheduled', 'Live', 'Removed')),
+  -- Not surfaced in the UI yet (see the outreach analysis doc's Q6 — cost
+  -- tracking isn't in scope for this MVP) but cheap to have from day one so
+  -- a later "cost per view" feature doesn't need a migration + backfill.
+  cost          numeric,
+  added_by      text not null,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists outreach_posts_campaign_id_idx on outreach_posts (campaign_id);
+
+alter table outreach_posts enable row level security;
+
+-- Time series, not a single overwritten row — lets a KOC's post show growth
+-- week over week, same "snapshot, don't overwrite" convention as fb_insights_daily.
+create table if not exists outreach_post_metrics (
+  id           uuid primary key default gen_random_uuid(),
+  post_id      uuid not null references outreach_posts(id) on delete cascade,
+  recorded_at  timestamptz not null default now(),
+  source       text not null default 'manual' check (source in ('manual', 'auto_youtube')),
+  views        int,
+  likes        int,
+  comments     int,
+  shares       int,
+  entered_by   text, -- null when source = auto_youtube
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists outreach_post_metrics_post_id_idx on outreach_post_metrics (post_id, recorded_at);
+
+alter table outreach_post_metrics enable row level security;

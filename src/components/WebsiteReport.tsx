@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { Globe, Search, Users, MousePointerClick, Eye, TrendingUp, RefreshCw, AlertCircle, Sparkles, Target } from "lucide-react";
 import { safeFetchJson } from "../App";
+import SeoToolsSection from "./SeoToolsSection";
 
 // Local mirrors of the server row shapes (see src/server/googleWebsiteStore.ts)
 // — same "don't import across the client/server boundary" convention as
@@ -194,7 +195,7 @@ interface WebsiteReportProps {
 // the manual "SEO Website" spreadsheet category (data.ts/dashboard) per
 // user request — this tab is additive, not a replacement.
 export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreateTask }: WebsiteReportProps) {
-  const [activeSection, setActiveSection] = useState<"overview" | "ga4" | "search-console">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "ga4" | "search-console" | "seo-tools">("overview");
 
   // Search Console's ~2-3 day reporting lag means "today" is always empty —
   // default the window to end a few days back so the first load isn't
@@ -552,10 +553,11 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
     return sentences;
   }, [sessionsTotal, organicShare, clicksTotal, impressionsTotal, avgCtr, avgPosition, keywordsLoading, strikingDistanceKeywords, minPosition, maxPosition]);
 
-  const sections: { id: "overview" | "ga4" | "search-console"; label: string }[] = [
+  const sections: { id: "overview" | "ga4" | "search-console" | "seo-tools"; label: string }[] = [
     { id: "overview", label: "Tổng hợp" },
     { id: "ga4", label: "GA4" },
     { id: "search-console", label: "Search Console" },
+    { id: "seo-tools", label: "SEO Tools" },
   ];
 
   const hasAccounts = brandAccounts.some((a) => a.is_active);
@@ -611,7 +613,12 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
         </div>
       )}
 
-      {isLoading ? (
+      {activeSection === "seo-tools" ? (
+        // Independent of GA4/Search Console connection status — Rank
+        // Tracker/SOV runs on serper.dev, Backlink Tracker is admin-entered,
+        // neither needs a Website (GA4/Search Console) OAuth connection.
+        <SeoToolsSection selectedBrand={selectedBrand} />
+      ) : isLoading ? (
         <div className="flex items-center gap-2 text-xs text-slate-400">
           <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Đang tải dữ liệu...
         </div>

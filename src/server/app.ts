@@ -42,6 +42,29 @@ import {
   Task,
 } from "./campaignStore";
 import {
+  getKeywordRankTargets,
+  createKeywordRankTarget,
+  updateKeywordRankTarget,
+  deleteKeywordRankTarget,
+  getKeywordRankHistory,
+  getSovMentions,
+} from "./seoToolsStore";
+import { runKeywordRankSync, runSovSync } from "./seoToolsSync";
+import { isSerperConfigured } from "./serperClient";
+import { getBacklinks, createBacklink, updateBacklink, deleteBacklink, verifyAllBacklinks } from "./backlinkStore";
+import {
+  getKocKolAccounts,
+  createKocKolAccount,
+  deleteKocKolAccount,
+  getOutreachPosts,
+  getOutreachPost,
+  createOutreachPost,
+  updateOutreachPost,
+  deleteOutreachPost,
+  getOutreachPostMetrics,
+  createOutreachPostMetric,
+} from "./outreachStore";
+import {
   runFacebookSync,
   fetchTokenExpiry,
   isFacebookOAuthConfigured,
@@ -1498,6 +1521,15 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       return [];
     });
 
+    // Backlink verification piggybacks here too — same Hobby-plan reasoning,
+    // and it's free (no paid API), unlike the Keyword Rank Tracker/SOV sync
+    // which gets its own weekly cron (GET /api/cron/seo-tools-weekly) because
+    // that one costs real serper.dev credits.
+    const backlinkVerifyResult = await verifyAllBacklinks().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (backlink verify) error:", err);
+      return [];
+    });
+
     res.json({
       success: true,
       results: pageResults,
@@ -1509,6 +1541,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       googleWebsiteResults,
       expiryCheck,
       recurringTasksResult,
+      backlinkVerifyResult,
     });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
@@ -3103,6 +3136,310 @@ app.delete("/api/campaign/asset-links/:id", requireAuth("Editor"), async (req, r
     await deleteAssetLink(req.params.id);
     await logAction((req as any).session, req, "campaign-delete-asset-link", `Xoá link ${req.params.id} khỏi Asset Library`);
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Keyword Rank Tracker + Brand SOV (search visibility) — src/server/
+// seoToolsStore.ts/seoToolsSync.ts. Reads (GET) are open to any logged-in
+// role (report data); managing the tracked-keyword list and triggering a
+// sync are Editor+ since a sync call costs real serper.dev credits.
+// ---------------------------------------------------------------------------
+
+app.get("/api/seo-tools/keyword-targets", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, targets: await getKeywordRankTargets(), serperConfigured: isSerperConfigured });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/seo-tools/keyword-targets", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { keyword, category, brands } = req.body || {};
+    if (!keyword || !category || !Array.isArray(brands) || brands.length === 0) {
+      return res.status(400).json({ error: "Thiếu keyword, category hoặc brands." });
+    }
+    const session = (req as any).session;
+    const target = await createKeywordRankTarget({ keyword, category, brands }, session.username);
+    await logAction(session, req, "seo-add-keyword-target", `Thêm từ khoá theo dõi "${target.keyword}"`);
+    res.json({ success: true, target });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.patch("/api/seo-tools/keyword-targets/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await updateKeywordRankTarget(req.params.id, req.body || {});
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/seo-tools/keyword-targets/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await deleteKeywordRankTarget(req.params.id);
+    await logAction((req as any).session, req, "seo-delete-keyword-target", `Xoá từ khoá theo dõi ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/seo-tools/keyword-rank-history", requireAuth(), async (req, res) => {
+  try {
+    const { brand, since, until } = req.query;
+    const history = await getKeywordRankHistory({
+      brand: typeof brand === "string" && brand ? (brand as any) : undefined,
+      since: typeof since === "string" && since ? since : undefined,
+      until: typeof until === "string" && until ? until : undefined,
+    });
+    res.json({ success: true, history });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/seo-tools/sov", requireAuth(), async (req, res) => {
+  try {
+    const { since, until } = req.query;
+    const mentions = await getSovMentions({
+      since: typeof since === "string" && since ? since : undefined,
+      until: typeof until === "string" && until ? until : undefined,
+    });
+    res.json({ success: true, mentions });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/seo-tools/sync-now — Editor+, manual trigger. Costs real
+// serper.dev credits (see seoToolsSync.ts's header comment for the weekly
+// budget this is designed around) — unlike every other "sync now" button in
+// this app, clicking this one repeatedly is not free.
+app.post("/api/seo-tools/sync-now", requireAuth("Editor"), async (req, res) => {
+  try {
+    const [rankResults, sovResults] = await Promise.all([runKeywordRankSync(), runSovSync()]);
+    await logAction((req as any).session, req, "seo-tools-sync", `Đồng bộ thủ công Rank Tracker (${rankResults.length}) + SOV (${sovResults.length})`);
+    res.json({ success: true, rankResults, sovResults });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/cron/seo-tools-weekly — Vercel Cron, own weekly schedule (see
+// vercel.json) since this costs real credits and has a completely different
+// cadence from the daily facebook-sync cron.
+app.get("/api/cron/seo-tools-weekly", async (req, res) => {
+  try {
+    if (!isValidCronRequest(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (!isSerperConfigured) {
+      return res.json({ success: true, skipped: "SERPER_API_KEY chưa được cấu hình." });
+    }
+    const [rankResults, sovResults] = await Promise.all([
+      runKeywordRankSync().catch((err) => {
+        console.error("GET /api/cron/seo-tools-weekly (rank) error:", err);
+        return [];
+      }),
+      runSovSync().catch((err) => {
+        console.error("GET /api/cron/seo-tools-weekly (sov) error:", err);
+        return [];
+      }),
+    ]);
+    res.json({ success: true, rankResults, sovResults });
+  } catch (err: any) {
+    console.error("GET /api/cron/seo-tools-weekly error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Backlink Tracker — src/server/backlinkStore.ts. Verification is free (a
+// plain fetch, no paid API) so it also runs on the existing daily cron —
+// see the addition inside GET /api/cron/facebook-sync above.
+// ---------------------------------------------------------------------------
+
+app.get("/api/backlinks", requireAuth(), async (req, res) => {
+  try {
+    const { brand } = req.query;
+    const backlinks = await getBacklinks({ brand: typeof brand === "string" && brand ? (brand as any) : undefined });
+    res.json({ success: true, backlinks });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/backlinks", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { brand, source_platform, target_url, backlink_url } = req.body || {};
+    if (!brand || !source_platform || !target_url || !backlink_url) {
+      return res.status(400).json({ error: "Thiếu brand, source_platform, target_url hoặc backlink_url." });
+    }
+    const session = (req as any).session;
+    const backlink = await createBacklink(req.body, session.username);
+    await logAction(session, req, "backlink-create", `Thêm backlink từ ${backlink.source_platform}`);
+    res.json({ success: true, backlink });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put("/api/backlinks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await updateBacklink(req.params.id, req.body || {});
+    await logAction((req as any).session, req, "backlink-update", `Cập nhật backlink ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/backlinks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await deleteBacklink(req.params.id);
+    await logAction((req as any).session, req, "backlink-delete", `Xoá backlink ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post("/api/backlinks/verify-now", requireAuth("Editor"), async (req, res) => {
+  try {
+    const results = await verifyAllBacklinks();
+    await logAction((req as any).session, req, "backlink-verify", `Kiểm tra thủ công ${results.length} backlink`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Social Outreach (KOC/KOL) — src/server/outreachStore.ts. Edit/delete
+// permission on outreach_posts reuses canEditCampaign (see this file's
+// definition above), same as campaign tasks — per the confirmed answer to
+// phan-tich-social-outreach-campaign.md's Q7.
+// ---------------------------------------------------------------------------
+
+app.get("/api/outreach/koc-kol", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, accounts: await getKocKolAccounts() });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/outreach/koc-kol", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { name, platform } = req.body || {};
+    if (!name || !platform) return res.status(400).json({ error: "Thiếu name hoặc platform." });
+    const session = (req as any).session;
+    const account = await createKocKolAccount(req.body, session.username);
+    await logAction(session, req, "outreach-add-roster", `Thêm KOC/KOL "${account.name}" vào roster`);
+    res.json({ success: true, account });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/outreach/koc-kol/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteKocKolAccount(req.params.id);
+    await logAction((req as any).session, req, "outreach-delete-roster", `Xoá KOC/KOL ${req.params.id} khỏi roster`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/outreach/posts", requireAuth(), async (req, res) => {
+  try {
+    const { campaign_id } = req.query;
+    const session = (req as any).session;
+    const posts = await getOutreachPosts({ campaignId: typeof campaign_id === "string" && campaign_id ? campaign_id : undefined });
+    const withPermission = await Promise.all(posts.map(async (p) => ({ ...p, can_edit: await canEditCampaign(p.campaign_id, session) })));
+    res.json({ success: true, posts: withPermission });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/outreach/posts", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { campaign_id, platform, post_url } = req.body || {};
+    if (!campaign_id || !platform || !post_url) return res.status(400).json({ error: "Thiếu campaign_id, platform hoặc post_url." });
+    const session = (req as any).session;
+    if (!(await canEditCampaign(campaign_id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền thêm bài đăng cho campaign này." });
+    }
+    const post = await createOutreachPost(req.body, session.username);
+    await logAction(session, req, "outreach-add-post", `Thêm bài đăng outreach cho campaign ${campaign_id}`);
+    res.json({ success: true, post });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.put("/api/outreach/posts/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getOutreachPost(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy bài đăng." });
+    const session = (req as any).session;
+    if (!(await canEditCampaign(existing.campaign_id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền sửa bài đăng này." });
+    }
+    await updateOutreachPost(req.params.id, req.body || {});
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete("/api/outreach/posts/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getOutreachPost(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy bài đăng." });
+    const session = (req as any).session;
+    if (!(await canEditCampaign(existing.campaign_id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền xoá bài đăng này." });
+    }
+    await deleteOutreachPost(req.params.id);
+    await logAction(session, req, "outreach-delete-post", `Xoá bài đăng outreach ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/outreach/metrics", requireAuth(), async (req, res) => {
+  try {
+    const { post_id, post_ids } = req.query;
+    const metrics = await getOutreachPostMetrics({
+      postId: typeof post_id === "string" && post_id ? post_id : undefined,
+      postIds: typeof post_ids === "string" && post_ids ? post_ids.split(",") : undefined,
+    });
+    res.json({ success: true, metrics });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/outreach/posts/:id/metrics", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getOutreachPost(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy bài đăng." });
+    const session = (req as any).session;
+    if (!(await canEditCampaign(existing.campaign_id, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền cập nhật số liệu bài đăng này." });
+    }
+    const metric = await createOutreachPostMetric({ post_id: req.params.id, ...req.body }, session.username);
+    res.json({ success: true, metric });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

@@ -21,9 +21,12 @@ import {
   Timer,
   Repeat,
   Target,
+  TrendingUp,
 } from "lucide-react";
 import { safeFetchJson } from "../App";
 import type { UserAccount } from "../lib/defaultUsers";
+import OutreachPanel from "./OutreachPanel";
+import OutreachOverview from "./OutreachOverview";
 
 // Campaign Calendar & Campaign Task. See
 // `task cần làm/campaign task/tong-hop-campaign-calendar-task.md` for the
@@ -114,6 +117,10 @@ interface Task {
   metric_unit: string | null;
   metric_baseline_value: number | null;
   metric_result_value: number | null;
+  seo_search_intent: string | null;
+  seo_outline: string | null;
+  seo_word_count_target: number | null;
+  seo_published_url: string | null;
   created_by: string;
   can_edit: boolean;
 }
@@ -190,6 +197,10 @@ const EMPTY_TASK_FORM = {
   recurrence_freq: "weekly" as TaskRecurrence["freq"],
   recurrence_interval: "1",
   recurrence_until: "",
+  seo_search_intent: "",
+  seo_outline: "",
+  seo_word_count_target: "",
+  seo_published_url: "",
 };
 
 function daysUntil(dateStr: string): number {
@@ -315,7 +326,7 @@ interface CampaignManagementProps {
 }
 
 export default function CampaignManagement({ currentUser, taskPrefill, onTaskPrefillConsumed }: CampaignManagementProps) {
-  const [section, setSection] = useState<"campaigns" | "tasks" | "workload">("campaigns");
+  const [section, setSection] = useState<"campaigns" | "tasks" | "workload" | "outreach">("campaigns");
   const [categories, setCategories] = useState<Category[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -331,6 +342,9 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
   const [campaignMembers, setCampaignMembers] = useState<CampaignMember[]>([]);
   const [newMemberUsername, setNewMemberUsername] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
+  // Social Outreach (KOC/KOL) — which campaign's outreach panel is expanded,
+  // see OutreachPanel.tsx.
+  const [expandedOutreachCampaignId, setExpandedOutreachCampaignId] = useState<string | null>(null);
   const [campaignStatusFilter, setCampaignStatusFilter] = useState<string>("");
   // Campaign Marketing is NOT split by brand (unlike the other report tabs) —
   // Livotec and Karofi campaigns show together; brand is just a filter here,
@@ -827,6 +841,10 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
       recurrence_freq: t.recurrence?.freq || "weekly",
       recurrence_interval: t.recurrence ? String(t.recurrence.interval) : "1",
       recurrence_until: t.recurrence?.until || "",
+      seo_search_intent: t.seo_search_intent || "",
+      seo_outline: t.seo_outline || "",
+      seo_word_count_target: t.seo_word_count_target != null ? String(t.seo_word_count_target) : "",
+      seo_published_url: t.seo_published_url || "",
     });
   }
 
@@ -855,6 +873,14 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
       recurrence: taskForm.recurrence_enabled
         ? { freq: taskForm.recurrence_freq, interval: Number(taskForm.recurrence_interval) || 1, until: taskForm.recurrence_until || null }
         : null,
+      // Content Brief — only meaningful when work_stream === "SEO" (see the
+      // conditional form fields below), but harmless to always send: saving
+      // as null when the section isn't shown just clears stale values if the
+      // work_stream was changed away from SEO.
+      seo_search_intent: taskForm.work_stream === "SEO" ? taskForm.seo_search_intent || null : null,
+      seo_outline: taskForm.work_stream === "SEO" ? taskForm.seo_outline || null : null,
+      seo_word_count_target: taskForm.work_stream === "SEO" && taskForm.seo_word_count_target ? Number(taskForm.seo_word_count_target) : null,
+      seo_published_url: taskForm.work_stream === "SEO" ? taskForm.seo_published_url || null : null,
     };
     if (taskForm.task_type === "campaign" && !taskForm.campaign_id) {
       setMessage({ type: "error", text: "Task loại Campaign bắt buộc phải chọn Campaign." });
@@ -989,6 +1015,17 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
             }`}
           >
             <Users className="h-3.5 w-3.5" /> Theo nhân viên
+          </button>
+          <button
+            onClick={() => {
+              setMessage(null);
+              setSection("outreach");
+            }}
+            className={`flex items-center gap-1.5 rounded-md px-4 py-1 text-xs font-bold transition-all ${
+              section === "outreach" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <TrendingUp className="h-3.5 w-3.5" /> Social Outreach
           </button>
         </div>
       </div>
@@ -1488,7 +1525,8 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                   </tr>
                 ) : (
                   campaigns.map((c) => (
-                    <tr key={c.id}>
+                    <React.Fragment key={c.id}>
+                    <tr>
                       <td className="px-3 py-2 font-medium text-slate-700">{c.name}</td>
                       <td className="px-3 py-2">
                         <span className={`rounded px-1.5 py-0.5 font-semibold ${c.brand === "Livotec" ? "bg-indigo-50 text-indigo-700" : "bg-sky-50 text-sky-700"}`}>
@@ -1511,20 +1549,36 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {c.can_edit ? (
-                          <div className="flex justify-end gap-1.5">
-                            <button onClick={() => startEditCampaign(c)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:bg-slate-50">
-                              <Pencil className="h-3 w-3" /> Sửa
-                            </button>
-                            <button onClick={() => handleDeleteCampaign(c)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-rose-600 hover:bg-rose-50">
-                              <Trash2 className="h-3 w-3" /> Xoá
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300">Không có quyền sửa</span>
-                        )}
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            onClick={() => setExpandedOutreachCampaignId((prev) => (prev === c.id ? null : c.id))}
+                            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-2 py-1 text-indigo-600 hover:bg-indigo-50"
+                          >
+                            <Users className="h-3 w-3" /> Outreach
+                          </button>
+                          {c.can_edit ? (
+                            <>
+                              <button onClick={() => startEditCampaign(c)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:bg-slate-50">
+                                <Pencil className="h-3 w-3" /> Sửa
+                              </button>
+                              <button onClick={() => handleDeleteCampaign(c)} className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2 py-1 text-rose-600 hover:bg-rose-50">
+                                <Trash2 className="h-3 w-3" /> Xoá
+                              </button>
+                            </>
+                          ) : (
+                            <span className="self-center text-slate-300">Không có quyền sửa</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
+                    {expandedOutreachCampaignId === c.id && (
+                      <tr>
+                        <td colSpan={10} className="bg-slate-50/70 px-4 py-3">
+                          <OutreachPanel campaignId={c.id} campaignName={c.name} canEdit={c.can_edit} />
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   ))
                 )}
               </tbody>
@@ -1749,6 +1803,44 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
                 />
               </div>
+
+              {/* Content Brief — chỉ hiện khi Nhóm việc = SEO. */}
+              {taskForm.work_stream === "SEO" && (
+                <div className="sm:col-span-4 space-y-2 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Content Brief (SEO)</label>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    <input
+                      type="text"
+                      value={taskForm.seo_search_intent}
+                      onChange={(e) => setTaskForm({ ...taskForm, seo_search_intent: e.target.value })}
+                      placeholder="Search intent (VD: informational)"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      value={taskForm.seo_word_count_target}
+                      onChange={(e) => setTaskForm({ ...taskForm, seo_word_count_target: e.target.value })}
+                      placeholder="Số từ dự kiến"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={taskForm.seo_published_url}
+                      onChange={(e) => setTaskForm({ ...taskForm, seo_published_url: e.target.value })}
+                      placeholder="URL sau khi đăng (nếu đã có)"
+                      className="sm:col-span-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+                  <textarea
+                    value={taskForm.seo_outline}
+                    onChange={(e) => setTaskForm({ ...taskForm, seo_outline: e.target.value })}
+                    placeholder="Outline / dàn ý bài viết"
+                    rows={3}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+              )}
 
               {/* Recurrence chỉ thật sự áp dụng cho task "gốc" (task chưa
                   được sinh ra từ 1 chuỗi lặp lại khác) — sửa 1 occurrence đã
@@ -2081,7 +2173,7 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
             </table>
           </div>
         </div>
-      ) : (
+      ) : section === "workload" ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-slate-500">Giai đoạn</span>
@@ -2132,6 +2224,8 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
             </table>
           </div>
         </div>
+      ) : (
+        <OutreachOverview />
       )}
     </div>
   );

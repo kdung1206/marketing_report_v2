@@ -20052,14 +20052,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto8 = require("crypto");
+    var crypto11 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto8.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto11.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22952,11 +22952,11 @@ var require_request = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto8 = require("crypto");
+    var crypto11 = require("crypto");
     exports2.sign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val2 + "." + crypto8.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
+      return val2 + "." + crypto11.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Signed cookie string must be provided.");
@@ -22965,7 +22965,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val2) ? str : false;
     };
     function sha1(str) {
-      return crypto8.createHash("sha1").update(str).digest("hex");
+      return crypto11.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -35478,22 +35478,22 @@ var require_crypto2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NodeCrypto = void 0;
-    var crypto8 = require("crypto");
+    var crypto11 = require("crypto");
     var NodeCrypto = class {
       async sha256DigestBase64(str) {
-        return crypto8.createHash("sha256").update(str).digest("base64");
+        return crypto11.createHash("sha256").update(str).digest("base64");
       }
       randomBytesBase64(count) {
-        return crypto8.randomBytes(count).toString("base64");
+        return crypto11.randomBytes(count).toString("base64");
       }
       async verify(pubkey, data, signature) {
-        const verifier = crypto8.createVerify("RSA-SHA256");
+        const verifier = crypto11.createVerify("RSA-SHA256");
         verifier.update(data);
         verifier.end();
         return verifier.verify(pubkey, signature, "base64");
       }
       async sign(privateKey, data) {
-        const signer = crypto8.createSign("RSA-SHA256");
+        const signer = crypto11.createSign("RSA-SHA256");
         signer.update(data);
         signer.end();
         return signer.sign(privateKey, "base64");
@@ -35511,7 +35511,7 @@ var require_crypto2 = __commonJS({
        *   string in hexadecimal encoding.
        */
       async sha256DigestHex(str) {
-        return crypto8.createHash("sha256").update(str).digest("hex");
+        return crypto11.createHash("sha256").update(str).digest("hex");
       }
       /**
        * Computes the HMAC hash of a message using the provided crypto key and the
@@ -35523,7 +35523,7 @@ var require_crypto2 = __commonJS({
        */
       async signWithHmacSha256(key, msg) {
         const cryptoKey = typeof key === "string" ? key : toBuffer(key);
-        return toArrayBuffer(crypto8.createHmac("sha256", cryptoKey).update(msg).digest());
+        return toArrayBuffer(crypto11.createHmac("sha256", cryptoKey).update(msg).digest());
       }
     };
     exports2.NodeCrypto = NodeCrypto;
@@ -36378,10 +36378,10 @@ var require_oauth2client = __commonJS({
        * https://github.com/googleapis/google-auth-library-nodejs/blob/main/samples/oauth2-codeVerifier.js
        */
       async generateCodeVerifierAsync() {
-        const crypto8 = (0, crypto_1.createCrypto)();
-        const randomString = crypto8.randomBytesBase64(96);
+        const crypto11 = (0, crypto_1.createCrypto)();
+        const randomString = crypto11.randomBytesBase64(96);
         const codeVerifier = randomString.replace(/\+/g, "~").replace(/=/g, "_").replace(/\//g, "-");
-        const unencodedCodeChallenge = await crypto8.sha256DigestBase64(codeVerifier);
+        const unencodedCodeChallenge = await crypto11.sha256DigestBase64(codeVerifier);
         const codeChallenge = unencodedCodeChallenge.split("=")[0].replace(/\+/g, "-").replace(/\//g, "_");
         return { codeVerifier, codeChallenge };
       }
@@ -36822,7 +36822,7 @@ var require_oauth2client = __commonJS({
        * @return Returns a promise resolving to LoginTicket on verification.
        */
       async verifySignedJwtWithCertsAsync(jwt, certs, requiredAudience, issuers, maxExpiry) {
-        const crypto8 = (0, crypto_1.createCrypto)();
+        const crypto11 = (0, crypto_1.createCrypto)();
         if (!maxExpiry) {
           maxExpiry = _OAuth2Client.DEFAULT_MAX_TOKEN_LIFETIME_SECS_;
         }
@@ -36835,7 +36835,7 @@ var require_oauth2client = __commonJS({
         let envelope;
         let payload;
         try {
-          envelope = JSON.parse(crypto8.decodeBase64StringUtf8(segments[0]));
+          envelope = JSON.parse(crypto11.decodeBase64StringUtf8(segments[0]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token envelope: ${segments[0]}': ${err.message}`;
@@ -36846,7 +36846,7 @@ var require_oauth2client = __commonJS({
           throw new Error("Can't parse token envelope: " + segments[0]);
         }
         try {
-          payload = JSON.parse(crypto8.decodeBase64StringUtf8(segments[1]));
+          payload = JSON.parse(crypto11.decodeBase64StringUtf8(segments[1]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token payload '${segments[0]}`;
@@ -36863,7 +36863,7 @@ var require_oauth2client = __commonJS({
         if (envelope.alg === "ES256") {
           signature = formatEcdsa.joseToDer(signature, "ES256").toString("base64");
         }
-        const verified = await crypto8.verify(cert, signed, signature);
+        const verified = await crypto11.verify(cert, signed, signature);
         if (!verified) {
           throw new Error("Invalid token signature: " + jwt);
         }
@@ -37238,14 +37238,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "node_modules/jwa/index.js"(exports2, module2) {
     var Buffer4 = require_safe_buffer().Buffer;
-    var crypto8 = require("crypto");
+    var crypto11 = require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util = require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto8.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto11.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -37335,17 +37335,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac = crypto8.createHmac("sha" + bits, secret);
+        var hmac = crypto11.createHmac("sha" + bits, secret);
         var sig = (hmac.update(thing), hmac.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto8 ? function timingSafeEqual2(a, b) {
+    var timingSafeEqual = "timingSafeEqual" in crypto11 ? function timingSafeEqual2(a, b) {
       if (a.byteLength !== b.byteLength) {
         return false;
       }
-      return crypto8.timingSafeEqual(a, b);
+      return crypto11.timingSafeEqual(a, b);
     } : function timingSafeEqual2(a, b) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -37362,7 +37362,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto8.createSign("RSA-SHA" + bits);
+        var signer = crypto11.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -37372,7 +37372,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto8.createVerify("RSA-SHA" + bits);
+        var verifier = crypto11.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -37381,11 +37381,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto8.createSign("RSA-SHA" + bits);
+        var signer = crypto11.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto8.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto8.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto11.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto11.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -37395,12 +37395,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto8.createVerify("RSA-SHA" + bits);
+        var verifier = crypto11.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto8.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto8.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto11.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto11.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -39976,14 +39976,14 @@ var require_awsrequestsigner = __commonJS({
       }
     };
     exports2.AwsRequestSigner = AwsRequestSigner;
-    async function sign(crypto8, key, msg) {
-      return await crypto8.signWithHmacSha256(key, msg);
+    async function sign(crypto11, key, msg) {
+      return await crypto11.signWithHmacSha256(key, msg);
     }
-    async function getSigningKey(crypto8, key, dateStamp, region, serviceName) {
-      const kDate = await sign(crypto8, `AWS4${key}`, dateStamp);
-      const kRegion = await sign(crypto8, kDate, region);
-      const kService = await sign(crypto8, kRegion, serviceName);
-      const kSigning = await sign(crypto8, kService, "aws4_request");
+    async function getSigningKey(crypto11, key, dateStamp, region, serviceName) {
+      const kDate = await sign(crypto11, `AWS4${key}`, dateStamp);
+      const kRegion = await sign(crypto11, kDate, region);
+      const kService = await sign(crypto11, kRegion, serviceName);
+      const kSigning = await sign(crypto11, kService, "aws4_request");
       return kSigning;
     }
     async function generateAuthenticationHeaderMap(options) {
@@ -40949,7 +40949,7 @@ var require_gdchclient = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.GdchClient = exports2.GDCH_SERVICE_ACCOUNT_TYPE = void 0;
-    var crypto8 = require("crypto");
+    var crypto11 = require("crypto");
     var fs4 = require("fs");
     var https2 = require("https");
     var oauth2client_1 = require_oauth2client();
@@ -41140,7 +41140,7 @@ var require_gdchclient = __commonJS({
         const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
         const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
         const signingInput = `${encodedHeader}.${encodedPayload}`;
-        const signature = crypto8.sign("sha256", Buffer.from(signingInput), {
+        const signature = crypto11.sign("sha256", Buffer.from(signingInput), {
           key: this.privateKey,
           dsaEncoding: "ieee-p1363"
         });
@@ -42001,24 +42001,24 @@ var require_googleauth = __commonJS({
           const signed = await client.sign(data);
           return signed.signedBlob;
         }
-        const crypto8 = (0, crypto_1.createCrypto)();
+        const crypto11 = (0, crypto_1.createCrypto)();
         if (client instanceof jwtclient_1.JWT && client.key) {
-          const sign = await crypto8.sign(client.key, data);
+          const sign = await crypto11.sign(client.key, data);
           return sign;
         }
         const creds = await this.getCredentials();
         if (!creds.client_email) {
           throw new Error("Cannot sign data without `client_email`.");
         }
-        return this.signBlob(crypto8, creds.client_email, data, endpoint);
+        return this.signBlob(crypto11, creds.client_email, data, endpoint);
       }
-      async signBlob(crypto8, emailOrUniqueId, data, endpoint) {
+      async signBlob(crypto11, emailOrUniqueId, data, endpoint) {
         const url = new URL(endpoint + `${emailOrUniqueId}:signBlob`);
         const res = await this.request({
           method: "POST",
           url: url.href,
           data: {
-            payload: crypto8.encodeBase64StringUtf8(data)
+            payload: crypto11.encodeBase64StringUtf8(data)
           },
           retry: true,
           retryConfig: {
@@ -46119,7 +46119,7 @@ var require_main = __commonJS({
     var fs4 = require("fs");
     var path3 = require("path");
     var os = require("os");
-    var crypto8 = require("crypto");
+    var crypto11 = require("crypto");
     var TIPS = [
       "\u25C8 encrypted .env [www.dotenvx.com]",
       "\u25C8 secrets for agents [www.dotenvx.com]",
@@ -46363,7 +46363,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto8.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto11.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -59895,7 +59895,7 @@ __export(app_exports, {
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
-var import_crypto15 = __toESM(require("crypto"), 1);
+var import_crypto18 = __toESM(require("crypto"), 1);
 var import_express = __toESM(require_express2(), 1);
 
 // node_modules/@google/genai/dist/node/index.mjs
@@ -124269,6 +124269,10 @@ async function createTask(input, creatorUsername) {
     metric_unit: input.metric_unit ?? null,
     metric_baseline_value: input.metric_baseline_value ?? null,
     metric_result_value: null,
+    seo_search_intent: input.seo_search_intent ?? null,
+    seo_outline: input.seo_outline ?? null,
+    seo_word_count_target: input.seo_word_count_target ?? null,
+    seo_published_url: input.seo_published_url ?? null,
     created_by: creatorUsername,
     created_at: now,
     updated_at: now
@@ -124548,6 +124552,491 @@ async function deleteAssetLink(id) {
   if (error) throw new Error(`L\u1ED7i xo\xE1 link: ${error.message}`);
 }
 
+// src/server/seoToolsStore.ts
+var import_crypto6 = __toESM(require("crypto"), 1);
+function newId2() {
+  return import_crypto6.default.randomUUID();
+}
+async function readLocal() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    keyword_rank_targets: Array.isArray(store.keyword_rank_targets) ? store.keyword_rank_targets : [],
+    keyword_rank_history: Array.isArray(store.keyword_rank_history) ? store.keyword_rank_history : [],
+    sov_mentions_history: Array.isArray(store.sov_mentions_history) ? store.sov_mentions_history : []
+  };
+}
+async function writeLocal(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+async function getKeywordRankTargets() {
+  if (!isSupabaseConfigured) {
+    const { keyword_rank_targets } = await readLocal();
+    return keyword_rank_targets;
+  }
+  const { data, error } = await supabase.from("keyword_rank_targets").select("*").order("category").order("keyword");
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch t\u1EEB kho\xE1 theo d\xF5i: ${error.message}`);
+  return data || [];
+}
+async function createKeywordRankTarget(input, createdBy) {
+  const target = {
+    id: newId2(),
+    keyword: input.keyword.trim(),
+    category: input.category.trim(),
+    brands: input.brands,
+    is_active: true,
+    created_by: createdBy,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, keyword_rank_targets } = await readLocal();
+    if (keyword_rank_targets.some((t2) => t2.keyword.toLowerCase() === target.keyword.toLowerCase())) {
+      throw new Error("T\u1EEB kho\xE1 n\xE0y \u0111\xE3 c\xF3 trong danh s\xE1ch theo d\xF5i.");
+    }
+    await writeLocal(store, { keyword_rank_targets: [...keyword_rank_targets, target] });
+    return target;
+  }
+  const { error } = await supabase.from("keyword_rank_targets").insert(target);
+  if (error) throw new Error(`L\u1ED7i th\xEAm t\u1EEB kho\xE1 theo d\xF5i: ${error.message}`);
+  return target;
+}
+async function updateKeywordRankTarget(id, patch) {
+  if (!isSupabaseConfigured) {
+    const { store, keyword_rank_targets } = await readLocal();
+    await writeLocal(store, { keyword_rank_targets: keyword_rank_targets.map((t2) => t2.id === id ? { ...t2, ...patch } : t2) });
+    return;
+  }
+  const { error } = await supabase.from("keyword_rank_targets").update(patch).eq("id", id);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt t\u1EEB kho\xE1 theo d\xF5i: ${error.message}`);
+}
+async function deleteKeywordRankTarget(id) {
+  if (!isSupabaseConfigured) {
+    const { store, keyword_rank_targets, keyword_rank_history } = await readLocal();
+    await writeLocal(store, {
+      keyword_rank_targets: keyword_rank_targets.filter((t2) => t2.id !== id),
+      keyword_rank_history: keyword_rank_history.filter((h2) => h2.target_id !== id)
+    });
+    return;
+  }
+  const { error } = await supabase.from("keyword_rank_targets").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 t\u1EEB kho\xE1 theo d\xF5i: ${error.message}`);
+}
+async function upsertKeywordRankHistory(rows) {
+  if (rows.length === 0) return;
+  const withMeta = rows.map((r2) => ({ ...r2, id: newId2(), created_at: (/* @__PURE__ */ new Date()).toISOString() }));
+  if (!isSupabaseConfigured) {
+    const { store, keyword_rank_history } = await readLocal();
+    const key = (r2) => `${r2.target_id}|${r2.brand}|${r2.checked_at}`;
+    const byKey = new Map(keyword_rank_history.map((r2) => [key(r2), r2]));
+    for (const row of withMeta) byKey.set(key(row), row);
+    await writeLocal(store, { keyword_rank_history: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("keyword_rank_history").upsert(withMeta, { onConflict: "target_id,brand,checked_at" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u l\u1ECBch s\u1EED th\u1EE9 h\u1EA1ng: ${error.message}`);
+}
+async function getKeywordRankHistory(filters) {
+  if (!isSupabaseConfigured) {
+    const { keyword_rank_history } = await readLocal();
+    return keyword_rank_history.filter((r2) => {
+      if (filters?.brand && r2.brand !== filters.brand) return false;
+      if (filters?.since && r2.checked_at < filters.since) return false;
+      if (filters?.until && r2.checked_at > filters.until) return false;
+      return true;
+    });
+  }
+  let query = supabase.from("keyword_rank_history").select("*");
+  if (filters?.brand) query = query.eq("brand", filters.brand);
+  if (filters?.since) query = query.gte("checked_at", filters.since);
+  if (filters?.until) query = query.lte("checked_at", filters.until);
+  const { data, error } = await query.order("checked_at", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc l\u1ECBch s\u1EED th\u1EE9 h\u1EA1ng: ${error.message}`);
+  return data || [];
+}
+async function upsertSovMentions(rows) {
+  if (rows.length === 0) return;
+  const withMeta = rows.map((r2) => ({ ...r2, id: newId2(), created_at: (/* @__PURE__ */ new Date()).toISOString() }));
+  if (!isSupabaseConfigured) {
+    const { store, sov_mentions_history } = await readLocal();
+    const key = (r2) => `${r2.brand_name}|${r2.checked_at}`;
+    const byKey = new Map(sov_mentions_history.map((r2) => [key(r2), r2]));
+    for (const row of withMeta) byKey.set(key(row), row);
+    await writeLocal(store, { sov_mentions_history: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("sov_mentions_history").upsert(withMeta, { onConflict: "brand_name,checked_at" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u l\u1ECBch s\u1EED SOV: ${error.message}`);
+}
+async function getSovMentions(filters) {
+  if (!isSupabaseConfigured) {
+    const { sov_mentions_history } = await readLocal();
+    return sov_mentions_history.filter((r2) => {
+      if (filters?.since && r2.checked_at < filters.since) return false;
+      if (filters?.until && r2.checked_at > filters.until) return false;
+      return true;
+    });
+  }
+  let query = supabase.from("sov_mentions_history").select("*");
+  if (filters?.since) query = query.gte("checked_at", filters.since);
+  if (filters?.until) query = query.lte("checked_at", filters.until);
+  const { data, error } = await query.order("checked_at", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc l\u1ECBch s\u1EED SOV: ${error.message}`);
+  return data || [];
+}
+
+// src/server/serperClient.ts
+var SERPER_API_BASE = "https://google.serper.dev";
+var SERPER_API_KEY = process.env.SERPER_API_KEY || "";
+var isSerperConfigured = Boolean(SERPER_API_KEY);
+var SerperApiError = class extends Error {
+};
+async function serperPost(path3, body) {
+  if (!isSerperConfigured) throw new SerperApiError("SERPER_API_KEY ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  const res = await fetch(`${SERPER_API_BASE}${path3}`, {
+    method: "POST",
+    headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const json2 = await res.json();
+  if (!res.ok) {
+    throw new SerperApiError(json2?.message || `Serper API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`);
+  }
+  return json2;
+}
+async function searchGoogle(query, num = 30) {
+  const body = await serperPost("/search", { q: query, gl: "vn", hl: "vi", num });
+  return (body?.organic || []).map((r2) => ({ position: r2.position, title: r2.title, link: r2.link }));
+}
+function findDomainPosition(results, domain) {
+  const needle = domain.toLowerCase();
+  for (const r2 of results) {
+    try {
+      const host = new URL(r2.link).hostname.toLowerCase();
+      if (host === needle || host.endsWith(`.${needle}`)) return { position: r2.position, url: r2.link };
+    } catch {
+    }
+  }
+  return null;
+}
+async function searchNewsMentionCount(query) {
+  const body = await serperPost("/news", { q: query, gl: "vn", hl: "vi" });
+  return Array.isArray(body?.news) ? body.news.length : 0;
+}
+
+// src/server/seoToolsSync.ts
+var BRAND_DOMAINS = {
+  Karofi: "karofi.com",
+  Livotec: "livotec.com"
+};
+var SOV_BRANDS = ["Karofi", "Livotec", "Kangaroo", "Sunhouse", "H\xF2a Ph\xE1t"];
+function toDateStr(d) {
+  return d.toISOString().slice(0, 10);
+}
+async function runKeywordRankSync() {
+  if (!isSerperConfigured) throw new Error("SERPER_API_KEY ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  const targets = (await getKeywordRankTargets()).filter((t2) => t2.is_active);
+  const today = toDateStr(/* @__PURE__ */ new Date());
+  const results = [];
+  for (const target of targets) {
+    try {
+      const organic = await searchGoogle(target.keyword);
+      const rows = [];
+      const positions = {};
+      for (const brand of target.brands) {
+        const found = findDomainPosition(organic, BRAND_DOMAINS[brand]);
+        rows.push({ target_id: target.id, brand, checked_at: today, position: found?.position ?? null, ranking_url: found?.url ?? null });
+        positions[brand] = found?.position ?? null;
+      }
+      await upsertKeywordRankHistory(rows);
+      results.push({ keyword: target.keyword, ok: true, positions });
+    } catch (err) {
+      console.error(`Rank tracker l\u1ED7i cho t\u1EEB kho\xE1 "${target.keyword}":`, err.message || err);
+      results.push({ keyword: target.keyword, ok: false, error: err.message || String(err) });
+    }
+  }
+  return results;
+}
+async function runSovSync() {
+  if (!isSerperConfigured) throw new Error("SERPER_API_KEY ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  const today = toDateStr(/* @__PURE__ */ new Date());
+  const results = [];
+  for (const brand of SOV_BRANDS) {
+    try {
+      const count = await searchNewsMentionCount(brand);
+      await upsertSovMentions([{ brand_name: brand, checked_at: today, mention_count: count }]);
+      results.push({ brand, ok: true, mention_count: count });
+    } catch (err) {
+      console.error(`SOV sync l\u1ED7i cho brand "${brand}":`, err.message || err);
+      results.push({ brand, ok: false, error: err.message || String(err) });
+    }
+  }
+  return results;
+}
+
+// src/server/backlinkStore.ts
+var import_crypto7 = __toESM(require("crypto"), 1);
+function newId3() {
+  return import_crypto7.default.randomUUID();
+}
+async function readLocal2() {
+  const store = await getDatabaseData();
+  return { store, backlinks: Array.isArray(store.backlinks) ? store.backlinks : [] };
+}
+async function writeLocal2(store, backlinks) {
+  await saveDatabaseData({ ...store, backlinks });
+}
+async function getBacklinks(filters) {
+  if (!isSupabaseConfigured) {
+    const { backlinks } = await readLocal2();
+    return filters?.brand ? backlinks.filter((b) => b.brand === filters.brand) : backlinks;
+  }
+  let query = supabase.from("backlinks").select("*");
+  if (filters?.brand) query = query.eq("brand", filters.brand);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch backlink: ${error.message}`);
+  return data || [];
+}
+async function createBacklink(input, createdBy) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const backlink = {
+    id: newId3(),
+    brand: input.brand,
+    source_platform: input.source_platform.trim(),
+    target_url: input.target_url.trim(),
+    anchor_text: input.anchor_text?.trim() || null,
+    backlink_url: input.backlink_url.trim(),
+    link_type: input.link_type || "unknown",
+    status: "Submitted",
+    assignee_username: input.assignee_username || null,
+    submitted_at: input.submitted_at || now.slice(0, 10),
+    last_checked_at: null,
+    last_check_result: null,
+    created_by: createdBy,
+    created_at: now,
+    updated_at: now
+  };
+  if (!isSupabaseConfigured) {
+    const { store, backlinks } = await readLocal2();
+    await writeLocal2(store, [...backlinks, backlink]);
+    return backlink;
+  }
+  const { error } = await supabase.from("backlinks").insert(backlink);
+  if (error) throw new Error(`L\u1ED7i th\xEAm backlink: ${error.message}`);
+  return backlink;
+}
+async function updateBacklink(id, patch) {
+  const updated_at = (/* @__PURE__ */ new Date()).toISOString();
+  if (!isSupabaseConfigured) {
+    const { store, backlinks } = await readLocal2();
+    await writeLocal2(store, backlinks.map((b) => b.id === id ? { ...b, ...patch, updated_at } : b));
+    return;
+  }
+  const { error } = await supabase.from("backlinks").update({ ...patch, updated_at }).eq("id", id);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt backlink: ${error.message}`);
+}
+async function deleteBacklink(id) {
+  if (!isSupabaseConfigured) {
+    const { store, backlinks } = await readLocal2();
+    await writeLocal2(store, backlinks.filter((b) => b.id !== id));
+    return;
+  }
+  const { error } = await supabase.from("backlinks").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 backlink: ${error.message}`);
+}
+async function setCheckResult(id, result, newStatus) {
+  const patch = { last_checked_at: (/* @__PURE__ */ new Date()).toISOString(), last_check_result: result };
+  if (newStatus) patch.status = newStatus;
+  if (!isSupabaseConfigured) {
+    const { store, backlinks } = await readLocal2();
+    await writeLocal2(store, backlinks.map((b) => b.id === id ? { ...b, ...patch } : b));
+    return;
+  }
+  const { error } = await supabase.from("backlinks").update(patch).eq("id", id);
+  if (error) console.error("setCheckResult error:", error.message);
+}
+async function verifyAllBacklinks() {
+  const backlinks = (await getBacklinks()).filter((b) => b.status !== "Removed");
+  const results = [];
+  for (const b of backlinks) {
+    try {
+      const targetHost = new URL(b.target_url.includes("://") ? b.target_url : `https://${b.target_url}`).hostname.replace(/^www\./, "");
+      const res = await fetch(b.backlink_url, { redirect: "follow" });
+      if (!res.ok) {
+        await setCheckResult(b.id, "not_found", "Removed");
+        results.push({ id: b.id, backlink_url: b.backlink_url, ok: true, result: "not_found" });
+        continue;
+      }
+      const html = await res.text();
+      const found = html.toLowerCase().includes(targetHost.toLowerCase());
+      await setCheckResult(b.id, found ? "found" : "not_found", found ? "Live" : "Removed");
+      results.push({ id: b.id, backlink_url: b.backlink_url, ok: true, result: found ? "found" : "not_found" });
+    } catch (err) {
+      console.error(`Ki\u1EC3m tra backlink l\u1ED7i (${b.backlink_url}):`, err.message || err);
+      await setCheckResult(b.id, "error");
+      results.push({ id: b.id, backlink_url: b.backlink_url, ok: false, result: "error" });
+    }
+  }
+  return results;
+}
+
+// src/server/outreachStore.ts
+var import_crypto8 = __toESM(require("crypto"), 1);
+function newId4() {
+  return import_crypto8.default.randomUUID();
+}
+async function readLocal3() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    koc_kol_accounts: Array.isArray(store.koc_kol_accounts) ? store.koc_kol_accounts : [],
+    outreach_posts: Array.isArray(store.outreach_posts) ? store.outreach_posts : [],
+    outreach_post_metrics: Array.isArray(store.outreach_post_metrics) ? store.outreach_post_metrics : []
+  };
+}
+async function writeLocal3(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+async function getKocKolAccounts() {
+  if (!isSupabaseConfigured) {
+    const { koc_kol_accounts } = await readLocal3();
+    return koc_kol_accounts;
+  }
+  const { data, error } = await supabase.from("koc_kol_accounts").select("*").order("name");
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch KOC/KOL: ${error.message}`);
+  return data || [];
+}
+async function createKocKolAccount(input, createdBy) {
+  const account = {
+    id: newId4(),
+    name: input.name.trim(),
+    platform: input.platform,
+    handle_or_url: input.handle_or_url?.trim() || null,
+    contact_info: input.contact_info?.trim() || null,
+    notes: input.notes?.trim() || null,
+    created_by: createdBy,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, koc_kol_accounts } = await readLocal3();
+    await writeLocal3(store, { koc_kol_accounts: [...koc_kol_accounts, account] });
+    return account;
+  }
+  const { error } = await supabase.from("koc_kol_accounts").insert(account);
+  if (error) throw new Error(`L\u1ED7i th\xEAm KOC/KOL: ${error.message}`);
+  return account;
+}
+async function deleteKocKolAccount(id) {
+  if (!isSupabaseConfigured) {
+    const { store, koc_kol_accounts } = await readLocal3();
+    await writeLocal3(store, { koc_kol_accounts: koc_kol_accounts.filter((a) => a.id !== id) });
+    return;
+  }
+  const { error } = await supabase.from("koc_kol_accounts").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 KOC/KOL: ${error.message}`);
+}
+async function getOutreachPosts(filters) {
+  if (!isSupabaseConfigured) {
+    const { outreach_posts } = await readLocal3();
+    return filters?.campaignId ? outreach_posts.filter((p) => p.campaign_id === filters.campaignId) : outreach_posts;
+  }
+  let query = supabase.from("outreach_posts").select("*");
+  if (filters?.campaignId) query = query.eq("campaign_id", filters.campaignId);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch b\xE0i \u0111\u0103ng outreach: ${error.message}`);
+  return data || [];
+}
+async function getOutreachPost(id) {
+  if (!isSupabaseConfigured) {
+    const { outreach_posts } = await readLocal3();
+    return outreach_posts.find((p) => p.id === id) || null;
+  }
+  const { data, error } = await supabase.from("outreach_posts").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc b\xE0i \u0111\u0103ng outreach: ${error.message}`);
+  return data;
+}
+async function createOutreachPost(input, addedBy) {
+  const post2 = {
+    id: newId4(),
+    campaign_id: input.campaign_id,
+    koc_kol_id: input.koc_kol_id || null,
+    platform: input.platform,
+    post_url: input.post_url.trim(),
+    external_id: input.external_id || null,
+    published_at: input.published_at || null,
+    status: input.status || "Live",
+    cost: input.cost ?? null,
+    added_by: addedBy,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, outreach_posts } = await readLocal3();
+    await writeLocal3(store, { outreach_posts: [...outreach_posts, post2] });
+    return post2;
+  }
+  const { error } = await supabase.from("outreach_posts").insert(post2);
+  if (error) throw new Error(`L\u1ED7i th\xEAm b\xE0i \u0111\u0103ng outreach: ${error.message}`);
+  return post2;
+}
+async function updateOutreachPost(id, patch) {
+  if (!isSupabaseConfigured) {
+    const { store, outreach_posts } = await readLocal3();
+    await writeLocal3(store, { outreach_posts: outreach_posts.map((p) => p.id === id ? { ...p, ...patch } : p) });
+    return;
+  }
+  const { error } = await supabase.from("outreach_posts").update(patch).eq("id", id);
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt b\xE0i \u0111\u0103ng outreach: ${error.message}`);
+}
+async function deleteOutreachPost(id) {
+  if (!isSupabaseConfigured) {
+    const { store, outreach_posts, outreach_post_metrics } = await readLocal3();
+    await writeLocal3(store, {
+      outreach_posts: outreach_posts.filter((p) => p.id !== id),
+      outreach_post_metrics: outreach_post_metrics.filter((m2) => m2.post_id !== id)
+    });
+    return;
+  }
+  const { error } = await supabase.from("outreach_posts").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 b\xE0i \u0111\u0103ng outreach: ${error.message}`);
+}
+async function getOutreachPostMetrics(filters) {
+  if (!isSupabaseConfigured) {
+    const { outreach_post_metrics } = await readLocal3();
+    return outreach_post_metrics.filter((m2) => {
+      if (filters?.postId && m2.post_id !== filters.postId) return false;
+      if (filters?.postIds && !filters.postIds.includes(m2.post_id)) return false;
+      return true;
+    });
+  }
+  let query = supabase.from("outreach_post_metrics").select("*");
+  if (filters?.postId) query = query.eq("post_id", filters.postId);
+  if (filters?.postIds) query = query.in("post_id", filters.postIds);
+  const { data, error } = await query.order("recorded_at", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u outreach: ${error.message}`);
+  return data || [];
+}
+async function createOutreachPostMetric(input, enteredBy) {
+  const metric = {
+    id: newId4(),
+    post_id: input.post_id,
+    recorded_at: (/* @__PURE__ */ new Date()).toISOString(),
+    source: "manual",
+    views: input.views ?? null,
+    likes: input.likes ?? null,
+    comments: input.comments ?? null,
+    shares: input.shares ?? null,
+    entered_by: enteredBy,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, outreach_post_metrics } = await readLocal3();
+    await writeLocal3(store, { outreach_post_metrics: [...outreach_post_metrics, metric] });
+    return metric;
+  }
+  const { error } = await supabase.from("outreach_post_metrics").insert(metric);
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u outreach: ${error.message}`);
+  return metric;
+}
+
 // src/server/facebookSync.ts
 var GRAPH_API_VERSION = "v21.0";
 var GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -124640,7 +125129,7 @@ var REACTION_FIELD_BY_TYPE = {
   SAD: "sorrys",
   ANGRY: "angers"
 };
-function toDateStr(d) {
+function toDateStr2(d) {
   return d.toISOString().slice(0, 10);
 }
 var GraphApiError = class extends Error {
@@ -124818,9 +125307,9 @@ async function preserveStoredValues(pageId, rows, since, until) {
 async function runFacebookSync() {
   const pages = (await getFbPages()).filter((p) => p.is_active);
   const now = /* @__PURE__ */ new Date();
-  const until = toDateStr(now);
-  const since = toDateStr(new Date(now.getTime() - INSIGHTS_BACKFILL_DAYS * 24 * 60 * 60 * 1e3));
-  const postsSince = toDateStr(new Date(now.getTime() - POSTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1e3));
+  const until = toDateStr2(now);
+  const since = toDateStr2(new Date(now.getTime() - INSIGHTS_BACKFILL_DAYS * 24 * 60 * 60 * 1e3));
+  const postsSince = toDateStr2(new Date(now.getTime() - POSTS_LOOKBACK_DAYS * 24 * 60 * 60 * 1e3));
   return Promise.all(
     pages.map(async (page) => {
       const tokenStatus = { invalid: false };
@@ -124918,20 +125407,20 @@ function detectBrandFromAdvertiserName(name) {
 }
 
 // src/server/oauthPendingStore.ts
-var import_crypto7 = require("crypto");
+var import_crypto10 = require("crypto");
 var PENDING_TTL_MS = 60 * 60 * 1e3;
-async function readLocal() {
+async function readLocal4() {
   const store = await getDatabaseData();
   return { store, rows: Array.isArray(store.platform_oauth_pending) ? store.platform_oauth_pending : [] };
 }
-async function writeLocal(store, rows) {
+async function writeLocal4(store, rows) {
   await saveDatabaseData({ ...store, platform_oauth_pending: rows });
 }
 function isExpired(row) {
   return Date.now() - new Date(row.created_at).getTime() > PENDING_TTL_MS;
 }
 async function createOAuthPending(platform, tokenPlain, candidates) {
-  const id = (0, import_crypto7.randomUUID)();
+  const id = (0, import_crypto10.randomUUID)();
   const record = {
     id,
     platform,
@@ -124940,8 +125429,8 @@ async function createOAuthPending(platform, tokenPlain, candidates) {
     created_at: (/* @__PURE__ */ new Date()).toISOString()
   };
   if (!isSupabaseConfigured) {
-    const { store, rows } = await readLocal();
-    await writeLocal(store, [...rows.filter((r2) => !isExpired(r2)), record]);
+    const { store, rows } = await readLocal4();
+    await writeLocal4(store, [...rows.filter((r2) => !isExpired(r2)), record]);
     return id;
   }
   await supabase.from("platform_oauth_pending").delete().lt("created_at", new Date(Date.now() - PENDING_TTL_MS).toISOString());
@@ -124952,7 +125441,7 @@ async function createOAuthPending(platform, tokenPlain, candidates) {
 async function getOAuthPending(id) {
   let record = null;
   if (!isSupabaseConfigured) {
-    const { rows } = await readLocal();
+    const { rows } = await readLocal4();
     record = rows.find((r2) => r2.id === id) || null;
   } else {
     const { data, error } = await supabase.from("platform_oauth_pending").select("*").eq("id", id).maybeSingle();
@@ -124965,8 +125454,8 @@ async function getOAuthPending(id) {
 }
 async function deleteOAuthPending(id) {
   if (!isSupabaseConfigured) {
-    const { store, rows } = await readLocal();
-    await writeLocal(store, rows.filter((r2) => r2.id !== id));
+    const { store, rows } = await readLocal4();
+    await writeLocal4(store, rows.filter((r2) => r2.id !== id));
     return;
   }
   const { error } = await supabase.from("platform_oauth_pending").delete().eq("id", id);
@@ -125272,7 +125761,7 @@ function dateRangeChunks(since, until) {
   while (chunkStart <= end) {
     const chunkEnd = new Date(chunkStart.getTime() + (MAX_CHUNK_DAYS - 1) * 24 * 60 * 60 * 1e3);
     if (chunkEnd > end) chunkEnd.setTime(end.getTime());
-    chunks.push({ since: toDateStr(chunkStart), until: toDateStr(chunkEnd) });
+    chunks.push({ since: toDateStr2(chunkStart), until: toDateStr2(chunkEnd) });
     chunkStart = new Date(chunkEnd.getTime() + 24 * 60 * 60 * 1e3);
   }
   return chunks;
@@ -125387,8 +125876,8 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
 async function runFacebookAdsSync(overrides) {
   const accounts = (await getFbAdAccounts()).filter((a) => a.is_active);
   const now = /* @__PURE__ */ new Date();
-  const until = overrides?.until || toDateStr(now);
-  const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS * 24 * 60 * 60 * 1e3));
+  const until = overrides?.until || toDateStr2(now);
+  const since = overrides?.since || toDateStr2(new Date(now.getTime() - ADS_BACKFILL_DAYS * 24 * 60 * 60 * 1e3));
   const chunks = dateRangeChunks(since, until);
   return Promise.all(
     accounts.map(async (account) => {
@@ -125455,7 +125944,7 @@ function dateRangeChunks2(since, until, maxDays) {
   while (chunkStart <= end) {
     const chunkEnd = new Date(chunkStart.getTime() + (maxDays - 1) * 24 * 60 * 60 * 1e3);
     if (chunkEnd > end) chunkEnd.setTime(end.getTime());
-    chunks.push({ since: toDateStr(chunkStart), until: toDateStr(chunkEnd) });
+    chunks.push({ since: toDateStr2(chunkStart), until: toDateStr2(chunkEnd) });
     chunkStart = new Date(chunkEnd.getTime() + 24 * 60 * 60 * 1e3);
   }
   return chunks;
@@ -125648,8 +126137,8 @@ async function runGoogleAdsSync(overrides) {
   }
   const accounts = (await getGoogleAdsAccounts()).filter((a) => a.is_active);
   const now = /* @__PURE__ */ new Date();
-  const until = overrides?.until || toDateStr(now);
-  const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS2 * 24 * 60 * 60 * 1e3));
+  const until = overrides?.until || toDateStr2(now);
+  const since = overrides?.since || toDateStr2(new Date(now.getTime() - ADS_BACKFILL_DAYS2 * 24 * 60 * 60 * 1e3));
   const chunks = dateRangeChunks2(since, until, MAX_GOOGLE_CHUNK_DAYS);
   return Promise.all(accounts.map(async (account) => {
     let rowsSynced = 0;
@@ -125686,8 +126175,8 @@ async function runGoogleAdsSync(overrides) {
 async function runTiktokAdsSync(overrides) {
   const accounts = (await getTiktokAdsAccounts()).filter((a) => a.is_active);
   const now = /* @__PURE__ */ new Date();
-  const until = overrides?.until || toDateStr(now);
-  const since = overrides?.since || toDateStr(new Date(now.getTime() - ADS_BACKFILL_DAYS2 * 24 * 60 * 60 * 1e3));
+  const until = overrides?.until || toDateStr2(now);
+  const since = overrides?.since || toDateStr2(new Date(now.getTime() - ADS_BACKFILL_DAYS2 * 24 * 60 * 60 * 1e3));
   const chunks = dateRangeChunks2(since, until, MAX_TIKTOK_CHUNK_DAYS);
   return Promise.all(accounts.map(async (account) => {
     let rowsSynced = 0;
@@ -125899,7 +126388,7 @@ async function fetchRecentVideos(accessToken) {
   }
   return videos;
 }
-function toDateStr2(d) {
+function toDateStr3(d) {
   return d.toISOString().slice(0, 10);
 }
 async function runTiktokSync() {
@@ -125908,7 +126397,7 @@ async function runTiktokSync() {
   }
   const accounts = (await getTiktokAccounts()).filter((a) => a.is_active);
   const results = [];
-  const today = toDateStr2(/* @__PURE__ */ new Date());
+  const today = toDateStr3(/* @__PURE__ */ new Date());
   for (const account of accounts) {
     let refreshTokenInvalid = false;
     try {
@@ -126203,7 +126692,7 @@ async function fetchVideoViewsBySource(accessToken, videoId, publishedAt) {
   }
   return { organic, advertising };
 }
-function toDateStr3(d) {
+function toDateStr4(d) {
   return d.toISOString().slice(0, 10);
 }
 async function runYoutubeSync() {
@@ -126212,7 +126701,7 @@ async function runYoutubeSync() {
   }
   const accounts = (await getYoutubeAccounts()).filter((a) => a.is_active);
   const results = [];
-  const today = toDateStr3(/* @__PURE__ */ new Date());
+  const today = toDateStr4(/* @__PURE__ */ new Date());
   for (const account of accounts) {
     let refreshTokenInvalid = false;
     try {
@@ -126634,7 +127123,7 @@ async function listSearchConsoleSites(accessToken) {
   }
   return (body?.siteEntry || []).map((s2) => s2.siteUrl);
 }
-function toDateStr4(d) {
+function toDateStr5(d) {
   return d.toISOString().slice(0, 10);
 }
 function formatGa4Date(raw) {
@@ -126854,8 +127343,8 @@ async function runGoogleWebsiteSync() {
   }
   const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active);
   const results = [];
-  const until = toDateStr4(new Date(Date.now() - 3 * 24 * 60 * 60 * 1e3));
-  const since = toDateStr4(new Date(Date.now() - 33 * 24 * 60 * 60 * 1e3));
+  const until = toDateStr5(new Date(Date.now() - 3 * 24 * 60 * 60 * 1e3));
+  const since = toDateStr5(new Date(Date.now() - 33 * 24 * 60 * 60 * 1e3));
   for (const account of accounts) {
     let refreshTokenInvalid = false;
     try {
@@ -127657,9 +128146,9 @@ function isValidCronRequest(req) {
   const expected = process.env.CRON_SECRET;
   const provided = req.headers.authorization;
   if (!expected || !provided) return false;
-  const expectedDigest = import_crypto15.default.createHash("sha256").update(`Bearer ${expected}`).digest();
-  const providedDigest = import_crypto15.default.createHash("sha256").update(provided).digest();
-  return import_crypto15.default.timingSafeEqual(expectedDigest, providedDigest);
+  const expectedDigest = import_crypto18.default.createHash("sha256").update(`Bearer ${expected}`).digest();
+  const providedDigest = import_crypto18.default.createHash("sha256").update(provided).digest();
+  return import_crypto18.default.timingSafeEqual(expectedDigest, providedDigest);
 }
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
@@ -128188,6 +128677,10 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       console.error("GET /api/cron/facebook-sync (recurring tasks) error:", err);
       return [];
     });
+    const backlinkVerifyResult = await verifyAllBacklinks().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (backlink verify) error:", err);
+      return [];
+    });
     res.json({
       success: true,
       results: pageResults,
@@ -128198,7 +128691,8 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       youtubeResults,
       googleWebsiteResults,
       expiryCheck,
-      recurringTasksResult
+      recurringTasksResult,
+      backlinkVerifyResult
     });
   } catch (err) {
     console.error("GET /api/cron/facebook-sync error:", err);
@@ -128621,8 +129115,8 @@ app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
     });
   }
   const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const codeVerifier = import_crypto15.default.randomBytes(48).toString("base64url");
-  const codeChallenge = import_crypto15.default.createHash("sha256").update(codeVerifier).digest("base64url");
+  const codeVerifier = import_crypto18.default.randomBytes(48).toString("base64url");
+  const codeChallenge = import_crypto18.default.createHash("sha256").update(codeVerifier).digest("base64url");
   const state = signOAuthState({ brand, username: req.session.username, codeVerifier });
   const params = new URLSearchParams({
     client_key: TIKTOK_CLIENT_KEY,
@@ -129419,6 +129913,261 @@ app.delete("/api/campaign/asset-links/:id", requireAuth("Editor"), async (req, r
     await deleteAssetLink(req.params.id);
     await logAction(req.session, req, "campaign-delete-asset-link", `Xo\xE1 link ${req.params.id} kh\u1ECFi Asset Library`);
     res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/seo-tools/keyword-targets", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, targets: await getKeywordRankTargets(), serperConfigured: isSerperConfigured });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/seo-tools/keyword-targets", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { keyword, category, brands } = req.body || {};
+    if (!keyword || !category || !Array.isArray(brands) || brands.length === 0) {
+      return res.status(400).json({ error: "Thi\u1EBFu keyword, category ho\u1EB7c brands." });
+    }
+    const session = req.session;
+    const target = await createKeywordRankTarget({ keyword, category, brands }, session.username);
+    await logAction(session, req, "seo-add-keyword-target", `Th\xEAm t\u1EEB kho\xE1 theo d\xF5i "${target.keyword}"`);
+    res.json({ success: true, target });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.patch("/api/seo-tools/keyword-targets/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await updateKeywordRankTarget(req.params.id, req.body || {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/seo-tools/keyword-targets/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await deleteKeywordRankTarget(req.params.id);
+    await logAction(req.session, req, "seo-delete-keyword-target", `Xo\xE1 t\u1EEB kho\xE1 theo d\xF5i ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/seo-tools/keyword-rank-history", requireAuth(), async (req, res) => {
+  try {
+    const { brand, since, until } = req.query;
+    const history = await getKeywordRankHistory({
+      brand: typeof brand === "string" && brand ? brand : void 0,
+      since: typeof since === "string" && since ? since : void 0,
+      until: typeof until === "string" && until ? until : void 0
+    });
+    res.json({ success: true, history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/api/seo-tools/sov", requireAuth(), async (req, res) => {
+  try {
+    const { since, until } = req.query;
+    const mentions = await getSovMentions({
+      since: typeof since === "string" && since ? since : void 0,
+      until: typeof until === "string" && until ? until : void 0
+    });
+    res.json({ success: true, mentions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/seo-tools/sync-now", requireAuth("Editor"), async (req, res) => {
+  try {
+    const [rankResults, sovResults] = await Promise.all([runKeywordRankSync(), runSovSync()]);
+    await logAction(req.session, req, "seo-tools-sync", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng Rank Tracker (${rankResults.length}) + SOV (${sovResults.length})`);
+    res.json({ success: true, rankResults, sovResults });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/cron/seo-tools-weekly", async (req, res) => {
+  try {
+    if (!isValidCronRequest(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (!isSerperConfigured) {
+      return res.json({ success: true, skipped: "SERPER_API_KEY ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh." });
+    }
+    const [rankResults, sovResults] = await Promise.all([
+      runKeywordRankSync().catch((err) => {
+        console.error("GET /api/cron/seo-tools-weekly (rank) error:", err);
+        return [];
+      }),
+      runSovSync().catch((err) => {
+        console.error("GET /api/cron/seo-tools-weekly (sov) error:", err);
+        return [];
+      })
+    ]);
+    res.json({ success: true, rankResults, sovResults });
+  } catch (err) {
+    console.error("GET /api/cron/seo-tools-weekly error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/api/backlinks", requireAuth(), async (req, res) => {
+  try {
+    const { brand } = req.query;
+    const backlinks = await getBacklinks({ brand: typeof brand === "string" && brand ? brand : void 0 });
+    res.json({ success: true, backlinks });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/backlinks", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { brand, source_platform, target_url, backlink_url } = req.body || {};
+    if (!brand || !source_platform || !target_url || !backlink_url) {
+      return res.status(400).json({ error: "Thi\u1EBFu brand, source_platform, target_url ho\u1EB7c backlink_url." });
+    }
+    const session = req.session;
+    const backlink = await createBacklink(req.body, session.username);
+    await logAction(session, req, "backlink-create", `Th\xEAm backlink t\u1EEB ${backlink.source_platform}`);
+    res.json({ success: true, backlink });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.put("/api/backlinks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await updateBacklink(req.params.id, req.body || {});
+    await logAction(req.session, req, "backlink-update", `C\u1EADp nh\u1EADt backlink ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/backlinks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await deleteBacklink(req.params.id);
+    await logAction(req.session, req, "backlink-delete", `Xo\xE1 backlink ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.post("/api/backlinks/verify-now", requireAuth("Editor"), async (req, res) => {
+  try {
+    const results = await verifyAllBacklinks();
+    await logAction(req.session, req, "backlink-verify", `Ki\u1EC3m tra th\u1EE7 c\xF4ng ${results.length} backlink`);
+    res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/outreach/koc-kol", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, accounts: await getKocKolAccounts() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/outreach/koc-kol", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { name, platform } = req.body || {};
+    if (!name || !platform) return res.status(400).json({ error: "Thi\u1EBFu name ho\u1EB7c platform." });
+    const session = req.session;
+    const account = await createKocKolAccount(req.body, session.username);
+    await logAction(session, req, "outreach-add-roster", `Th\xEAm KOC/KOL "${account.name}" v\xE0o roster`);
+    res.json({ success: true, account });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/outreach/koc-kol/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteKocKolAccount(req.params.id);
+    await logAction(req.session, req, "outreach-delete-roster", `Xo\xE1 KOC/KOL ${req.params.id} kh\u1ECFi roster`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/outreach/posts", requireAuth(), async (req, res) => {
+  try {
+    const { campaign_id } = req.query;
+    const session = req.session;
+    const posts = await getOutreachPosts({ campaignId: typeof campaign_id === "string" && campaign_id ? campaign_id : void 0 });
+    const withPermission = await Promise.all(posts.map(async (p) => ({ ...p, can_edit: await canEditCampaign(p.campaign_id, session) })));
+    res.json({ success: true, posts: withPermission });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/outreach/posts", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { campaign_id, platform, post_url } = req.body || {};
+    if (!campaign_id || !platform || !post_url) return res.status(400).json({ error: "Thi\u1EBFu campaign_id, platform ho\u1EB7c post_url." });
+    const session = req.session;
+    if (!await canEditCampaign(campaign_id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n th\xEAm b\xE0i \u0111\u0103ng cho campaign n\xE0y." });
+    }
+    const post2 = await createOutreachPost(req.body, session.username);
+    await logAction(session, req, "outreach-add-post", `Th\xEAm b\xE0i \u0111\u0103ng outreach cho campaign ${campaign_id}`);
+    res.json({ success: true, post: post2 });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.put("/api/outreach/posts/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getOutreachPost(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y b\xE0i \u0111\u0103ng." });
+    const session = req.session;
+    if (!await canEditCampaign(existing.campaign_id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n s\u1EEDa b\xE0i \u0111\u0103ng n\xE0y." });
+    }
+    await updateOutreachPost(req.params.id, req.body || {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/outreach/posts/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getOutreachPost(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y b\xE0i \u0111\u0103ng." });
+    const session = req.session;
+    if (!await canEditCampaign(existing.campaign_id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n xo\xE1 b\xE0i \u0111\u0103ng n\xE0y." });
+    }
+    await deleteOutreachPost(req.params.id);
+    await logAction(session, req, "outreach-delete-post", `Xo\xE1 b\xE0i \u0111\u0103ng outreach ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/outreach/metrics", requireAuth(), async (req, res) => {
+  try {
+    const { post_id, post_ids } = req.query;
+    const metrics = await getOutreachPostMetrics({
+      postId: typeof post_id === "string" && post_id ? post_id : void 0,
+      postIds: typeof post_ids === "string" && post_ids ? post_ids.split(",") : void 0
+    });
+    res.json({ success: true, metrics });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/outreach/posts/:id/metrics", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getOutreachPost(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y b\xE0i \u0111\u0103ng." });
+    const session = req.session;
+    if (!await canEditCampaign(existing.campaign_id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n c\u1EADp nh\u1EADt s\u1ED1 li\u1EC7u b\xE0i \u0111\u0103ng n\xE0y." });
+    }
+    const metric = await createOutreachPostMetric({ post_id: req.params.id, ...req.body }, session.username);
+    res.json({ success: true, metric });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

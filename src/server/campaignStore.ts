@@ -96,6 +96,12 @@ export interface Task {
   metric_unit: string | null;
   metric_baseline_value: number | null;
   metric_result_value: number | null;
+  // Content Brief (SEO) — only meaningful when work_stream = "SEO". Shown
+  // conditionally in CampaignManagement.tsx's task form.
+  seo_search_intent: string | null;
+  seo_outline: string | null;
+  seo_word_count_target: number | null;
+  seo_published_url: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -452,6 +458,10 @@ export async function createTask(
         | "metric_unit"
         | "metric_baseline_value"
         | "recurrence"
+        | "seo_search_intent"
+        | "seo_outline"
+        | "seo_word_count_target"
+        | "seo_published_url"
       >
     >,
   creatorUsername: string
@@ -480,6 +490,10 @@ export async function createTask(
     metric_unit: input.metric_unit ?? null,
     metric_baseline_value: input.metric_baseline_value ?? null,
     metric_result_value: null,
+    seo_search_intent: input.seo_search_intent ?? null,
+    seo_outline: input.seo_outline ?? null,
+    seo_word_count_target: input.seo_word_count_target ?? null,
+    seo_published_url: input.seo_published_url ?? null,
     created_by: creatorUsername,
     created_at: now,
     updated_at: now,
@@ -532,6 +546,10 @@ export async function updateTask(
       | "metric_baseline_value"
       | "metric_result_value"
       | "recurrence"
+      | "seo_search_intent"
+      | "seo_outline"
+      | "seo_word_count_target"
+      | "seo_published_url"
     >
   >,
   actorUsername: string
