@@ -21,6 +21,7 @@ import { mergeCommentTrees } from "./lib/comments";
 import { UserAccount, DEFAULT_USERS, USERS_CONFIG_VERSION, reconcileUsers } from "./lib/defaultUsers";
 import { AdsPerformanceRow } from "./lib/adsImport";
 import SocialReport from "./components/SocialReport";
+import FacebookConnectAdmin from "./components/FacebookConnectAdmin";
 import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
 import DigitalAdsReport from "./components/DigitalAdsReport";
 import FbAdAccountsAdmin from "./components/FbAdAccountsAdmin";
@@ -29,6 +30,7 @@ import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
 import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
 import DriveBackupAdmin from "./components/DriveBackupAdmin";
 import PaidAdsApiAccountsAdmin from "./components/PaidAdsApiAccountsAdmin";
+import TiktokAdsConnectAdmin from "./components/TiktokAdsConnectAdmin";
 import GoogleWebsiteAccountsAdmin from "./components/GoogleWebsiteAccountsAdmin";
 import WebsiteReport from "./components/WebsiteReport";
 import CampaignManagement from "./components/CampaignManagement";
@@ -6477,6 +6479,7 @@ export default function App() {
 
             {controlPanelSection === "platform-connections" && platformSubTab === "facebook" && currentUser && currentUser.role === "Admin" && (
               <div className="space-y-6">
+                <FacebookConnectAdmin onImported={() => window.location.reload()} />
                 <FacebookPagesAdmin />
                 <FbAdAccountsAdmin />
                 <AdsUploadAdmin channel="facebook" />
@@ -6493,6 +6496,7 @@ export default function App() {
             {controlPanelSection === "platform-connections" && platformSubTab === "tiktok" && (
               <div className="space-y-6">
                 {currentUser && currentUser.role === "Admin" && <TiktokAccountsAdmin />}
+                {currentUser && currentUser.role === "Admin" && <TiktokAdsConnectAdmin onImported={() => window.location.reload()} />}
                 {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="tiktok" />}
                 <AdsUploadAdmin channel="tiktok" />
               </div>

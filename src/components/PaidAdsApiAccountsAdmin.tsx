@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, ExternalLink, PlusCircle, RefreshCw, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 type PaidAdsPlatform = "google" | "tiktok";
@@ -37,9 +37,9 @@ const PLATFORM_COPY = {
     accountsPath: "/api/google-ads/accounts",
   },
   tiktok: {
-    title: "Kết Nối TikTok Ads (Business API)",
+    title: "TikTok Ads Advertiser đã kết nối",
     description:
-      "Đồng bộ dữ liệu quảng cáo TikTok từ Business API vào tab TikTok trong Digital Ads Report. Access Token được mã hóa trước khi lưu.",
+      "Đồng bộ dữ liệu quảng cáo TikTok từ Business API vào tab TikTok trong Digital Ads Report. Thêm Advertiser mới qua thẻ \"Kết Nối TikTok Ads\" phía trên (đăng nhập TikTok Business một lần, chọn Advertiser cần nhập) — không dán token tay ở đây nữa.",
     idLabel: "Advertiser ID",
     idPlaceholder: "7490000000000000000",
     namePlaceholder: "Karofi - TikTok Ads",
@@ -64,7 +64,6 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
   const [accountName, setAccountName] = useState("");
   const [brand, setBrand] = useState<"Livotec" | "Karofi">("Livotec");
   const [loginCustomerId, setLoginCustomerId] = useState("590-131-4360");
-  const [accessToken, setAccessToken] = useState("");
   const [backfillSince, setBackfillSince] = useState("");
 
   async function loadAccounts() {
@@ -127,34 +126,17 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
     }
   }
 
-  async function handleTiktokSave(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSaving(true);
-    setMessage(null);
+  async function handleSetTiktokBrand(id: string, newBrand: "Livotec" | "Karofi") {
     try {
-      const result = await safeFetchJson(copy.accountsPath, {
-        method: "POST",
+      const result = await safeFetchJson(`/api/tiktok-ads/accounts/${encodeURIComponent(id)}/brand`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          advertiser_id: accountId.trim(),
-          account_name: accountName.trim(),
-          brand,
-          access_token: accessToken.trim(),
-        }),
+        body: JSON.stringify({ brand: newBrand }),
       });
-      if (result.success) {
-        setMessage({ type: "success", text: "Đã lưu TikTok Ads Account." });
-        setAccountId("");
-        setAccountName("");
-        setAccessToken("");
-        await loadAccounts();
-      } else {
-        setMessage({ type: "error", text: result.error || "Lưu tài khoản thất bại." });
-      }
+      if (result.success) await loadAccounts();
+      else setMessage({ type: "error", text: result.error || "Gán thương hiệu thất bại." });
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Lưu tài khoản thất bại." });
-    } finally {
-      setIsSaving(false);
+      setMessage({ type: "error", text: err.message || "Gán thương hiệu thất bại." });
     }
   }
 
@@ -192,7 +174,6 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
     }
   }
 
-  const onSubmit = platform === "google" ? handleGoogleConnect : handleTiktokSave;
 
   return (
     <div className="w-full animate-fade-in space-y-4 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
@@ -229,41 +210,41 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">{copy.idLabel}</label>
-          <input
-            type="text"
-            required
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            placeholder={copy.idPlaceholder}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Tên Account</label>
-          <input
-            type="text"
-            required
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            placeholder={copy.namePlaceholder}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Thương hiệu</label>
-          <select
-            value={brand}
-            onChange={(e) => setBrand(e.target.value as "Livotec" | "Karofi")}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          >
-            <option value="Livotec">Livotec</option>
-            <option value="Karofi">Karofi</option>
-          </select>
-        </div>
-        {platform === "google" ? (
+      {platform === "google" && (
+        <form onSubmit={handleGoogleConnect} className="grid gap-3 sm:grid-cols-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600">{copy.idLabel}</label>
+            <input
+              type="text"
+              required
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              placeholder={copy.idPlaceholder}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Tên Account</label>
+            <input
+              type="text"
+              required
+              value={accountName}
+              onChange={(e) => setAccountName(e.target.value)}
+              placeholder={copy.namePlaceholder}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Thương hiệu</label>
+            <select
+              value={brand}
+              onChange={(e) => setBrand(e.target.value as "Livotec" | "Karofi")}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+            >
+              <option value="Livotec">Livotec</option>
+              <option value="Karofi">Karofi</option>
+            </select>
+          </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Manager ID</label>
             <input
@@ -275,30 +256,18 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
             />
             <p className="text-[11px] text-slate-500">Bắt buộc khi truy cập client qua MCC.</p>
           </div>
-        ) : (
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-600">{copy.tokenLabel}</label>
-            <input
-              type="password"
-              required
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              placeholder={copy.tokenPlaceholder}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-            />
+          <div className="sm:col-span-4">
+            <button
+              type="submit"
+              disabled={isSaving || !configured}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {isSaving ? "Đang lưu..." : "Kết nối Google Ads"}
+            </button>
           </div>
-        )}
-        <div className="sm:col-span-4">
-          <button
-            type="submit"
-            disabled={isSaving || (platform === "google" && !configured)}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {platform === "google" ? <ExternalLink className="h-3.5 w-3.5" /> : <PlusCircle className="h-3.5 w-3.5" />}
-            {isSaving ? "Đang lưu..." : platform === "google" ? "Kết nối Google Ads" : "Thêm / Cập nhật TikTok Ads"}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <table className="w-full text-xs">
@@ -328,7 +297,25 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
                     <div className="text-slate-400">{a.account_id}{a.login_customer_id ? ` · MCC ${a.login_customer_id}` : ""}</div>
                   </td>
                   <td className="px-3 py-2">
-                    {a.brand ? <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{a.brand}</span> : <span className="text-amber-600">Chưa gán</span>}
+                    {platform === "tiktok" ? (
+                      <select
+                        value={a.brand || ""}
+                        onChange={(e) => handleSetTiktokBrand(a.account_id, e.target.value as "Livotec" | "Karofi")}
+                        className={`rounded-lg border px-2 py-1 text-xs font-semibold ${
+                          a.brand ? "border-slate-200 bg-slate-100 text-slate-600" : "border-amber-300 bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        <option value="" disabled>
+                          {a.brand ? a.brand : "Chưa gán — chọn"}
+                        </option>
+                        <option value="Livotec">Livotec</option>
+                        <option value="Karofi">Karofi</option>
+                      </select>
+                    ) : a.brand ? (
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{a.brand}</span>
+                    ) : (
+                      <span className="text-amber-600">Chưa gán</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-slate-500">{a.last_synced_at ? new Date(a.last_synced_at).toLocaleString("vi-VN") : "Chưa đồng bộ"}</td>
                   <td className="px-3 py-2">

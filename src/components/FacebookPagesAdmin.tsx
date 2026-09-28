@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Facebook, Trash2, RefreshCw, CheckCircle2, AlertCircle, PlusCircle } from "lucide-react";
+import { Facebook, Trash2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 interface FbPageRow {
@@ -74,11 +74,6 @@ interface SyncResult {
 export default function FacebookPagesAdmin() {
   const [pages, setPages] = useState<FbPageRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [pageId, setPageId] = useState("");
-  const [pageName, setPageName] = useState("");
-  const [brand, setBrand] = useState<"Livotec" | "Karofi">("Livotec");
-  const [accessToken, setAccessToken] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<SyncResult[] | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -99,29 +94,17 @@ export default function FacebookPagesAdmin() {
     loadPages();
   }, []);
 
-  async function handleAddPage(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSaving(true);
-    setMessage(null);
+  async function handleSetBrand(id: string, brand: "Livotec" | "Karofi") {
     try {
-      const result = await safeFetchJson("/api/fb/pages", {
-        method: "POST",
+      const result = await safeFetchJson(`/api/fb/pages/${encodeURIComponent(id)}/brand`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page_id: pageId.trim(), page_name: pageName.trim(), brand, access_token: accessToken.trim() }),
+        body: JSON.stringify({ brand }),
       });
-      if (result.success) {
-        setMessage({ type: "success", text: "Đã lưu Page." });
-        setPageId("");
-        setPageName("");
-        setAccessToken("");
-        await loadPages();
-      } else {
-        setMessage({ type: "error", text: result.error || "Lưu Page thất bại." });
-      }
+      if (result.success) await loadPages();
+      else setMessage({ type: "error", text: result.error || "Gán thương hiệu thất bại." });
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Lưu Page thất bại." });
-    } finally {
-      setIsSaving(false);
+      setMessage({ type: "error", text: err.message || "Gán thương hiệu thất bại." });
     }
   }
 
@@ -171,40 +154,14 @@ export default function FacebookPagesAdmin() {
           <Facebook className="h-4 w-4" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-slate-900">Kết Nối Facebook Page</h3>
+          <h3 className="text-sm font-bold text-slate-900">Facebook Page đã kết nối</h3>
           <p className="text-[11px] text-slate-500">
-            Đồng bộ Page/Post Insights mỗi ngày (Vercel Cron 01:00) cho tab "Facebook Insights". Access Token được mã hóa trước khi lưu. Kết nối được giữ nguyên vô thời hạn — chỉ mất khi bạn bấm "Xóa" hoặc khi Facebook tự xác nhận token đã hết hạn (🔴 dưới đây); lỗi tạm thời (⚠️) sẽ tự đồng bộ lại ở lần sau, không cần làm gì.
+            Đồng bộ Page/Post Insights mỗi ngày (Vercel Cron 01:00) cho tab "Facebook Insights". Thêm Page mới qua thẻ "Kết Nối
+            Facebook" phía trên (đăng nhập Facebook một lần, chọn Page cần nhập) — không dán token tay ở đây nữa. Kết nối được
+            giữ nguyên vô thời hạn — chỉ mất khi bạn bấm "Xóa" hoặc khi Facebook tự xác nhận token đã hết hạn (🔴 dưới đây); lỗi
+            tạm thời (⚠️) sẽ tự đồng bộ lại ở lần sau, không cần làm gì.
           </p>
         </div>
-      </div>
-
-      <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
-        <p className="font-semibold">
-          Lưu ý: phải dán <u>Page Access Token</u>, không phải User Access Token — dán nhầm sẽ báo lỗi "Invalid OAuth
-          2.0 Access Token" khi đồng bộ.
-        </p>
-        <ol className="list-decimal space-y-1 pl-4">
-          <li>
-            Vào{" "}
-            <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="font-semibold underline">
-              Graph API Explorer
-            </a>{" "}
-            → chọn App của bạn → "Add Permissions" → tick đủ{" "}
-            <code className="rounded bg-amber-100 px-1">pages_show_list</code>,{" "}
-            <code className="rounded bg-amber-100 px-1">pages_read_engagement</code>,{" "}
-            <code className="rounded bg-amber-100 px-1">pages_read_user_content</code>,{" "}
-            <code className="rounded bg-amber-100 px-1">read_insights</code> → Generate Access Token (đây vẫn là User Token, sống ngắn).
-          </li>
-          <li>
-            Dán User Token đó vào <em>Access Token Debugger</em> → "Extend Access Token" → lấy User Token dài hạn (60 ngày).
-          </li>
-          <li>
-            Dùng chính User Token dài hạn đó mở URL{" "}
-            <code className="rounded bg-amber-100 px-1">https://graph.facebook.com/me/accounts?access_token=&lt;user_token_dài_hạn&gt;</code>{" "}
-            — mỗi Page trong kết quả JSON có field <code className="rounded bg-amber-100 px-1">access_token</code> riêng, đó mới là{" "}
-            <strong>Page Access Token</strong> cần dán vào ô "Access Token" bên dưới (kế thừa quyền + thời hạn từ User Token gốc, không cần extend riêng).
-          </li>
-        </ol>
       </div>
 
       {expiringSoon.length > 0 && (
@@ -233,63 +190,6 @@ export default function FacebookPagesAdmin() {
           {message.text}
         </div>
       )}
-
-      <form onSubmit={handleAddPage} className="grid gap-3 sm:grid-cols-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Page ID</label>
-          <input
-            type="text"
-            required
-            value={pageId}
-            onChange={(e) => setPageId(e.target.value)}
-            placeholder="1234567890"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Tên Page</label>
-          <input
-            type="text"
-            required
-            value={pageName}
-            onChange={(e) => setPageName(e.target.value)}
-            placeholder="Karofi Việt Nam"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Thương hiệu</label>
-          <select
-            value={brand}
-            onChange={(e) => setBrand(e.target.value as "Livotec" | "Karofi")}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          >
-            <option value="Livotec">Livotec</option>
-            <option value="Karofi">Karofi</option>
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Access Token</label>
-          <input
-            type="password"
-            required
-            value={accessToken}
-            onChange={(e) => setAccessToken(e.target.value)}
-            placeholder="EAAG..."
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="sm:col-span-4">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            {isSaving ? "Đang lưu..." : "Thêm / Cập nhật Page"}
-          </button>
-        </div>
-      </form>
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <table className="w-full text-xs">
@@ -323,11 +223,19 @@ export default function FacebookPagesAdmin() {
                     <div className="text-slate-400">{p.page_id}</div>
                   </td>
                   <td className="px-3 py-2">
-                    {p.brand ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{p.brand}</span>
-                    ) : (
-                      <span className="text-amber-600">Chưa gán</span>
-                    )}
+                    <select
+                      value={p.brand || ""}
+                      onChange={(e) => handleSetBrand(p.page_id, e.target.value as "Livotec" | "Karofi")}
+                      className={`rounded-lg border px-2 py-1 text-xs font-semibold ${
+                        p.brand ? "border-slate-200 bg-slate-100 text-slate-600" : "border-amber-300 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      <option value="" disabled>
+                        {p.brand ? p.brand : "Chưa gán — chọn"}
+                      </option>
+                      <option value="Livotec">Livotec</option>
+                      <option value="Karofi">Karofi</option>
+                    </select>
                   </td>
                   <td className="px-3 py-2 text-slate-500">
                     {p.last_synced_at ? new Date(p.last_synced_at).toLocaleString("vi-VN") : "Chưa đồng bộ"}

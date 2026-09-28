@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Megaphone, Trash2, RefreshCw, CheckCircle2, AlertCircle, PlusCircle } from "lucide-react";
+import { Megaphone, Trash2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 interface FbAdAccountRow {
@@ -30,11 +30,6 @@ interface SyncResult {
 export default function FbAdAccountsAdmin() {
   const [accounts, setAccounts] = useState<FbAdAccountRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [adAccountId, setAdAccountId] = useState("");
-  const [accountName, setAccountName] = useState("");
-  const [brand, setBrand] = useState<"Livotec" | "Karofi">("Livotec");
-  const [accessToken, setAccessToken] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [backfillSince, setBackfillSince] = useState("");
   const [syncResults, setSyncResults] = useState<SyncResult[] | null>(null);
@@ -56,34 +51,17 @@ export default function FbAdAccountsAdmin() {
     loadAccounts();
   }, []);
 
-  async function handleAddAccount(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSaving(true);
-    setMessage(null);
+  async function handleSetBrand(id: string, brand: "Livotec" | "Karofi") {
     try {
-      const result = await safeFetchJson("/api/fb-ads/accounts", {
-        method: "POST",
+      const result = await safeFetchJson(`/api/fb-ads/accounts/${encodeURIComponent(id)}/brand`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ad_account_id: adAccountId.trim(),
-          account_name: accountName.trim(),
-          brand,
-          access_token: accessToken.trim(),
-        }),
+        body: JSON.stringify({ brand }),
       });
-      if (result.success) {
-        setMessage({ type: "success", text: "Đã lưu Ad Account." });
-        setAdAccountId("");
-        setAccountName("");
-        setAccessToken("");
-        await loadAccounts();
-      } else {
-        setMessage({ type: "error", text: result.error || "Lưu Ad Account thất bại." });
-      }
+      if (result.success) await loadAccounts();
+      else setMessage({ type: "error", text: result.error || "Gán thương hiệu thất bại." });
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Lưu Ad Account thất bại." });
-    } finally {
-      setIsSaving(false);
+      setMessage({ type: "error", text: err.message || "Gán thương hiệu thất bại." });
     }
   }
 
@@ -128,28 +106,13 @@ export default function FbAdAccountsAdmin() {
           <Megaphone className="h-4 w-4" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-slate-900">Kết Nối Facebook Ads (Marketing API)</h3>
+          <h3 className="text-sm font-bold text-slate-900">Facebook Ad Account đã kết nối</h3>
           <p className="text-[11px] text-slate-500">
-            Đồng bộ hiệu suất quảng cáo (spend/impressions/clicks/leads...) mỗi ngày cho tab "Facebook" trong Digital Ads Report. Đây là token khác với Facebook Page Insights ở trên — Access Token được mã hóa trước khi lưu.
+            Đồng bộ hiệu suất quảng cáo (spend/impressions/clicks/leads...) mỗi ngày cho tab "Facebook" trong Digital Ads Report.
+            Thêm Ad Account mới qua thẻ "Kết Nối Facebook" phía trên (đăng nhập Facebook một lần, chọn Ad Account cần nhập) —
+            không dán token tay ở đây nữa.
           </p>
         </div>
-      </div>
-
-      <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
-        <p className="font-semibold">Lưu ý: cần Marketing API Access Token có quyền "ads_read", không phải Page Token.</p>
-        <ol className="list-decimal space-y-1 pl-4">
-          <li>
-            Vào{" "}
-            <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="font-semibold underline">
-              Graph API Explorer
-            </a>{" "}
-            → chọn App → "Add Permissions" → tick <code className="rounded bg-amber-100 px-1">ads_read</code> → Generate Access Token.
-          </li>
-          <li>Dùng Access Token Debugger để "Extend Access Token" lấy token dài hạn (khuyến nghị dùng System User token cho kết nối lâu dài).</li>
-          <li>
-            Ad Account ID lấy tại Ads Manager (dạng <code className="rounded bg-amber-100 px-1">act_1234567890</code>), nhập kèm tiền tố <code className="rounded bg-amber-100 px-1">act_</code>.
-          </li>
-        </ol>
       </div>
 
       {message && (
@@ -162,63 +125,6 @@ export default function FbAdAccountsAdmin() {
           {message.text}
         </div>
       )}
-
-      <form onSubmit={handleAddAccount} className="grid gap-3 sm:grid-cols-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Ad Account ID</label>
-          <input
-            type="text"
-            required
-            value={adAccountId}
-            onChange={(e) => setAdAccountId(e.target.value)}
-            placeholder="act_1234567890"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Tên Account</label>
-          <input
-            type="text"
-            required
-            value={accountName}
-            onChange={(e) => setAccountName(e.target.value)}
-            placeholder="Karofi - MKT"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Thương hiệu</label>
-          <select
-            value={brand}
-            onChange={(e) => setBrand(e.target.value as "Livotec" | "Karofi")}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          >
-            <option value="Livotec">Livotec</option>
-            <option value="Karofi">Karofi</option>
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Access Token</label>
-          <input
-            type="password"
-            required
-            value={accessToken}
-            onChange={(e) => setAccessToken(e.target.value)}
-            placeholder="EAAG..."
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
-          />
-        </div>
-        <div className="sm:col-span-4">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
-          >
-            <PlusCircle className="h-3.5 w-3.5" />
-            {isSaving ? "Đang lưu..." : "Thêm / Cập nhật Ad Account"}
-          </button>
-        </div>
-      </form>
 
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <table className="w-full text-xs">
@@ -252,11 +158,19 @@ export default function FbAdAccountsAdmin() {
                     <div className="text-slate-400">{a.ad_account_id}</div>
                   </td>
                   <td className="px-3 py-2">
-                    {a.brand ? (
-                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{a.brand}</span>
-                    ) : (
-                      <span className="text-amber-600">Chưa gán</span>
-                    )}
+                    <select
+                      value={a.brand || ""}
+                      onChange={(e) => handleSetBrand(a.ad_account_id, e.target.value as "Livotec" | "Karofi")}
+                      className={`rounded-lg border px-2 py-1 text-xs font-semibold ${
+                        a.brand ? "border-slate-200 bg-slate-100 text-slate-600" : "border-amber-300 bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      <option value="" disabled>
+                        {a.brand ? a.brand : "Chưa gán — chọn"}
+                      </option>
+                      <option value="Livotec">Livotec</option>
+                      <option value="Karofi">Karofi</option>
+                    </select>
                   </td>
                   <td className="px-3 py-2 text-slate-500">
                     {a.last_synced_at ? new Date(a.last_synced_at).toLocaleString("vi-VN") : "Chưa đồng bộ"}

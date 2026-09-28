@@ -20052,14 +20052,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto7 = require("crypto");
+    var crypto8 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto7.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto8.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22952,11 +22952,11 @@ var require_request = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto7 = require("crypto");
+    var crypto8 = require("crypto");
     exports2.sign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val2 + "." + crypto7.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
+      return val2 + "." + crypto8.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Signed cookie string must be provided.");
@@ -22965,7 +22965,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val2) ? str : false;
     };
     function sha1(str) {
-      return crypto7.createHash("sha1").update(str).digest("hex");
+      return crypto8.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -32317,7 +32317,7 @@ var require_gaxios = __commonJS({
     var retry_js_1 = require_retry3();
     var stream_1 = require("stream");
     var interceptor_js_1 = require_interceptor();
-    var randomUUID = async () => globalThis.crypto?.randomUUID() || (await import("crypto")).randomUUID();
+    var randomUUID2 = async () => globalThis.crypto?.randomUUID() || (await import("crypto")).randomUUID();
     var HTTP_STATUS_NO_CONTENT = 204;
     var Gaxios = class {
       agentCache = /* @__PURE__ */ new Map();
@@ -32590,7 +32590,7 @@ var require_gaxios = __commonJS({
          */
         ["Blob", "File", "FormData"].includes(opts.data?.constructor?.name || "");
         if (opts.multipart?.length) {
-          const boundary = await randomUUID();
+          const boundary = await randomUUID2();
           preparedHeaders.set("content-type", `multipart/related; boundary=${boundary}`);
           opts.body = stream_1.Readable.from(this.getMultipartRequest(opts.multipart, boundary));
         } else if (shouldDirectlyPassData) {
@@ -35478,22 +35478,22 @@ var require_crypto2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NodeCrypto = void 0;
-    var crypto7 = require("crypto");
+    var crypto8 = require("crypto");
     var NodeCrypto = class {
       async sha256DigestBase64(str) {
-        return crypto7.createHash("sha256").update(str).digest("base64");
+        return crypto8.createHash("sha256").update(str).digest("base64");
       }
       randomBytesBase64(count) {
-        return crypto7.randomBytes(count).toString("base64");
+        return crypto8.randomBytes(count).toString("base64");
       }
       async verify(pubkey, data, signature) {
-        const verifier = crypto7.createVerify("RSA-SHA256");
+        const verifier = crypto8.createVerify("RSA-SHA256");
         verifier.update(data);
         verifier.end();
         return verifier.verify(pubkey, signature, "base64");
       }
       async sign(privateKey, data) {
-        const signer = crypto7.createSign("RSA-SHA256");
+        const signer = crypto8.createSign("RSA-SHA256");
         signer.update(data);
         signer.end();
         return signer.sign(privateKey, "base64");
@@ -35511,7 +35511,7 @@ var require_crypto2 = __commonJS({
        *   string in hexadecimal encoding.
        */
       async sha256DigestHex(str) {
-        return crypto7.createHash("sha256").update(str).digest("hex");
+        return crypto8.createHash("sha256").update(str).digest("hex");
       }
       /**
        * Computes the HMAC hash of a message using the provided crypto key and the
@@ -35523,7 +35523,7 @@ var require_crypto2 = __commonJS({
        */
       async signWithHmacSha256(key, msg) {
         const cryptoKey = typeof key === "string" ? key : toBuffer(key);
-        return toArrayBuffer(crypto7.createHmac("sha256", cryptoKey).update(msg).digest());
+        return toArrayBuffer(crypto8.createHmac("sha256", cryptoKey).update(msg).digest());
       }
     };
     exports2.NodeCrypto = NodeCrypto;
@@ -36378,10 +36378,10 @@ var require_oauth2client = __commonJS({
        * https://github.com/googleapis/google-auth-library-nodejs/blob/main/samples/oauth2-codeVerifier.js
        */
       async generateCodeVerifierAsync() {
-        const crypto7 = (0, crypto_1.createCrypto)();
-        const randomString = crypto7.randomBytesBase64(96);
+        const crypto8 = (0, crypto_1.createCrypto)();
+        const randomString = crypto8.randomBytesBase64(96);
         const codeVerifier = randomString.replace(/\+/g, "~").replace(/=/g, "_").replace(/\//g, "-");
-        const unencodedCodeChallenge = await crypto7.sha256DigestBase64(codeVerifier);
+        const unencodedCodeChallenge = await crypto8.sha256DigestBase64(codeVerifier);
         const codeChallenge = unencodedCodeChallenge.split("=")[0].replace(/\+/g, "-").replace(/\//g, "_");
         return { codeVerifier, codeChallenge };
       }
@@ -36822,7 +36822,7 @@ var require_oauth2client = __commonJS({
        * @return Returns a promise resolving to LoginTicket on verification.
        */
       async verifySignedJwtWithCertsAsync(jwt, certs, requiredAudience, issuers, maxExpiry) {
-        const crypto7 = (0, crypto_1.createCrypto)();
+        const crypto8 = (0, crypto_1.createCrypto)();
         if (!maxExpiry) {
           maxExpiry = _OAuth2Client.DEFAULT_MAX_TOKEN_LIFETIME_SECS_;
         }
@@ -36835,7 +36835,7 @@ var require_oauth2client = __commonJS({
         let envelope;
         let payload;
         try {
-          envelope = JSON.parse(crypto7.decodeBase64StringUtf8(segments[0]));
+          envelope = JSON.parse(crypto8.decodeBase64StringUtf8(segments[0]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token envelope: ${segments[0]}': ${err.message}`;
@@ -36846,7 +36846,7 @@ var require_oauth2client = __commonJS({
           throw new Error("Can't parse token envelope: " + segments[0]);
         }
         try {
-          payload = JSON.parse(crypto7.decodeBase64StringUtf8(segments[1]));
+          payload = JSON.parse(crypto8.decodeBase64StringUtf8(segments[1]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token payload '${segments[0]}`;
@@ -36863,7 +36863,7 @@ var require_oauth2client = __commonJS({
         if (envelope.alg === "ES256") {
           signature = formatEcdsa.joseToDer(signature, "ES256").toString("base64");
         }
-        const verified = await crypto7.verify(cert, signed, signature);
+        const verified = await crypto8.verify(cert, signed, signature);
         if (!verified) {
           throw new Error("Invalid token signature: " + jwt);
         }
@@ -37238,14 +37238,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "node_modules/jwa/index.js"(exports2, module2) {
     var Buffer4 = require_safe_buffer().Buffer;
-    var crypto7 = require("crypto");
+    var crypto8 = require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util = require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto7.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto8.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -37335,17 +37335,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac = crypto7.createHmac("sha" + bits, secret);
+        var hmac = crypto8.createHmac("sha" + bits, secret);
         var sig = (hmac.update(thing), hmac.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto7 ? function timingSafeEqual2(a, b) {
+    var timingSafeEqual = "timingSafeEqual" in crypto8 ? function timingSafeEqual2(a, b) {
       if (a.byteLength !== b.byteLength) {
         return false;
       }
-      return crypto7.timingSafeEqual(a, b);
+      return crypto8.timingSafeEqual(a, b);
     } : function timingSafeEqual2(a, b) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -37362,7 +37362,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto7.createSign("RSA-SHA" + bits);
+        var signer = crypto8.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -37372,7 +37372,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto7.createVerify("RSA-SHA" + bits);
+        var verifier = crypto8.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -37381,11 +37381,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto7.createSign("RSA-SHA" + bits);
+        var signer = crypto8.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto7.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto7.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto8.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto8.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -37395,12 +37395,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto7.createVerify("RSA-SHA" + bits);
+        var verifier = crypto8.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto7.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto7.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto8.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto8.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -39976,14 +39976,14 @@ var require_awsrequestsigner = __commonJS({
       }
     };
     exports2.AwsRequestSigner = AwsRequestSigner;
-    async function sign(crypto7, key, msg) {
-      return await crypto7.signWithHmacSha256(key, msg);
+    async function sign(crypto8, key, msg) {
+      return await crypto8.signWithHmacSha256(key, msg);
     }
-    async function getSigningKey(crypto7, key, dateStamp, region, serviceName) {
-      const kDate = await sign(crypto7, `AWS4${key}`, dateStamp);
-      const kRegion = await sign(crypto7, kDate, region);
-      const kService = await sign(crypto7, kRegion, serviceName);
-      const kSigning = await sign(crypto7, kService, "aws4_request");
+    async function getSigningKey(crypto8, key, dateStamp, region, serviceName) {
+      const kDate = await sign(crypto8, `AWS4${key}`, dateStamp);
+      const kRegion = await sign(crypto8, kDate, region);
+      const kService = await sign(crypto8, kRegion, serviceName);
+      const kSigning = await sign(crypto8, kService, "aws4_request");
       return kSigning;
     }
     async function generateAuthenticationHeaderMap(options) {
@@ -40949,7 +40949,7 @@ var require_gdchclient = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.GdchClient = exports2.GDCH_SERVICE_ACCOUNT_TYPE = void 0;
-    var crypto7 = require("crypto");
+    var crypto8 = require("crypto");
     var fs4 = require("fs");
     var https2 = require("https");
     var oauth2client_1 = require_oauth2client();
@@ -41140,7 +41140,7 @@ var require_gdchclient = __commonJS({
         const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
         const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
         const signingInput = `${encodedHeader}.${encodedPayload}`;
-        const signature = crypto7.sign("sha256", Buffer.from(signingInput), {
+        const signature = crypto8.sign("sha256", Buffer.from(signingInput), {
           key: this.privateKey,
           dsaEncoding: "ieee-p1363"
         });
@@ -42001,24 +42001,24 @@ var require_googleauth = __commonJS({
           const signed = await client.sign(data);
           return signed.signedBlob;
         }
-        const crypto7 = (0, crypto_1.createCrypto)();
+        const crypto8 = (0, crypto_1.createCrypto)();
         if (client instanceof jwtclient_1.JWT && client.key) {
-          const sign = await crypto7.sign(client.key, data);
+          const sign = await crypto8.sign(client.key, data);
           return sign;
         }
         const creds = await this.getCredentials();
         if (!creds.client_email) {
           throw new Error("Cannot sign data without `client_email`.");
         }
-        return this.signBlob(crypto7, creds.client_email, data, endpoint);
+        return this.signBlob(crypto8, creds.client_email, data, endpoint);
       }
-      async signBlob(crypto7, emailOrUniqueId, data, endpoint) {
+      async signBlob(crypto8, emailOrUniqueId, data, endpoint) {
         const url = new URL(endpoint + `${emailOrUniqueId}:signBlob`);
         const res = await this.request({
           method: "POST",
           url: url.href,
           data: {
-            payload: crypto7.encodeBase64StringUtf8(data)
+            payload: crypto8.encodeBase64StringUtf8(data)
           },
           retry: true,
           retryConfig: {
@@ -46119,7 +46119,7 @@ var require_main = __commonJS({
     var fs4 = require("fs");
     var path3 = require("path");
     var os = require("os");
-    var crypto7 = require("crypto");
+    var crypto8 = require("crypto");
     var TIPS = [
       "\u25C8 encrypted .env [www.dotenvx.com]",
       "\u25C8 secrets for agents [www.dotenvx.com]",
@@ -46363,7 +46363,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto7.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto8.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -59895,7 +59895,7 @@ __export(app_exports, {
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
-var import_crypto12 = __toESM(require("crypto"), 1);
+var import_crypto15 = __toESM(require("crypto"), 1);
 var import_express = __toESM(require_express2(), 1);
 
 // node_modules/@google/genai/dist/node/index.mjs
@@ -123963,6 +123963,16 @@ async function deleteFbPage(pageId) {
   const { error } = await supabase.from("fb_pages").delete().eq("page_id", pageId);
   if (error) throw new Error(`L\u1ED7i x\xF3a Facebook Page: ${error.message}`);
 }
+async function patchFbPageBrand(pageId, brand) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_pages } = await readLocalCollections();
+    const next = fb_pages.map((p) => p.page_id === pageId ? { ...p, brand } : p);
+    await writeLocalCollections(store, { fb_pages: next });
+    return;
+  }
+  const { error } = await supabase.from("fb_pages").update({ brand }).eq("page_id", pageId);
+  if (error) throw new Error(`L\u1ED7i g\xE1n th\u01B0\u01A1ng hi\u1EC7u: ${error.message}`);
+}
 async function setFbPageSyncStatus(pageId, status) {
   if (!isSupabaseConfigured) {
     const { store, fb_pages } = await readLocalCollections();
@@ -124025,9 +124035,440 @@ async function getFbPosts(pageIds, since, until) {
   });
 }
 
+// src/server/campaignStore.ts
+var import_crypto5 = __toESM(require("crypto"), 1);
+async function readLocalCollections2() {
+  const store = await getDatabaseData();
+  return {
+    store,
+    categories: Array.isArray(store.categories) ? store.categories : [],
+    campaigns: Array.isArray(store.campaigns) ? store.campaigns : [],
+    campaign_members: Array.isArray(store.campaign_members) ? store.campaign_members : [],
+    tasks: Array.isArray(store.tasks) ? store.tasks : [],
+    task_activity_log: Array.isArray(store.task_activity_log) ? store.task_activity_log : [],
+    asset_links: Array.isArray(store.asset_links) ? store.asset_links : []
+  };
+}
+async function writeLocalCollections2(store, updates) {
+  await saveDatabaseData({ ...store, ...updates });
+}
+function newId() {
+  return import_crypto5.default.randomUUID();
+}
+async function getCategories() {
+  if (!isSupabaseConfigured) {
+    const { categories } = await readLocalCollections2();
+    return categories;
+  }
+  const { data, error } = await supabase.from("categories").select("*").order("brand").order("name");
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch ng\xE0nh h\xE0ng: ${error.message}`);
+  return data || [];
+}
+async function createCategory(input) {
+  const category = {
+    id: newId(),
+    brand: input.brand,
+    name: input.name.trim(),
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, categories } = await readLocalCollections2();
+    if (categories.some((c) => c.brand === category.brand && c.name.toLowerCase() === category.name.toLowerCase())) {
+      throw new Error("Ng\xE0nh h\xE0ng n\xE0y \u0111\xE3 t\u1ED3n t\u1EA1i cho brand \u0111\xE3 ch\u1ECDn.");
+    }
+    await writeLocalCollections2(store, { categories: [...categories, category] });
+    return category;
+  }
+  const { data, error } = await supabase.from("categories").insert(category).select().single();
+  if (error) throw new Error(`L\u1ED7i t\u1EA1o ng\xE0nh h\xE0ng: ${error.message}`);
+  return data;
+}
+async function getCampaigns(filters) {
+  if (!isSupabaseConfigured) {
+    const { campaigns } = await readLocalCollections2();
+    return campaigns.filter((c) => {
+      if (filters?.brand && c.brand !== filters.brand) return false;
+      if (filters?.categoryId && c.category_id !== filters.categoryId) return false;
+      if (filters?.status && c.status !== filters.status) return false;
+      return true;
+    });
+  }
+  const rows = await fetchAllRows((from, to) => {
+    let query = supabase.from("campaigns").select("*");
+    if (filters?.brand) query = query.eq("brand", filters.brand);
+    if (filters?.categoryId) query = query.eq("category_id", filters.categoryId);
+    if (filters?.status) query = query.eq("status", filters.status);
+    return query.order("start_date", { ascending: false }).range(from, to);
+  }).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch campaign: ${err.message}`);
+  });
+  return rows;
+}
+async function createCampaign(input, creatorUsername) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const campaign = {
+    id: newId(),
+    name: input.name.trim(),
+    type: input.type ?? null,
+    brand: input.brand,
+    category_id: input.category_id ?? null,
+    channel: input.channel ?? null,
+    status: input.status ?? "Planned",
+    start_date: input.start_date,
+    end_date: input.end_date,
+    budget: input.budget ?? null,
+    pic_username: input.pic_username ?? null,
+    visual_gallery_url: input.visual_gallery_url ?? null,
+    visual_urls: input.visual_urls ?? [],
+    created_by: creatorUsername,
+    updated_by: creatorUsername,
+    created_at: now,
+    updated_at: now
+  };
+  const membership = {
+    campaign_id: campaign.id,
+    username: creatorUsername,
+    added_by: creatorUsername,
+    added_at: now
+  };
+  if (!isSupabaseConfigured) {
+    const { store, campaigns, campaign_members } = await readLocalCollections2();
+    await writeLocalCollections2(store, {
+      campaigns: [...campaigns, campaign],
+      campaign_members: [...campaign_members, membership]
+    });
+    return campaign;
+  }
+  const { error } = await supabase.from("campaigns").insert(campaign);
+  if (error) throw new Error(`L\u1ED7i t\u1EA1o campaign: ${error.message}`);
+  const { error: memberError } = await supabase.from("campaign_members").insert(membership);
+  if (memberError) throw new Error(`L\u1ED7i g\xE1n quy\u1EC1n ch\u1EC9nh s\u1EEDa campaign: ${memberError.message}`);
+  return campaign;
+}
+async function updateCampaign(id, patch, actorUsername) {
+  const updated_at = (/* @__PURE__ */ new Date()).toISOString();
+  if (!isSupabaseConfigured) {
+    const { store, campaigns } = await readLocalCollections2();
+    const existing = campaigns.find((c) => c.id === id);
+    if (!existing) throw new Error("Kh\xF4ng t\xECm th\u1EA5y campaign.");
+    const next = { ...existing, ...patch, updated_by: actorUsername, updated_at };
+    await writeLocalCollections2(store, { campaigns: campaigns.map((c) => c.id === id ? next : c) });
+    return next;
+  }
+  const { data, error } = await supabase.from("campaigns").update({ ...patch, updated_by: actorUsername, updated_at }).eq("id", id).select().single();
+  if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt campaign: ${error.message}`);
+  return data;
+}
+async function deleteCampaign(id) {
+  if (!isSupabaseConfigured) {
+    const { store, campaigns, campaign_members, tasks } = await readLocalCollections2();
+    await writeLocalCollections2(store, {
+      campaigns: campaigns.filter((c) => c.id !== id),
+      campaign_members: campaign_members.filter((m2) => m2.campaign_id !== id),
+      // Same "config removal doesn't retroactively delete history" choice as
+      // fb_ad_accounts deletion — tasks lose their campaign link (matches
+      // the `on delete set null` foreign key used in the Supabase schema)
+      // rather than disappearing.
+      tasks: tasks.map((t2) => t2.campaign_id === id ? { ...t2, campaign_id: null } : t2)
+    });
+    return;
+  }
+  const { error } = await supabase.from("campaigns").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 campaign: ${error.message}`);
+}
+async function getCampaignMembers(campaignId) {
+  if (!isSupabaseConfigured) {
+    const { campaign_members } = await readLocalCollections2();
+    return campaign_members.filter((m2) => m2.campaign_id === campaignId);
+  }
+  const { data, error } = await supabase.from("campaign_members").select("*").eq("campaign_id", campaignId);
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch ng\u01B0\u1EDDi \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n: ${error.message}`);
+  return data || [];
+}
+async function isCampaignMember(campaignId, username) {
+  const members = await getCampaignMembers(campaignId);
+  return members.some((m2) => m2.username.toLowerCase() === username.toLowerCase());
+}
+async function addCampaignMember(campaignId, username, addedBy) {
+  const membership = { campaign_id: campaignId, username, added_by: addedBy, added_at: (/* @__PURE__ */ new Date()).toISOString() };
+  if (!isSupabaseConfigured) {
+    const { store, campaign_members } = await readLocalCollections2();
+    const rest = campaign_members.filter((m2) => !(m2.campaign_id === campaignId && m2.username.toLowerCase() === username.toLowerCase()));
+    await writeLocalCollections2(store, { campaign_members: [...rest, membership] });
+    return;
+  }
+  const { error } = await supabase.from("campaign_members").upsert(membership, { onConflict: "campaign_id,username" });
+  if (error) throw new Error(`L\u1ED7i g\xE1n quy\u1EC1n ch\u1EC9nh s\u1EEDa: ${error.message}`);
+}
+async function removeCampaignMember(campaignId, username) {
+  if (!isSupabaseConfigured) {
+    const { store, campaign_members } = await readLocalCollections2();
+    await writeLocalCollections2(store, {
+      campaign_members: campaign_members.filter((m2) => !(m2.campaign_id === campaignId && m2.username.toLowerCase() === username.toLowerCase()))
+    });
+    return;
+  }
+  const { error } = await supabase.from("campaign_members").delete().eq("campaign_id", campaignId).eq("username", username);
+  if (error) throw new Error(`L\u1ED7i thu h\u1ED3i quy\u1EC1n ch\u1EC9nh s\u1EEDa: ${error.message}`);
+}
+async function getTasks(filters) {
+  if (!isSupabaseConfigured) {
+    const { tasks } = await readLocalCollections2();
+    return tasks.filter((t2) => {
+      if (filters?.campaignId !== void 0 && t2.campaign_id !== filters.campaignId) return false;
+      if (filters?.status && t2.status !== filters.status) return false;
+      if (filters?.taskType && t2.task_type !== filters.taskType) return false;
+      if (filters?.assigneeUsername && (t2.assignee_username || "").toLowerCase() !== filters.assigneeUsername.toLowerCase()) return false;
+      return true;
+    });
+  }
+  const rows = await fetchAllRows((from, to) => {
+    let query = supabase.from("tasks").select("*");
+    if (filters?.campaignId !== void 0) query = query.eq("campaign_id", filters.campaignId);
+    if (filters?.status) query = query.eq("status", filters.status);
+    if (filters?.taskType) query = query.eq("task_type", filters.taskType);
+    if (filters?.assigneeUsername) query = query.eq("assignee_username", filters.assigneeUsername);
+    return query.order("end_date", { ascending: true }).range(from, to);
+  }).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch task: ${err.message}`);
+  });
+  return rows;
+}
+async function getTask(id) {
+  if (!isSupabaseConfigured) {
+    const { tasks } = await readLocalCollections2();
+    return tasks.find((t2) => t2.id === id) || null;
+  }
+  const { data, error } = await supabase.from("tasks").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc task: ${error.message}`);
+  return data;
+}
+async function createTask(input, creatorUsername) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const task = {
+    id: newId(),
+    title: input.title.trim(),
+    task_type: input.task_type,
+    campaign_id: input.task_type === "campaign" ? input.campaign_id ?? null : null,
+    activity_id: input.activity_id ?? null,
+    assignee_username: input.assignee_username ?? null,
+    start_date: input.start_date ?? null,
+    end_date: input.end_date ?? null,
+    priority: input.priority ?? "Medium",
+    status: input.status ?? "To do",
+    blocked_reason: null,
+    // Ad-hoc is by nature urgent — warn immediately instead of waiting 2 days.
+    due_soon_threshold_days: input.due_soon_threshold_days ?? (input.task_type === "adhoc" ? 0 : 2),
+    recurrence: null,
+    parent_recurring_id: null,
+    parent_task_id: input.parent_task_id ?? null,
+    created_by: creatorUsername,
+    created_at: now,
+    updated_at: now
+  };
+  if (task.task_type === "campaign" && !task.campaign_id) {
+    throw new Error("Task lo\u1EA1i Campaign b\u1EAFt bu\u1ED9c ph\u1EA3i ch\u1ECDn Campaign.");
+  }
+  if (!isSupabaseConfigured) {
+    const { store, tasks, task_activity_log } = await readLocalCollections2();
+    const logEntry = {
+      id: newId(),
+      task_id: task.id,
+      type: "created",
+      text: `T\u1EA1o task "${task.title}"`,
+      actor_username: creatorUsername,
+      created_at: now
+    };
+    await writeLocalCollections2(store, { tasks: [...tasks, task], task_activity_log: [...task_activity_log, logEntry] });
+    return task;
+  }
+  const { error } = await supabase.from("tasks").insert(task);
+  if (error) throw new Error(`L\u1ED7i t\u1EA1o task: ${error.message}`);
+  await appendTaskLog(task.id, "created", `T\u1EA1o task "${task.title}"`, creatorUsername);
+  return task;
+}
+async function updateTask(id, patch, actorUsername) {
+  const existing = await getTask(id);
+  if (!existing) throw new Error("Kh\xF4ng t\xECm th\u1EA5y task.");
+  if (patch.status === "Blocked" && !patch.blocked_reason && !existing.blocked_reason) {
+    throw new Error("Chuy\u1EC3n sang tr\u1EA1ng th\xE1i Blocked c\u1EA7n nh\u1EADp l\xFD do (blocked_reason).");
+  }
+  if (patch.parent_task_id === id) {
+    throw new Error("Task kh\xF4ng th\u1EC3 t\u1EF1 l\xE0m task ch\xEDnh c\u1EE7a ch\xEDnh n\xF3.");
+  }
+  const updated_at = (/* @__PURE__ */ new Date()).toISOString();
+  const nextActivityId = patch.campaign_id !== void 0 && patch.campaign_id !== existing.campaign_id ? null : patch.activity_id ?? existing.activity_id;
+  let nextBlockedReason = existing.blocked_reason;
+  if (patch.status === "Blocked") {
+    nextBlockedReason = patch.blocked_reason ?? existing.blocked_reason;
+  } else if (patch.status) {
+    nextBlockedReason = null;
+  } else if (patch.blocked_reason !== void 0) {
+    nextBlockedReason = patch.blocked_reason;
+  }
+  const next = {
+    ...existing,
+    ...patch,
+    activity_id: nextActivityId,
+    blocked_reason: nextBlockedReason,
+    updated_at
+  };
+  if (!isSupabaseConfigured) {
+    const { store, tasks } = await readLocalCollections2();
+    await writeLocalCollections2(store, { tasks: tasks.map((t2) => t2.id === id ? next : t2) });
+  } else {
+    const { error } = await supabase.from("tasks").update({ ...patch, activity_id: nextActivityId, blocked_reason: next.blocked_reason, updated_at }).eq("id", id);
+    if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt task: ${error.message}`);
+  }
+  if (patch.status && patch.status !== existing.status) {
+    let text = `Status: ${existing.status} \u2192 ${patch.status}`;
+    if (patch.status === "Blocked" && next.blocked_reason) text += ` (L\xFD do: ${next.blocked_reason})`;
+    await appendTaskLog(id, "status_change", text, actorUsername);
+  }
+  if (patch.campaign_id !== void 0 && patch.campaign_id !== existing.campaign_id) {
+    await appendTaskLog(id, "moved_campaign", `Chuy\u1EC3n campaign: ${existing.campaign_id ?? "(kh\xF4ng c\xF3)"} \u2192 ${patch.campaign_id ?? "(kh\xF4ng c\xF3)"}`, actorUsername);
+  }
+  const otherFieldsChanged = Object.keys(patch).some(
+    (k) => k !== "status" && k !== "campaign_id" && k !== "blocked_reason" && patch[k] !== existing[k]
+  );
+  if (otherFieldsChanged) {
+    await appendTaskLog(id, "edited", "C\u1EADp nh\u1EADt th\xF4ng tin task", actorUsername);
+  }
+  return next;
+}
+async function deleteTask(id) {
+  if (!isSupabaseConfigured) {
+    const { store, tasks, task_activity_log } = await readLocalCollections2();
+    await writeLocalCollections2(store, {
+      tasks: tasks.filter((t2) => t2.id !== id),
+      task_activity_log: task_activity_log.filter((l) => l.task_id !== id)
+    });
+    return;
+  }
+  const { error } = await supabase.from("tasks").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 task: ${error.message}`);
+}
+async function getTaskActivityLog(taskId) {
+  if (!isSupabaseConfigured) {
+    const { task_activity_log } = await readLocalCollections2();
+    return task_activity_log.filter((l) => l.task_id === taskId).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+  const { data, error } = await supabase.from("task_activity_log").select("*").eq("task_id", taskId).order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc nh\u1EADt k\xFD task: ${error.message}`);
+  return data || [];
+}
+async function appendTaskLog(taskId, type, text, actorUsername) {
+  const entry = {
+    id: newId(),
+    task_id: taskId,
+    type,
+    text,
+    actor_username: actorUsername,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, task_activity_log } = await readLocalCollections2();
+    await writeLocalCollections2(store, { task_activity_log: [...task_activity_log, entry] });
+    return;
+  }
+  const { error } = await supabase.from("task_activity_log").insert(entry);
+  if (error) console.error("appendTaskLog error:", error.message);
+}
+async function getAssetLinks() {
+  if (!isSupabaseConfigured) {
+    const { asset_links } = await readLocalCollections2();
+    return asset_links;
+  }
+  const { data, error } = await supabase.from("asset_links").select("*").order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc Asset Library: ${error.message}`);
+  return data || [];
+}
+async function createAssetLink(input, createdBy) {
+  const link = {
+    id: newId(),
+    group_key: input.group_key,
+    label: input.label.trim(),
+    url: input.url.trim(),
+    created_by: createdBy,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, asset_links } = await readLocalCollections2();
+    await writeLocalCollections2(store, { asset_links: [...asset_links, link] });
+    return link;
+  }
+  const { error } = await supabase.from("asset_links").insert(link);
+  if (error) throw new Error(`L\u1ED7i th\xEAm link v\xE0o Asset Library: ${error.message}`);
+  return link;
+}
+async function deleteAssetLink(id) {
+  if (!isSupabaseConfigured) {
+    const { store, asset_links } = await readLocalCollections2();
+    await writeLocalCollections2(store, { asset_links: asset_links.filter((l) => l.id !== id) });
+    return;
+  }
+  const { error } = await supabase.from("asset_links").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 link: ${error.message}`);
+}
+
 // src/server/facebookSync.ts
 var GRAPH_API_VERSION = "v21.0";
 var GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+var FACEBOOK_OAUTH_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_read_user_content", "read_insights", "ads_read"];
+var FACEBOOK_AUTHORIZE_URL = `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth`;
+var FB_APP_ID = process.env.FB_APP_ID || "";
+var FB_APP_SECRET = process.env.FB_APP_SECRET || "";
+var FACEBOOK_REDIRECT_URI = process.env.FACEBOOK_REDIRECT_URI || "";
+var isFacebookOAuthConfigured = Boolean(FB_APP_ID && FB_APP_SECRET && FACEBOOK_REDIRECT_URI);
+function buildFacebookAuthorizeUrl(state) {
+  const params = new URLSearchParams({
+    client_id: FB_APP_ID,
+    redirect_uri: FACEBOOK_REDIRECT_URI,
+    state,
+    scope: FACEBOOK_OAUTH_SCOPES.join(","),
+    response_type: "code"
+  });
+  return `${FACEBOOK_AUTHORIZE_URL}?${params.toString()}`;
+}
+async function fetchGraphJson(url) {
+  const res = await fetch(url);
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GraphApiError(body?.error?.message || `Graph API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, body?.error?.code, body?.error?.error_subcode);
+  }
+  return body;
+}
+async function exchangeFacebookCode(code, redirectUri) {
+  const params = new URLSearchParams({ client_id: FB_APP_ID, redirect_uri: redirectUri, client_secret: FB_APP_SECRET, code });
+  return fetchGraphJson(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`);
+}
+async function exchangeForLongLivedToken(shortLivedToken) {
+  const params = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: FB_APP_ID,
+    client_secret: FB_APP_SECRET,
+    fb_exchange_token: shortLivedToken
+  });
+  return fetchGraphJson(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`);
+}
+async function listOwnedPages(userAccessToken) {
+  const body = await fetchGraphJson(`${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token,category&limit=200&access_token=${encodeURIComponent(userAccessToken)}`);
+  return body?.data || [];
+}
+async function listOwnedAdAccounts(userAccessToken) {
+  const body = await fetchGraphJson(
+    `${GRAPH_API_BASE}/me/adaccounts?fields=id,name,account_id,currency,account_status&limit=200&access_token=${encodeURIComponent(userAccessToken)}`
+  );
+  return body?.data || [];
+}
+function detectBrandFromFacebookName(name) {
+  const haystack = (name || "").toLowerCase();
+  const hasLivotec = haystack.includes("livotec");
+  const hasKarofi = haystack.includes("karofi");
+  if (hasLivotec && !hasKarofi) return "Livotec";
+  if (hasKarofi && !hasLivotec) return "Karofi";
+  return null;
+}
 var INSIGHTS_BACKFILL_DAYS = 14;
 var POSTS_LOOKBACK_DAYS = 30;
 var POST_FETCH_CONCURRENCY = 6;
@@ -124283,8 +124724,120 @@ async function runFacebookSync() {
   );
 }
 
+// src/server/tiktokAdsOAuth.ts
+var TIKTOK_MARKETING_API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
+var TIKTOK_MARKETING_AUTHORIZE_URL = "https://business-api.tiktok.com/portal/auth";
+var TIKTOK_MARKETING_APP_ID = process.env.TIKTOK_MARKETING_APP_ID || "";
+var TIKTOK_MARKETING_APP_SECRET = process.env.TIKTOK_MARKETING_APP_SECRET || "";
+var TIKTOK_MARKETING_REDIRECT_URI = process.env.TIKTOK_MARKETING_REDIRECT_URI || "";
+var isTiktokAdsOAuthConfigured = Boolean(TIKTOK_MARKETING_APP_ID && TIKTOK_MARKETING_APP_SECRET && TIKTOK_MARKETING_REDIRECT_URI);
+var TiktokMarketingApiError = class extends Error {
+  constructor(message, code) {
+    super(message);
+    this.code = code;
+  }
+};
+function buildTiktokAdsAuthorizeUrl(state) {
+  const params = new URLSearchParams({
+    app_id: TIKTOK_MARKETING_APP_ID,
+    state,
+    redirect_uri: TIKTOK_MARKETING_REDIRECT_URI
+  });
+  return `${TIKTOK_MARKETING_AUTHORIZE_URL}?${params.toString()}`;
+}
+async function exchangeTiktokAdsCode(authCode) {
+  const res = await fetch(`${TIKTOK_MARKETING_API_BASE}/oauth2/access_token/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ app_id: TIKTOK_MARKETING_APP_ID, secret: TIKTOK_MARKETING_APP_SECRET, auth_code: authCode })
+  });
+  const body = await res.json();
+  if (!res.ok || body?.code !== 0) {
+    throw new TiktokMarketingApiError(body?.message || `TikTok oauth2/access_token tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, body?.code);
+  }
+  return body.data;
+}
+async function fetchAdvertiserNames(accessToken, advertiserIds) {
+  if (advertiserIds.length === 0) return [];
+  const params = new URLSearchParams({ advertiser_ids: JSON.stringify(advertiserIds), fields: JSON.stringify(["advertiser_id", "name"]) });
+  const res = await fetch(`${TIKTOK_MARKETING_API_BASE}/advertiser/info/?${params.toString()}`, {
+    headers: { "Access-Token": accessToken }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.code !== 0) {
+    console.error("TikTok advertiser/info l\u1ED7i (kh\xF4ng ch\u1EB7n k\u1EBFt n\u1ED1i):", body?.message || res.status);
+    return advertiserIds.map((id) => ({ advertiser_id: id, name: id }));
+  }
+  const list = body?.data?.list || [];
+  return list.map((a) => ({ advertiser_id: a.advertiser_id, name: a.name || a.advertiser_id }));
+}
+function detectBrandFromAdvertiserName(name) {
+  const haystack = (name || "").toLowerCase();
+  const hasLivotec = haystack.includes("livotec");
+  const hasKarofi = haystack.includes("karofi");
+  if (hasLivotec && !hasKarofi) return "Livotec";
+  if (hasKarofi && !hasLivotec) return "Karofi";
+  return null;
+}
+
+// src/server/oauthPendingStore.ts
+var import_crypto7 = require("crypto");
+var PENDING_TTL_MS = 60 * 60 * 1e3;
+async function readLocal() {
+  const store = await getDatabaseData();
+  return { store, rows: Array.isArray(store.platform_oauth_pending) ? store.platform_oauth_pending : [] };
+}
+async function writeLocal(store, rows) {
+  await saveDatabaseData({ ...store, platform_oauth_pending: rows });
+}
+function isExpired(row) {
+  return Date.now() - new Date(row.created_at).getTime() > PENDING_TTL_MS;
+}
+async function createOAuthPending(platform, tokenPlain, candidates) {
+  const id = (0, import_crypto7.randomUUID)();
+  const record = {
+    id,
+    platform,
+    token_encrypted: encrypt(tokenPlain),
+    candidates,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, rows } = await readLocal();
+    await writeLocal(store, [...rows.filter((r2) => !isExpired(r2)), record]);
+    return id;
+  }
+  await supabase.from("platform_oauth_pending").delete().lt("created_at", new Date(Date.now() - PENDING_TTL_MS).toISOString());
+  const { error } = await supabase.from("platform_oauth_pending").insert(record);
+  if (error) throw new Error(`L\u1ED7i l\u01B0u k\u1EBFt n\u1ED1i t\u1EA1m th\u1EDDi: ${error.message}`);
+  return id;
+}
+async function getOAuthPending(id) {
+  let record = null;
+  if (!isSupabaseConfigured) {
+    const { rows } = await readLocal();
+    record = rows.find((r2) => r2.id === id) || null;
+  } else {
+    const { data, error } = await supabase.from("platform_oauth_pending").select("*").eq("id", id).maybeSingle();
+    if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc k\u1EBFt n\u1ED1i t\u1EA1m th\u1EDDi: ${error.message}`);
+    record = data || null;
+  }
+  if (!record || isExpired(record)) return null;
+  const { token_encrypted, ...rest } = record;
+  return { ...rest, token: decrypt(token_encrypted) };
+}
+async function deleteOAuthPending(id) {
+  if (!isSupabaseConfigured) {
+    const { store, rows } = await readLocal();
+    await writeLocal(store, rows.filter((r2) => r2.id !== id));
+    return;
+  }
+  const { error } = await supabase.from("platform_oauth_pending").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i x\xF3a k\u1EBFt n\u1ED1i t\u1EA1m th\u1EDDi: ${error.message}`);
+}
+
 // src/server/adsPerformanceStore.ts
-async function readLocalCollections2() {
+async function readLocalCollections3() {
   const store = await getDatabaseData();
   return {
     store,
@@ -124294,7 +124847,7 @@ async function readLocalCollections2() {
     tiktok_ads_accounts: Array.isArray(store.tiktok_ads_accounts) ? store.tiktok_ads_accounts : []
   };
 }
-async function writeLocalCollections2(store, updates) {
+async function writeLocalCollections3(store, updates) {
   await saveDatabaseData({ ...store, ...updates });
 }
 function adsPerformanceKey(r2) {
@@ -124303,10 +124856,10 @@ function adsPerformanceKey(r2) {
 async function upsertAdsPerformance(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, ads_performance } = await readLocalCollections2();
+    const { store, ads_performance } = await readLocalCollections3();
     const byKey = new Map(ads_performance.map((r2) => [adsPerformanceKey(r2), r2]));
     for (const row of rows) byKey.set(adsPerformanceKey(row), row);
-    await writeLocalCollections2(store, { ads_performance: Array.from(byKey.values()) });
+    await writeLocalCollections3(store, { ads_performance: Array.from(byKey.values()) });
     return;
   }
   const { error } = await supabase.from("ads_performance").upsert(rows, { onConflict: "channel,campaign_name,ad_group_name,ad_name,date" });
@@ -124315,7 +124868,7 @@ async function upsertAdsPerformance(rows) {
 async function getAdsPerformance(params) {
   const { channels, brand, since, until } = params;
   if (!isSupabaseConfigured) {
-    const { ads_performance } = await readLocalCollections2();
+    const { ads_performance } = await readLocalCollections3();
     return ads_performance.filter((r2) => {
       if (channels && channels.length > 0 && !channels.includes(r2.channel)) return false;
       if (brand && r2.brand !== brand) return false;
@@ -124332,9 +124885,23 @@ async function getAdsPerformance(params) {
   });
   return rows;
 }
+async function getAdsPerformanceByPostIds(postIds, since, until) {
+  if (postIds.length === 0) return [];
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections3();
+    const idSet = new Set(postIds);
+    return ads_performance.filter((r2) => r2.channel === "facebook" && r2.post_id && idSet.has(r2.post_id) && r2.date >= since && r2.date <= until);
+  }
+  const rows = await fetchAllRows(
+    (from, to) => supabase.from("ads_performance").select("*").eq("channel", "facebook").in("post_id", postIds).gte("date", since).lte("date", until).range(from, to)
+  ).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o theo post: ${err.message}`);
+  });
+  return rows;
+}
 async function getFbAdAccounts() {
   if (!isSupabaseConfigured) {
-    const { fb_ad_accounts } = await readLocalCollections2();
+    const { fb_ad_accounts } = await readLocalCollections3();
     return fb_ad_accounts;
   }
   const { data, error } = await supabase.from("fb_ad_accounts").select("*").order("created_at", { ascending: true });
@@ -124343,7 +124910,7 @@ async function getFbAdAccounts() {
 }
 async function upsertFbAdAccount(input) {
   if (!isSupabaseConfigured) {
-    const { store, fb_ad_accounts } = await readLocalCollections2();
+    const { store, fb_ad_accounts } = await readLocalCollections3();
     const existing = fb_ad_accounts.find((a) => a.ad_account_id === input.ad_account_id);
     const next = {
       ad_account_id: input.ad_account_id,
@@ -124357,7 +124924,7 @@ async function upsertFbAdAccount(input) {
       created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
     };
     const rest = fb_ad_accounts.filter((a) => a.ad_account_id !== input.ad_account_id);
-    await writeLocalCollections2(store, { fb_ad_accounts: [...rest, next] });
+    await writeLocalCollections3(store, { fb_ad_accounts: [...rest, next] });
     return;
   }
   const { error } = await supabase.from("fb_ad_accounts").upsert(
@@ -124374,8 +124941,8 @@ async function upsertFbAdAccount(input) {
 }
 async function deleteFbAdAccount(adAccountId) {
   if (!isSupabaseConfigured) {
-    const { store, fb_ad_accounts, ads_performance } = await readLocalCollections2();
-    await writeLocalCollections2(store, {
+    const { store, fb_ad_accounts, ads_performance } = await readLocalCollections3();
+    await writeLocalCollections3(store, {
       fb_ad_accounts: fb_ad_accounts.filter((a) => a.ad_account_id !== adAccountId),
       // Ad-account-scoped rows aren't keyed by ad_account_id (only by
       // channel/campaign/ad_group/ad/date), so deleting the account config
@@ -124393,17 +124960,27 @@ async function deleteFbAdAccount(adAccountId) {
 }
 async function setFbAdAccountSyncStatus(adAccountId, status) {
   if (!isSupabaseConfigured) {
-    const { store, fb_ad_accounts } = await readLocalCollections2();
+    const { store, fb_ad_accounts } = await readLocalCollections3();
     const next = fb_ad_accounts.map((a) => a.ad_account_id === adAccountId ? { ...a, ...status } : a);
-    await writeLocalCollections2(store, { fb_ad_accounts: next });
+    await writeLocalCollections3(store, { fb_ad_accounts: next });
     return;
   }
   const { error } = await supabase.from("fb_ad_accounts").update(status).eq("ad_account_id", adAccountId);
   if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 Ad Account: ${error.message}`);
 }
+async function patchFbAdAccountBrand(adAccountId, brand) {
+  if (!isSupabaseConfigured) {
+    const { store, fb_ad_accounts } = await readLocalCollections3();
+    const next = fb_ad_accounts.map((a) => a.ad_account_id === adAccountId ? { ...a, brand } : a);
+    await writeLocalCollections3(store, { fb_ad_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("fb_ad_accounts").update({ brand }).eq("ad_account_id", adAccountId);
+  if (error) throw new Error(`L\u1ED7i g\xE1n th\u01B0\u01A1ng hi\u1EC7u: ${error.message}`);
+}
 async function getGoogleAdsAccounts() {
   if (!isSupabaseConfigured) {
-    const { google_ads_accounts } = await readLocalCollections2();
+    const { google_ads_accounts } = await readLocalCollections3();
     return google_ads_accounts;
   }
   const { data, error } = await supabase.from("google_ads_accounts").select("*").order("created_at", { ascending: true });
@@ -124412,7 +124989,7 @@ async function getGoogleAdsAccounts() {
 }
 async function upsertGoogleAdsAccount(input) {
   if (!isSupabaseConfigured) {
-    const { store, google_ads_accounts } = await readLocalCollections2();
+    const { store, google_ads_accounts } = await readLocalCollections3();
     const existing = google_ads_accounts.find((a) => a.customer_id === input.customer_id);
     const next = {
       customer_id: input.customer_id,
@@ -124428,7 +125005,7 @@ async function upsertGoogleAdsAccount(input) {
       token_expired: existing?.token_expired || false,
       created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
     };
-    await writeLocalCollections2(store, {
+    await writeLocalCollections3(store, {
       google_ads_accounts: [...google_ads_accounts.filter((a) => a.customer_id !== input.customer_id), next]
     });
     return;
@@ -124450,8 +125027,8 @@ async function upsertGoogleAdsAccount(input) {
 }
 async function deleteGoogleAdsAccount(customerId) {
   if (!isSupabaseConfigured) {
-    const { store, google_ads_accounts } = await readLocalCollections2();
-    await writeLocalCollections2(store, { google_ads_accounts: google_ads_accounts.filter((a) => a.customer_id !== customerId) });
+    const { store, google_ads_accounts } = await readLocalCollections3();
+    await writeLocalCollections3(store, { google_ads_accounts: google_ads_accounts.filter((a) => a.customer_id !== customerId) });
     return;
   }
   const { error } = await supabase.from("google_ads_accounts").delete().eq("customer_id", customerId);
@@ -124459,9 +125036,9 @@ async function deleteGoogleAdsAccount(customerId) {
 }
 async function updateGoogleAdsAccountTokens(customerId, tokens) {
   if (!isSupabaseConfigured) {
-    const { store, google_ads_accounts } = await readLocalCollections2();
+    const { store, google_ads_accounts } = await readLocalCollections3();
     const next = google_ads_accounts.map((a) => a.customer_id === customerId ? { ...a, ...tokens } : a);
-    await writeLocalCollections2(store, { google_ads_accounts: next });
+    await writeLocalCollections3(store, { google_ads_accounts: next });
     return;
   }
   const { error } = await supabase.from("google_ads_accounts").update(tokens).eq("customer_id", customerId);
@@ -124469,9 +125046,9 @@ async function updateGoogleAdsAccountTokens(customerId, tokens) {
 }
 async function setGoogleAdsAccountSyncStatus(customerId, status) {
   if (!isSupabaseConfigured) {
-    const { store, google_ads_accounts } = await readLocalCollections2();
+    const { store, google_ads_accounts } = await readLocalCollections3();
     const next = google_ads_accounts.map((a) => a.customer_id === customerId ? { ...a, ...status } : a);
-    await writeLocalCollections2(store, { google_ads_accounts: next });
+    await writeLocalCollections3(store, { google_ads_accounts: next });
     return;
   }
   const { error } = await supabase.from("google_ads_accounts").update(status).eq("customer_id", customerId);
@@ -124479,7 +125056,7 @@ async function setGoogleAdsAccountSyncStatus(customerId, status) {
 }
 async function getTiktokAdsAccounts() {
   if (!isSupabaseConfigured) {
-    const { tiktok_ads_accounts } = await readLocalCollections2();
+    const { tiktok_ads_accounts } = await readLocalCollections3();
     return tiktok_ads_accounts;
   }
   const { data, error } = await supabase.from("tiktok_ads_accounts").select("*").order("created_at", { ascending: true });
@@ -124488,7 +125065,7 @@ async function getTiktokAdsAccounts() {
 }
 async function upsertTiktokAdsAccount(input) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_ads_accounts } = await readLocalCollections2();
+    const { store, tiktok_ads_accounts } = await readLocalCollections3();
     const existing = tiktok_ads_accounts.find((a) => a.advertiser_id === input.advertiser_id);
     const next = {
       advertiser_id: input.advertiser_id,
@@ -124501,7 +125078,7 @@ async function upsertTiktokAdsAccount(input) {
       token_expired: existing?.token_expired || false,
       created_at: existing?.created_at || (/* @__PURE__ */ new Date()).toISOString()
     };
-    await writeLocalCollections2(store, {
+    await writeLocalCollections3(store, {
       tiktok_ads_accounts: [...tiktok_ads_accounts.filter((a) => a.advertiser_id !== input.advertiser_id), next]
     });
     return;
@@ -124520,8 +125097,8 @@ async function upsertTiktokAdsAccount(input) {
 }
 async function deleteTiktokAdsAccount(advertiserId) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_ads_accounts } = await readLocalCollections2();
-    await writeLocalCollections2(store, { tiktok_ads_accounts: tiktok_ads_accounts.filter((a) => a.advertiser_id !== advertiserId) });
+    const { store, tiktok_ads_accounts } = await readLocalCollections3();
+    await writeLocalCollections3(store, { tiktok_ads_accounts: tiktok_ads_accounts.filter((a) => a.advertiser_id !== advertiserId) });
     return;
   }
   const { error } = await supabase.from("tiktok_ads_accounts").delete().eq("advertiser_id", advertiserId);
@@ -124529,13 +125106,23 @@ async function deleteTiktokAdsAccount(advertiserId) {
 }
 async function setTiktokAdsAccountSyncStatus(advertiserId, status) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_ads_accounts } = await readLocalCollections2();
+    const { store, tiktok_ads_accounts } = await readLocalCollections3();
     const next = tiktok_ads_accounts.map((a) => a.advertiser_id === advertiserId ? { ...a, ...status } : a);
-    await writeLocalCollections2(store, { tiktok_ads_accounts: next });
+    await writeLocalCollections3(store, { tiktok_ads_accounts: next });
     return;
   }
   const { error } = await supabase.from("tiktok_ads_accounts").update(status).eq("advertiser_id", advertiserId);
   if (error) throw new Error(`L\u1ED7i c\u1EADp nh\u1EADt tr\u1EA1ng th\xE1i \u0111\u1ED3ng b\u1ED9 TikTok Ads: ${error.message}`);
+}
+async function patchTiktokAdsAccountBrand(advertiserId, brand) {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections3();
+    const next = tiktok_ads_accounts.map((a) => a.advertiser_id === advertiserId ? { ...a, brand } : a);
+    await writeLocalCollections3(store, { tiktok_ads_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("tiktok_ads_accounts").update({ brand }).eq("advertiser_id", advertiserId);
+  if (error) throw new Error(`L\u1ED7i g\xE1n th\u01B0\u01A1ng hi\u1EC7u: ${error.message}`);
 }
 
 // src/server/facebookAdsSync.ts
@@ -124554,6 +125141,7 @@ function dateRangeChunks(since, until) {
   return chunks;
 }
 var INSIGHTS_FIELDS = [
+  "ad_id",
   "campaign_name",
   "adset_name",
   "ad_name",
@@ -124574,7 +125162,34 @@ function sumAllActionValues(actions) {
   if (!Array.isArray(actions)) return 0;
   return actions.reduce((sum, a) => sum + (Number(a.value) || 0), 0);
 }
-async function fetchAdAccountInsights(adAccountId, accessToken, since, until, brand, tokenStatus) {
+async function fetchAdPostMap(adAccountId, accessToken, tokenStatus) {
+  const map = /* @__PURE__ */ new Map();
+  let body;
+  try {
+    body = await graphGet(`/${adAccountId}/ads?fields=id,creative{effective_object_story_id}&limit=500`, accessToken);
+  } catch (err) {
+    if (isTokenInvalidError(err)) tokenStatus.invalid = true;
+    console.error(`Facebook Ads \u2192 post map (${adAccountId}) l\u1ED7i:`, err.message || err);
+    return map;
+  }
+  while (body) {
+    for (const item of body.data || []) {
+      const postId = item.creative?.effective_object_story_id;
+      if (item.id && postId) map.set(item.id, postId);
+    }
+    const nextUrl = body.paging?.next;
+    if (!nextUrl) break;
+    try {
+      const res = await fetch(nextUrl);
+      body = await res.json();
+      if (!res.ok || body?.error) break;
+    } catch {
+      break;
+    }
+  }
+  return map;
+}
+async function fetchAdAccountInsights(adAccountId, accessToken, since, until, brand, tokenStatus, adPostMap) {
   const rows = [];
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
   let body;
@@ -124604,6 +125219,11 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
         frequency: item.frequency != null ? Number(item.frequency) : null,
         video_views: item.video_play_actions ? sumAllActionValues(item.video_play_actions) : null,
         conversions: sumActionValues(item.actions, CONVERSION_ACTION_TYPES),
+        // Only set when this ad boosts an existing Page post — see
+        // fetchAdPostMap above. Lets the same post's paid spend/reach be
+        // joined against its organic row in fb_posts (post_id there is the
+        // same "{page_id}_{post_id}" string).
+        post_id: item.ad_id ? adPostMap.get(item.ad_id) || null : null,
         extra: {}
       });
     }
@@ -124640,6 +125260,7 @@ async function runFacebookAdsSync(overrides) {
       try {
         const accessToken = decrypt(account.access_token_encrypted);
         if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+        const adPostMap = await fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus);
         for (const chunk of chunks) {
           const rows = await fetchAdAccountInsights(
             account.ad_account_id,
@@ -124647,7 +125268,8 @@ async function runFacebookAdsSync(overrides) {
             chunk.since,
             chunk.until,
             account.brand,
-            tokenStatus
+            tokenStatus,
+            adPostMap
           );
           if (rows.length > 0) await upsertAdsPerformance(rows);
           rowsSynced += rows.length;
@@ -124952,7 +125574,7 @@ async function runTiktokAdsSync(overrides) {
 }
 
 // src/server/tiktokStore.ts
-async function readLocalCollections3() {
+async function readLocalCollections4() {
   const store = await getDatabaseData();
   return {
     store,
@@ -124961,12 +125583,12 @@ async function readLocalCollections3() {
     tiktok_posts: Array.isArray(store.tiktok_posts) ? store.tiktok_posts : []
   };
 }
-async function writeLocalCollections3(store, updates) {
+async function writeLocalCollections4(store, updates) {
   await saveDatabaseData({ ...store, ...updates });
 }
 async function getTiktokAccounts() {
   if (!isSupabaseConfigured) {
-    const { tiktok_accounts } = await readLocalCollections3();
+    const { tiktok_accounts } = await readLocalCollections4();
     return tiktok_accounts;
   }
   const { data, error } = await supabase.from("tiktok_accounts").select("*").order("created_at", { ascending: true });
@@ -124975,9 +125597,9 @@ async function getTiktokAccounts() {
 }
 async function upsertTiktokAccount(account) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_accounts } = await readLocalCollections3();
+    const { store, tiktok_accounts } = await readLocalCollections4();
     const rest = tiktok_accounts.filter((a) => a.open_id !== account.open_id);
-    await writeLocalCollections3(store, { tiktok_accounts: [...rest, account] });
+    await writeLocalCollections4(store, { tiktok_accounts: [...rest, account] });
     return;
   }
   const { error } = await supabase.from("tiktok_accounts").upsert(account, { onConflict: "open_id" });
@@ -124985,8 +125607,8 @@ async function upsertTiktokAccount(account) {
 }
 async function deleteTiktokAccount(openId) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_accounts, tiktok_insights_daily, tiktok_posts } = await readLocalCollections3();
-    await writeLocalCollections3(store, {
+    const { store, tiktok_accounts, tiktok_insights_daily, tiktok_posts } = await readLocalCollections4();
+    await writeLocalCollections4(store, {
       tiktok_accounts: tiktok_accounts.filter((a) => a.open_id !== openId),
       tiktok_insights_daily: tiktok_insights_daily.filter((r2) => r2.open_id !== openId),
       tiktok_posts: tiktok_posts.filter((r2) => r2.open_id !== openId)
@@ -124998,9 +125620,9 @@ async function deleteTiktokAccount(openId) {
 }
 async function setTiktokAccountSyncStatus(openId, status) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_accounts } = await readLocalCollections3();
+    const { store, tiktok_accounts } = await readLocalCollections4();
     const next = tiktok_accounts.map((a) => a.open_id === openId ? { ...a, ...status } : a);
-    await writeLocalCollections3(store, { tiktok_accounts: next });
+    await writeLocalCollections4(store, { tiktok_accounts: next });
     return;
   }
   const { error } = await supabase.from("tiktok_accounts").update(status).eq("open_id", openId);
@@ -125008,9 +125630,9 @@ async function setTiktokAccountSyncStatus(openId, status) {
 }
 async function updateTiktokAccountTokens(openId, tokens) {
   if (!isSupabaseConfigured) {
-    const { store, tiktok_accounts } = await readLocalCollections3();
+    const { store, tiktok_accounts } = await readLocalCollections4();
     const next = tiktok_accounts.map((a) => a.open_id === openId ? { ...a, ...tokens } : a);
-    await writeLocalCollections3(store, { tiktok_accounts: next });
+    await writeLocalCollections4(store, { tiktok_accounts: next });
     return;
   }
   const { error } = await supabase.from("tiktok_accounts").update(tokens).eq("open_id", openId);
@@ -125019,11 +125641,11 @@ async function updateTiktokAccountTokens(openId, tokens) {
 async function upsertTiktokInsightsDaily(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, tiktok_insights_daily } = await readLocalCollections3();
+    const { store, tiktok_insights_daily } = await readLocalCollections4();
     const key = (r2) => `${r2.open_id}|${r2.date}`;
     const byKey = new Map(tiktok_insights_daily.map((r2) => [key(r2), r2]));
     for (const row of rows) byKey.set(key(row), row);
-    await writeLocalCollections3(store, { tiktok_insights_daily: Array.from(byKey.values()) });
+    await writeLocalCollections4(store, { tiktok_insights_daily: Array.from(byKey.values()) });
     return;
   }
   const { error } = await supabase.from("tiktok_insights_daily").upsert(rows, { onConflict: "open_id,date" });
@@ -125031,7 +125653,7 @@ async function upsertTiktokInsightsDaily(rows) {
 }
 async function getTiktokInsightsDaily(openIds, since, until) {
   if (!isSupabaseConfigured) {
-    const { tiktok_insights_daily } = await readLocalCollections3();
+    const { tiktok_insights_daily } = await readLocalCollections4();
     return tiktok_insights_daily.filter((r2) => openIds.includes(r2.open_id) && r2.date >= since && r2.date <= until);
   }
   const { data, error } = await supabase.from("tiktok_insights_daily").select("*").in("open_id", openIds).gte("date", since).lte("date", until).order("date", { ascending: true });
@@ -125041,10 +125663,10 @@ async function getTiktokInsightsDaily(openIds, since, until) {
 async function upsertTiktokPosts(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, tiktok_posts } = await readLocalCollections3();
+    const { store, tiktok_posts } = await readLocalCollections4();
     const byId = new Map(tiktok_posts.map((r2) => [r2.video_id, r2]));
     for (const row of rows) byId.set(row.video_id, row);
-    await writeLocalCollections3(store, { tiktok_posts: Array.from(byId.values()) });
+    await writeLocalCollections4(store, { tiktok_posts: Array.from(byId.values()) });
     return;
   }
   const { error } = await supabase.from("tiktok_posts").upsert(rows, { onConflict: "video_id" });
@@ -125052,7 +125674,7 @@ async function upsertTiktokPosts(rows) {
 }
 async function getTiktokPosts(openIds, since, until) {
   if (!isSupabaseConfigured) {
-    const { tiktok_posts } = await readLocalCollections3();
+    const { tiktok_posts } = await readLocalCollections4();
     return tiktok_posts.filter((r2) => openIds.includes(r2.open_id) && r2.create_time >= since && r2.create_time <= until).sort((a, b) => a.create_time < b.create_time ? 1 : -1);
   }
   const { data, error } = await supabase.from("tiktok_posts").select("*").in("open_id", openIds).gte("create_time", since).lte("create_time", until).order("create_time", { ascending: false });
@@ -125216,7 +125838,7 @@ async function runTiktokSync() {
 }
 
 // src/server/youtubeStore.ts
-async function readLocalCollections4() {
+async function readLocalCollections5() {
   const store = await getDatabaseData();
   return {
     store,
@@ -125225,12 +125847,12 @@ async function readLocalCollections4() {
     youtube_videos: Array.isArray(store.youtube_videos) ? store.youtube_videos : []
   };
 }
-async function writeLocalCollections4(store, updates) {
+async function writeLocalCollections5(store, updates) {
   await saveDatabaseData({ ...store, ...updates });
 }
 async function getYoutubeAccounts() {
   if (!isSupabaseConfigured) {
-    const { youtube_accounts } = await readLocalCollections4();
+    const { youtube_accounts } = await readLocalCollections5();
     return youtube_accounts;
   }
   const { data, error } = await supabase.from("youtube_accounts").select("*").order("created_at", { ascending: true });
@@ -125239,9 +125861,9 @@ async function getYoutubeAccounts() {
 }
 async function upsertYoutubeAccount(account) {
   if (!isSupabaseConfigured) {
-    const { store, youtube_accounts } = await readLocalCollections4();
+    const { store, youtube_accounts } = await readLocalCollections5();
     const rest = youtube_accounts.filter((a) => a.channel_id !== account.channel_id);
-    await writeLocalCollections4(store, { youtube_accounts: [...rest, account] });
+    await writeLocalCollections5(store, { youtube_accounts: [...rest, account] });
     return;
   }
   const { error } = await supabase.from("youtube_accounts").upsert(account, { onConflict: "channel_id" });
@@ -125249,8 +125871,8 @@ async function upsertYoutubeAccount(account) {
 }
 async function deleteYoutubeAccount(channelId) {
   if (!isSupabaseConfigured) {
-    const { store, youtube_accounts, youtube_insights_daily, youtube_videos } = await readLocalCollections4();
-    await writeLocalCollections4(store, {
+    const { store, youtube_accounts, youtube_insights_daily, youtube_videos } = await readLocalCollections5();
+    await writeLocalCollections5(store, {
       youtube_accounts: youtube_accounts.filter((a) => a.channel_id !== channelId),
       youtube_insights_daily: youtube_insights_daily.filter((r2) => r2.channel_id !== channelId),
       youtube_videos: youtube_videos.filter((r2) => r2.channel_id !== channelId)
@@ -125262,9 +125884,9 @@ async function deleteYoutubeAccount(channelId) {
 }
 async function setYoutubeAccountSyncStatus(channelId, status) {
   if (!isSupabaseConfigured) {
-    const { store, youtube_accounts } = await readLocalCollections4();
+    const { store, youtube_accounts } = await readLocalCollections5();
     const next = youtube_accounts.map((a) => a.channel_id === channelId ? { ...a, ...status } : a);
-    await writeLocalCollections4(store, { youtube_accounts: next });
+    await writeLocalCollections5(store, { youtube_accounts: next });
     return;
   }
   const { error } = await supabase.from("youtube_accounts").update(status).eq("channel_id", channelId);
@@ -125272,9 +125894,9 @@ async function setYoutubeAccountSyncStatus(channelId, status) {
 }
 async function updateYoutubeAccountAccessToken(channelId, tokens) {
   if (!isSupabaseConfigured) {
-    const { store, youtube_accounts } = await readLocalCollections4();
+    const { store, youtube_accounts } = await readLocalCollections5();
     const next = youtube_accounts.map((a) => a.channel_id === channelId ? { ...a, ...tokens } : a);
-    await writeLocalCollections4(store, { youtube_accounts: next });
+    await writeLocalCollections5(store, { youtube_accounts: next });
     return;
   }
   const { error } = await supabase.from("youtube_accounts").update(tokens).eq("channel_id", channelId);
@@ -125283,11 +125905,11 @@ async function updateYoutubeAccountAccessToken(channelId, tokens) {
 async function upsertYoutubeInsightsDaily(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, youtube_insights_daily } = await readLocalCollections4();
+    const { store, youtube_insights_daily } = await readLocalCollections5();
     const key = (r2) => `${r2.channel_id}|${r2.date}`;
     const byKey = new Map(youtube_insights_daily.map((r2) => [key(r2), r2]));
     for (const row of rows) byKey.set(key(row), row);
-    await writeLocalCollections4(store, { youtube_insights_daily: Array.from(byKey.values()) });
+    await writeLocalCollections5(store, { youtube_insights_daily: Array.from(byKey.values()) });
     return;
   }
   const { error } = await supabase.from("youtube_insights_daily").upsert(rows, { onConflict: "channel_id,date" });
@@ -125295,7 +125917,7 @@ async function upsertYoutubeInsightsDaily(rows) {
 }
 async function getYoutubeInsightsDaily(channelIds, since, until) {
   if (!isSupabaseConfigured) {
-    const { youtube_insights_daily } = await readLocalCollections4();
+    const { youtube_insights_daily } = await readLocalCollections5();
     return youtube_insights_daily.filter((r2) => channelIds.includes(r2.channel_id) && r2.date >= since && r2.date <= until);
   }
   const { data, error } = await supabase.from("youtube_insights_daily").select("*").in("channel_id", channelIds).gte("date", since).lte("date", until).order("date", { ascending: true });
@@ -125305,10 +125927,10 @@ async function getYoutubeInsightsDaily(channelIds, since, until) {
 async function upsertYoutubeVideos(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, youtube_videos } = await readLocalCollections4();
+    const { store, youtube_videos } = await readLocalCollections5();
     const byId = new Map(youtube_videos.map((r2) => [r2.video_id, r2]));
     for (const row of rows) byId.set(row.video_id, row);
-    await writeLocalCollections4(store, { youtube_videos: Array.from(byId.values()) });
+    await writeLocalCollections5(store, { youtube_videos: Array.from(byId.values()) });
     return;
   }
   const { error } = await supabase.from("youtube_videos").upsert(rows, { onConflict: "video_id" });
@@ -125316,7 +125938,7 @@ async function upsertYoutubeVideos(rows) {
 }
 async function getYoutubeVideos(channelIds, since, until) {
   if (!isSupabaseConfigured) {
-    const { youtube_videos } = await readLocalCollections4();
+    const { youtube_videos } = await readLocalCollections5();
     return youtube_videos.filter((r2) => channelIds.includes(r2.channel_id) && r2.published_at >= since && r2.published_at <= until).sort((a, b) => a.published_at < b.published_at ? 1 : -1);
   }
   const { data, error } = await supabase.from("youtube_videos").select("*").in("channel_id", channelIds).gte("published_at", since).lte("published_at", until).order("published_at", { ascending: false });
@@ -125524,21 +126146,27 @@ async function runYoutubeSync() {
 }
 
 // src/server/googleWebsiteStore.ts
-async function readLocalCollections5() {
+async function readLocalCollections6() {
   const store = await getDatabaseData();
   return {
     store,
     google_website_accounts: Array.isArray(store.google_website_accounts) ? store.google_website_accounts : [],
     ga4_insights_daily: Array.isArray(store.ga4_insights_daily) ? store.ga4_insights_daily : [],
-    search_console_insights_daily: Array.isArray(store.search_console_insights_daily) ? store.search_console_insights_daily : []
+    search_console_insights_daily: Array.isArray(store.search_console_insights_daily) ? store.search_console_insights_daily : [],
+    ga4_channel_sessions_daily: Array.isArray(store.ga4_channel_sessions_daily) ? store.ga4_channel_sessions_daily : [],
+    ga4_pages_summary: Array.isArray(store.ga4_pages_summary) ? store.ga4_pages_summary : [],
+    search_console_pages_summary: Array.isArray(store.search_console_pages_summary) ? store.search_console_pages_summary : [],
+    ga4_geo_summary: Array.isArray(store.ga4_geo_summary) ? store.ga4_geo_summary : [],
+    ga4_device_summary: Array.isArray(store.ga4_device_summary) ? store.ga4_device_summary : [],
+    search_console_device_summary: Array.isArray(store.search_console_device_summary) ? store.search_console_device_summary : []
   };
 }
-async function writeLocalCollections5(store, updates) {
+async function writeLocalCollections6(store, updates) {
   await saveDatabaseData({ ...store, ...updates });
 }
 async function getGoogleWebsiteAccounts() {
   if (!isSupabaseConfigured) {
-    const { google_website_accounts } = await readLocalCollections5();
+    const { google_website_accounts } = await readLocalCollections6();
     return google_website_accounts;
   }
   const { data, error } = await supabase.from("google_website_accounts").select("*").order("created_at", { ascending: true });
@@ -125547,9 +126175,9 @@ async function getGoogleWebsiteAccounts() {
 }
 async function upsertGoogleWebsiteAccount(account) {
   if (!isSupabaseConfigured) {
-    const { store, google_website_accounts } = await readLocalCollections5();
+    const { store, google_website_accounts } = await readLocalCollections6();
     const rest = google_website_accounts.filter((a) => a.id !== account.id);
-    await writeLocalCollections5(store, { google_website_accounts: [...rest, account] });
+    await writeLocalCollections6(store, { google_website_accounts: [...rest, account] });
     return;
   }
   const { error } = await supabase.from("google_website_accounts").upsert(account, { onConflict: "id" });
@@ -125557,9 +126185,9 @@ async function upsertGoogleWebsiteAccount(account) {
 }
 async function patchGoogleWebsiteAccount(id, patch) {
   if (!isSupabaseConfigured) {
-    const { store, google_website_accounts } = await readLocalCollections5();
+    const { store, google_website_accounts } = await readLocalCollections6();
     const next = google_website_accounts.map((a) => a.id === id ? { ...a, ...patch } : a);
-    await writeLocalCollections5(store, { google_website_accounts: next });
+    await writeLocalCollections6(store, { google_website_accounts: next });
     return;
   }
   const { error } = await supabase.from("google_website_accounts").update(patch).eq("id", id);
@@ -125567,11 +126195,28 @@ async function patchGoogleWebsiteAccount(id, patch) {
 }
 async function deleteGoogleWebsiteAccount(id) {
   if (!isSupabaseConfigured) {
-    const { store, google_website_accounts, ga4_insights_daily, search_console_insights_daily } = await readLocalCollections5();
-    await writeLocalCollections5(store, {
+    const {
+      store,
+      google_website_accounts,
+      ga4_insights_daily,
+      search_console_insights_daily,
+      ga4_channel_sessions_daily,
+      ga4_pages_summary,
+      search_console_pages_summary,
+      ga4_geo_summary,
+      ga4_device_summary,
+      search_console_device_summary
+    } = await readLocalCollections6();
+    await writeLocalCollections6(store, {
       google_website_accounts: google_website_accounts.filter((a) => a.id !== id),
       ga4_insights_daily: ga4_insights_daily.filter((r2) => r2.account_id !== id),
-      search_console_insights_daily: search_console_insights_daily.filter((r2) => r2.account_id !== id)
+      search_console_insights_daily: search_console_insights_daily.filter((r2) => r2.account_id !== id),
+      ga4_channel_sessions_daily: ga4_channel_sessions_daily.filter((r2) => r2.account_id !== id),
+      ga4_pages_summary: ga4_pages_summary.filter((r2) => r2.account_id !== id),
+      search_console_pages_summary: search_console_pages_summary.filter((r2) => r2.account_id !== id),
+      ga4_geo_summary: ga4_geo_summary.filter((r2) => r2.account_id !== id),
+      ga4_device_summary: ga4_device_summary.filter((r2) => r2.account_id !== id),
+      search_console_device_summary: search_console_device_summary.filter((r2) => r2.account_id !== id)
     });
     return;
   }
@@ -125581,11 +126226,11 @@ async function deleteGoogleWebsiteAccount(id) {
 async function upsertGa4InsightsDaily(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, ga4_insights_daily } = await readLocalCollections5();
+    const { store, ga4_insights_daily } = await readLocalCollections6();
     const key = (r2) => `${r2.account_id}|${r2.date}`;
     const byKey = new Map(ga4_insights_daily.map((r2) => [key(r2), r2]));
     for (const row of rows) byKey.set(key(row), row);
-    await writeLocalCollections5(store, { ga4_insights_daily: Array.from(byKey.values()) });
+    await writeLocalCollections6(store, { ga4_insights_daily: Array.from(byKey.values()) });
     return;
   }
   const { error } = await supabase.from("ga4_insights_daily").upsert(rows, { onConflict: "account_id,date" });
@@ -125593,7 +126238,7 @@ async function upsertGa4InsightsDaily(rows) {
 }
 async function getGa4InsightsDaily(accountIds, since, until) {
   if (!isSupabaseConfigured) {
-    const { ga4_insights_daily } = await readLocalCollections5();
+    const { ga4_insights_daily } = await readLocalCollections6();
     return ga4_insights_daily.filter((r2) => accountIds.includes(r2.account_id) && r2.date >= since && r2.date <= until);
   }
   const { data, error } = await supabase.from("ga4_insights_daily").select("*").in("account_id", accountIds).gte("date", since).lte("date", until).order("date", { ascending: true });
@@ -125603,11 +126248,11 @@ async function getGa4InsightsDaily(accountIds, since, until) {
 async function upsertSearchConsoleInsightsDaily(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, search_console_insights_daily } = await readLocalCollections5();
+    const { store, search_console_insights_daily } = await readLocalCollections6();
     const key = (r2) => `${r2.account_id}|${r2.date}`;
     const byKey = new Map(search_console_insights_daily.map((r2) => [key(r2), r2]));
     for (const row of rows) byKey.set(key(row), row);
-    await writeLocalCollections5(store, { search_console_insights_daily: Array.from(byKey.values()) });
+    await writeLocalCollections6(store, { search_console_insights_daily: Array.from(byKey.values()) });
     return;
   }
   const { error } = await supabase.from("search_console_insights_daily").upsert(rows, { onConflict: "account_id,date" });
@@ -125615,11 +126260,148 @@ async function upsertSearchConsoleInsightsDaily(rows) {
 }
 async function getSearchConsoleInsightsDaily(accountIds, since, until) {
   if (!isSupabaseConfigured) {
-    const { search_console_insights_daily } = await readLocalCollections5();
+    const { search_console_insights_daily } = await readLocalCollections6();
     return search_console_insights_daily.filter((r2) => accountIds.includes(r2.account_id) && r2.date >= since && r2.date <= until);
   }
   const { data, error } = await supabase.from("search_console_insights_daily").select("*").in("account_id", accountIds).gte("date", since).lte("date", until).order("date", { ascending: true });
   if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u Search Console: ${error.message}`);
+  return data || [];
+}
+async function upsertGa4ChannelSessionsDaily(rows) {
+  if (rows.length === 0) return;
+  if (!isSupabaseConfigured) {
+    const { store, ga4_channel_sessions_daily } = await readLocalCollections6();
+    const key = (r2) => `${r2.account_id}|${r2.date}|${r2.channel}`;
+    const byKey = new Map(ga4_channel_sessions_daily.map((r2) => [key(r2), r2]));
+    for (const row of rows) byKey.set(key(row), row);
+    await writeLocalCollections6(store, { ga4_channel_sessions_daily: Array.from(byKey.values()) });
+    return;
+  }
+  const { error } = await supabase.from("ga4_channel_sessions_daily").upsert(rows, { onConflict: "account_id,date,channel" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u GA4 theo k\xEAnh: ${error.message}`);
+}
+async function getGa4ChannelSessionsDaily(accountIds, since, until) {
+  if (!isSupabaseConfigured) {
+    const { ga4_channel_sessions_daily } = await readLocalCollections6();
+    return ga4_channel_sessions_daily.filter((r2) => accountIds.includes(r2.account_id) && r2.date >= since && r2.date <= until);
+  }
+  const { data, error } = await supabase.from("ga4_channel_sessions_daily").select("*").in("account_id", accountIds).gte("date", since).lte("date", until).order("date", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u GA4 theo k\xEAnh: ${error.message}`);
+  return data || [];
+}
+async function replaceGa4PagesSummary(accountId, rows) {
+  if (!isSupabaseConfigured) {
+    const { store, ga4_pages_summary } = await readLocalCollections6();
+    const rest = ga4_pages_summary.filter((r2) => r2.account_id !== accountId);
+    const next = rows.map((r2) => ({ account_id: accountId, ...r2 }));
+    await writeLocalCollections6(store, { ga4_pages_summary: [...rest, ...next] });
+    return;
+  }
+  const { error: deleteError } = await supabase.from("ga4_pages_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`L\u1ED7i x\xF3a d\u1EEF li\u1EC7u trang GA4 c\u0169: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("ga4_pages_summary").insert(rows.map((r2) => ({ account_id: accountId, ...r2, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
+  if (error) throw new Error(`L\u1ED7i l\u01B0u d\u1EEF li\u1EC7u trang GA4: ${error.message}`);
+}
+async function getGa4PagesSummary(accountIds) {
+  if (!isSupabaseConfigured) {
+    const { ga4_pages_summary } = await readLocalCollections6();
+    return ga4_pages_summary.filter((r2) => accountIds.includes(r2.account_id));
+  }
+  const { data, error } = await supabase.from("ga4_pages_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u trang GA4: ${error.message}`);
+  return data || [];
+}
+async function replaceSearchConsolePagesSummary(accountId, rows) {
+  if (!isSupabaseConfigured) {
+    const { store, search_console_pages_summary } = await readLocalCollections6();
+    const rest = search_console_pages_summary.filter((r2) => r2.account_id !== accountId);
+    const next = rows.map((r2) => ({ account_id: accountId, ...r2 }));
+    await writeLocalCollections6(store, { search_console_pages_summary: [...rest, ...next] });
+    return;
+  }
+  const { error: deleteError } = await supabase.from("search_console_pages_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`L\u1ED7i x\xF3a d\u1EEF li\u1EC7u trang Search Console c\u0169: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("search_console_pages_summary").insert(rows.map((r2) => ({ account_id: accountId, ...r2, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
+  if (error) throw new Error(`L\u1ED7i l\u01B0u d\u1EEF li\u1EC7u trang Search Console: ${error.message}`);
+}
+async function getSearchConsolePagesSummary(accountIds) {
+  if (!isSupabaseConfigured) {
+    const { search_console_pages_summary } = await readLocalCollections6();
+    return search_console_pages_summary.filter((r2) => accountIds.includes(r2.account_id));
+  }
+  const { data, error } = await supabase.from("search_console_pages_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u trang Search Console: ${error.message}`);
+  return data || [];
+}
+async function replaceGa4GeoSummary(accountId, rows) {
+  if (!isSupabaseConfigured) {
+    const { store, ga4_geo_summary } = await readLocalCollections6();
+    const rest = ga4_geo_summary.filter((r2) => r2.account_id !== accountId);
+    const next = rows.map((r2) => ({ account_id: accountId, ...r2 }));
+    await writeLocalCollections6(store, { ga4_geo_summary: [...rest, ...next] });
+    return;
+  }
+  const { error: deleteError } = await supabase.from("ga4_geo_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`L\u1ED7i x\xF3a d\u1EEF li\u1EC7u \u0111\u1ECBa l\xFD GA4 c\u0169: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("ga4_geo_summary").insert(rows.map((r2) => ({ account_id: accountId, ...r2, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
+  if (error) throw new Error(`L\u1ED7i l\u01B0u d\u1EEF li\u1EC7u \u0111\u1ECBa l\xFD GA4: ${error.message}`);
+}
+async function getGa4GeoSummary(accountIds) {
+  if (!isSupabaseConfigured) {
+    const { ga4_geo_summary } = await readLocalCollections6();
+    return ga4_geo_summary.filter((r2) => accountIds.includes(r2.account_id));
+  }
+  const { data, error } = await supabase.from("ga4_geo_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u \u0111\u1ECBa l\xFD GA4: ${error.message}`);
+  return data || [];
+}
+async function replaceGa4DeviceSummary(accountId, rows) {
+  if (!isSupabaseConfigured) {
+    const { store, ga4_device_summary } = await readLocalCollections6();
+    const rest = ga4_device_summary.filter((r2) => r2.account_id !== accountId);
+    const next = rows.map((r2) => ({ account_id: accountId, ...r2 }));
+    await writeLocalCollections6(store, { ga4_device_summary: [...rest, ...next] });
+    return;
+  }
+  const { error: deleteError } = await supabase.from("ga4_device_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`L\u1ED7i x\xF3a d\u1EEF li\u1EC7u thi\u1EBFt b\u1ECB GA4 c\u0169: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("ga4_device_summary").insert(rows.map((r2) => ({ account_id: accountId, ...r2, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
+  if (error) throw new Error(`L\u1ED7i l\u01B0u d\u1EEF li\u1EC7u thi\u1EBFt b\u1ECB GA4: ${error.message}`);
+}
+async function getGa4DeviceSummary(accountIds) {
+  if (!isSupabaseConfigured) {
+    const { ga4_device_summary } = await readLocalCollections6();
+    return ga4_device_summary.filter((r2) => accountIds.includes(r2.account_id));
+  }
+  const { data, error } = await supabase.from("ga4_device_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u thi\u1EBFt b\u1ECB GA4: ${error.message}`);
+  return data || [];
+}
+async function replaceSearchConsoleDeviceSummary(accountId, rows) {
+  if (!isSupabaseConfigured) {
+    const { store, search_console_device_summary } = await readLocalCollections6();
+    const rest = search_console_device_summary.filter((r2) => r2.account_id !== accountId);
+    const next = rows.map((r2) => ({ account_id: accountId, ...r2 }));
+    await writeLocalCollections6(store, { search_console_device_summary: [...rest, ...next] });
+    return;
+  }
+  const { error: deleteError } = await supabase.from("search_console_device_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`L\u1ED7i x\xF3a d\u1EEF li\u1EC7u thi\u1EBFt b\u1ECB Search Console c\u0169: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("search_console_device_summary").insert(rows.map((r2) => ({ account_id: accountId, ...r2, updated_at: (/* @__PURE__ */ new Date()).toISOString() })));
+  if (error) throw new Error(`L\u1ED7i l\u01B0u d\u1EEF li\u1EC7u thi\u1EBFt b\u1ECB Search Console: ${error.message}`);
+}
+async function getSearchConsoleDeviceSummary(accountIds) {
+  if (!isSupabaseConfigured) {
+    const { search_console_device_summary } = await readLocalCollections6();
+    return search_console_device_summary.filter((r2) => accountIds.includes(r2.account_id));
+  }
+  const { data, error } = await supabase.from("search_console_device_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc d\u1EEF li\u1EC7u thi\u1EBFt b\u1ECB Search Console: ${error.message}`);
   return data || [];
 }
 
@@ -125633,6 +126415,8 @@ var YOUTUBE_CLIENT_SECRET2 = process.env.YOUTUBE_CLIENT_SECRET || "";
 var GOOGLE_WEBSITE_REDIRECT_URI = process.env.GOOGLE_WEBSITE_REDIRECT_URI || "";
 var isGoogleWebsiteConfigured = Boolean(YOUTUBE_CLIENT_ID && YOUTUBE_CLIENT_SECRET2 && GOOGLE_WEBSITE_REDIRECT_URI);
 var GOOGLE_WEBSITE_SCOPES = [
+  "openid",
+  "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/analytics.readonly",
   "https://www.googleapis.com/auth/webmasters.readonly"
 ];
@@ -125675,6 +126459,14 @@ async function refreshGoogleWebsiteToken(refreshToken) {
     refresh_token: refreshToken
   });
 }
+function detectBrandFromName(...names) {
+  const haystack = names.filter(Boolean).join(" ").toLowerCase();
+  const hasLivotec = haystack.includes("livotec");
+  const hasKarofi = haystack.includes("karofi");
+  if (hasLivotec && !hasKarofi) return "Livotec";
+  if (hasKarofi && !hasLivotec) return "Karofi";
+  return null;
+}
 function decodeIdToken(idToken) {
   const payload = JSON.parse(Buffer.from(idToken.split(".")[1], "base64url").toString("utf8"));
   return { sub: payload.sub, email: payload.email || null };
@@ -125708,11 +126500,24 @@ async function listSearchConsoleSites(accessToken) {
 function toDateStr4(d) {
   return d.toISOString().slice(0, 10);
 }
-async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
+function formatGa4Date(raw) {
+  return raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw;
+}
+async function runGa4Report(accessToken, propertyId, body) {
   const res = await fetch(`${GA4_DATA_API_BASE}/${propertyId}:runReport`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
+    body: JSON.stringify(body)
+  });
+  const parsed = await res.json();
+  if (!res.ok || parsed?.error) {
+    throw new GoogleWebsiteApiError(parsed?.error?.message || `GA4 runReport tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, parsed?.error?.status);
+  }
+  return parsed?.rows || [];
+}
+async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
+  const [totalRows, organicRows] = await Promise.all([
+    runGa4Report(accessToken, propertyId, {
       dateRanges: [{ startDate: since, endDate: until }],
       dimensions: [{ name: "date" }],
       metrics: [
@@ -125724,21 +126529,33 @@ async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
         { name: "conversions" },
         { name: "bounceRate" }
       ]
+    }),
+    runGa4Report(accessToken, propertyId, {
+      dateRanges: [{ startDate: since, endDate: until }],
+      dimensions: [{ name: "date" }],
+      metrics: [{ name: "sessions" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "sessionDefaultChannelGroup",
+          stringFilter: { matchType: "EXACT", value: "Organic Search" }
+        }
+      }
     })
-  });
-  const body = await res.json();
-  if (!res.ok || body?.error) {
-    throw new GoogleWebsiteApiError(body?.error?.message || `GA4 runReport tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  ]);
+  const organicByDate = /* @__PURE__ */ new Map();
+  for (const row of organicRows) {
+    const date = formatGa4Date(row.dimensionValues?.[0]?.value || "");
+    organicByDate.set(date, Number(row.metricValues?.[0]?.value) || 0);
   }
-  return (body?.rows || []).map((row) => {
-    const raw = row.dimensionValues?.[0]?.value || "";
-    const date = raw.length === 8 ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw;
+  return totalRows.map((row) => {
+    const date = formatGa4Date(row.dimensionValues?.[0]?.value || "");
     const [sessions, activeUsers, newUsers, engagedSessions, avgSessionDuration, conversions, bounceRate] = (row.metricValues || []).map(
       (m2) => Number(m2.value)
     );
     return {
       date,
       sessions: sessions ?? null,
+      organic_sessions: organicByDate.has(date) ? organicByDate.get(date) : null,
       active_users: activeUsers ?? null,
       new_users: newUsers ?? null,
       engaged_sessions: engagedSessions ?? null,
@@ -125747,6 +126564,78 @@ async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
       bounce_rate: bounceRate ?? null
     };
   });
+}
+async function fetchGa4ChannelSessionsDaily(accessToken, propertyId, since, until) {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "date" }, { name: "sessionDefaultChannelGroup" }],
+    metrics: [{ name: "sessions" }]
+  });
+  return rows.map((row) => ({
+    date: formatGa4Date(row.dimensionValues?.[0]?.value || ""),
+    channel: row.dimensionValues?.[1]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0
+  }));
+}
+async function fetchGa4PageMetrics(accessToken, propertyId, since, until) {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "pagePath" }],
+    metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }, { name: "userEngagementDuration" }],
+    orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+    limit: 500
+  });
+  return rows.map((row) => ({
+    page_path: row.dimensionValues?.[0]?.value || "",
+    screen_page_views: Number(row.metricValues?.[0]?.value) || 0,
+    total_users: Number(row.metricValues?.[1]?.value) || 0,
+    user_engagement_duration: Number(row.metricValues?.[2]?.value) || 0
+  }));
+}
+async function fetchGa4GeoMetrics(accessToken, propertyId, since, until) {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "country" }, { name: "city" }],
+    metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 50
+  });
+  return rows.map((row) => ({
+    country: row.dimensionValues?.[0]?.value || "(not set)",
+    city: row.dimensionValues?.[1]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0,
+    active_users: Number(row.metricValues?.[1]?.value) || 0
+  }));
+}
+async function fetchGa4DeviceMetrics(accessToken, propertyId, since, until) {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "deviceCategory" }],
+    metrics: [{ name: "sessions" }, { name: "activeUsers" }]
+  });
+  return rows.map((row) => ({
+    device_category: row.dimensionValues?.[0]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0,
+    active_users: Number(row.metricValues?.[1]?.value) || 0
+  }));
+}
+async function fetchSearchConsoleDeviceMetrics(accessToken, siteUrl, since, until) {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ startDate: since, endDate: until, dimensions: ["device"], rowLimit: 10 })
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row) => ({
+    device: row.keys?.[0] || "(not set)",
+    clicks: row.clicks ?? 0,
+    impressions: row.impressions ?? 0,
+    ctr: row.ctr ?? 0,
+    position: row.position ?? 0
+  }));
 }
 async function fetchSearchConsoleDailyMetrics(accessToken, siteUrl, since, until) {
   const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
@@ -125771,6 +126660,57 @@ async function fetchSearchConsoleDailyMetrics(accessToken, siteUrl, since, until
     position: row.position ?? null
   }));
 }
+async function getFreshAccessToken(account) {
+  let accessToken = decrypt(account.access_token_encrypted);
+  if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+  const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
+  if (Date.now() > accessExpiresAt - 5 * 60 * 1e3) {
+    const refreshToken = decrypt(account.refresh_token_encrypted);
+    const refreshed = await refreshGoogleWebsiteToken(refreshToken);
+    accessToken = refreshed.access_token;
+    await patchGoogleWebsiteAccount(account.id, {
+      access_token_encrypted: encrypt(refreshed.access_token),
+      access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString()
+    });
+  }
+  return accessToken;
+}
+async function listSearchConsoleTopPages(accessToken, siteUrl, since, until, rowLimit = 250) {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ startDate: since, endDate: until, dimensions: ["page"], rowLimit })
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row) => ({
+    page: row.keys?.[0],
+    clicks: row.clicks ?? 0,
+    impressions: row.impressions ?? 0,
+    ctr: row.ctr ?? 0,
+    position: row.position ?? 0
+  }));
+}
+async function listSearchConsoleTopQueries(accessToken, siteUrl, since, until, rowLimit = 1e3) {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ startDate: since, endDate: until, dimensions: ["query"], rowLimit })
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row) => ({
+    query: row.keys?.[0],
+    clicks: row.clicks ?? 0,
+    impressions: row.impressions ?? 0,
+    ctr: row.ctr ?? 0,
+    position: row.position ?? 0
+  }));
+}
 async function runGoogleWebsiteSync() {
   if (!isGoogleWebsiteConfigured) {
     throw new Error("GOOGLE_WEBSITE_REDIRECT_URI (ho\u1EB7c YOUTUBE_CLIENT_ID/SECRET) ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7.");
@@ -125782,29 +126722,27 @@ async function runGoogleWebsiteSync() {
   for (const account of accounts) {
     let refreshTokenInvalid = false;
     try {
-      let accessToken = decrypt(account.access_token_encrypted);
-      if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
-      const accessExpiresAt = new Date(account.access_token_expires_at).getTime();
-      if (Date.now() > accessExpiresAt - 5 * 60 * 1e3) {
-        const refreshToken = decrypt(account.refresh_token_encrypted);
-        try {
-          const refreshed = await refreshGoogleWebsiteToken(refreshToken);
-          accessToken = refreshed.access_token;
-          await patchGoogleWebsiteAccount(account.id, {
-            access_token_encrypted: encrypt(refreshed.access_token),
-            access_token_expires_at: new Date(Date.now() + refreshed.expires_in * 1e3).toISOString()
-          });
-        } catch (err) {
-          if (isRefreshTokenInvalidError3(err)) refreshTokenInvalid = true;
-          throw err;
-        }
-      }
+      const accessToken = await getFreshAccessToken(account).catch((err) => {
+        if (isRefreshTokenInvalidError3(err)) refreshTokenInvalid = true;
+        throw err;
+      });
       let ga4RowsSynced = 0;
+      let ga4ChannelRowsSynced = 0;
       if (account.ga4_property_id) {
         const ga4Rows = await fetchGa4DailyMetrics(accessToken, account.ga4_property_id, since, until);
         const rows = ga4Rows.map((r2) => ({ account_id: account.id, ...r2 }));
         await upsertGa4InsightsDaily(rows);
         ga4RowsSynced = rows.length;
+        const channelRows = await fetchGa4ChannelSessionsDaily(accessToken, account.ga4_property_id, since, until);
+        const channelRowsWithAccount = channelRows.map((r2) => ({ account_id: account.id, ...r2 }));
+        await upsertGa4ChannelSessionsDaily(channelRowsWithAccount);
+        ga4ChannelRowsSynced = channelRowsWithAccount.length;
+        const pageRows = await fetchGa4PageMetrics(accessToken, account.ga4_property_id, since, until);
+        await replaceGa4PagesSummary(account.id, pageRows);
+        const geoRows = await fetchGa4GeoMetrics(accessToken, account.ga4_property_id, since, until);
+        await replaceGa4GeoSummary(account.id, geoRows);
+        const deviceRows = await fetchGa4DeviceMetrics(accessToken, account.ga4_property_id, since, until);
+        await replaceGa4DeviceSummary(account.id, deviceRows);
       }
       let gscRowsSynced = 0;
       if (account.gsc_site_url) {
@@ -125812,13 +126750,17 @@ async function runGoogleWebsiteSync() {
         const rows = gscRows.map((r2) => ({ account_id: account.id, ...r2 }));
         await upsertSearchConsoleInsightsDaily(rows);
         gscRowsSynced = rows.length;
+        const gscPageRows = await listSearchConsoleTopPages(accessToken, account.gsc_site_url, since, until, 500);
+        await replaceSearchConsolePagesSummary(account.id, gscPageRows);
+        const gscDeviceRows = await fetchSearchConsoleDeviceMetrics(accessToken, account.gsc_site_url, since, until);
+        await replaceSearchConsoleDeviceSummary(account.id, gscDeviceRows);
       }
       await patchGoogleWebsiteAccount(account.id, {
         last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
         last_sync_error: null,
         token_expired: false
       });
-      results.push({ account_id: account.id, brand: account.brand, ok: true, ga4_rows_synced: ga4RowsSynced, gsc_rows_synced: gscRowsSynced });
+      results.push({ account_id: account.id, brand: account.brand, ok: true, ga4_rows_synced: ga4RowsSynced, gsc_rows_synced: gscRowsSynced, ga4_channel_rows_synced: ga4ChannelRowsSynced });
     } catch (err) {
       const message = err?.message || String(err);
       console.error(`\u0110\u1ED3ng b\u1ED9 Website (GA4/Search Console) th\u1EA5t b\u1EA1i cho ${account.id}:`, message);
@@ -126578,9 +127520,9 @@ function isValidCronRequest(req) {
   const expected = process.env.CRON_SECRET;
   const provided = req.headers.authorization;
   if (!expected || !provided) return false;
-  const expectedDigest = import_crypto12.default.createHash("sha256").update(`Bearer ${expected}`).digest();
-  const providedDigest = import_crypto12.default.createHash("sha256").update(provided).digest();
-  return import_crypto12.default.timingSafeEqual(expectedDigest, providedDigest);
+  const expectedDigest = import_crypto15.default.createHash("sha256").update(`Bearer ${expected}`).digest();
+  const providedDigest = import_crypto15.default.createHash("sha256").update(provided).digest();
+  return import_crypto15.default.timingSafeEqual(expectedDigest, providedDigest);
 }
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
@@ -126604,7 +127546,7 @@ app.get("/api/cron/weekly-backup", async (req, res) => {
     return res.status(500).json({ error: err.message || "L\u1ED7i backup \u0111\u1ECBnh k\u1EF3." });
   }
 });
-var REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads"];
+var REPORT_CATEGORY_IDS = ["dashboard", "fb-insights", "digital-ads", "website-report", "campaign"];
 var DEFAULT_REPORT_PERMISSIONS = {
   Editor: [...REPORT_CATEGORY_IDS],
   Viewer: [...REPORT_CATEGORY_IDS]
@@ -126896,7 +127838,8 @@ app.get("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
         token_expires_at: p.token_expires_at ?? null,
         token_data_access_expires_at: p.token_data_access_expires_at ?? null,
         token_checked_at: p.token_checked_at ?? null
-      }))
+      })),
+      facebookOAuthConfigured: isFacebookOAuthConfigured
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -126940,11 +127883,121 @@ app.delete("/api/fb/pages/:page_id", requireAuth("Admin"), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.patch("/api/fb/pages/:page_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand kh\xF4ng h\u1EE3p l\u1EC7 (ch\u1EC9 nh\u1EADn Livotec, Karofi, ho\u1EB7c null)." });
+    }
+    await patchFbPageBrand(req.params.page_id, brand);
+    await logAction(req.session, req, "set-fb-page-brand", `G\xE1n brand "${brand}" cho Facebook Page ${req.params.page_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
   try {
     const results = await runFacebookSync();
     await logAction(req.session, req, "sync-facebook", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} Facebook Page`);
     res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/facebook/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isFacebookOAuthConfigured) {
+    return res.status(400).json({ success: false, error: "FB_APP_ID / FB_APP_SECRET / FACEBOOK_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7." });
+  }
+  const state = signOAuthState({ username: req.session.username });
+  res.json({ success: true, authorizeUrl: buildFacebookAuthorizeUrl(state) });
+});
+app.get("/api/facebook/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError, error_description } = req.query;
+  if (oauthError) {
+    return res.status(400).send(`K\u1EBFt n\u1ED1i Facebook b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${error_description || oauthError}`);
+  }
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c Facebook kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i t\u1EEB Control Panel.");
+  }
+  try {
+    const shortLived = await exchangeFacebookCode(code, FACEBOOK_REDIRECT_URI);
+    const longLived = await exchangeForLongLivedToken(shortLived.access_token);
+    const [pages, adAccounts] = await Promise.all([listOwnedPages(longLived.access_token), listOwnedAdAccounts(longLived.access_token)]);
+    const pendingId = await createOAuthPending("facebook", longLived.access_token, {
+      pages: pages.map((p) => ({ id: p.id, name: p.name, category: p.category || null, brandGuess: detectBrandFromFacebookName(p.name) })),
+      // Page access tokens ride along inside `candidates` (not just the
+      // shared long-lived token) since each Page needs its OWN token, not
+      // the User Token — kept out of the brand/name fields the frontend
+      // actually renders so a stray console.log of the candidates array
+      // doesn't casually print a token, but still technically present in
+      // the stored JSON; the whole record is only ever readable server-side
+      // (getOAuthPending), same trust boundary as every *_encrypted column.
+      pageTokens: Object.fromEntries(pages.map((p) => [p.id, p.access_token])),
+      adAccounts: adAccounts.map((a) => ({ id: a.id, name: a.name, brandGuess: detectBrandFromFacebookName(a.name) }))
+    });
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-facebook-oauth", `\u0110\u0103ng nh\u1EADp Facebook th\xE0nh c\xF4ng \u2014 ${pages.length} Page, ${adAccounts.length} Ad Account kh\u1EA3 d\u1EE5ng`);
+    res.redirect(302, `/?fbPendingId=${encodeURIComponent(pendingId)}`);
+  } catch (err) {
+    console.error("GET /api/facebook/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i Facebook th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.get("/api/oauth-pending/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending) return res.status(404).json({ success: false, error: "Li\xEAn k\u1EBFt \u0111\xE3 h\u1EBFt h\u1EA1n ho\u1EB7c kh\xF4ng t\u1ED3n t\u1EA1i \u2014 vui l\xF2ng k\u1EBFt n\u1ED1i l\u1EA1i." });
+    const candidates = pending.platform === "facebook" ? { ...pending.candidates, pageTokens: void 0 } : pending.candidates;
+    res.json({ success: true, platform: pending.platform, candidates });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/oauth-pending/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteOAuthPending(req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/facebook/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending || pending.platform !== "facebook") {
+      return res.status(404).json({ success: false, error: "Li\xEAn k\u1EBFt \u0111\xE3 h\u1EBFt h\u1EA1n ho\u1EB7c kh\xF4ng t\u1ED3n t\u1EA1i \u2014 vui l\xF2ng k\u1EBFt n\u1ED1i l\u1EA1i." });
+    }
+    const candidates = pending.candidates;
+    const selectedPages = Array.isArray(req.body?.pages) ? req.body.pages : [];
+    const selectedAdAccounts = Array.isArray(req.body?.adAccounts) ? req.body.adAccounts : [];
+    for (const sel of selectedPages) {
+      const candidate = candidates.pages.find((p) => p.id === sel.id);
+      const pageToken = candidates.pageTokens[sel.id];
+      if (!candidate || !pageToken) continue;
+      await upsertFbPage({
+        page_id: candidate.id,
+        page_name: candidate.name,
+        brand: sel.brand || null,
+        access_token_encrypted: encrypt(pageToken),
+        is_active: true
+      });
+    }
+    for (const sel of selectedAdAccounts) {
+      const candidate = candidates.adAccounts.find((a) => a.id === sel.id);
+      if (!candidate) continue;
+      await upsertFbAdAccount({
+        ad_account_id: candidate.id,
+        account_name: candidate.name,
+        brand: sel.brand || null,
+        access_token_encrypted: encrypt(pending.token),
+        // the long-lived User Token — Ad Insights calls use it directly, no per-account token
+        is_active: true
+      });
+    }
+    await deleteOAuthPending(req.params.id);
+    await logAction(req.session, req, "complete-facebook-oauth", `Nh\u1EADp ${selectedPages.length} Page + ${selectedAdAccounts.length} Ad Account t\u1EEB Facebook OAuth`);
+    res.json({ success: true, pagesImported: selectedPages.length, adAccountsImported: selectedAdAccounts.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -127010,11 +128063,24 @@ app.get("/api/fb/insights", requireAuth(), async (req, res) => {
       getFbInsightsDaily(requestedIds, since, until),
       getFbPosts(requestedIds, `${since}T00:00:00.000Z`, `${until}T23:59:59.999Z`)
     ]);
+    const postIds = posts.map((p) => p.post_id);
+    const adsUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const adsForPosts = await getAdsPerformanceByPostIds(postIds, since, adsUntil);
+    const adsByPostId = /* @__PURE__ */ new Map();
+    for (const row of adsForPosts) {
+      if (!row.post_id) continue;
+      const existing = adsByPostId.get(row.post_id) || { ads_spend: 0, ads_impressions: 0, ads_reach: 0 };
+      existing.ads_spend += row.spend || 0;
+      existing.ads_impressions += row.impressions || 0;
+      existing.ads_reach += row.reach || 0;
+      adsByPostId.set(row.post_id, existing);
+    }
+    const postsWithAds = posts.map((p) => ({ ...p, ads: adsByPostId.get(p.post_id) || null }));
     res.json({
       success: true,
       pages: allPages.map((p) => ({ page_id: p.page_id, page_name: p.page_name, brand: p.brand, is_active: p.is_active })),
       daily,
-      posts
+      posts: postsWithAds
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -127081,7 +128147,8 @@ app.get("/api/fb-ads/accounts", requireAuth("Admin"), async (req, res) => {
         last_synced_at: a.last_synced_at,
         last_sync_error: a.last_sync_error,
         token_expired: a.token_expired
-      }))
+      })),
+      facebookOAuthConfigured: isFacebookOAuthConfigured
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -127110,6 +128177,19 @@ app.delete("/api/fb-ads/accounts/:ad_account_id", requireAuth("Admin"), async (r
   try {
     await deleteFbAdAccount(req.params.ad_account_id);
     await logAction(req.session, req, "delete-fb-ad-account", `X\xF3a c\u1EA5u h\xECnh Ad Account ${req.params.ad_account_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.patch("/api/fb-ads/accounts/:ad_account_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand kh\xF4ng h\u1EE3p l\u1EC7 (ch\u1EC9 nh\u1EADn Livotec, Karofi, ho\u1EB7c null)." });
+    }
+    await patchFbAdAccountBrand(req.params.ad_account_id, brand);
+    await logAction(req.session, req, "set-fb-ad-account-brand", `G\xE1n brand "${brand}" cho Ad Account ${req.params.ad_account_id}`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -127268,7 +128348,8 @@ app.get("/api/tiktok-ads/accounts", requireAuth("Admin"), async (req, res) => {
         last_synced_at: a.last_synced_at,
         last_sync_error: a.last_sync_error,
         token_expired: a.token_expired
-      }))
+      })),
+      tiktokAdsOAuthConfigured: isTiktokAdsOAuthConfigured
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -127302,12 +128383,80 @@ app.delete("/api/tiktok-ads/accounts/:advertiser_id", requireAuth("Admin"), asyn
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.patch("/api/tiktok-ads/accounts/:advertiser_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand kh\xF4ng h\u1EE3p l\u1EC7 (ch\u1EC9 nh\u1EADn Livotec, Karofi, ho\u1EB7c null)." });
+    }
+    await patchTiktokAdsAccountBrand(req.params.advertiser_id, brand);
+    await logAction(req.session, req, "set-tiktok-ads-account-brand", `G\xE1n brand "${brand}" cho TikTok Ads Advertiser ${req.params.advertiser_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.post("/api/tiktok-ads/sync-now", requireAuth("Admin"), async (req, res) => {
   try {
     const overrides = getAdsSyncOverrides(req.body);
     const results = await runTiktokAdsSync(overrides);
     await logAction(req.session, req, "sync-tiktok-ads", `\u0110\u1ED3ng b\u1ED9 th\u1EE7 c\xF4ng ${results.length} TikTok Ads Advertiser`);
     res.json({ success: true, results });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/tiktok-ads/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isTiktokAdsOAuthConfigured) {
+    return res.status(400).json({ success: false, error: "TIKTOK_MARKETING_APP_ID / TIKTOK_MARKETING_APP_SECRET / TIKTOK_MARKETING_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7." });
+  }
+  const state = signOAuthState({ username: req.session.username });
+  res.json({ success: true, authorizeUrl: buildTiktokAdsAuthorizeUrl(state) });
+});
+app.get("/api/tiktok-ads/oauth/callback", async (req, res) => {
+  const { auth_code, state, error: oauthError, error_description } = req.query;
+  if (oauthError) {
+    return res.status(400).send(`K\u1EBFt n\u1ED1i TikTok Ads b\u1ECB h\u1EE7y ho\u1EB7c l\u1ED7i: ${error_description || oauthError}`);
+  }
+  const payload = verifyOAuthState(state);
+  if (!payload || typeof auth_code !== "string") {
+    return res.status(400).send("Li\xEAn k\u1EBFt x\xE1c th\u1EF1c TikTok Ads kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i t\u1EEB Control Panel.");
+  }
+  try {
+    const tokenResponse = await exchangeTiktokAdsCode(auth_code);
+    const advertisers = await fetchAdvertiserNames(tokenResponse.access_token, tokenResponse.advertiser_ids || []);
+    const pendingId = await createOAuthPending("tiktok_ads", tokenResponse.access_token, {
+      advertisers: advertisers.map((a) => ({ id: a.advertiser_id, name: a.name, brandGuess: detectBrandFromAdvertiserName(a.name) }))
+    });
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-tiktok-ads-oauth", `\u0110\u0103ng nh\u1EADp TikTok Ads th\xE0nh c\xF4ng \u2014 ${advertisers.length} Advertiser kh\u1EA3 d\u1EE5ng`);
+    res.redirect(302, `/?ttAdsPendingId=${encodeURIComponent(pendingId)}`);
+  } catch (err) {
+    console.error("GET /api/tiktok-ads/oauth/callback error:", err);
+    res.status(500).send(`K\u1EBFt n\u1ED1i TikTok Ads th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.post("/api/tiktok-ads/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending || pending.platform !== "tiktok_ads") {
+      return res.status(404).json({ success: false, error: "Li\xEAn k\u1EBFt \u0111\xE3 h\u1EBFt h\u1EA1n ho\u1EB7c kh\xF4ng t\u1ED3n t\u1EA1i \u2014 vui l\xF2ng k\u1EBFt n\u1ED1i l\u1EA1i." });
+    }
+    const candidates = pending.candidates;
+    const selected = Array.isArray(req.body?.advertisers) ? req.body.advertisers : [];
+    for (const sel of selected) {
+      const candidate = candidates.advertisers.find((a) => a.id === sel.id);
+      if (!candidate) continue;
+      await upsertTiktokAdsAccount({
+        advertiser_id: candidate.id,
+        account_name: candidate.name,
+        brand: sel.brand || null,
+        access_token_encrypted: encrypt(pending.token),
+        is_active: true
+      });
+    }
+    await deleteOAuthPending(req.params.id);
+    await logAction(req.session, req, "complete-tiktok-ads-oauth", `Nh\u1EADp ${selected.length} Advertiser t\u1EEB TikTok Ads OAuth`);
+    res.json({ success: true, advertisersImported: selected.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -127320,8 +128469,8 @@ app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
     });
   }
   const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const codeVerifier = import_crypto12.default.randomBytes(48).toString("base64url");
-  const codeChallenge = import_crypto12.default.createHash("sha256").update(codeVerifier).digest("base64url");
+  const codeVerifier = import_crypto15.default.randomBytes(48).toString("base64url");
+  const codeChallenge = import_crypto15.default.createHash("sha256").update(codeVerifier).digest("base64url");
   const state = signOAuthState({ brand, username: req.session.username, codeVerifier });
   const params = new URLSearchParams({
     client_key: TIKTOK_CLIENT_KEY,
@@ -127600,8 +128749,7 @@ app.get("/api/google-website/oauth/start", requireAuth("Admin"), (req, res) => {
       error: "GOOGLE_WEBSITE_REDIRECT_URI (ho\u1EB7c YOUTUBE_CLIENT_ID/SECRET) ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
     });
   }
-  const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const state = signOAuthState({ brand, username: req.session.username });
+  const state = signOAuthState({ username: req.session.username });
   const params = new URLSearchParams({
     client_id: YOUTUBE_CLIENT_ID,
     redirect_uri: GOOGLE_WEBSITE_REDIRECT_URI,
@@ -127639,10 +128787,11 @@ app.get("/api/google-website/oauth/callback", async (req, res) => {
       listSearchConsoleSites(tokens.access_token)
     ]);
     const needsSelection = properties.length !== 1 || sites.length !== 1;
+    const brand = needsSelection ? null : detectBrandFromName(properties[0].name, sites[0], email);
     await upsertGoogleWebsiteAccount({
       id: sub,
       google_account_email: email,
-      brand: payload.brand,
+      brand,
       ga4_property_id: needsSelection ? null : properties[0].id,
       ga4_property_name: needsSelection ? null : properties[0].name,
       ga4_available_properties: needsSelection ? properties : null,
@@ -127714,16 +128863,53 @@ app.post("/api/google-website/accounts/:id/complete", requireAuth("Admin"), asyn
     if (account.gsc_available_sites && account.gsc_available_sites.length > 0 && !chosenSite) {
       return res.status(400).json({ success: false, error: "Search Console site kh\xF4ng h\u1EE3p l\u1EC7." });
     }
+    const finalPropertyName = chosenProperty ? chosenProperty.name : account.ga4_property_name;
+    const finalSiteUrl = chosenSite || account.gsc_site_url;
     await patchGoogleWebsiteAccount(account.id, {
       ga4_property_id: chosenProperty ? chosenProperty.id : account.ga4_property_id,
-      ga4_property_name: chosenProperty ? chosenProperty.name : account.ga4_property_name,
+      ga4_property_name: finalPropertyName,
       ga4_available_properties: null,
-      gsc_site_url: chosenSite || account.gsc_site_url,
+      gsc_site_url: finalSiteUrl,
       gsc_available_sites: null,
-      is_active: true
+      is_active: true,
+      // Only auto-detect here if OAuth callback time couldn't (brand was
+      // still null pending this exact choice) — never override a brand the
+      // admin already confirmed/corrected manually.
+      ...account.brand ? {} : { brand: detectBrandFromName(finalPropertyName, finalSiteUrl, account.google_account_email) }
     });
     await logAction(req.session, req, "complete-google-website-setup", `Ho\xE0n t\u1EA5t thi\u1EBFt l\u1EADp Website ${account.google_account_email || account.id}`);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.patch("/api/google-website/accounts/:id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand kh\xF4ng h\u1EE3p l\u1EC7 (ch\u1EC9 nh\u1EADn Livotec, Karofi, ho\u1EB7c null)." });
+    }
+    const accounts = await getGoogleWebsiteAccounts();
+    const account = accounts.find((a) => a.id === req.params.id);
+    if (!account) return res.status(404).json({ success: false, error: "Kh\xF4ng t\xECm th\u1EA5y k\u1EBFt n\u1ED1i." });
+    await patchGoogleWebsiteAccount(account.id, { brand });
+    await logAction(req.session, req, "set-google-website-brand", `G\xE1n brand "${brand}" cho k\u1EBFt n\u1ED1i Website ${account.google_account_email || account.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/google-website/accounts/:id/pages-preview", requireAuth("Admin"), async (req, res) => {
+  try {
+    const accounts = await getGoogleWebsiteAccounts();
+    const account = accounts.find((a) => a.id === req.params.id);
+    if (!account) return res.status(404).json({ success: false, error: "Kh\xF4ng t\xECm th\u1EA5y k\u1EBFt n\u1ED1i." });
+    if (!account.gsc_site_url) return res.status(400).json({ success: false, error: "K\u1EBFt n\u1ED1i n\xE0y ch\u01B0a c\xF3 Search Console site." });
+    const accessToken = await getFreshAccessToken(account);
+    const until = new Date(Date.now() - 3 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const since = new Date(Date.now() - 33 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const pages = await listSearchConsoleTopPages(accessToken, account.gsc_site_url, since, until, 250);
+    res.json({ success: true, site: account.gsc_site_url, since, until, pages });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -127752,9 +128938,15 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
     const requestedIds = typeof req.query.accounts === "string" && req.query.accounts.length > 0 ? req.query.accounts.split(",").map((s2) => s2.trim()) : allAccounts.map((a) => a.id);
     const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
-    const [ga4Daily, gscDaily] = await Promise.all([
+    const [ga4Daily, gscDaily, ga4ChannelDaily, ga4Pages, gscPages, ga4Geo, ga4Device, gscDevice] = await Promise.all([
       getGa4InsightsDaily(requestedIds, since, until),
-      getSearchConsoleInsightsDaily(requestedIds, since, until)
+      getSearchConsoleInsightsDaily(requestedIds, since, until),
+      getGa4ChannelSessionsDaily(requestedIds, since, until),
+      getGa4PagesSummary(requestedIds),
+      getSearchConsolePagesSummary(requestedIds),
+      getGa4GeoSummary(requestedIds),
+      getGa4DeviceSummary(requestedIds),
+      getSearchConsoleDeviceSummary(requestedIds)
     ]);
     res.json({
       success: true,
@@ -127766,10 +128958,270 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
         is_active: a.is_active
       })),
       ga4Daily,
-      gscDaily
+      gscDaily,
+      ga4ChannelDaily,
+      ga4Pages,
+      gscPages,
+      ga4Geo,
+      ga4Device,
+      gscDevice
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/google-website/keywords", requireAuth(), async (req, res) => {
+  try {
+    const allAccounts = await getGoogleWebsiteAccounts();
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date(Date.now() - 3 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 33 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const accountsWithSite = allAccounts.filter((a) => a.is_active && a.gsc_site_url);
+    const perAccountRows = await Promise.all(
+      accountsWithSite.map(async (account) => {
+        const accessToken = await getFreshAccessToken(account);
+        const rows = await listSearchConsoleTopQueries(accessToken, account.gsc_site_url, since, until, 1e3);
+        return rows.map((r2) => ({ account_id: account.id, ...r2 }));
+      })
+    );
+    res.json({ success: true, since, until, keywords: perAccountRows.flat() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+async function canEditCampaign(campaignId, session) {
+  if (session.role === "Admin") return true;
+  return isCampaignMember(campaignId, session.username);
+}
+async function canEditTask(task, session) {
+  if (session.role === "Admin") return true;
+  if (task.task_type === "campaign") {
+    return task.campaign_id ? isCampaignMember(task.campaign_id, session.username) : false;
+  }
+  const username = session.username.toLowerCase();
+  return (task.assignee_username || "").toLowerCase() === username || task.created_by.toLowerCase() === username;
+}
+app.get("/api/campaign/categories", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, categories: await getCategories() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/categories", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand, name } = req.body || {};
+    if (!brand || !name) return res.status(400).json({ error: "Thi\u1EBFu brand ho\u1EB7c t\xEAn ng\xE0nh h\xE0ng." });
+    const category = await createCategory({ brand, name });
+    await logAction(req.session, req, "campaign-create-category", `T\u1EA1o ng\xE0nh h\xE0ng "${name}" (${brand})`);
+    res.json({ success: true, category });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/users/basic", requireAuth("Editor"), async (req, res) => {
+  try {
+    const store = await getDatabaseData();
+    const users = Array.isArray(store.users) ? store.users : [];
+    res.json({ success: true, users: users.map(({ username, name }) => ({ username, name })) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/campaigns", requireAuth(), async (req, res) => {
+  try {
+    const { brand, category_id, status } = req.query;
+    const session = req.session;
+    const campaigns = await getCampaigns({
+      brand: typeof brand === "string" && brand ? brand : void 0,
+      categoryId: typeof category_id === "string" && category_id ? category_id : void 0,
+      status: typeof status === "string" && status ? status : void 0
+    });
+    const withPermission = await Promise.all(
+      campaigns.map(async (c) => ({ ...c, can_edit: await canEditCampaign(c.id, session) }))
+    );
+    res.json({ success: true, campaigns: withPermission });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/campaigns", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { name, brand, start_date, end_date } = req.body || {};
+    if (!name || !brand || !start_date || !end_date) {
+      return res.status(400).json({ error: "Thi\u1EBFu name, brand, start_date ho\u1EB7c end_date." });
+    }
+    const session = req.session;
+    const campaign = await createCampaign(req.body, session.username);
+    await logAction(session, req, "campaign-create", `T\u1EA1o campaign "${campaign.name}"`);
+    res.json({ success: true, campaign });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.put("/api/campaign/campaigns/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const session = req.session;
+    if (!await canEditCampaign(req.params.id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ch\u1EC9nh s\u1EEDa campaign n\xE0y." });
+    }
+    const campaign = await updateCampaign(req.params.id, req.body || {}, session.username);
+    await logAction(session, req, "campaign-update", `C\u1EADp nh\u1EADt campaign "${campaign.name}"`);
+    res.json({ success: true, campaign });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/campaign/campaigns/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const session = req.session;
+    if (!await canEditCampaign(req.params.id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ch\u1EC9nh s\u1EEDa campaign n\xE0y." });
+    }
+    await deleteCampaign(req.params.id);
+    await logAction(session, req, "campaign-delete", `Xo\xE1 campaign ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/campaigns/:id/members", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, members: await getCampaignMembers(req.params.id) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/campaigns/:id/members", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { username } = req.body || {};
+    if (!username) return res.status(400).json({ error: "Thi\u1EBFu username." });
+    const session = req.session;
+    await addCampaignMember(req.params.id, username, session.username);
+    await logAction(session, req, "campaign-add-member", `G\xE1n quy\u1EC1n s\u1EEDa campaign ${req.params.id} cho ${username}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/campaign/campaigns/:id/members/:username", requireAuth("Admin"), async (req, res) => {
+  try {
+    await removeCampaignMember(req.params.id, req.params.username);
+    await logAction(req.session, req, "campaign-remove-member", `Thu h\u1ED3i quy\u1EC1n s\u1EEDa campaign ${req.params.id} c\u1EE7a ${req.params.username}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/tasks", requireAuth(), async (req, res) => {
+  try {
+    const { campaign_id, status, task_type, assignee, mine } = req.query;
+    const session = req.session;
+    const tasks = await getTasks({
+      campaignId: typeof campaign_id === "string" && campaign_id ? campaign_id : void 0,
+      status: typeof status === "string" && status ? status : void 0,
+      taskType: typeof task_type === "string" && task_type ? task_type : void 0,
+      assigneeUsername: mine === "1" || mine === "true" ? session.username : typeof assignee === "string" && assignee ? assignee : void 0
+    });
+    const withPermission = await Promise.all(tasks.map(async (t2) => ({ ...t2, can_edit: await canEditTask(t2, session) })));
+    res.json({ success: true, tasks: withPermission });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/tasks", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { title, task_type } = req.body || {};
+    if (!title || !task_type) return res.status(400).json({ error: "Thi\u1EBFu title ho\u1EB7c task_type." });
+    const session = req.session;
+    if (task_type === "campaign" && !await canEditCampaign(req.body.campaign_id, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n t\u1EA1o task cho campaign n\xE0y." });
+    }
+    const task = await createTask(req.body, session.username);
+    await logAction(session, req, "campaign-task-create", `T\u1EA1o task "${task.title}"`);
+    res.json({ success: true, task });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.put("/api/campaign/tasks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y task." });
+    const session = req.session;
+    if (!await canEditTask(existing, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ch\u1EC9nh s\u1EEDa task n\xE0y." });
+    }
+    const task = await updateTask(req.params.id, req.body || {}, session.username);
+    await logAction(session, req, "campaign-task-update", `C\u1EADp nh\u1EADt task "${task.title}"`);
+    res.json({ success: true, task });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/campaign/tasks/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y task." });
+    const session = req.session;
+    if (!await canEditTask(existing, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n xo\xE1 task n\xE0y." });
+    }
+    await deleteTask(req.params.id);
+    await logAction(session, req, "campaign-task-delete", `Xo\xE1 task "${existing.title}"`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/tasks/:id/log", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, log: await getTaskActivityLog(req.params.id) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/tasks/:id/notes", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (!text) return res.status(400).json({ error: "Thi\u1EBFu n\u1ED9i dung ghi ch\xFA." });
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y task." });
+    const session = req.session;
+    if (!await canEditTask(existing, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ghi ch\xFA task n\xE0y." });
+    }
+    await appendTaskLog(req.params.id, "note", text, session.username);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/asset-links", requireAuth(), async (req, res) => {
+  try {
+    res.json({ success: true, links: await getAssetLinks() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/asset-links", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { group_key, label, url } = req.body || {};
+    if (!group_key || !label || !url) return res.status(400).json({ error: "Thi\u1EBFu group_key, label ho\u1EB7c url." });
+    const session = req.session;
+    const link = await createAssetLink({ group_key, label, url }, session.username);
+    await logAction(session, req, "campaign-add-asset-link", `Th\xEAm link "${label}" v\xE0o Asset Library (${group_key})`);
+    res.json({ success: true, link });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/campaign/asset-links/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    await deleteAssetLink(req.params.id);
+    await logAction(req.session, req, "campaign-delete-asset-link", `Xo\xE1 link ${req.params.id} kh\u1ECFi Asset Library`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 var app_default = app;

@@ -202,6 +202,22 @@ export async function deleteFbPage(pageId: string): Promise<void> {
   if (error) throw new Error(`Lỗi xóa Facebook Page: ${error.message}`);
 }
 
+// Manual brand correction — the OAuth-connect picker (FacebookConnectAdmin)
+// already assigns a brand at import time (auto-guessed, admin-editable
+// before confirming), this just covers fixing it afterward without needing
+// to redo the whole OAuth flow.
+export async function patchFbPageBrand(pageId: string, brand: string | null): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, fb_pages } = await readLocalCollections();
+    const next = fb_pages.map((p) => (p.page_id === pageId ? { ...p, brand } : p));
+    await writeLocalCollections(store, { fb_pages: next });
+    return;
+  }
+
+  const { error } = await supabase.from("fb_pages").update({ brand }).eq("page_id", pageId);
+  if (error) throw new Error(`Lỗi gán thương hiệu: ${error.message}`);
+}
+
 export async function setFbPageSyncStatus(
   pageId: string,
   status: {

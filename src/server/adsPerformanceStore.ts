@@ -281,6 +281,21 @@ export async function setFbAdAccountSyncStatus(
   if (error) throw new Error(`Lỗi cập nhật trạng thái đồng bộ Ad Account: ${error.message}`);
 }
 
+// Manual brand correction — see facebookStore.ts's patchFbPageBrand for the
+// same reasoning (the OAuth-connect picker already assigns one at import
+// time, this just covers fixing it afterward).
+export async function patchFbAdAccountBrand(adAccountId: string, brand: string | null): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, fb_ad_accounts } = await readLocalCollections();
+    const next = fb_ad_accounts.map((a) => (a.ad_account_id === adAccountId ? { ...a, brand } : a));
+    await writeLocalCollections(store, { fb_ad_accounts: next });
+    return;
+  }
+
+  const { error } = await supabase.from("fb_ad_accounts").update({ brand }).eq("ad_account_id", adAccountId);
+  if (error) throw new Error(`Lỗi gán thương hiệu: ${error.message}`);
+}
+
 // -- Google Ads Accounts ------------------------------------------------------
 
 export async function getGoogleAdsAccounts(): Promise<GoogleAdsAccountConfig[]> {
@@ -461,4 +476,18 @@ export async function setTiktokAdsAccountSyncStatus(
 
   const { error } = await supabase.from("tiktok_ads_accounts").update(status).eq("advertiser_id", advertiserId);
   if (error) throw new Error(`Lỗi cập nhật trạng thái đồng bộ TikTok Ads: ${error.message}`);
+}
+
+// Manual brand correction — see facebookStore.ts's patchFbPageBrand for the
+// same reasoning.
+export async function patchTiktokAdsAccountBrand(advertiserId: string, brand: string | null): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, tiktok_ads_accounts } = await readLocalCollections();
+    const next = tiktok_ads_accounts.map((a) => (a.advertiser_id === advertiserId ? { ...a, brand } : a));
+    await writeLocalCollections(store, { tiktok_ads_accounts: next });
+    return;
+  }
+
+  const { error } = await supabase.from("tiktok_ads_accounts").update({ brand }).eq("advertiser_id", advertiserId);
+  if (error) throw new Error(`Lỗi gán thương hiệu: ${error.message}`);
 }

@@ -27,6 +27,121 @@ import {
 const GRAPH_API_VERSION = "v21.0";
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
+// -- OAuth (Facebook Login) --------------------------------------------------
+//
+// Reuses FB_APP_ID/FB_APP_SECRET (previously only used to build an App Token
+// for debug_token probes, see fetchTokenExpiry below) as the actual OAuth
+// Client — same Meta App, just with the "Facebook Login" product turned on
+// and a Valid OAuth Redirect URI registered. Read-only scopes only, matching
+// every other integration in this app: `pages_show_list` (list Pages this
+// login manages), `pages_read_engagement`/`pages_read_user_content`/
+// `read_insights` (Page Insights, same as the old manually-pasted Page
+// token), `ads_read` (Ad Account Insights, same as the old manually-pasted
+// Marketing API token). These are all permissions Meta gates behind App
+// Review for public use — but NOT for accounts added as a Developer/Tester/
+// Admin on the App while it stays in Development Mode, which is all this
+// internal single-admin tool needs (see .env.example for the exact setup
+// steps). `ads_management` (write access) is deliberately never requested
+// here — this app only ever reads.
+export const FACEBOOK_OAUTH_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_read_user_content", "read_insights", "ads_read"];
+const FACEBOOK_AUTHORIZE_URL = `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth`;
+const FB_APP_ID = process.env.FB_APP_ID || "";
+const FB_APP_SECRET = process.env.FB_APP_SECRET || "";
+export const FACEBOOK_REDIRECT_URI = process.env.FACEBOOK_REDIRECT_URI || "";
+export const isFacebookOAuthConfigured = Boolean(FB_APP_ID && FB_APP_SECRET && FACEBOOK_REDIRECT_URI);
+
+export function buildFacebookAuthorizeUrl(state: string): string {
+  const params = new URLSearchParams({
+    client_id: FB_APP_ID,
+    redirect_uri: FACEBOOK_REDIRECT_URI,
+    state,
+    scope: FACEBOOK_OAUTH_SCOPES.join(","),
+    response_type: "code",
+  });
+  return `${FACEBOOK_AUTHORIZE_URL}?${params.toString()}`;
+}
+
+async function fetchGraphJson(url: string): Promise<any> {
+  const res = await fetch(url);
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GraphApiError(body?.error?.message || `Graph API trả về lỗi HTTP ${res.status}`, body?.error?.code, body?.error?.error_subcode);
+  }
+  return body;
+}
+
+// Exchanges the one-time `code` (from oauth/callback) for a short-lived
+// (~1-2h) User Access Token.
+export async function exchangeFacebookCode(code: string, redirectUri: string): Promise<{ access_token: string }> {
+  const params = new URLSearchParams({ client_id: FB_APP_ID, redirect_uri: redirectUri, client_secret: FB_APP_SECRET, code });
+  return fetchGraphJson(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`);
+}
+
+// Extends a short-lived User Access Token to a long-lived one (~60 days).
+// Every Page Access Token in the /me/accounts response below inherits this
+// same long lifetime automatically (Meta derives it from the User Token that
+// requested it) — no separate extension step needed per Page.
+export async function exchangeForLongLivedToken(shortLivedToken: string): Promise<{ access_token: string; expires_in?: number }> {
+  const params = new URLSearchParams({
+    grant_type: "fb_exchange_token",
+    client_id: FB_APP_ID,
+    client_secret: FB_APP_SECRET,
+    fb_exchange_token: shortLivedToken,
+  });
+  return fetchGraphJson(`${GRAPH_API_BASE}/oauth/access_token?${params.toString()}`);
+}
+
+export interface FacebookPageCandidate {
+  id: string;
+  name: string;
+  access_token: string;
+  category?: string;
+}
+
+// Lists every Page this login manages, each with its own long-lived Page
+// Access Token already embedded (`access_token` field) — this is exactly the
+// value an Admin used to have to fish out of a raw /me/accounts?access_token=
+// URL by hand (see the old setup instructions this OAuth flow replaces).
+export async function listOwnedPages(userAccessToken: string): Promise<FacebookPageCandidate[]> {
+  const body = await fetchGraphJson(`${GRAPH_API_BASE}/me/accounts?fields=id,name,access_token,category&limit=200&access_token=${encodeURIComponent(userAccessToken)}`);
+  return body?.data || [];
+}
+
+export interface FacebookAdAccountCandidate {
+  id: string; // "act_1234567890"
+  name: string;
+  account_id: string; // "1234567890", no "act_" prefix
+  currency?: string;
+  account_status?: number;
+}
+
+// Lists every Ad Account this login can read. Unlike Pages, there's no
+// per-account token here — Marketing API Insights calls are authorized with
+// the same User Access Token directly (see the "complete" route in app.ts,
+// which stores this long-lived User Token, not a derived one, per ad
+// account row).
+export async function listOwnedAdAccounts(userAccessToken: string): Promise<FacebookAdAccountCandidate[]> {
+  const body = await fetchGraphJson(
+    `${GRAPH_API_BASE}/me/adaccounts?fields=id,name,account_id,currency,account_status&limit=200&access_token=${encodeURIComponent(userAccessToken)}`
+  );
+  return body?.data || [];
+}
+
+// Same "karofi"/"livotec" case-insensitive substring convention as
+// googleWebsiteSync.ts's detectBrandFromName — Page/Ad Account names in this
+// app consistently contain the brand name, so a simple match is reliable in
+// practice. Returns null (never guesses) when it's ambiguous or absent, so
+// the picker UI always shows an explicit "chưa xác định" the admin has to
+// resolve rather than silently defaulting to the wrong brand.
+export function detectBrandFromFacebookName(name: string | null | undefined): "Livotec" | "Karofi" | null {
+  const haystack = (name || "").toLowerCase();
+  const hasLivotec = haystack.includes("livotec");
+  const hasKarofi = haystack.includes("karofi");
+  if (hasLivotec && !hasKarofi) return "Livotec";
+  if (hasKarofi && !hasLivotec) return "Karofi";
+  return null;
+}
+
 // How far back each sync run re-pulls data. Larger than "since the last
 // successful sync" on purpose: Meta backfills/revises insights values for
 // recent days after the fact, and this also self-heals any missed cron runs

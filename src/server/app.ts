@@ -11,7 +11,7 @@ import { mergeNewDataIntoDatabase } from "./dataMerge";
 import { runSpreadsheetAutoSync, getSpreadsheetSyncConfig, saveSpreadsheetSyncConfig } from "./spreadsheetSync";
 import { requireAuth, signSessionToken, signOAuthState, verifyOAuthState } from "./auth";
 import { encrypt, decrypt } from "./crypto";
-import { getFbPages, upsertFbPage, deleteFbPage, setFbPageSyncStatus, getFbInsightsDaily, getFbPosts } from "./facebookStore";
+import { getFbPages, upsertFbPage, deleteFbPage, setFbPageSyncStatus, patchFbPageBrand, getFbInsightsDaily, getFbPosts } from "./facebookStore";
 import {
   getCategories,
   createCategory,
@@ -36,7 +36,27 @@ import {
   deleteAssetLink,
   Task,
 } from "./campaignStore";
-import { runFacebookSync, fetchTokenExpiry } from "./facebookSync";
+import {
+  runFacebookSync,
+  fetchTokenExpiry,
+  isFacebookOAuthConfigured,
+  buildFacebookAuthorizeUrl,
+  exchangeFacebookCode,
+  exchangeForLongLivedToken,
+  listOwnedPages,
+  listOwnedAdAccounts,
+  detectBrandFromFacebookName,
+  FACEBOOK_REDIRECT_URI,
+} from "./facebookSync";
+import {
+  isTiktokAdsOAuthConfigured,
+  buildTiktokAdsAuthorizeUrl,
+  exchangeTiktokAdsCode,
+  fetchAdvertiserNames,
+  detectBrandFromAdvertiserName,
+  TIKTOK_MARKETING_REDIRECT_URI,
+} from "./tiktokAdsOAuth";
+import { createOAuthPending, getOAuthPending, deleteOAuthPending } from "./oauthPendingStore";
 import {
   getAdsPerformance,
   getAdsPerformanceByPostIds,
@@ -44,12 +64,14 @@ import {
   getFbAdAccounts,
   upsertFbAdAccount,
   deleteFbAdAccount,
+  patchFbAdAccountBrand,
   getGoogleAdsAccounts,
   upsertGoogleAdsAccount,
   deleteGoogleAdsAccount,
   getTiktokAdsAccounts,
   upsertTiktokAdsAccount,
   deleteTiktokAdsAccount,
+  patchTiktokAdsAccountBrand,
   AdsChannel,
   AdsPerformanceRow,
 } from "./adsPerformanceStore";
@@ -1174,6 +1196,7 @@ app.get("/api/fb/pages", requireAuth("Admin"), async (req, res) => {
         token_data_access_expires_at: p.token_data_access_expires_at ?? null,
         token_checked_at: p.token_checked_at ?? null,
       })),
+      facebookOAuthConfigured: isFacebookOAuthConfigured,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1228,6 +1251,22 @@ app.delete("/api/fb/pages/:page_id", requireAuth("Admin"), async (req, res) => {
   }
 });
 
+// PATCH /api/fb/pages/:page_id/brand — manual override, for when the
+// OAuth-connect picker's brand guess (FacebookConnectAdmin) was wrong/absent.
+app.patch("/api/fb/pages/:page_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand không hợp lệ (chỉ nhận Livotec, Karofi, hoặc null)." });
+    }
+    await patchFbPageBrand(req.params.page_id, brand);
+    await logAction((req as any).session, req, "set-fb-page-brand", `Gán brand "${brand}" cho Facebook Page ${req.params.page_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/fb/sync-now — Admin-only manual trigger, mirrors
 // POST /api/backup/drive/run-now's "test it right after saving" UX.
 app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
@@ -1235,6 +1274,137 @@ app.post("/api/fb/sync-now", requireAuth("Admin"), async (req, res) => {
     const results = await runFacebookSync();
     await logAction((req as any).session, req, "sync-facebook", `Đồng bộ thủ công ${results.length} Facebook Page`);
     res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Facebook OAuth (Facebook Login) — replaces the old "paste a Page Access
+// Token you fished out of a raw Graph API URL by hand" setup for BOTH
+// fb_pages and fb_ad_accounts with one login: the admin authorizes once,
+// this app lists every Page and Ad Account that login can access, and the
+// admin picks which ones to import (see platform_oauth_pending's comment in
+// supabase/schema.sql for why a picker step needs its own holding table).
+// Mirrors the GET .../oauth/start (returns the URL, doesn't redirect itself)
+// → GET .../oauth/callback (real browser navigation, verifies signed state)
+// shape every other OAuth flow in this file already uses.
+// ---------------------------------------------------------------------------
+
+app.get("/api/facebook/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isFacebookOAuthConfigured) {
+    return res.status(400).json({ success: false, error: "FB_APP_ID / FB_APP_SECRET / FACEBOOK_REDIRECT_URI chưa được cấu hình đầy đủ." });
+  }
+  const state = signOAuthState({ username: (req as any).session.username });
+  res.json({ success: true, authorizeUrl: buildFacebookAuthorizeUrl(state) });
+});
+
+app.get("/api/facebook/oauth/callback", async (req, res) => {
+  const { code, state, error: oauthError, error_description } = req.query as Record<string, string | undefined>;
+  if (oauthError) {
+    return res.status(400).send(`Kết nối Facebook bị hủy hoặc lỗi: ${error_description || oauthError}`);
+  }
+  const payload = verifyOAuthState<{ username: string }>(state);
+  if (!payload || typeof code !== "string") {
+    return res.status(400).send("Liên kết xác thực Facebook không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
+  }
+
+  try {
+    const shortLived = await exchangeFacebookCode(code, FACEBOOK_REDIRECT_URI);
+    const longLived = await exchangeForLongLivedToken(shortLived.access_token);
+    const [pages, adAccounts] = await Promise.all([listOwnedPages(longLived.access_token), listOwnedAdAccounts(longLived.access_token)]);
+
+    const pendingId = await createOAuthPending("facebook", longLived.access_token, {
+      pages: pages.map((p) => ({ id: p.id, name: p.name, category: p.category || null, brandGuess: detectBrandFromFacebookName(p.name) })),
+      // Page access tokens ride along inside `candidates` (not just the
+      // shared long-lived token) since each Page needs its OWN token, not
+      // the User Token — kept out of the brand/name fields the frontend
+      // actually renders so a stray console.log of the candidates array
+      // doesn't casually print a token, but still technically present in
+      // the stored JSON; the whole record is only ever readable server-side
+      // (getOAuthPending), same trust boundary as every *_encrypted column.
+      pageTokens: Object.fromEntries(pages.map((p) => [p.id, p.access_token])),
+      adAccounts: adAccounts.map((a) => ({ id: a.id, name: a.name, brandGuess: detectBrandFromFacebookName(a.name) })),
+    });
+
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-facebook-oauth", `Đăng nhập Facebook thành công — ${pages.length} Page, ${adAccounts.length} Ad Account khả dụng`);
+    res.redirect(302, `/?fbPendingId=${encodeURIComponent(pendingId)}`);
+  } catch (err: any) {
+    console.error("GET /api/facebook/oauth/callback error:", err);
+    res.status(500).send(`Kết nối Facebook thất bại: ${err.message}`);
+  }
+});
+
+// GET /api/oauth-pending/:id — shared by Facebook and TikTok Ads: returns the
+// candidate list(s) an OAuth callback stashed, for the picker UI. Never the
+// token itself, and never the Page-scoped tokens riding inside Facebook's
+// `candidates.pageTokens` — those stay server-side until POST .../complete.
+app.get("/api/oauth-pending/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending) return res.status(404).json({ success: false, error: "Liên kết đã hết hạn hoặc không tồn tại — vui lòng kết nối lại." });
+    const candidates: any = pending.platform === "facebook" ? { ...(pending.candidates as any), pageTokens: undefined } : pending.candidates;
+    res.json({ success: true, platform: pending.platform, candidates });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/oauth-pending/:id — dismiss without importing anything.
+app.delete("/api/oauth-pending/:id", requireAuth("Admin"), async (req, res) => {
+  try {
+    await deleteOAuthPending(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/facebook/oauth/pending/:id/complete — admin's picked subset of
+// Pages/Ad Accounts from the candidate list gets written to fb_pages/
+// fb_ad_accounts, then the pending row is consumed (single use).
+app.post("/api/facebook/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending || pending.platform !== "facebook") {
+      return res.status(404).json({ success: false, error: "Liên kết đã hết hạn hoặc không tồn tại — vui lòng kết nối lại." });
+    }
+    const candidates = pending.candidates as {
+      pages: { id: string; name: string; brandGuess: string | null }[];
+      pageTokens: Record<string, string>;
+      adAccounts: { id: string; name: string; brandGuess: string | null }[];
+    };
+    const selectedPages: { id: string; brand: string | null }[] = Array.isArray(req.body?.pages) ? req.body.pages : [];
+    const selectedAdAccounts: { id: string; brand: string | null }[] = Array.isArray(req.body?.adAccounts) ? req.body.adAccounts : [];
+
+    for (const sel of selectedPages) {
+      const candidate = candidates.pages.find((p) => p.id === sel.id);
+      const pageToken = candidates.pageTokens[sel.id];
+      if (!candidate || !pageToken) continue; // ignore ids the callback never actually offered
+      await upsertFbPage({
+        page_id: candidate.id,
+        page_name: candidate.name,
+        brand: sel.brand || null,
+        access_token_encrypted: encrypt(pageToken),
+        is_active: true,
+      });
+    }
+
+    for (const sel of selectedAdAccounts) {
+      const candidate = candidates.adAccounts.find((a) => a.id === sel.id);
+      if (!candidate) continue;
+      await upsertFbAdAccount({
+        ad_account_id: candidate.id,
+        account_name: candidate.name,
+        brand: sel.brand || null,
+        access_token_encrypted: encrypt(pending.token), // the long-lived User Token — Ad Insights calls use it directly, no per-account token
+        is_active: true,
+      });
+    }
+
+    await deleteOAuthPending(req.params.id);
+    await logAction((req as any).session, req, "complete-facebook-oauth", `Nhập ${selectedPages.length} Page + ${selectedAdAccounts.length} Ad Account từ Facebook OAuth`);
+    res.json({ success: true, pagesImported: selectedPages.length, adAccountsImported: selectedAdAccounts.length });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1480,6 +1650,7 @@ app.get("/api/fb-ads/accounts", requireAuth("Admin"), async (req, res) => {
         last_sync_error: a.last_sync_error,
         token_expired: a.token_expired,
       })),
+      facebookOAuthConfigured: isFacebookOAuthConfigured,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1514,6 +1685,21 @@ app.delete("/api/fb-ads/accounts/:ad_account_id", requireAuth("Admin"), async (r
   try {
     await deleteFbAdAccount(req.params.ad_account_id);
     await logAction((req as any).session, req, "delete-fb-ad-account", `Xóa cấu hình Ad Account ${req.params.ad_account_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/fb-ads/accounts/:ad_account_id/brand — same as fb/pages' brand override.
+app.patch("/api/fb-ads/accounts/:ad_account_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand không hợp lệ (chỉ nhận Livotec, Karofi, hoặc null)." });
+    }
+    await patchFbAdAccountBrand(req.params.ad_account_id, brand);
+    await logAction((req as any).session, req, "set-fb-ad-account-brand", `Gán brand "${brand}" cho Ad Account ${req.params.ad_account_id}`);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1710,6 +1896,7 @@ app.get("/api/tiktok-ads/accounts", requireAuth("Admin"), async (req, res) => {
         last_sync_error: a.last_sync_error,
         token_expired: a.token_expired,
       })),
+      tiktokAdsOAuthConfigured: isTiktokAdsOAuthConfigured,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1748,6 +1935,21 @@ app.delete("/api/tiktok-ads/accounts/:advertiser_id", requireAuth("Admin"), asyn
   }
 });
 
+// PATCH /api/tiktok-ads/accounts/:advertiser_id/brand — same as fb/pages' brand override.
+app.patch("/api/tiktok-ads/accounts/:advertiser_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand không hợp lệ (chỉ nhận Livotec, Karofi, hoặc null)." });
+    }
+    await patchTiktokAdsAccountBrand(req.params.advertiser_id, brand);
+    await logAction((req as any).session, req, "set-tiktok-ads-account-brand", `Gán brand "${brand}" cho TikTok Ads Advertiser ${req.params.advertiser_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/tiktok-ads/sync-now — Admin-only manual trigger.
 app.post("/api/tiktok-ads/sync-now", requireAuth("Admin"), async (req, res) => {
   try {
@@ -1755,6 +1957,83 @@ app.post("/api/tiktok-ads/sync-now", requireAuth("Admin"), async (req, res) => {
     const results = await runTiktokAdsSync(overrides);
     await logAction((req as any).session, req, "sync-tiktok-ads", `Đồng bộ thủ công ${results.length} TikTok Ads Advertiser`);
     res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// TikTok Ads (Business API) OAuth — a SEPARATE app/flow from the TikTok
+// Login Kit OAuth above (organic Social Report) and from Facebook's OAuth
+// above (different platform entirely); see tiktokAdsOAuth.ts's header
+// comment. Replaces the old "paste an Advertiser ID + Access Token you
+// generated by hand" setup — the token exchange itself already tells us
+// every advertiser_id this login authorized, so there's no separate
+// "list what this token can access" call needed before the picker step
+// (contrast with Facebook, which needs /me/accounts + /me/adaccounts).
+// ---------------------------------------------------------------------------
+
+app.get("/api/tiktok-ads/oauth/start", requireAuth("Admin"), (req, res) => {
+  if (!isTiktokAdsOAuthConfigured) {
+    return res.status(400).json({ success: false, error: "TIKTOK_MARKETING_APP_ID / TIKTOK_MARKETING_APP_SECRET / TIKTOK_MARKETING_REDIRECT_URI chưa được cấu hình đầy đủ." });
+  }
+  const state = signOAuthState({ username: (req as any).session.username });
+  res.json({ success: true, authorizeUrl: buildTiktokAdsAuthorizeUrl(state) });
+});
+
+app.get("/api/tiktok-ads/oauth/callback", async (req, res) => {
+  const { auth_code, state, error: oauthError, error_description } = req.query as Record<string, string | undefined>;
+  if (oauthError) {
+    return res.status(400).send(`Kết nối TikTok Ads bị hủy hoặc lỗi: ${error_description || oauthError}`);
+  }
+  const payload = verifyOAuthState<{ username: string }>(state);
+  if (!payload || typeof auth_code !== "string") {
+    return res.status(400).send("Liên kết xác thực TikTok Ads không hợp lệ hoặc đã hết hạn — vui lòng thử kết nối lại từ Control Panel.");
+  }
+
+  try {
+    const tokenResponse = await exchangeTiktokAdsCode(auth_code);
+    const advertisers = await fetchAdvertiserNames(tokenResponse.access_token, tokenResponse.advertiser_ids || []);
+
+    const pendingId = await createOAuthPending("tiktok_ads", tokenResponse.access_token, {
+      advertisers: advertisers.map((a) => ({ id: a.advertiser_id, name: a.name, brandGuess: detectBrandFromAdvertiserName(a.name) })),
+    });
+
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-tiktok-ads-oauth", `Đăng nhập TikTok Ads thành công — ${advertisers.length} Advertiser khả dụng`);
+    res.redirect(302, `/?ttAdsPendingId=${encodeURIComponent(pendingId)}`);
+  } catch (err: any) {
+    console.error("GET /api/tiktok-ads/oauth/callback error:", err);
+    res.status(500).send(`Kết nối TikTok Ads thất bại: ${err.message}`);
+  }
+});
+
+// POST /api/tiktok-ads/oauth/pending/:id/complete — same shape as Facebook's
+// complete route, but every selected advertiser shares the ONE access token
+// from the exchange (no per-advertiser token like Facebook's Page tokens).
+app.post("/api/tiktok-ads/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending || pending.platform !== "tiktok_ads") {
+      return res.status(404).json({ success: false, error: "Liên kết đã hết hạn hoặc không tồn tại — vui lòng kết nối lại." });
+    }
+    const candidates = pending.candidates as { advertisers: { id: string; name: string; brandGuess: string | null }[] };
+    const selected: { id: string; brand: string | null }[] = Array.isArray(req.body?.advertisers) ? req.body.advertisers : [];
+
+    for (const sel of selected) {
+      const candidate = candidates.advertisers.find((a) => a.id === sel.id);
+      if (!candidate) continue;
+      await upsertTiktokAdsAccount({
+        advertiser_id: candidate.id,
+        account_name: candidate.name,
+        brand: sel.brand || null,
+        access_token_encrypted: encrypt(pending.token),
+        is_active: true,
+      });
+    }
+
+    await deleteOAuthPending(req.params.id);
+    await logAction((req as any).session, req, "complete-tiktok-ads-oauth", `Nhập ${selected.length} Advertiser từ TikTok Ads OAuth`);
+    res.json({ success: true, advertisersImported: selected.length });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

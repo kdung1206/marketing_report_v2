@@ -292,6 +292,35 @@ create table if not exists tiktok_ads_accounts (
 
 alter table tiktok_ads_accounts enable row level security;
 
+-- ---------------------------------------------------------------------------
+-- Short-lived holding area for OAuth-connect flows that need a "pick which
+-- of these accounts to import" step before writing to a final table (unlike
+-- the single-choice Google Website flow's ga4_available_properties/
+-- gsc_available_sites columns on the account row itself — Facebook and
+-- TikTok Ads instead need MULTIPLE final rows created from ONE OAuth
+-- exchange, e.g. several Pages + several Ad Accounts at once, so there's no
+-- single "account row" to attach candidates to until the admin has picked).
+--
+-- Flow: oauth/callback exchanges the code, fetches the candidate list(s),
+-- inserts one row here (encrypting whatever token the picked items will
+-- need), and redirects the browser to Control Panel with just this row's id
+-- in the query string. The frontend fetches candidates via GET
+-- /api/oauth-pending/:id (never the token), the admin checks which ones to
+-- import, and POST .../complete decrypts the token server-side, writes the
+-- selected rows into fb_pages/fb_ad_accounts/tiktok_ads_accounts, then
+-- deletes this row. Rows older than ~1 hour are treated as abandoned and
+-- opportunistically cleaned up (see oauthPendingStore.ts) — nothing reads an
+-- expired row as valid regardless.
+create table if not exists platform_oauth_pending (
+  id text primary key,
+  platform text not null check (platform in ('facebook', 'tiktok_ads')),
+  token_encrypted text not null,
+  candidates jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+alter table platform_oauth_pending enable row level security;
+
 -- One row per channel/campaign/ad group/ad/day. Upserted on the composite key
 -- below so a re-upload (Google/TikTok) or a re-sync (Facebook) safely
 -- overwrites just the matching rows instead of duplicating or requiring a
