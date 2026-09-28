@@ -1,9 +1,164 @@
 # Handoff — marketing_report_v2 (chuyển sang máy khác tiếp tục)
 
-Ngày đóng gói gần nhất: **2026-09-26** (mục 0 bên dưới). Bản gốc 2026-08-07 giữ nguyên phía dưới —
-vẫn còn giá trị (TikTok sandbox key, YouTube consent screen, Google Ads case). Đọc mục 0 trước.
+Ngày đóng gói gần nhất: **2026-09-28** (mục 0 bên dưới). Mục 0-cũ (2026-09-26, Website Report
+redesign A-D) giữ nguyên phía dưới, vẫn còn giá trị. Bản gốc 2026-08-07 ở cuối file cũng vẫn còn
+giá trị (TikTok sandbox key, YouTube consent screen, Google Ads case). **Đọc mục 0 mới nhất trước.**
 
-## 0. Phiên 2026-09-26 — đã xong gì, đang dở gì, làm gì tiếp theo
+## 0. Phiên 2026-09-28 — đã xong gì, đang dở gì, làm gì tiếp theo (MỚI NHẤT)
+
+**Context phiên này gần hết — mục này viết để 1 phiên MỚI đọc là code tiếp được ngay, không cần
+hỏi lại user hay suy luận lại từ đầu.** Đây là tiếp nối trực tiếp của mục "0-cũ" bên dưới (cùng 1
+luồng làm việc dài, nhiều lần gần hết context).
+
+### Đã code, test, migrate, push xong (không còn việc tồn đọng ở các mục này)
+
+Theo thứ tự thời gian, commit mới nhất trước khi viết mục này: `5075a9d`.
+
+1. **Hoàn thiện Website Report redesign mục A-D** (tiếp nối mục 0-cũ): chuyển "đánh giá nhanh" của
+   mục B/C (Top pages/Organic pages/Từ khoá) lên **đầu** mỗi card thay vì chân bảng; thêm ghi chú
+   liệt kê các kênh GA4 gốc nằm trong nhóm "Khác" (vì "Khác" chiếm tỉ trọng lớn trong dữ liệu thật);
+   phân trang bảng "Từ khoá tiềm năng SEO" — mặc định 15/trang, có dropdown chọn 15/50/100/200.
+2. **Thu gọn thẻ bài viết trong Social Report** (`FacebookInsights.tsx`) — ảnh 16:9 thay vì gần
+   vuông, ẩn cột Ads Impr./Ads Reach khi bài không chạy ads, lưới hiển thị tới 6 cột trên màn hình
+   rộng (trước tối đa 4) — đỡ phải cuộn.
+3. **Thay luồng kết nối Facebook + TikTok Ads từ dán token thủ công sang OAuth + chọn tài khoản**
+   (`FacebookConnectAdmin.tsx`, `TiktokAdsConnectAdmin.tsx`, `src/server/oauthPendingStore.ts`,
+   `facebookSync.ts`, `tiktokAdsOAuth.ts`) — 1 lần đăng nhập Facebook lấy được cả Page lẫn Ad
+   Account để tick chọn; TikTok Ads tương tự qua Business API. Brand tự đoán, sửa được sau qua các
+   route `PATCH .../brand` mới. **Facebook đã cấu hình xong và chạy được thật**: `FB_APP_ID` =
+   `1964087384185195`, `FB_APP_SECRET` (32 hex, đã set đúng sau khi phát hiện lần đầu user nhập
+   nhầm access token vào ô này), `FACEBOOK_REDIRECT_URI` — cả 3 đã có trong `.env.local` **và** đã
+   push lên Vercel production qua Composio. Bạn có thể vào Control Panel → Kết nối nền tảng →
+   Facebook → "Kết Nối Facebook" để test thật. **TikTok Ads OAuth: code xong nhưng CHƯA cấu hình**
+   (`TIKTOK_MARKETING_APP_ID/SECRET/REDIRECT_URI` chưa set ở đâu cả) — user chủ động bảo "hold" vì
+   app TikTok Marketing đang chờ TikTok duyệt, đừng tự ý làm tiếp cho tới khi user báo đã duyệt.
+4. **Quản lý công việc (Campaign Marketing)** — mở rộng module Campaign/Task (schema đã có từ
+   trước nhưng **0 dữ liệu thật trong production**, vẫn đúng ở thời điểm viết mục này):
+   - `work_stream` (Digital Ads/SEO/Content/Design/Khác), `estimated_hours` trên Task.
+   - Bảng `task_time_logs` — log giờ thực tế thủ công theo ngày (không dùng timer), nút ⏱ trên mỗi
+     dòng task để mở panel log giờ + xem lịch sử.
+   - Tab **"Theo nhân viên"** (3rd tab Campaign Marketing) — workload dashboard: task/hoàn
+     thành/trễ hạn/tỉ lệ hoàn thành/giờ ước tính vs giờ log, theo khoảng ngày.
+   - **Task lặp lại**: field `recurrence` (đã có sẵn tên cột từ trước nhưng chưa dùng, giờ dùng
+     thật) — bật "Lặp lại" khi tạo task (mỗi N ngày/tuần/tháng, có ngày dừng tuỳ chọn), tự sinh
+     occurrence tiếp theo qua cron hàng ngày có sẵn (`GET /api/cron/facebook-sync`, hàm
+     `generateDueRecurringTasks` trong `campaignStore.ts`), giới hạn tạo trước tối đa 14 ngày (không
+     bao giờ chạy runaway). Đã tự viết script test logic này trực tiếp trên `db_store.json` (không
+     qua UI vì không đăng nhập được — xem mục "Vấn đề chưa giải quyết" bên dưới), xác nhận đúng.
+   - **Liên kết task ↔ số liệu report thật**: field chung `metric_label`/`metric_unit`/
+     `metric_baseline_value`/`metric_result_value` trên Task (KHÔNG phải foreign key vào bảng report
+     nào — vì dữ liệu từ khoá Website Report mục C là fetch-live, không có id ổn định để tham
+     chiếu). Nút **"+ Task"** trên mỗi dòng bảng "Từ khoá tiềm năng SEO" (Website Report) mở
+     Campaign Marketing với task đã điền sẵn (qua state `campaignTaskPrefill` nâng lên `App.tsx`).
+   - **Content Brief (SEO)**: field `seo_search_intent`/`seo_outline`/`seo_word_count_target`/
+     `seo_published_url` trên Task, chỉ hiện trong form khi `work_stream = "SEO"`.
+5. **4 tool SEO/Ads mới** (yêu cầu "phân tích công việc SEO-Ads để xây tool tích hợp" của user):
+   - **Keyword Rank Tracker + Brand SOV** (Website Report → tab mới **"SEO Tools"**) — dùng
+     **serper.dev** (API TRẢ PHÍ theo credit, khác mọi tích hợp khác trong app này) — vị trí SERP
+     thật trên Google.com.vn (khác hẳn vị trí trung bình của Search Console ở tab "Tổng hợp"). Đã
+     seed sẵn **22 từ khoá** đã chốt với user (8 "Lọc nước" dùng chung Karofi+Livotec — 1 lần gọi
+     API đọc vị trí cả 2 domain cùng lúc, không tốn gấp đôi; 6 "Lọc tổng" riêng Karofi; 8 "Điều hoà"
+     riêng Livotec — **Livotec domain đã xác nhận là `livotec.com`**, Karofi là `karofi.com`). SOV
+     = đếm kết quả tin tức nhắc tới brand (khác hẳn số "Thị phần thảo luận" thủ công trên Dashboard
+     chính — đã ghi chú rõ trong UI để không nhầm 2 số). Ngân sách đã tính: ~27 credit/tuần, cron
+     chạy **thứ Hai hàng tuần** (`GET /api/cron/seo-tools-weekly`, tách riêng khỏi cron hàng ngày vì
+     tốn tiền thật) → còn dùng được ~21 tháng trên 2500 credit free. **`SERPER_API_KEY` đã set cả
+     `.env.local` và Vercel production.** ⚠️ **CHƯA gọi API serper.dev thật lần nào** — cố tình
+     tránh tốn credit lúc code/test, chỉ test logic thuần (`findDomainPosition`) bằng dữ liệu giả.
+     User nên tự bấm "Đồng bộ ngay" 1 lần để xác nhận trước khi tin cậy lịch tuần.
+   - **Backlink Tracker** (cùng tab SEO Tools) — MIỄN PHÍ, không cần API trả phí. Cron hàng ngày có
+     sẵn tự fetch từng `backlink_url`, kiểm tra còn chứa link trỏ về `target_url` không, tự
+     chuyển status "Removed" nếu mất. Đã test thật bằng 1 backlink trỏ tới wikipedia.org (fetch thật
+     sự, không giả lập) — chạy đúng.
+   - **Social Outreach (KOC/KOL)** — theo đúng 7 câu trả lời user đã chốt (đọc file
+     `task cần làm/campaign task/phan-tich-social-outreach-campaign.md` để biết bối cảnh đầy đủ nếu
+     cần): ưu tiên TikTok+Facebook, roster tái dùng được (`koc_kol_accounts`), **nhập tay số liệu**
+     (không có API public đáng tin cho FB/TikTok — đã tra cứu kỹ ở phiên trước), phân quyền sửa/xoá
+     dùng chung cơ chế `campaign_members` đã có. Nút "Outreach" trên mỗi dòng campaign (tab Campaign
+     Calendar) mở panel quản lý bài đăng + nhập số liệu (`OutreachPanel.tsx`); tab mới **"Social
+     Outreach"** trong Campaign Marketing tổng hợp toàn bộ campaign + biểu đồ theo nền tảng + top 10
+     KOC/KOL. **CHƯA đụng vào** scorecard "KOC/KOL Air Bài Tuần" cũ trên Dashboard chính (nhập tay,
+     gắn chặt hệ thống Excel-sync/AI-analysis cốt lõi trong `App.tsx`) — user đã đồng ý để 2 nguồn
+     chạy song song trước, chỉ nối vào scorecard chính khi user xác nhận số liệu ổn (xem
+     `OutreachOverview.tsx`'s header comment).
+   - Migration đã chạy hết trên Supabase production qua Composio (cột mới trên `tasks`, bảng
+     `task_time_logs`, `keyword_rank_targets`/`keyword_rank_history`/`sov_mentions_history`
+     (đã seed 22 từ khoá), `backlinks`, `koc_kol_accounts`/`outreach_posts`/`outreach_post_metrics`).
+
+### Đang dở — Phân tích thêm tool SEO/Ads từ file Excel user cung cấp (ĐANG LÀM, CHƯA CODE DÒNG NÀO)
+
+User gửi file `C:\Users\dungntk.tecomen\Desktop\file download\Phan_Tich_Cong_Viec_SEO_Ads_Automation.xlsx`
+(2 sheet: "SEO Tasks", "Ads Branding Tasks", mỗi sheet 5 dòng: Nhóm công việc/Công việc chi
+tiết/Tần suất/Khả năng tự động hóa/Giải pháp đề xuất) — đã đọc bằng `pandas` (không dùng `markitdown`
+CLI được, lệnh không có trong PATH của bash tool ở máy này — dùng `python3 -c "import pandas..."`
+ghi ra file rồi Read lại để tránh lỗi encode tiếng Việt trên console Windows).
+
+Đã phân tích xong khả thi từng dòng (ưu tiên API miễn phí/đã có sẵn, tránh Ahrefs/SEMrush/Screaming
+Frog/Moz — toàn SaaS trả phí không có free tier dùng được), đã trình bày cho user và **user đã chốt
+làm TẤT CẢ theo đúng thứ tự sau** (KHÔNG cần hỏi lại thứ tự nữa, code luôn):
+
+1. **Ngân sách & Pacing (Ads)** — MIỄN PHÍ, tận dụng dữ liệu đã có sẵn:
+   `ads_performance` (schema: `channel`/`brand`/`campaign_name`/`ad_group_name`/`ad_name`/`date`/
+   `spend`/... — xem `supabase/schema.sql` dòng ~328) đã có field `spend` theo ngày; Campaign
+   Calendar's `campaigns.budget`/`start_date`/`end_date`/`brand`/`channel` (free text) đã có sẵn.
+   **Đang dở đúng lúc bị ngắt**: mới đọc xong `getAdsPerformance()` trong `adsPerformanceStore.ts`
+   (nhận `{channels?, brand?, since, until}`) và `telegramNotifier.ts` (hàm `sendTelegramMessage(text)`
+   generic, dùng lại được ngay, đã dùng cho cảnh báo token hết hạn) — **CHƯA viết dòng code tính
+   pacing nào**. Việc cần làm tiếp: viết hàm so sánh spend thực tế (sum theo channel+brand+khoảng
+   ngày campaign, match `campaign.channel` text với `ads_performance.channel` enum
+   facebook/google/tiktok — cần lowercase/map tên) vs `budget`/`%ngày đã qua` của campaign, cảnh báo
+   Telegram nếu lệch pacing >15% hoặc sắp cạn ngân sách trước hạn. Lưu ý: **0 campaign thật nào có
+   `budget` set trong production** (Campaign Calendar vẫn chưa dùng thật) — tính năng sẽ sẵn sàng
+   nhưng chưa có gì để tính cho tới khi có campaign thật.
+2. **Technical SEO Monitor** (404/tốc độ/sitemap/indexing) — CHƯA BẮT ĐẦU. Kế hoạch: PageSpeed
+   Insights API (miễn phí, 25k request/ngày, KHÔNG cần OAuth — chỉ cần enable API + có thể dùng
+   không key ở quota thấp hơn hoặc tạo key riêng trong cùng Google Cloud project đã dùng cho
+   GA4/GSC/YouTube); GSC Sitemaps API + URL Inspection API (miễn phí, dùng chung OAuth Website đã
+   kết nối — đây là API KHÁC với Search Analytics API đang dùng, xem `googleWebsiteSync.ts`); tự
+   viết crawler nhỏ (fetch từng URL trong sitemap.xml, xem status code) để bắt lỗi 404 — reuse kỹ
+   thuật fetch giống `backlinkStore.ts`'s `verifyAllBacklinks`.
+3. **Creative Frequency Monitor (Ads)** — CHƯA BẮT ĐẦU nhưng dữ liệu ĐÃ CÓ SẴN: field `frequency`
+   trong `ads_performance` đã được `facebookAdsSync.ts` đồng bộ đầy đủ rồi (xác nhận grep thấy dòng
+   165 `frequency: item.frequency != null ? Number(item.frequency) : null`) — chỉ cần viết logic
+   đọc + ngưỡng cảnh báo (ví dụ >4-5) + gửi Telegram/hiển thị UI, không cần sync gì thêm.
+4. **On-page Optimization Scanner (SEO)** — CHƯA BẮT ĐẦU. Kế hoạch: crawl trang own site (title/
+   meta description/alt ảnh/internal link count) bằng fetch + parse HTML, AI (Gemini) gợi ý sửa.
+5. **AI Content Planning Assistant (SEO)** — CHƯA BẮT ĐẦU. User xác nhận **đã có `GEMINI_API_KEY`
+   thật**, đang dùng cho phần "Đánh giá AI" trên Dashboard chính (`app.ts` dòng ~437-451, model
+   `"gemini-3.5-flash"` — tên model hơi lạ, kiểm tra lại còn đúng không khi code phần này). Kế
+   hoạch: dùng Gemini để gom nhóm từ khoá/gợi ý outline từ dữ liệu GSC + serper.dev's
+   "related searches"/"people also ask" (trả kèm miễn phí trong response `/search` đã tính credit
+   cho Rank Tracker — không tốn thêm credit).
+
+**Việc CHỦ ĐỘNG bỏ qua** (đã giải thích lý do cho user, đồng ý): guest-post outreach tự động, chỉ số
+spam backlink (cần Moz — trả phí, không có free tier), Brand Safety exclusion list tự động, A/B
+Testing & Bidding tự động — 2 mục cuối cần **quyền ghi** vào cấu hình quảng cáo, nằm ngoài phạm vi
+app này (thuộc dự án `ads_manager` riêng, đang pause).
+
+### Vấn đề chưa giải quyết — không đăng nhập được UI ở local dev
+
+Trong suốt phiên này, session cookie/login ở local dev (`npm run dev`) liên tục hết hạn giữa các lần
+`preview_start`, và **không có mật khẩu admin thật nào biết được** để đăng nhập lại test UI trên
+trình duyệt. Đã thử 1 lần "hack" tạm thời set password hash user `admin` trong `db_store.json` nhưng
+**KHÔNG hoạt động** vì `reconcileUsers()` trong `src/lib/defaultUsers.ts` luôn ghi đè lại bằng hash
+hardcode cho 5 tài khoản mặc định — không sửa được qua `db_store.json`. Vì vậy mọi tính năng UI mới
+trong phiên này **chỉ được verify qua**: `tsc --noEmit`, `npm run build` (vite+esbuild), và script
+Node độc lập gọi thẳng các hàm `*Store.ts` (không qua HTTP/UI) để test logic — KHÔNG có xác nhận
+trực quan thật trên trình duyệt. Nếu phiên tiếp theo cần test UI thật, xin user cung cấp mật khẩu
+admin thật, hoặc user tự test sau khi deploy.
+
+### File tham khảo user đã chuẩn bị sẵn (đọc nếu cần bối cảnh đầy đủ)
+- `task cần làm/campaign task/de-xuat-toi-uu-quan-ly-campaign-va-task.md` — phân tích tối ưu
+  Campaign/Task (đã áp dụng 1 phần: Blocked status, workload view... đã có từ trước phiên này).
+- `task cần làm/campaign task/phan-tich-social-outreach-campaign.md` + phản hồi user tại
+  `C:\Users\dungntk.tecomen\Desktop\file download\phan hoi cau hoi social outreach.md` — đã dùng để
+  code Social Outreach ở mục 5 trên.
+- `C:\Users\dungntk.tecomen\Desktop\file download\Phan_Tich_Cong_Viec_SEO_Ads_Automation.xlsx` —
+  đang dùng để code 5 mục ở "Đang dở" trên.
+
+Ngày đóng gói: 2026-09-26 (mục 0-cũ). Bản gốc dưới đây giữ nguyên.
+
+## 0-cũ. Phiên 2026-09-26 — đã xong gì, đang dở gì, làm gì tiếp theo
 
 **Context của phiên này đã dùng ~86%, sắp auto-compact — mục này viết để 1 phiên MỚI (hoặc sau khi
 compact) đọc là tiếp tục code được ngay, không cần hỏi lại user hay suy luận lại từ đầu.**
