@@ -216,6 +216,8 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const [minPosition, setMinPosition] = useState(4);
   const [maxPosition, setMaxPosition] = useState(20);
   const [minImpressions, setMinImpressions] = useState(10);
+  const [keywordsPage, setKeywordsPage] = useState(0);
+  const KEYWORDS_PAGE_SIZE = 50;
   const [keywords, setKeywords] = useState<KeywordRow[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(true);
   const [keywordsError, setKeywordsError] = useState<string | null>(null);
@@ -351,6 +353,22 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
     });
   }, [channelScoped]);
 
+  // Raw GA4 channel names bucketed into "Khác" (Paid Social, Display, Email,
+  // Affiliates, Unassigned, ...) — "Khác" can dominate the total in practice
+  // (GA4's channel grouping puts a lot of real traffic outside the 5 named
+  // groups), so this breaks it back open for the "Nguồn traffic" table
+  // instead of leaving it a mystery bucket.
+  const khacBreakdown = useMemo(() => {
+    const totals = new Map<string, number>();
+    channelScoped.forEach((r) => {
+      if (bucketChannel(r.channel) !== "Khác") return;
+      totals.set(r.channel, (totals.get(r.channel) || 0) + n(r.sessions));
+    });
+    return Array.from(totals.entries())
+      .map(([channel, sessions]) => ({ channel, sessions }))
+      .sort((a, b) => b.sessions - a.sessions);
+  }, [channelScoped]);
+
   const sessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.sessions), 0);
   const organicSessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.organic_sessions), 0);
   const activeUsersTotal = ga4Scoped.reduce((s, r) => s + n(r.active_users), 0);
@@ -480,6 +498,20 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
       .filter((r) => r.position >= minPosition && r.position <= maxPosition && r.impressions >= minImpressions)
       .sort((a, b) => b.impressions - a.impressions);
   }, [keywordsScoped, minPosition, maxPosition, minImpressions]);
+
+  // Reset to page 1 whenever the filtered list changes shape — otherwise
+  // tightening the threshold while sitting on page 3 could land on an
+  // out-of-range empty page.
+  useEffect(() => {
+    setKeywordsPage(0);
+  }, [minPosition, maxPosition, minImpressions, keywordsScoped]);
+
+  const keywordsTotalPages = Math.max(1, Math.ceil(strikingDistanceKeywords.length / KEYWORDS_PAGE_SIZE));
+  const keywordsPageClamped = Math.min(keywordsPage, keywordsTotalPages - 1);
+  const keywordsPageRows = strikingDistanceKeywords.slice(
+    keywordsPageClamped * KEYWORDS_PAGE_SIZE,
+    keywordsPageClamped * KEYWORDS_PAGE_SIZE + KEYWORDS_PAGE_SIZE
+  );
 
   const keywordsInsight = useMemo(() => {
     if (strikingDistanceKeywords.length === 0) return null;
@@ -668,6 +700,18 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                       ))}
                     </tbody>
                   </table>
+                  {khacBreakdown.length > 0 && (
+                    <p className="pt-3 text-[11px] leading-relaxed text-slate-400">
+                      <span className="font-semibold text-slate-500">Khác</span> gồm:{" "}
+                      {khacBreakdown.map((k, i) => (
+                        <React.Fragment key={k.channel}>
+                          {i > 0 && ", "}
+                          {k.channel} ({fmt(k.sessions)})
+                        </React.Fragment>
+                      ))}
+                      .
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -675,7 +719,12 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                   <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Top pages (GA4)</span>
-                  <span className="block pb-3 text-[11px] text-slate-400">Theo loại trang · 30 ngày gần nhất</span>
+                  <span className="block pb-2 text-[11px] text-slate-400">Theo loại trang · 30 ngày gần nhất</span>
+                  {ga4PagesInsight && (
+                    <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-indigo-50/60 p-2 text-[11px] leading-relaxed text-indigo-700">
+                      <Sparkles className="mt-0.5 h-3 w-3 shrink-0" /> {ga4PagesInsight}
+                    </p>
+                  )}
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-slate-400">
@@ -694,12 +743,16 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                       ))}
                     </tbody>
                   </table>
-                  {ga4PagesInsight && <p className="pt-3 text-[11px] italic text-slate-400">{ga4PagesInsight}</p>}
                 </div>
 
                 <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                   <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Organic pages (Search Console)</span>
-                  <span className="block pb-3 text-[11px] text-slate-400">Theo loại trang · 30 ngày gần nhất</span>
+                  <span className="block pb-2 text-[11px] text-slate-400">Theo loại trang · 30 ngày gần nhất</span>
+                  {gscPagesInsight && (
+                    <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-indigo-50/60 p-2 text-[11px] leading-relaxed text-indigo-700">
+                      <Sparkles className="mt-0.5 h-3 w-3 shrink-0" /> {gscPagesInsight}
+                    </p>
+                  )}
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-slate-400">
@@ -720,7 +773,6 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                       ))}
                     </tbody>
                   </table>
-                  {gscPagesInsight && <p className="pt-3 text-[11px] italic text-slate-400">{gscPagesInsight}</p>}
                 </div>
               </div>
 
@@ -753,6 +805,12 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                   </div>
                 </div>
 
+                {keywordsInsight && (
+                  <p className="mb-3 flex items-start gap-1.5 rounded-lg bg-indigo-50/60 p-2 text-[11px] leading-relaxed text-indigo-700">
+                    <Sparkles className="mt-0.5 h-3 w-3 shrink-0" /> {keywordsInsight}
+                  </p>
+                )}
+
                 <div className="mb-3 flex items-center gap-2 text-[11px]">
                   <span className="text-slate-400">Brand / Non-brand (impressions):</span>
                   <span className="flex h-2 flex-1 max-w-xs overflow-hidden rounded-full bg-slate-100">
@@ -777,34 +835,58 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                     Không có từ khoá nào ở vị trí {minPosition}–{maxPosition} với ≥{minImpressions} impressions trong giai đoạn đã chọn.
                   </p>
                 ) : (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-left text-slate-400">
-                        <th className="pb-2 font-medium">Query</th>
-                        <th className="pb-2 font-medium">Loại</th>
-                        <th className="pb-2 font-medium text-right">Impressions</th>
-                        <th className="pb-2 font-medium text-right">Clicks</th>
-                        <th className="pb-2 font-medium text-right">CTR</th>
-                        <th className="pb-2 font-medium text-right">Position</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {strikingDistanceKeywords.slice(0, 50).map((row) => (
-                        <tr key={row.query} className="border-b border-slate-50 last:border-0">
-                          <td className="py-2 text-indigo-700">{row.query}</td>
-                          <td className="py-2 text-slate-400">{isBrandQuery(row.query) ? "Brand" : "Non-brand"}</td>
-                          <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
-                          <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
-                          <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
-                          <td className="py-2 text-right">
-                            <span className={`rounded-md px-1.5 py-0.5 font-mono font-bold ${positionBadgeColor(row.position)}`}>{row.position.toFixed(1)}</span>
-                          </td>
+                  <>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-slate-400">
+                          <th className="pb-2 font-medium">Query</th>
+                          <th className="pb-2 font-medium">Loại</th>
+                          <th className="pb-2 font-medium text-right">Impressions</th>
+                          <th className="pb-2 font-medium text-right">Clicks</th>
+                          <th className="pb-2 font-medium text-right">CTR</th>
+                          <th className="pb-2 font-medium text-right">Position</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {keywordsPageRows.map((row) => (
+                          <tr key={row.query} className="border-b border-slate-50 last:border-0">
+                            <td className="py-2 text-indigo-700">{row.query}</td>
+                            <td className="py-2 text-slate-400">{isBrandQuery(row.query) ? "Brand" : "Non-brand"}</td>
+                            <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                            <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                            <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                            <td className="py-2 text-right">
+                              <span className={`rounded-md px-1.5 py-0.5 font-mono font-bold ${positionBadgeColor(row.position)}`}>{row.position.toFixed(1)}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="flex items-center justify-between pt-3 text-[11px] text-slate-500">
+                      <span>
+                        Trang {keywordsPageClamped + 1}/{keywordsTotalPages} · {strikingDistanceKeywords.length} từ khoá
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setKeywordsPage((p) => Math.max(0, p - 1))}
+                          disabled={keywordsPageClamped === 0}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                        >
+                          ← Trước
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setKeywordsPage((p) => Math.min(keywordsTotalPages - 1, p + 1))}
+                          disabled={keywordsPageClamped >= keywordsTotalPages - 1}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                        >
+                          Sau →
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
-                {keywordsInsight && <p className="pt-3 text-[11px] italic text-slate-400">{keywordsInsight}</p>}
               </div>
             </div>
           )}
