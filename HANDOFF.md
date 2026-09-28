@@ -12,7 +12,8 @@ luồng làm việc dài, nhiều lần gần hết context).
 
 ### Đã code, test, migrate, push xong (không còn việc tồn đọng ở các mục này)
 
-Theo thứ tự thời gian, commit mới nhất trước khi viết mục này: `5075a9d`.
+Theo thứ tự thời gian, commit mới nhất trước khi viết mục này: `9c2726a` (đã push + deploy production
+qua Vercel — xem mục 6 bên dưới cho chi tiết trạng thái deploy).
 
 1. **Hoàn thiện Website Report redesign mục A-D** (tiếp nối mục 0-cũ): chuyển "đánh giá nhanh" của
    mục B/C (Top pages/Organic pages/Từ khoá) lên **đầu** mỗi card thay vì chân bảng; thêm ghi chú
@@ -84,8 +85,84 @@ Theo thứ tự thời gian, commit mới nhất trước khi viết mục này:
    - Migration đã chạy hết trên Supabase production qua Composio (cột mới trên `tasks`, bảng
      `task_time_logs`, `keyword_rank_targets`/`keyword_rank_history`/`sov_mentions_history`
      (đã seed 22 từ khoá), `backlinks`, `koc_kol_accounts`/`outreach_posts`/`outreach_post_metrics`).
+6. **3/5 tool trong file Excel SEO/Ads Automation** (commit `9c2726a`) — tiếp nối mục "Đang dở" của
+   phiên trước, đã hoàn thành đúng thứ tự #1, #2, #4 trong danh sách 5 mục user đã chốt (còn #3, #5 —
+   xem "Đang dở" bên dưới):
+   - **Ngân sách & Pacing (Ads)** (`budgetPacingNotifier.ts`) — so `ads_performance.spend` (gộp theo
+     brand + kênh parse từ `campaigns.channel` text, KHÔNG match theo tên campaign cụ thể — xem lý do
+     trong header comment file) với `budget`/% thời gian đã qua của campaign trong Campaign Calendar.
+     Lệch pacing >15% → cảnh báo Telegram (kèm ngày dự kiến cạn ngân sách nếu đang vượt tiến độ). Cột
+     mới `pacing_alert_state`/`pacing_alert_sent_at` trên `campaigns` (đã migrate production) chống
+     spam: chỉ báo lại khi đổi trạng thái hoặc sau 7 ngày vẫn còn xấu. Đã test bằng script tsx bơm dữ
+     liệu giả vào `db_store.json` local rồi khôi phục lại — xác nhận đúng cả 3 nhánh (vượt/chậm/đúng
+     tiến độ + tự reset khi hết lệch). **0 campaign thật nào có `budget` set trong production** — như
+     phiên trước, tính năng sẵn sàng nhưng chưa có gì để tính.
+   - **Technical SEO Monitor** (`technicalSeoStore.ts`/`technicalSeoSync.ts`, tab SEO Tools) — 3 kiểm
+     tra MIỄN PHÍ, cron riêng hàng tuần (`GET /api/cron/technical-seo-weekly`, thứ Hai 04:00, tách
+     khỏi cron ngày vì crawl vài trăm URL khá chậm) + nút "Kiểm tra ngay" thủ công:
+     1. Crawl sitemap.xml (tự tìm qua robots.txt, fallback `/sitemap.xml`, hỗ trợ 1 cấp sitemap index)
+        → check HTTP status từng URL, tối đa 300 URL/site.
+     2. PageSpeed Insights (chỉ trang chủ, mobile) — điểm hiệu năng + LCP/CLS.
+     3. Search Console Sitemaps API — số đã nộp/đã index, cảnh báo/lỗi theo Google.
+     Bảng mới `technical_seo_checks` (đã migrate production, xác nhận qua Composio) — 1 dòng/URL,
+     ghi đè mỗi lần chạy (không phải time-series), `first_detected_at` giữ nguyên qua các lần cập
+     nhật để biết lỗi tồn tại bao lâu. **Đã test thật (không phải giả lập)** bằng cách tạo tạm 1
+     `google_website_accounts` giả trỏ `karofi.com` + 1 user Editor tạm trong `db_store.json` local
+     (dùng được vì `reconcileUsers()` chỉ ghi đè 5 tài khoản mặc định, tài khoản khác giữ nguyên — xem
+     mục "Vấn đề chưa giải quyết" bên dưới, đã update cách giải quyết), chạy thật qua UI, rồi xoá sạch
+     khôi phục lại `db_store.json` gốc. Phát hiện thật từ lần test này (không phải giả định):
+     - ⚠️ **`karofi.com/sitemap1.xml` đang trả về HTTP 500 thật** — không phải lỗi code, là vấn đề
+       thật trên site production. Nên báo team dev website kiểm tra. Technical SEO Monitor đã bắt
+       đúng lỗi này (hiện dạng dòng "SITEMAP" riêng trong bảng URL lỗi, ưu tiên cao hơn URL thường).
+     - ⚠️ **Quota PageSpeed Insights không-cần-key đã bị dùng hết TOÀN CỤC** (gọi thử không key nhận
+       ngay lỗi 429 "Quota exceeded") — khác với giả định ban đầu "không key vẫn dùng được ở quota
+       thấp hơn". Coi `PAGESPEED_API_KEY` là **bắt buộc**, không phải tuỳ chọn. User đã thử set biến
+       này trên Vercel nhưng **kiểm tra qua Vercel API (Composio) xác nhận biến CHƯA thực sự tồn tại
+       trên Vercel production** (có thể chưa bấm lưu, hoặc lưu nhầm project khác) — **việc còn treo
+       cho phiên sau**: hỏi user đã set lại đúng chưa, nếu rồi thì trigger redeploy production 1 lần
+       nữa (xem cách trigger ở cuối mục này) để key có hiệu lực.
+     - Phát hiện + sửa 1 bug thật lúc test: nếu bước gọi Search Console Sitemaps API lỗi (vd token
+       hết hạn), code CŨ sẽ mất luôn kết quả crawl + PageSpeed đã chạy thành công trước đó (throw
+       trước khi kịp lưu). Đã sửa: bước Sitemaps API giờ có try/catch riêng, không làm mất kết quả 2
+       bước kia.
+     - Hạn chế đã biết (đúng theo phạm vi user yêu cầu — dựa theo status code): không bắt được
+       "soft-404" (trang không tồn tại nhưng server vẫn trả HTTP 200) — xác nhận thật:
+       `karofi.com/<path-bất-kỳ-không-tồn-tại>` trả về 200 thay vì 404.
+     - **CHỦ ĐỘNG bỏ qua** Search Console URL Inspection API (trạng thái index từng URL) — quota chặt
+       hơn nhiều, kiểm tra hết vài trăm URL/tuần sẽ tốn phần lớn quota cho 1 property. 3 check trên
+       đã đủ phủ "gãy/chậm/thiếu coverage".
+   - **On-page Optimization Scanner** (`onpageScanner.ts`, tab SEO Tools) — CHỈ chạy khi bấm tay (Editor
+     dán 1 URL), KHÔNG cron, KHÔNG lưu lịch sử (xem lý do trong header comment file — quét cả trăm
+     trang bằng Gemini theo lịch sẽ chậm/tốn/thừa). Trích title/meta description/H1/ảnh thiếu alt/
+     internal-external link/số từ bằng regex thuần (không thêm thư viện parse HTML), sau đó nhờ
+     Gemini gợi ý sửa bằng tiếng Việt. **Chặn theo domain đã kết nối Website Report** (tự suy từ
+     `gsc_site_url` các account) — không cho quét URL bất kỳ, tránh biến route này thành SSRF proxy
+     mở. Đã test thật với `https://karofi.com/` qua UI (cùng lúc với Technical SEO Monitor ở trên) —
+     trích xuất đúng: title 55 ký tự, meta 200 ký tự (vượt ngưỡng 160 khuyến nghị), 2 thẻ H1 (nên chỉ
+     1), 41/171 ảnh thiếu alt, 163 internal/19 external link, ~1854 từ. Gemini thật chưa test được
+     (không có `GEMINI_API_KEY` ở local, chỉ có trên Vercel production) — code tái dùng y nguyên logic
+     `/api/analyze` đã chạy thật từ trước, không có lý do để khác hành vi.
+   - Đã tách client Gemini dùng chung ra `geminiClient.ts` (trước đó khởi tạo inline trong `app.ts`)
+     để `onpageScanner.ts` dùng lại được mà không phải import ngược `app.ts`.
+   - Migration `technical_seo_checks` + 2 cột `pacing_alert_state`/`pacing_alert_sent_at` trên
+     `campaigns` đã chạy trên Supabase production qua Composio, đã verify lại bằng query đọc schema.
+   - **Đã tự trigger redeploy production qua Vercel API (Composio)** sau khi push — deployment
+     `dpl_GVbdJQoQXhvSk7rfXc9rKEo6yBkR`, commit `9c2726a`. Lúc trigger, `PAGESPEED_API_KEY` vẫn CHƯA
+     có trên Vercel (xem phát hiện ở trên) — cần redeploy thêm 1 lần nữa sau khi user set đúng biến
+     này. **Đã xác nhận qua Vercel API**: `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID` ĐÃ có sẵn trên
+     Vercel production (trả lời câu hỏi còn treo từ phiên trước) — Budget Pacing + Technical SEO
+     Monitor's cảnh báo Telegram sẵn sàng gửi được, chỉ chờ có dữ liệu thật để cảnh báo.
+     **Cách trigger redeploy qua Composio (để phiên sau khỏi dò lại)**: project Vercel là
+     `prj_ynNovsFPvZv94riTmzZdrisnb46R` (tên `marketing-report-v2`), repo GitHub numeric id
+     `1289388125` (`kdung1206/marketing_report_v2`) — gọi `VERCEL_CREATE_NEW_DEPLOYMENT` với
+     `{name: "marketing-report-v2", project: "<project id trên>", target: "production", gitSource:
+     {type: "github", repoId: "1289388125", ref: "main"}}`. Đọc env var thật trên Vercel (để verify
+     1 biến đã set đúng chưa) qua `VERCEL_GET_PROJECTS` lọc theo `repoId`, xem field
+     `projects[0].env[].key`/`.target` (KHÔNG trả về giá trị thật của biến, chỉ tên + phạm vi áp
+     dụng — muốn đổi giá trị vẫn phải qua `VERCEL_ADD_ENVIRONMENT_VARIABLE` với `upsert: true`, hoặc
+     nhờ user tự sửa trên dashboard).
 
-### Đang dở — Phân tích thêm tool SEO/Ads từ file Excel user cung cấp (ĐANG LÀM, CHƯA CODE DÒNG NÀO)
+### Đang dở — Phân tích thêm tool SEO/Ads từ file Excel user cung cấp (còn 2/5 mục)
 
 User gửi file `C:\Users\dungntk.tecomen\Desktop\file download\Phan_Tich_Cong_Viec_SEO_Ads_Automation.xlsx`
 (2 sheet: "SEO Tasks", "Ads Branding Tasks", mỗi sheet 5 dòng: Nhóm công việc/Công việc chi
@@ -95,57 +172,50 @@ ghi ra file rồi Read lại để tránh lỗi encode tiếng Việt trên cons
 
 Đã phân tích xong khả thi từng dòng (ưu tiên API miễn phí/đã có sẵn, tránh Ahrefs/SEMrush/Screaming
 Frog/Moz — toàn SaaS trả phí không có free tier dùng được), đã trình bày cho user và **user đã chốt
-làm TẤT CẢ theo đúng thứ tự sau** (KHÔNG cần hỏi lại thứ tự nữa, code luôn):
+làm TẤT CẢ theo đúng thứ tự sau** (KHÔNG cần hỏi lại thứ tự nữa, code luôn). Đã xong #1 Ngân sách &
+Pacing, #2 Technical SEO Monitor, #4 On-page Optimization Scanner (xem mục 6 phía trên) — còn lại
+đúng 2 mục dưới đây, giữ nguyên số thứ tự gốc (#3, #5) để không lẫn với ghi chú cũ:
 
-1. **Ngân sách & Pacing (Ads)** — MIỄN PHÍ, tận dụng dữ liệu đã có sẵn:
-   `ads_performance` (schema: `channel`/`brand`/`campaign_name`/`ad_group_name`/`ad_name`/`date`/
-   `spend`/... — xem `supabase/schema.sql` dòng ~328) đã có field `spend` theo ngày; Campaign
-   Calendar's `campaigns.budget`/`start_date`/`end_date`/`brand`/`channel` (free text) đã có sẵn.
-   **Đang dở đúng lúc bị ngắt**: mới đọc xong `getAdsPerformance()` trong `adsPerformanceStore.ts`
-   (nhận `{channels?, brand?, since, until}`) và `telegramNotifier.ts` (hàm `sendTelegramMessage(text)`
-   generic, dùng lại được ngay, đã dùng cho cảnh báo token hết hạn) — **CHƯA viết dòng code tính
-   pacing nào**. Việc cần làm tiếp: viết hàm so sánh spend thực tế (sum theo channel+brand+khoảng
-   ngày campaign, match `campaign.channel` text với `ads_performance.channel` enum
-   facebook/google/tiktok — cần lowercase/map tên) vs `budget`/`%ngày đã qua` của campaign, cảnh báo
-   Telegram nếu lệch pacing >15% hoặc sắp cạn ngân sách trước hạn. Lưu ý: **0 campaign thật nào có
-   `budget` set trong production** (Campaign Calendar vẫn chưa dùng thật) — tính năng sẽ sẵn sàng
-   nhưng chưa có gì để tính cho tới khi có campaign thật.
-2. **Technical SEO Monitor** (404/tốc độ/sitemap/indexing) — CHƯA BẮT ĐẦU. Kế hoạch: PageSpeed
-   Insights API (miễn phí, 25k request/ngày, KHÔNG cần OAuth — chỉ cần enable API + có thể dùng
-   không key ở quota thấp hơn hoặc tạo key riêng trong cùng Google Cloud project đã dùng cho
-   GA4/GSC/YouTube); GSC Sitemaps API + URL Inspection API (miễn phí, dùng chung OAuth Website đã
-   kết nối — đây là API KHÁC với Search Analytics API đang dùng, xem `googleWebsiteSync.ts`); tự
-   viết crawler nhỏ (fetch từng URL trong sitemap.xml, xem status code) để bắt lỗi 404 — reuse kỹ
-   thuật fetch giống `backlinkStore.ts`'s `verifyAllBacklinks`.
 3. **Creative Frequency Monitor (Ads)** — CHƯA BẮT ĐẦU nhưng dữ liệu ĐÃ CÓ SẴN: field `frequency`
    trong `ads_performance` đã được `facebookAdsSync.ts` đồng bộ đầy đủ rồi (xác nhận grep thấy dòng
    165 `frequency: item.frequency != null ? Number(item.frequency) : null`) — chỉ cần viết logic
-   đọc + ngưỡng cảnh báo (ví dụ >4-5) + gửi Telegram/hiển thị UI, không cần sync gì thêm.
-4. **On-page Optimization Scanner (SEO)** — CHƯA BẮT ĐẦU. Kế hoạch: crawl trang own site (title/
-   meta description/alt ảnh/internal link count) bằng fetch + parse HTML, AI (Gemini) gợi ý sửa.
+   đọc + ngưỡng cảnh báo (ví dụ >4-5) + gửi Telegram/hiển thị UI, không cần sync gì thêm. Gợi ý:
+   có thể ghép chung vào `budgetPacingNotifier.ts` (đã có sẵn cơ chế Telegram + dedupe theo
+   brand/channel/campaign) hoặc tách file riêng — chưa quyết, để phiên sau tự cân nhắc theo lúc đó
+   còn bao nhiêu context.
 5. **AI Content Planning Assistant (SEO)** — CHƯA BẮT ĐẦU. User xác nhận **đã có `GEMINI_API_KEY`
-   thật**, đang dùng cho phần "Đánh giá AI" trên Dashboard chính (`app.ts` dòng ~437-451, model
-   `"gemini-3.5-flash"` — tên model hơi lạ, kiểm tra lại còn đúng không khi code phần này). Kế
-   hoạch: dùng Gemini để gom nhóm từ khoá/gợi ý outline từ dữ liệu GSC + serper.dev's
-   "related searches"/"people also ask" (trả kèm miễn phí trong response `/search` đã tính credit
-   cho Rank Tracker — không tốn thêm credit).
+   thật**, đang dùng cho phần "Đánh giá AI" trên Dashboard chính VÀ giờ cũng dùng cho On-page
+   Optimization Scanner (mục 6 phía trên) — model đã tách ra hằng số `GEMINI_MODEL` trong
+   `geminiClient.ts` (`"gemini-3.5-flash"` — tên model vẫn hơi lạ, **vẫn CHƯA verify được** vì không
+   có `GEMINI_API_KEY` ở local để test thật, chỉ có trên Vercel production; On-page Scanner tái dùng
+   y nguyên code/model đã chạy thật của `/api/analyze` nên về lý thuyết phải hoạt động y hệt — nếu
+   phiên sau thấy Gemini lỗi ở cả 2 chỗ thì đây là nghi phạm đầu tiên cần kiểm tra). Kế hoạch: dùng
+   Gemini để gom nhóm từ khoá/gợi ý outline từ dữ liệu GSC + serper.dev's "related searches"/
+   "people also ask" (trả kèm miễn phí trong response `/search` đã tính credit cho Rank Tracker —
+   không tốn thêm credit).
 
 **Việc CHỦ ĐỘNG bỏ qua** (đã giải thích lý do cho user, đồng ý): guest-post outreach tự động, chỉ số
 spam backlink (cần Moz — trả phí, không có free tier), Brand Safety exclusion list tự động, A/B
 Testing & Bidding tự động — 2 mục cuối cần **quyền ghi** vào cấu hình quảng cáo, nằm ngoài phạm vi
 app này (thuộc dự án `ads_manager` riêng, đang pause).
 
-### Vấn đề chưa giải quyết — không đăng nhập được UI ở local dev
+### Đã GIẢI QUYẾT được — không đăng nhập được UI ở local dev (cách làm cho phiên sau)
 
-Trong suốt phiên này, session cookie/login ở local dev (`npm run dev`) liên tục hết hạn giữa các lần
-`preview_start`, và **không có mật khẩu admin thật nào biết được** để đăng nhập lại test UI trên
-trình duyệt. Đã thử 1 lần "hack" tạm thời set password hash user `admin` trong `db_store.json` nhưng
-**KHÔNG hoạt động** vì `reconcileUsers()` trong `src/lib/defaultUsers.ts` luôn ghi đè lại bằng hash
-hardcode cho 5 tài khoản mặc định — không sửa được qua `db_store.json`. Vì vậy mọi tính năng UI mới
-trong phiên này **chỉ được verify qua**: `tsc --noEmit`, `npm run build` (vite+esbuild), và script
-Node độc lập gọi thẳng các hàm `*Store.ts` (không qua HTTP/UI) để test logic — KHÔNG có xác nhận
-trực quan thật trên trình duyệt. Nếu phiên tiếp theo cần test UI thật, xin user cung cấp mật khẩu
-admin thật, hoặc user tự test sau khi deploy.
+Phiên trước bị chặn ở đây (không có mật khẩu admin thật, hack set password hash user `admin` không ăn
+thua vì `reconcileUsers()` ghi đè lại hash hardcode cho 5 tài khoản mặc định). Phiên này tìm ra cách
+đúng: `reconcileUsers()` (`src/lib/defaultUsers.ts`) **chỉ ghi đè 5 username mặc định** (`admin`,
+`editor1`, `viewer1`, `viewer2`, `ntkdung1206@gmail.com`) — mọi username KHÁC 5 cái đó được giữ
+nguyên (`customExtras` trong hàm này). Vậy chỉ cần thêm 1 user với username MỚI (không trùng 5 cái
+trên) thẳng vào mảng `users` trong `src/db_store.json` local, kèm `passwordHash`/`salt` tự sinh bằng
+`hashPasswordScrypt()`/`generateServerSalt()` (`src/lib/serverPasswordHash.ts`) — đăng nhập được ngay,
+không đụng gì tới 5 tài khoản thật. Cũng làm tương tự để test tính năng cần 1 site đã kết nối Website
+Report: thêm thẳng 1 dòng giả vào `google_website_accounts` (chỉ cần `gsc_site_url` trỏ domain thật —
+token giả cũng được, phần nào cần token thật sẽ tự lỗi riêng phần đó, không chặn phần còn lại).
+
+**Luôn nhớ dọn dẹp sau khi test**: backup `src/db_store.json` trước khi sửa (copy ra thư mục scratch),
+xong việc thì phục hồi lại nguyên bản — dữ liệu test không được lẫn vào file thật. Đã áp dụng đúng quy
+trình này khi test Technical SEO Monitor + On-page Scanner ở mục 6 phía trên (tạo user `qa_test_editor`
++ 1 account giả trỏ `karofi.com`, test xong xoá sạch, khôi phục `db_store.json` nguyên vẹn).
 
 ### File tham khảo user đã chuẩn bị sẵn (đọc nếu cần bối cảnh đầy đủ)
 - `task cần làm/campaign task/de-xuat-toi-uu-quan-ly-campaign-va-task.md` — phân tích tối ưu
