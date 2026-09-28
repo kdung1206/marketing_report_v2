@@ -44,6 +44,14 @@ export interface Campaign {
   pic_username: string | null;
   visual_gallery_url: string | null;
   visual_urls: string[];
+  // Budget & Pacing alert dedupe (see budgetPacingNotifier.ts) — same
+  // "remember what state we last alerted at" idea as fb_pages'
+  // expiry_alert_sent_at, but keyed on the pacing state itself
+  // ('over'/'under'/null) rather than a single boolean, so a campaign that
+  // recovers to on-pace and later drifts again gets a fresh alert instead of
+  // staying permanently suppressed.
+  pacing_alert_state: "over" | "under" | null;
+  pacing_alert_sent_at: string | null;
   created_by: string;
   updated_by: string | null;
   created_at: string;
@@ -277,6 +285,8 @@ export async function createCampaign(
     pic_username: input.pic_username ?? null,
     visual_gallery_url: input.visual_gallery_url ?? null,
     visual_urls: input.visual_urls ?? [],
+    pacing_alert_state: null,
+    pacing_alert_sent_at: null,
     created_by: creatorUsername,
     updated_by: creatorUsername,
     created_at: now,
@@ -331,6 +341,26 @@ export async function updateCampaign(
     .single();
   if (error) throw new Error(`Lỗi cập nhật campaign: ${error.message}`);
   return data;
+}
+
+// Cron-only write path (budgetPacingNotifier.ts) — bypasses updateCampaign's
+// updated_by/updated_at audit trail on purpose, same reasoning as
+// facebookStore.ts's setFbPageSyncStatus: this isn't a human edit, and
+// stamping updated_by with some synthetic "system" username would pollute
+// the real edit history Admin sees on the campaign.
+export async function setCampaignPacingAlertStatus(
+  id: string,
+  status: { pacing_alert_state: "over" | "under" | null; pacing_alert_sent_at: string | null }
+): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, campaigns } = await readLocalCollections();
+    const next = campaigns.map((c) => (c.id === id ? { ...c, ...status } : c));
+    await writeLocalCollections(store, { campaigns: next });
+    return;
+  }
+
+  const { error } = await supabase.from("campaigns").update(status).eq("id", id);
+  if (error) throw new Error(`Lỗi cập nhật trạng thái pacing: ${error.message}`);
 }
 
 export async function deleteCampaign(id: string): Promise<void> {

@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Search, Link2, TrendingUp, RefreshCw, AlertCircle, CheckCircle2, Trash2, PlusCircle } from "lucide-react";
+import { Search, Link2, TrendingUp, RefreshCw, AlertCircle, CheckCircle2, Trash2, PlusCircle, Wrench, Gauge, FileSearch, Sparkles } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 interface KeywordRankTarget {
@@ -51,6 +51,31 @@ interface Backlink {
   last_check_result: "found" | "not_found" | "error" | null;
 }
 
+interface TechnicalSeoCheck {
+  account_id: string;
+  check_type: "broken_link" | "pagespeed" | "sitemap";
+  url: string;
+  status: "ok" | "error" | "warning";
+  details: Record<string, any>;
+  first_detected_at: string;
+  checked_at: string;
+}
+
+interface OnPageSignals {
+  url: string;
+  title: string | null;
+  title_length: number;
+  meta_description: string | null;
+  meta_description_length: number;
+  h1_count: number;
+  h1_texts: string[];
+  image_count: number;
+  images_missing_alt: number;
+  internal_link_count: number;
+  external_link_count: number;
+  word_count: number;
+}
+
 const CATEGORY_SUGGESTIONS = ["Lọc nước", "Lọc tổng", "Điều hòa"];
 const SOV_COLORS: Record<string, string> = {
   Karofi: "#059669",
@@ -78,11 +103,18 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
   const [rankHistory, setRankHistory] = useState<KeywordRankHistoryRow[]>([]);
   const [sovMentions, setSovMentions] = useState<SovMentionRow[]>([]);
   const [backlinks, setBacklinks] = useState<Backlink[]>([]);
+  const [technicalChecks, setTechnicalChecks] = useState<TechnicalSeoCheck[]>([]);
   const [serperConfigured, setSerperConfigured] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSyncingRank, setIsSyncingRank] = useState(false);
   const [isVerifyingBacklinks, setIsVerifyingBacklinks] = useState(false);
+  const [isCheckingTechnicalSeo, setIsCheckingTechnicalSeo] = useState(false);
+
+  const [scanUrl, setScanUrl] = useState("");
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ signals: OnPageSignals; ai_suggestions: string } | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const [newKeyword, setNewKeyword] = useState({ keyword: "", category: "Lọc nước", brands: [] as ("Livotec" | "Karofi")[] });
   const [newBacklink, setNewBacklink] = useState({ source_platform: "", target_url: "", backlink_url: "", anchor_text: "", link_type: "unknown" as Backlink["link_type"] });
@@ -90,11 +122,12 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
   async function loadAll() {
     setIsLoading(true);
     try {
-      const [targetsRes, historyRes, sovRes, backlinksRes] = await Promise.all([
+      const [targetsRes, historyRes, sovRes, backlinksRes, technicalRes] = await Promise.all([
         safeFetchJson("/api/seo-tools/keyword-targets"),
         safeFetchJson("/api/seo-tools/keyword-rank-history"),
         safeFetchJson("/api/seo-tools/sov"),
         safeFetchJson(`/api/backlinks?brand=${encodeURIComponent(selectedBrand)}`),
+        safeFetchJson(`/api/technical-seo?brand=${encodeURIComponent(selectedBrand)}`),
       ]);
       if (targetsRes.success) {
         setKeywordTargets(targetsRes.targets || []);
@@ -103,6 +136,7 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
       if (historyRes.success) setRankHistory(historyRes.history || []);
       if (sovRes.success) setSovMentions(sovRes.mentions || []);
       if (backlinksRes.success) setBacklinks(backlinksRes.backlinks || []);
+      if (technicalRes.success) setTechnicalChecks(technicalRes.checks || []);
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Không tải được dữ liệu SEO Tools." });
     } finally {
@@ -137,6 +171,13 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
     });
     return Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
   }, [sovMentions]);
+
+  const brokenLinks = useMemo(
+    () => technicalChecks.filter((c) => c.check_type === "broken_link" && c.status === "error").sort((a, b) => (a.first_detected_at < b.first_detected_at ? 1 : -1)),
+    [technicalChecks]
+  );
+  const sitemapChecks = useMemo(() => technicalChecks.filter((c) => c.check_type === "sitemap"), [technicalChecks]);
+  const pagespeedCheck = useMemo(() => technicalChecks.find((c) => c.check_type === "pagespeed") || null, [technicalChecks]);
 
   async function handleAddKeyword(e: React.FormEvent) {
     e.preventDefault();
@@ -237,6 +278,48 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
       setMessage({ type: "error", text: err.message || "Kiểm tra thất bại." });
     } finally {
       setIsVerifyingBacklinks(false);
+    }
+  }
+
+  async function handleCheckTechnicalSeoNow() {
+    setIsCheckingTechnicalSeo(true);
+    setMessage(null);
+    try {
+      const result = await safeFetchJson("/api/technical-seo/sync-now", { method: "POST" });
+      if (result.success) {
+        setMessage({ type: "success", text: "Đã kiểm tra Technical SEO Monitor." });
+        await loadAll();
+      } else {
+        setMessage({ type: "error", text: result.error || "Kiểm tra thất bại." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Kiểm tra thất bại." });
+    } finally {
+      setIsCheckingTechnicalSeo(false);
+    }
+  }
+
+  async function handleScanPage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!scanUrl.trim()) return;
+    setIsScanning(true);
+    setScanError(null);
+    setScanResult(null);
+    try {
+      const result = await safeFetchJson("/api/onpage-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: scanUrl.trim() }),
+      });
+      if (result.success) {
+        setScanResult({ signals: result.signals, ai_suggestions: result.ai_suggestions });
+      } else {
+        setScanError(result.error || "Quét thất bại.");
+      }
+    } catch (err: any) {
+      setScanError(err.message || "Quét thất bại.");
+    } finally {
+      setIsScanning(false);
     }
   }
 
@@ -504,6 +587,171 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
             </button>
           </div>
         </form>
+      </div>
+
+      {/* 4. Technical SEO Monitor */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+          <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+            <Wrench className="h-3.5 w-3.5" /> Technical SEO Monitor
+          </span>
+          <button
+            onClick={handleCheckTechnicalSeoNow}
+            disabled={isCheckingTechnicalSeo}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${isCheckingTechnicalSeo ? "animate-spin" : ""}`} /> Kiểm tra ngay (miễn phí, hơi chậm)
+          </button>
+        </div>
+        <p className="pb-3 text-[11px] text-slate-400">
+          Quét sitemap tìm URL lỗi (404/500), điểm PageSpeed trang chủ, và tình trạng sitemap theo Search Console — cron tự chạy hàng tuần.
+        </p>
+
+        {pagespeedCheck && (
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+            <Gauge className={`h-8 w-8 shrink-0 ${pagespeedCheck.status === "error" ? "text-rose-500" : pagespeedCheck.status === "warning" ? "text-slate-300" : "text-emerald-500"}`} />
+            <div className="text-xs">
+              <div className="font-semibold text-slate-700">
+                PageSpeed (mobile, trang chủ):{" "}
+                {pagespeedCheck.details?.performance_score != null ? (
+                  <span className={pagespeedCheck.status === "error" ? "text-rose-600" : "text-emerald-600"}>{pagespeedCheck.details.performance_score}/100</span>
+                ) : (
+                  <span className="text-slate-400">chưa có dữ liệu ({pagespeedCheck.details?.error || "PAGESPEED_API_KEY chưa cấu hình?"})</span>
+                )}
+              </div>
+              {pagespeedCheck.details?.lcp_ms != null && (
+                <div className="text-slate-400">LCP {Math.round(pagespeedCheck.details.lcp_ms)}ms · CLS {Number(pagespeedCheck.details.cls || 0).toFixed(3)}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {sitemapChecks.length > 0 && (
+          <table className="mb-3 w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-slate-400">
+                <th className="pb-2 font-medium">Sitemap</th>
+                <th className="pb-2 font-medium text-right">Đã nộp</th>
+                <th className="pb-2 font-medium text-right">Đã index</th>
+                <th className="pb-2 font-medium text-right">Cảnh báo/Lỗi</th>
+                <th className="pb-2 font-medium">Tải gần nhất</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sitemapChecks.map((s) => (
+                <tr key={s.url} className="border-b border-slate-50 last:border-0">
+                  <td className="max-w-[220px] truncate py-2 text-slate-500" title={s.url}>{s.url}</td>
+                  <td className="py-2 text-right font-mono text-slate-500">{s.details?.submitted ?? "—"}</td>
+                  <td className="py-2 text-right font-mono text-slate-500">{s.details?.indexed ?? "—"}</td>
+                  <td className={`py-2 text-right font-mono ${s.status === "error" ? "font-bold text-rose-600" : "text-slate-400"}`}>
+                    {(s.details?.warnings || 0) + (s.details?.errors || 0)}
+                  </td>
+                  <td className="py-2 text-slate-400">{s.details?.last_downloaded ? new Date(s.details.last_downloaded).toLocaleDateString("vi-VN") : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-slate-100 text-left text-slate-400">
+              <th className="pb-2 font-medium">URL lỗi</th>
+              <th className="pb-2 font-medium">Lỗi</th>
+              <th className="pb-2 font-medium">Phát hiện từ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {brokenLinks.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="py-4 text-center text-slate-400">
+                  Chưa phát hiện URL lỗi nào cho {selectedBrand}.
+                </td>
+              </tr>
+            ) : (
+              brokenLinks.slice(0, 20).map((c) => (
+                <tr key={c.url} className="border-b border-slate-50 last:border-0">
+                  <td className="max-w-[260px] truncate py-2 font-medium text-slate-700" title={c.url}>
+                    {c.details?.is_sitemap_file && <span className="mr-1 rounded bg-rose-100 px-1 text-[10px] font-bold text-rose-700">SITEMAP</span>}
+                    <a href={c.url} target="_blank" rel="noreferrer" className="hover:underline">
+                      {c.url}
+                    </a>
+                  </td>
+                  <td className="py-2 text-rose-600">{c.details?.status_code ? `HTTP ${c.details.status_code}` : c.details?.error || "lỗi"}</td>
+                  <td className="py-2 text-slate-400">{new Date(c.first_detected_at).toLocaleDateString("vi-VN")}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        {brokenLinks.length > 20 && <p className="pt-2 text-center text-[11px] text-slate-400">… và {brokenLinks.length - 20} URL lỗi khác.</p>}
+      </div>
+
+      {/* 5. On-page Optimization Scanner */}
+      <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+        <span className="flex items-center gap-1.5 pb-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+          <FileSearch className="h-3.5 w-3.5" /> On-page Optimization Scanner
+        </span>
+        <p className="pb-3 text-[11px] text-slate-400">Dán URL 1 trang trên site đã kết nối để xem tín hiệu SEO on-page + gợi ý cải thiện từ AI. Chỉ chạy khi bấm — không quét tự động.</p>
+
+        <form onSubmit={handleScanPage} className="mb-3 flex gap-2">
+          <input
+            type="text"
+            value={scanUrl}
+            onChange={(e) => setScanUrl(e.target.value)}
+            placeholder="https://karofi.com/san-pham/..."
+            className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+          />
+          <button
+            type="submit"
+            disabled={isScanning}
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3 w-3 ${isScanning ? "animate-spin" : ""}`} /> Quét
+          </button>
+        </form>
+
+        {scanError && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-[11px] text-rose-700">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {scanError}
+          </div>
+        )}
+
+        {scanResult && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {[
+                { label: "Title", value: `${scanResult.signals.title_length} ký tự`, warn: scanResult.signals.title_length < 50 || scanResult.signals.title_length > 60 },
+                {
+                  label: "Meta description",
+                  value: `${scanResult.signals.meta_description_length} ký tự`,
+                  warn: scanResult.signals.meta_description_length < 120 || scanResult.signals.meta_description_length > 160,
+                },
+                { label: "Thẻ H1", value: `${scanResult.signals.h1_count}`, warn: scanResult.signals.h1_count !== 1 },
+                { label: "Ảnh thiếu alt", value: `${scanResult.signals.images_missing_alt}/${scanResult.signals.image_count}`, warn: scanResult.signals.images_missing_alt > 0 },
+                { label: "Internal / External link", value: `${scanResult.signals.internal_link_count} / ${scanResult.signals.external_link_count}`, warn: false },
+                { label: "Số từ nội dung", value: `${scanResult.signals.word_count}`, warn: scanResult.signals.word_count < 300 },
+              ].map((tile) => (
+                <div key={tile.label} className={`rounded-lg border p-2.5 text-xs ${tile.warn ? "border-amber-200 bg-amber-50" : "border-slate-100 bg-slate-50"}`}>
+                  <div className="text-[10px] uppercase tracking-wide text-slate-400">{tile.label}</div>
+                  <div className={`font-bold ${tile.warn ? "text-amber-700" : "text-slate-700"}`}>{tile.value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500">
+              <div className="font-semibold text-slate-600">Title: </div>
+              <div className="pb-2">{scanResult.signals.title || "(không có)"}</div>
+              <div className="font-semibold text-slate-600">Meta description: </div>
+              <div>{scanResult.signals.meta_description || "(không có)"}</div>
+            </div>
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-slate-700">
+              <div className="pb-1.5 flex items-center gap-1.5 font-semibold text-indigo-700">
+                <Sparkles className="h-3.5 w-3.5" /> Gợi ý từ AI
+              </div>
+              <div className="whitespace-pre-wrap">{scanResult.ai_suggestions}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -673,6 +673,28 @@ create table if not exists search_console_device_summary (
 
 alter table search_console_device_summary enable row level security;
 
+-- Technical SEO Monitor (src/server/technicalSeoStore.ts/technicalSeoSync.ts)
+-- — "current state" table, not a time series: one row per (account, check
+-- type, URL), overwritten every weekly run. check_type is one of
+-- 'broken_link' (sitemap crawl), 'pagespeed' (homepage PageSpeed Insights),
+-- 'sitemap' (Search Console Sitemaps API coverage). `first_detected_at` is
+-- preserved across upserts by the application layer (not a DB default) so an
+-- alert can say how long an issue has persisted.
+create table if not exists technical_seo_checks (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  check_type text not null check (check_type in ('broken_link', 'pagespeed', 'sitemap')),
+  url text not null,
+  status text not null check (status in ('ok', 'error', 'warning')),
+  details jsonb not null default '{}'::jsonb,
+  first_detected_at timestamptz not null default now(),
+  checked_at timestamptz not null default now(),
+  primary key (account_id, check_type, url)
+);
+
+create index if not exists technical_seo_checks_account_status_idx on technical_seo_checks (account_id, status);
+
+alter table technical_seo_checks enable row level security;
+
 -- ---------------------------------------------------------------------------
 -- Campaign Calendar & Campaign Task module (src/server/campaignStore.ts,
 -- src/components/CampaignManagement.tsx). Phase 1 (MVP) only — Activities
@@ -734,6 +756,11 @@ alter table campaigns enable row level security;
 -- `timestamptz` — safe to run even if already timestamptz (no-op cast).
 alter table campaigns alter column start_date type timestamptz using start_date::timestamptz;
 alter table campaigns alter column end_date type timestamptz using end_date::timestamptz;
+
+-- Budget & Pacing alert dedupe (src/server/budgetPacingNotifier.ts) — see the
+-- comment on Campaign.pacing_alert_state in campaignStore.ts.
+alter table campaigns add column if not exists pacing_alert_state text check (pacing_alert_state in ('over', 'under'));
+alter table campaigns add column if not exists pacing_alert_sent_at timestamptz;
 
 -- Who (besides Admin, who always can) is allowed to edit a given campaign and
 -- its campaign-scoped tasks. Managed by Admin only (POST/DELETE

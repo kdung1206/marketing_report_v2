@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import express from "express";
-import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import { normalizeMarketingData, getBtlReportMonth } from "../data";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
@@ -166,6 +165,11 @@ import {
   GOOGLE_WEBSITE_SCOPES,
 } from "./googleWebsiteSync";
 import { checkExpiringConnectionsAndNotify } from "./expiryNotifier";
+import { checkBudgetPacingAndNotify } from "./budgetPacingNotifier";
+import { geminiClient, GEMINI_MODEL } from "./geminiClient";
+import { getTechnicalSeoChecks } from "./technicalSeoStore";
+import { runTechnicalSeoSync } from "./technicalSeoSync";
+import { scanPage } from "./onpageScanner";
 import {
   exchangeDriveCode,
   fetchGoogleEmail,
@@ -433,26 +437,8 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Initialize Gemini Client safely
-let ai: GoogleGenAI | null = null;
-try {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey && apiKey !== "MY_GEMINI_API_KEY") {
-    ai = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-    console.log("Gemini API Client initialized successfully.");
-  } else {
-    console.warn("GEMINI_API_KEY is not configured or uses placeholder value.");
-  }
-} catch (error) {
-  console.error("Failed to initialize Gemini API Client:", error);
-}
+// Gemini client — see geminiClient.ts (also used by onpageScanner.ts).
+const ai = geminiClient;
 
 // API: Fetch file from Google Drive via direct link
 app.post("/api/fetch-drive", requireAuth("Editor"), async (req, res) => {
@@ -569,7 +555,7 @@ Cấu trúc JSON phản hồi bắt buộc phải đúng 100% mẫu dưới đâ
 }`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1530,6 +1516,15 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       return [];
     });
 
+    // Budget & Pacing alert (Ads) piggybacks here too, right after adsResults
+    // above so it reads today's freshest ads_performance.spend — same
+    // Hobby-plan "once/day per job" reasoning, and it's free (reuses data
+    // already synced by the syncs above, no paid API).
+    const budgetPacingResult = await checkBudgetPacingAndNotify().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (budget pacing) error:", err);
+      return { checked: false, evaluatedCount: 0, alertedCount: 0, notified: false, error: err.message };
+    });
+
     res.json({
       success: true,
       results: pageResults,
@@ -1542,6 +1537,7 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       expiryCheck,
       recurringTasksResult,
       backlinkVerifyResult,
+      budgetPacingResult,
     });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
@@ -3317,6 +3313,65 @@ app.post("/api/backlinks/verify-now", requireAuth("Editor"), async (req, res) =>
     res.json({ success: true, results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Technical SEO Monitor — src/server/technicalSeoStore.ts/technicalSeoSync.ts.
+// Free (no paid API), but a genuinely slow crawl, so "sync now" is allowed
+// (unlike Keyword Rank Tracker's credit-metered one) but still its own
+// weekly cron rather than the daily one — see technicalSeoSync.ts's header.
+// ---------------------------------------------------------------------------
+
+app.get("/api/technical-seo", requireAuth(), async (req, res) => {
+  try {
+    const { brand } = req.query;
+    const accounts = await getGoogleWebsiteAccounts();
+    const accountIds = (brand && typeof brand === "string" ? accounts.filter((a) => a.brand === brand) : accounts).map((a) => a.id);
+    const checks = await getTechnicalSeoChecks(accountIds);
+    res.json({ success: true, checks });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/technical-seo/sync-now", requireAuth("Editor"), async (req, res) => {
+  try {
+    const results = await runTechnicalSeoSync();
+    await logAction((req as any).session, req, "technical-seo-sync", `Kiểm tra thủ công Technical SEO Monitor (${results.length} account)`);
+    res.json({ success: true, results });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/cron/technical-seo-weekly", async (req, res) => {
+  try {
+    if (!isValidCronRequest(req)) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const results = await runTechnicalSeoSync();
+    res.json({ success: true, results });
+  } catch (err: any) {
+    console.error("GET /api/cron/technical-seo-weekly error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// On-page Optimization Scanner — src/server/onpageScanner.ts. On-demand
+// only (no cron, no stored history — see that file's header comment).
+// Editor+ since it burns a Gemini call per scan.
+app.post("/api/onpage-scan", requireAuth("Editor"), async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ success: false, error: "Thiếu URL cần quét." });
+    }
+    const result = await scanPage(url);
+    await logAction((req as any).session, req, "onpage-scan", `Quét on-page: ${url}`);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
