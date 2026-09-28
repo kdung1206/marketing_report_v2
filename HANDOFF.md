@@ -116,11 +116,16 @@ qua Vercel — xem mục 6 bên dưới cho chi tiết trạng thái deploy).
        đúng lỗi này (hiện dạng dòng "SITEMAP" riêng trong bảng URL lỗi, ưu tiên cao hơn URL thường).
      - ⚠️ **Quota PageSpeed Insights không-cần-key đã bị dùng hết TOÀN CỤC** (gọi thử không key nhận
        ngay lỗi 429 "Quota exceeded") — khác với giả định ban đầu "không key vẫn dùng được ở quota
-       thấp hơn". Coi `PAGESPEED_API_KEY` là **bắt buộc**, không phải tuỳ chọn. User đã thử set biến
-       này trên Vercel nhưng **kiểm tra qua Vercel API (Composio) xác nhận biến CHƯA thực sự tồn tại
-       trên Vercel production** (có thể chưa bấm lưu, hoặc lưu nhầm project khác) — **việc còn treo
-       cho phiên sau**: hỏi user đã set lại đúng chưa, nếu rồi thì trigger redeploy production 1 lần
-       nữa (xem cách trigger ở cuối mục này) để key có hiệu lực.
+       thấp hơn". Coi `PAGESPEED_API_KEY` là **bắt buộc**, không phải tuỳ chọn. Lần đầu user set biến
+       này trên Vercel qua dashboard nhưng không thành công (kiểm tra qua Vercel API xác nhận biến
+       chưa thực sự tồn tại) — **ĐÃ GIẢI QUYẾT xong trong phiên này**: user dán thẳng giá trị key vào
+       chat, đã dùng Composio (`VERCEL_ADD_ENVIRONMENT_VARIABLE`, `target: ["production"]`,
+       `type: "encrypted"`) lưu trực tiếp lên Vercel, verify lại bằng `VERCEL_GET_PROJECTS` thấy số
+       env var tăng từ 26 → 27, rồi trigger redeploy (deployment `dpl_GjrobY7CnKvqaUsyaAq8ns3pVn9J`,
+       commit `3504253`). **Key đã có hiệu lực trên production từ đây** — không còn việc gì tồn đọng
+       ở mục này nữa. (Trong lúc tìm hiểu tại sao Google Cloud Console không hiện lựa chọn "API key"
+       ở dropdown "+ Create credentials" ban đầu, user đã tự tìm ra cách vào đúng luồng — không phải
+       vấn đề của app này, không cần theo dõi thêm.)
      - Phát hiện + sửa 1 bug thật lúc test: nếu bước gọi Search Console Sitemaps API lỗi (vd token
        hết hạn), code CŨ sẽ mất luôn kết quả crawl + PageSpeed đã chạy thành công trước đó (throw
        trước khi kịp lưu). Đã sửa: bước Sitemaps API giờ có try/catch riêng, không làm mất kết quả 2
@@ -131,6 +136,15 @@ qua Vercel — xem mục 6 bên dưới cho chi tiết trạng thái deploy).
      - **CHỦ ĐỘNG bỏ qua** Search Console URL Inspection API (trạng thái index từng URL) — quota chặt
        hơn nhiều, kiểm tra hết vài trăm URL/tuần sẽ tốn phần lớn quota cho 1 property. 3 check trên
        đã đủ phủ "gãy/chậm/thiếu coverage".
+     - User hỏi lại (lo lắng hợp lý vì đây là dữ liệu thật của công ty): app này có quyền sửa/xoá gì
+       trên GA4/Search Console không? **Đã xác nhận CHỈ ĐỌC, không thể sửa/xoá** — cả 2 lớp bảo vệ:
+       (1) scope OAuth đang xin (`GOOGLE_WEBSITE_SCOPES` trong `googleWebsiteSync.ts`) là
+       `analytics.readonly`/`webmasters.readonly` — hậu tố `.readonly` theo quy ước Google nghĩa là
+       Google tự chặn mọi request ghi ở tầng API dù code có cố gọi (403), không phải chỉ dựa vào code
+       "tự giác" không ghi; (2) grep toàn bộ file xác nhận code cũng chỉ gọi `runReport`/
+       `searchAnalytics/query`/`sitemaps` (đều là API đọc/truy vấn, POST chỉ để gửi điều kiện lọc
+       trong body chứ không phải ghi dữ liệu) — không có `PUT`/`DELETE`/`PATCH` nào tới GA4/Search
+       Console ở bất kỳ đâu trong codebase.
    - **On-page Optimization Scanner** (`onpageScanner.ts`, tab SEO Tools) — CHỈ chạy khi bấm tay (Editor
      dán 1 URL), KHÔNG cron, KHÔNG lưu lịch sử (xem lý do trong header comment file — quét cả trăm
      trang bằng Gemini theo lịch sẽ chậm/tốn/thừa). Trích title/meta description/H1/ảnh thiếu alt/
