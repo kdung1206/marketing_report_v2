@@ -34,6 +34,11 @@ import {
   getAssetLinks,
   createAssetLink,
   deleteAssetLink,
+  getTimeLogs,
+  createTimeLog,
+  getTimeLog,
+  deleteTimeLog,
+  generateDueRecurringTasks,
   Task,
 } from "./campaignStore";
 import {
@@ -1484,7 +1489,27 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       return { checked: false, expiringCount: 0, notified: false, error: err.message };
     });
 
-    res.json({ success: true, results: pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, googleWebsiteResults, expiryCheck });
+    // Recurring Campaign Task generation piggybacks on this same daily cron
+    // for the same Hobby-plan "once/day per job" reason as everything else
+    // above — unrelated to any platform sync, but there's no cheaper place
+    // to hang a once-a-day check.
+    const recurringTasksResult = await generateDueRecurringTasks().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (recurring tasks) error:", err);
+      return [];
+    });
+
+    res.json({
+      success: true,
+      results: pageResults,
+      adsResults,
+      googleAdsResults,
+      tiktokAdsResults,
+      tiktokResults,
+      youtubeResults,
+      googleWebsiteResults,
+      expiryCheck,
+      recurringTasksResult,
+    });
   } catch (err: any) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "Lỗi đồng bộ Facebook định kỳ." });
@@ -2980,6 +3005,70 @@ app.post("/api/campaign/tasks/:id/notes", requireAuth("Editor"), async (req, res
       return res.status(403).json({ error: "Bạn chưa được phân quyền ghi chú task này." });
     }
     await appendTaskLog(req.params.id, "note", text, session.username);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// -- Task time logs (giờ thực tế đã làm) — quản lý hiệu suất/thời gian nhân
+// viên. GET is unfiltered-by-permission (any logged-in role can see everyone's
+// logged hours — same transparency choice as the task list itself, which
+// already shows every assignee's tasks); only creating/deleting is gated.
+// ---------------------------------------------------------------------------
+
+// GET /api/campaign/time-logs?task_id=&username=&since=&until= — used by both
+// a task's own "giờ đã log" list and the "Theo nhân viên" workload dashboard
+// (which fetches a date range unfiltered by task/user and aggregates client-side,
+// same architecture as Website Report's report tabs).
+app.get("/api/campaign/time-logs", requireAuth(), async (req, res) => {
+  try {
+    const { task_id, username, since, until } = req.query;
+    const logs = await getTimeLogs({
+      taskId: typeof task_id === "string" && task_id ? task_id : undefined,
+      username: typeof username === "string" && username ? username : undefined,
+      since: typeof since === "string" && since ? since : undefined,
+      until: typeof until === "string" && until ? until : undefined,
+    });
+    res.json({ success: true, logs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/campaign/tasks/:id/time-logs — logs the CALLER's own hours
+// against a task they're allowed to edit; there's no "log time on someone
+// else's behalf" — username always comes from the session, never the body.
+app.post("/api/campaign/tasks/:id/time-logs", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy task." });
+    const session = (req as any).session;
+    if (!(await canEditTask(existing, session))) {
+      return res.status(403).json({ error: "Bạn chưa được phân quyền log giờ cho task này." });
+    }
+    const { log_date, hours, note } = req.body || {};
+    if (!log_date || typeof hours !== "number") {
+      return res.status(400).json({ error: "Thiếu log_date hoặc hours." });
+    }
+    const log = await createTimeLog({ task_id: req.params.id, username: session.username, log_date, hours, note: note || null });
+    await appendTaskLog(req.params.id, "note", `Log ${hours}h ngày ${log_date}${note ? ` — ${note}` : ""}`, session.username);
+    res.json({ success: true, log });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/campaign/time-logs/:id — only the log's own author or an Admin.
+app.delete("/api/campaign/time-logs/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTimeLog(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Không tìm thấy bản ghi giờ làm việc." });
+    const session = (req as any).session;
+    if (session.role !== "Admin" && existing.username.toLowerCase() !== session.username.toLowerCase()) {
+      return res.status(403).json({ error: "Bạn chỉ có thể xoá bản ghi giờ làm việc của chính mình." });
+    }
+    await deleteTimeLog(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

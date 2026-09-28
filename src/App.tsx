@@ -576,6 +576,18 @@ export default function App() {
     isAdminPath(window.location.pathname) ? "control-panel" : "dashboard"
   );
 
+  // Set by a report tab's "+ Task" button (e.g. Website Report's
+  // striking-distance keyword rows) — consumed once by CampaignManagement,
+  // which then clears it via onTaskPrefillConsumed. See campaignTaskPrefill
+  // usage below.
+  const [campaignTaskPrefill, setCampaignTaskPrefill] = useState<{
+    title: string;
+    work_stream: string;
+    metric_label: string;
+    metric_unit: string;
+    metric_baseline_value: number;
+  } | null>(null);
+
   // Below the lg breakpoint the left sidebar collapses into a "current tab"
   // bar that expands into a dropdown on tap (see app_sidebar/app_report_sidebar
   // below) instead of the always-visible vertical list shown on desktop — a
@@ -4949,9 +4961,20 @@ export default function App() {
         ) : activeTab === "digital-ads" ? (
           <DigitalAdsReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
         ) : activeTab === "website-report" ? (
-          <WebsiteReport selectedBrand={selectedBrand} setSelectedBrand={setSelectedBrand} />
+          <WebsiteReport
+            selectedBrand={selectedBrand}
+            setSelectedBrand={setSelectedBrand}
+            onCreateTask={(prefill) => {
+              setCampaignTaskPrefill(prefill);
+              setActiveTab("campaign");
+            }}
+          />
         ) : activeTab === "campaign" ? (
-          <CampaignManagement currentUser={currentUser} />
+          <CampaignManagement
+            currentUser={currentUser}
+            taskPrefill={campaignTaskPrefill}
+            onTaskPrefillConsumed={() => setCampaignTaskPrefill(null)}
+          />
         ) : (
           /* ------------------------------------------------------------
               GIAO DIỆN CONTROL PANEL (BẢNG ĐIỀU KHIỂN RIÊNG BIỆT)

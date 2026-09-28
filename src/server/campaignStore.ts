@@ -57,6 +57,16 @@ export interface CampaignMember {
   added_at: string;
 }
 
+// Recurrence rule carried on the "root" task of a recurring series (see
+// generateDueRecurringTasks) — a generated occurrence has recurrence: null
+// and parent_recurring_id pointing back at the root, so only the root ever
+// needs editing to change/stop the whole series.
+export interface TaskRecurrence {
+  freq: "daily" | "weekly" | "monthly";
+  interval: number; // every N days/weeks/months
+  until: string | null; // YYYY-MM-DD — stop generating new occurrences after this date
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -70,16 +80,38 @@ export interface Task {
   status: TaskStatus;
   blocked_reason: string | null;
   due_soon_threshold_days: number;
-  recurrence: unknown | null;
+  recurrence: TaskRecurrence | null;
   parent_recurring_id: string | null;
   // "Main task" this one branches off of — AlwaysOn/Ad-hoc tasks have no
   // Campaign/Activity to organize under, so this is their way to link a
   // related/child task to a main one. Not a full subtask system: no status
   // cascading, no multi-level cycle detection (see updateTask).
   parent_task_id: string | null;
+  // Work-management additions — see supabase/schema.sql's comment on these
+  // columns for the full reasoning (free-text work_stream, generic metric
+  // before/after tracker instead of a foreign key into any report table).
+  work_stream: string | null;
+  estimated_hours: number | null;
+  metric_label: string | null;
+  metric_unit: string | null;
+  metric_baseline_value: number | null;
+  metric_result_value: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+// One row per person per day per task — see supabase/schema.sql's comment on
+// task_time_logs for why this is manual daily entry rather than a running
+// timer.
+export interface TaskTimeLog {
+  id: string;
+  task_id: string;
+  username: string;
+  log_date: string; // YYYY-MM-DD
+  hours: number;
+  note: string | null;
+  created_at: string;
 }
 
 export interface TaskActivityLogEntry {
@@ -112,6 +144,7 @@ async function readLocalCollections(): Promise<{
   tasks: Task[];
   task_activity_log: TaskActivityLogEntry[];
   asset_links: AssetLink[];
+  task_time_logs: TaskTimeLog[];
 }> {
   const store = await getDatabaseData();
   return {
@@ -122,6 +155,7 @@ async function readLocalCollections(): Promise<{
     tasks: Array.isArray(store.tasks) ? store.tasks : [],
     task_activity_log: Array.isArray(store.task_activity_log) ? store.task_activity_log : [],
     asset_links: Array.isArray(store.asset_links) ? store.asset_links : [],
+    task_time_logs: Array.isArray(store.task_time_logs) ? store.task_time_logs : [],
   };
 }
 
@@ -134,6 +168,7 @@ async function writeLocalCollections(
     tasks: Task[];
     task_activity_log: TaskActivityLogEntry[];
     asset_links: AssetLink[];
+    task_time_logs: TaskTimeLog[];
   }>
 ): Promise<void> {
   await saveDatabaseData({ ...store, ...updates });
@@ -402,7 +437,21 @@ export async function createTask(
     Partial<
       Pick<
         Task,
-        "campaign_id" | "activity_id" | "assignee_username" | "start_date" | "end_date" | "priority" | "status" | "due_soon_threshold_days" | "parent_task_id"
+        | "campaign_id"
+        | "activity_id"
+        | "assignee_username"
+        | "start_date"
+        | "end_date"
+        | "priority"
+        | "status"
+        | "due_soon_threshold_days"
+        | "parent_task_id"
+        | "work_stream"
+        | "estimated_hours"
+        | "metric_label"
+        | "metric_unit"
+        | "metric_baseline_value"
+        | "recurrence"
       >
     >,
   creatorUsername: string
@@ -422,9 +471,15 @@ export async function createTask(
     blocked_reason: null,
     // Ad-hoc is by nature urgent — warn immediately instead of waiting 2 days.
     due_soon_threshold_days: input.due_soon_threshold_days ?? (input.task_type === "adhoc" ? 0 : 2),
-    recurrence: null,
+    recurrence: input.recurrence ?? null,
     parent_recurring_id: null,
     parent_task_id: input.parent_task_id ?? null,
+    work_stream: input.work_stream ?? null,
+    estimated_hours: input.estimated_hours ?? null,
+    metric_label: input.metric_label ?? null,
+    metric_unit: input.metric_unit ?? null,
+    metric_baseline_value: input.metric_baseline_value ?? null,
+    metric_result_value: null,
     created_by: creatorUsername,
     created_at: now,
     updated_at: now,
@@ -456,7 +511,29 @@ export async function createTask(
 
 export async function updateTask(
   id: string,
-  patch: Partial<Pick<Task, "title" | "campaign_id" | "activity_id" | "assignee_username" | "start_date" | "end_date" | "priority" | "status" | "blocked_reason" | "due_soon_threshold_days" | "parent_task_id">>,
+  patch: Partial<
+    Pick<
+      Task,
+      | "title"
+      | "campaign_id"
+      | "activity_id"
+      | "assignee_username"
+      | "start_date"
+      | "end_date"
+      | "priority"
+      | "status"
+      | "blocked_reason"
+      | "due_soon_threshold_days"
+      | "parent_task_id"
+      | "work_stream"
+      | "estimated_hours"
+      | "metric_label"
+      | "metric_unit"
+      | "metric_baseline_value"
+      | "metric_result_value"
+      | "recurrence"
+    >
+  >,
   actorUsername: string
 ): Promise<Task> {
   const existing = await getTask(id);
@@ -528,13 +605,15 @@ export async function updateTask(
 
 export async function deleteTask(id: string): Promise<void> {
   if (!isSupabaseConfigured) {
-    const { store, tasks, task_activity_log } = await readLocalCollections();
+    const { store, tasks, task_activity_log, task_time_logs } = await readLocalCollections();
     await writeLocalCollections(store, {
       tasks: tasks.filter((t) => t.id !== id),
       task_activity_log: task_activity_log.filter((l) => l.task_id !== id),
+      task_time_logs: task_time_logs.filter((l) => l.task_id !== id),
     });
     return;
   }
+  // task_time_logs/task_activity_log rows cascade via their FK's "on delete cascade".
   const { error } = await supabase.from("tasks").delete().eq("id", id);
   if (error) throw new Error(`Lỗi xoá task: ${error.message}`);
 }
@@ -578,6 +657,169 @@ export async function appendTaskLog(
 
   const { error } = await supabase.from("task_activity_log").insert(entry);
   if (error) console.error("appendTaskLog error:", error.message);
+}
+
+// -- Task time logs (giờ thực tế đã làm) -----------------------------------------
+
+export async function getTimeLogs(filters?: { taskId?: string; username?: string; since?: string; until?: string }): Promise<TaskTimeLog[]> {
+  if (!isSupabaseConfigured) {
+    const { task_time_logs } = await readLocalCollections();
+    return task_time_logs.filter((l) => {
+      if (filters?.taskId && l.task_id !== filters.taskId) return false;
+      if (filters?.username && l.username.toLowerCase() !== filters.username.toLowerCase()) return false;
+      if (filters?.since && l.log_date < filters.since) return false;
+      if (filters?.until && l.log_date > filters.until) return false;
+      return true;
+    });
+  }
+
+  let query = supabase.from("task_time_logs").select("*");
+  if (filters?.taskId) query = query.eq("task_id", filters.taskId);
+  if (filters?.username) query = query.eq("username", filters.username);
+  if (filters?.since) query = query.gte("log_date", filters.since);
+  if (filters?.until) query = query.lte("log_date", filters.until);
+  const { data, error } = await query.order("log_date", { ascending: false });
+  if (error) throw new Error(`Lỗi đọc nhật ký giờ làm việc: ${error.message}`);
+  return data || [];
+}
+
+export async function createTimeLog(input: { task_id: string; username: string; log_date: string; hours: number; note?: string | null }): Promise<TaskTimeLog> {
+  if (!(input.hours > 0 && input.hours <= 24)) {
+    throw new Error("Số giờ phải lớn hơn 0 và không quá 24.");
+  }
+  const log: TaskTimeLog = {
+    id: newId(),
+    task_id: input.task_id,
+    username: input.username,
+    log_date: input.log_date,
+    hours: input.hours,
+    note: input.note ?? null,
+    created_at: new Date().toISOString(),
+  };
+
+  if (!isSupabaseConfigured) {
+    const { store, task_time_logs } = await readLocalCollections();
+    await writeLocalCollections(store, { task_time_logs: [...task_time_logs, log] });
+    return log;
+  }
+
+  const { error } = await supabase.from("task_time_logs").insert(log);
+  if (error) throw new Error(`Lỗi lưu giờ làm việc: ${error.message}`);
+  return log;
+}
+
+// Only the log's own author (or an Admin, checked by the route) may delete
+// it — enforced by the caller, this just removes the row by id.
+export async function getTimeLog(id: string): Promise<TaskTimeLog | null> {
+  if (!isSupabaseConfigured) {
+    const { task_time_logs } = await readLocalCollections();
+    return task_time_logs.find((l) => l.id === id) || null;
+  }
+  const { data, error } = await supabase.from("task_time_logs").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`Lỗi đọc giờ làm việc: ${error.message}`);
+  return data;
+}
+
+export async function deleteTimeLog(id: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, task_time_logs } = await readLocalCollections();
+    await writeLocalCollections(store, { task_time_logs: task_time_logs.filter((l) => l.id !== id) });
+    return;
+  }
+  const { error } = await supabase.from("task_time_logs").delete().eq("id", id);
+  if (error) throw new Error(`Lỗi xoá giờ làm việc: ${error.message}`);
+}
+
+// -- Recurring task generation ----------------------------------------------
+
+function advanceDate(dateStr: string, recurrence: TaskRecurrence): string {
+  const d = new Date(dateStr + "T00:00:00");
+  if (recurrence.freq === "daily") d.setDate(d.getDate() + recurrence.interval);
+  else if (recurrence.freq === "weekly") d.setDate(d.getDate() + recurrence.interval * 7);
+  else d.setMonth(d.getMonth() + recurrence.interval);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function daysBetween(a: string, b: string): number {
+  return Math.round((new Date(b + "T00:00:00").getTime() - new Date(a + "T00:00:00").getTime()) / 86400000);
+}
+
+export interface RecurringTaskGenerationResult {
+  root_task_id: string;
+  created_task_id?: string;
+  skipped_reason?: string;
+}
+
+// Called daily from GET /api/cron/generate-recurring-tasks. One occurrence
+// ahead at a time, per root — the next day's cron run generates the one
+// after that once this one's due date gets close, rather than eagerly
+// materializing a long tail of future tasks up front.
+const RECURRING_GENERATION_HORIZON_DAYS = 14;
+
+export async function generateDueRecurringTasks(): Promise<RecurringTaskGenerationResult[]> {
+  const allTasks = await getTasks();
+  const roots = allTasks.filter((t) => t.recurrence);
+  const results: RecurringTaskGenerationResult[] = [];
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  for (const root of roots) {
+    if (!root.end_date) {
+      results.push({ root_task_id: root.id, skipped_reason: "Task gốc chưa có ngày kết thúc, không tính được ngày lặp tiếp theo." });
+      continue;
+    }
+    const recurrence = root.recurrence as TaskRecurrence;
+    const siblings = allTasks.filter((t) => t.parent_recurring_id === root.id);
+    const lastAnchor = [root, ...siblings].reduce((latest, t) => ((t.end_date || "") > (latest.end_date || "") ? t : latest), root);
+    const nextEndDate = advanceDate(lastAnchor.end_date!, recurrence);
+
+    if (recurrence.until && nextEndDate > recurrence.until) {
+      results.push({ root_task_id: root.id, skipped_reason: "Đã tới ngày kết thúc lặp lại (until)." });
+      continue;
+    }
+    if (daysBetween(todayStr, nextEndDate) > RECURRING_GENERATION_HORIZON_DAYS) {
+      results.push({ root_task_id: root.id, skipped_reason: "Chưa tới trong phạm vi tạo trước (14 ngày)." });
+      continue;
+    }
+    if (siblings.some((t) => t.end_date === nextEndDate) || root.end_date === nextEndDate) {
+      results.push({ root_task_id: root.id, skipped_reason: "Occurrence này đã tồn tại." });
+      continue;
+    }
+
+    // Preserve the same start→end span as the root/last occurrence.
+    const span = lastAnchor.start_date ? daysBetween(lastAnchor.start_date, lastAnchor.end_date!) : 0;
+    const nextStartDate = lastAnchor.start_date ? advanceDate(lastAnchor.start_date, recurrence) : null;
+    void span; // span is implied by advancing both dates by the same recurrence step — kept for clarity, not separately used
+
+    const created = await createTask(
+      {
+        title: root.title,
+        task_type: root.task_type,
+        campaign_id: root.campaign_id ?? undefined,
+        assignee_username: root.assignee_username ?? undefined,
+        start_date: nextStartDate ?? undefined,
+        end_date: nextEndDate,
+        priority: root.priority,
+        work_stream: root.work_stream ?? undefined,
+        estimated_hours: root.estimated_hours ?? undefined,
+      },
+      "system-recurring"
+    );
+    await patchTaskRecurringParent(created.id, root.id);
+    results.push({ root_task_id: root.id, created_task_id: created.id });
+  }
+
+  return results;
+}
+
+async function patchTaskRecurringParent(taskId: string, rootId: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, tasks } = await readLocalCollections();
+    await writeLocalCollections(store, { tasks: tasks.map((t) => (t.id === taskId ? { ...t, parent_recurring_id: rootId } : t)) });
+    return;
+  }
+  const { error } = await supabase.from("tasks").update({ parent_recurring_id: rootId }).eq("id", taskId);
+  if (error) throw new Error(`Lỗi gán task lặp lại: ${error.message}`);
 }
 
 // -- Asset Library (Campaign Calendar screen) ------------------------------------

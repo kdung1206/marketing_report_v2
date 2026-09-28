@@ -17,6 +17,10 @@ import {
   ImagePlus,
   RefreshCcw,
   Zap,
+  Users,
+  Timer,
+  Repeat,
+  Target,
 } from "lucide-react";
 import { safeFetchJson } from "../App";
 import type { UserAccount } from "../lib/defaultUsers";
@@ -83,6 +87,12 @@ const GANTT_COLORS = [
   { bar: "bg-slate-400", text: "text-white" },
 ];
 
+interface TaskRecurrence {
+  freq: "daily" | "weekly" | "monthly";
+  interval: number;
+  until: string | null;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -96,8 +106,25 @@ interface Task {
   blocked_reason: string | null;
   due_soon_threshold_days: number;
   parent_task_id: string | null;
+  parent_recurring_id: string | null;
+  recurrence: TaskRecurrence | null;
+  work_stream: string | null;
+  estimated_hours: number | null;
+  metric_label: string | null;
+  metric_unit: string | null;
+  metric_baseline_value: number | null;
+  metric_result_value: number | null;
   created_by: string;
   can_edit: boolean;
+}
+
+interface TaskTimeLog {
+  id: string;
+  task_id: string;
+  username: string;
+  log_date: string;
+  hours: number;
+  note: string | null;
 }
 
 interface BasicUser {
@@ -108,6 +135,24 @@ interface BasicUser {
 interface CampaignMember {
   campaign_id: string;
   username: string;
+}
+
+// Suggested list, not a DB enum (see supabase/schema.sql's comment on
+// tasks.work_stream) — "Khác" always available as a catch-all, and the
+// select still accepts whatever a task already has stored even if it isn't
+// in this list (an older/renamed value never becomes unselectable).
+const WORK_STREAMS = ["Digital Ads", "SEO", "Content", "Design", "Khác"];
+
+// Passed down from App.tsx when a report tab's "+ Task" button (e.g.
+// Website Report's striking-distance keyword rows) wants to open Campaign
+// Marketing with a new task pre-filled — see the App.tsx wiring comment atop
+// CampaignManagementProps below.
+interface CampaignTaskPrefill {
+  title: string;
+  work_stream: string;
+  metric_label: string;
+  metric_unit: string;
+  metric_baseline_value: number;
 }
 
 const EMPTY_CAMPAIGN_FORM = {
@@ -135,6 +180,16 @@ const EMPTY_TASK_FORM = {
   priority: "Medium" as Task["priority"],
   status: "To do" as TaskStatus,
   parent_task_id: "",
+  work_stream: "",
+  estimated_hours: "",
+  metric_label: "",
+  metric_unit: "",
+  metric_baseline_value: "",
+  metric_result_value: "",
+  recurrence_enabled: false,
+  recurrence_freq: "weekly" as TaskRecurrence["freq"],
+  recurrence_interval: "1",
+  recurrence_until: "",
 };
 
 function daysUntil(dateStr: string): number {
@@ -196,6 +251,12 @@ function formatDateTime(dateStr: string): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+function todayStr(offsetDays = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
 function addDays(d: Date, n: number): Date {
   const result = new Date(d);
   result.setDate(result.getDate() + n);
@@ -245,10 +306,16 @@ function overlapsRange(c: Pick<Campaign, "start_date" | "end_date">, start: Date
 
 interface CampaignManagementProps {
   currentUser: UserAccount;
+  // Set by App.tsx right before switching activeTab to "campaign" when a
+  // report tab's "+ Task" button is clicked (e.g. Website Report's
+  // striking-distance keyword rows) — consumed once (see the useEffect
+  // below) so re-rendering this component doesn't keep re-applying it.
+  taskPrefill?: CampaignTaskPrefill | null;
+  onTaskPrefillConsumed?: () => void;
 }
 
-export default function CampaignManagement({ currentUser }: CampaignManagementProps) {
-  const [section, setSection] = useState<"campaigns" | "tasks">("campaigns");
+export default function CampaignManagement({ currentUser, taskPrefill, onTaskPrefillConsumed }: CampaignManagementProps) {
+  const [section, setSection] = useState<"campaigns" | "tasks" | "workload">("campaigns");
   const [categories, setCategories] = useState<Category[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -277,6 +344,34 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
   const [taskStatusFilter, setTaskStatusFilter] = useState("");
   const [taskTypeFilter, setTaskTypeFilter] = useState("");
   const [onlyMine, setOnlyMine] = useState(false);
+
+  // -- Time logs (giờ thực tế) --------------------------------------------
+  const [timeLogs, setTimeLogs] = useState<TaskTimeLog[]>([]);
+  const [expandedTimeLogTaskId, setExpandedTimeLogTaskId] = useState<string | null>(null);
+  const [timeLogForm, setTimeLogForm] = useState({ log_date: todayStr(), hours: "", note: "" });
+
+  // -- Workload dashboard ("Theo nhân viên") -------------------------------
+  const [workloadSince, setWorkloadSince] = useState(todayStr(-30));
+  const [workloadUntil, setWorkloadUntil] = useState(todayStr());
+
+  // Applies a report tab's "+ Task" prefill exactly once, then tells the
+  // parent to clear it — see CampaignManagementProps' comment.
+  useEffect(() => {
+    if (!taskPrefill) return;
+    setSection("tasks");
+    setEditingTaskId(null);
+    setTaskForm({
+      ...EMPTY_TASK_FORM,
+      title: taskPrefill.title,
+      task_type: "adhoc",
+      work_stream: taskPrefill.work_stream,
+      metric_label: taskPrefill.metric_label,
+      metric_unit: taskPrefill.metric_unit,
+      metric_baseline_value: String(taskPrefill.metric_baseline_value),
+    });
+    onTaskPrefillConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskPrefill]);
 
   // -- Gantt + Asset Library --------------------------------------------------
   const [ganttViewMode, setGanttViewMode] = useState<GanttViewMode>("month");
@@ -354,9 +449,21 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
     }
   }
 
+  // Unfiltered like loadTasks — the workload date-range filter and the
+  // per-task log list are both applied client-side against this same array,
+  // same "fetch once, slice locally" architecture as the report tabs.
+  async function loadTimeLogs() {
+    try {
+      const result = await safeFetchJson("/api/campaign/time-logs");
+      if (result.success) setTimeLogs(result.logs || []);
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Không tải được nhật ký giờ làm việc." });
+    }
+  }
+
   async function loadAll() {
     setIsLoading(true);
-    await Promise.all([loadCategories(), loadCampaigns(), loadTasks(), loadBasicUsers(), loadAssetLinks()]);
+    await Promise.all([loadCategories(), loadCampaigns(), loadTasks(), loadBasicUsers(), loadAssetLinks(), loadTimeLogs()]);
     setIsLoading(false);
   }
 
@@ -387,6 +494,58 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
     }
     return map;
   }, [tasks]);
+
+  const logsByTask = useMemo(() => {
+    const map = new Map<string, TaskTimeLog[]>();
+    for (const l of timeLogs) {
+      const list = map.get(l.task_id) || [];
+      list.push(l);
+      map.set(l.task_id, list);
+    }
+    return map;
+  }, [timeLogs]);
+  const hoursByTask = useMemo(() => {
+    const map = new Map<string, number>();
+    logsByTask.forEach((logs, taskId) => map.set(taskId, logs.reduce((s, l) => s + l.hours, 0)));
+    return map;
+  }, [logsByTask]);
+
+  // "Theo nhân viên" workload — aggregated per assignee over the selected
+  // date range: hours logged in range, tasks whose end_date falls in range
+  // (open/overdue/done breakdown + on-time completion rate). Client-side
+  // aggregation over already-fetched tasks/time logs, same architecture as
+  // the report tabs elsewhere in this app (fetch once, slice/aggregate here).
+  const workloadByUser = useMemo(() => {
+    const rangeLogs = timeLogs.filter((l) => l.log_date >= workloadSince && l.log_date <= workloadUntil);
+    const rangeTasks = tasks.filter((t) => t.end_date && t.end_date >= workloadSince && t.end_date <= workloadUntil);
+
+    const usernames = new Set<string>([
+      ...basicUsers.map((u) => u.username),
+      ...tasks.map((t) => t.assignee_username).filter((u): u is string => !!u),
+    ]);
+
+    return Array.from(usernames)
+      .map((username) => {
+        const myTasks = rangeTasks.filter((t) => (t.assignee_username || "").toLowerCase() === username.toLowerCase());
+        const myLogs = rangeLogs.filter((l) => l.username.toLowerCase() === username.toLowerCase());
+        const done = myTasks.filter((t) => t.status === "Done");
+        const overdue = myTasks.filter((t) => taskUrgency(t) === "overdue");
+        const estimatedHours = myTasks.reduce((s, t) => s + (t.estimated_hours || 0), 0);
+        const loggedHours = myLogs.reduce((s, l) => s + l.hours, 0);
+        return {
+          username,
+          name: userNameByUsername.get(username) || username,
+          totalTasks: myTasks.length,
+          doneTasks: done.length,
+          overdueTasks: overdue.length,
+          completionRate: myTasks.length ? done.length / myTasks.length : 0,
+          estimatedHours,
+          loggedHours,
+        };
+      })
+      .filter((w) => w.totalTasks > 0 || w.loggedHours > 0)
+      .sort((a, b) => b.loggedHours - a.loggedHours);
+  }, [tasks, timeLogs, basicUsers, workloadSince, workloadUntil]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Every filter except taskType applied — used to compute the "Campaign X /
   // AlwaysOn Y / Ad-hoc Z" tiles below, so they stay meaningful (reflect
@@ -658,6 +817,16 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
       priority: t.priority,
       status: t.status,
       parent_task_id: t.parent_task_id || "",
+      work_stream: t.work_stream || "",
+      estimated_hours: t.estimated_hours != null ? String(t.estimated_hours) : "",
+      metric_label: t.metric_label || "",
+      metric_unit: t.metric_unit || "",
+      metric_baseline_value: t.metric_baseline_value != null ? String(t.metric_baseline_value) : "",
+      metric_result_value: t.metric_result_value != null ? String(t.metric_result_value) : "",
+      recurrence_enabled: !!t.recurrence,
+      recurrence_freq: t.recurrence?.freq || "weekly",
+      recurrence_interval: t.recurrence ? String(t.recurrence.interval) : "1",
+      recurrence_until: t.recurrence?.until || "",
     });
   }
 
@@ -674,6 +843,18 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
       priority: taskForm.priority,
       status: taskForm.status,
       parent_task_id: taskForm.parent_task_id || null,
+      work_stream: taskForm.work_stream || null,
+      estimated_hours: taskForm.estimated_hours ? Number(taskForm.estimated_hours) : null,
+      metric_label: taskForm.metric_label || null,
+      metric_unit: taskForm.metric_unit || null,
+      metric_baseline_value: taskForm.metric_baseline_value ? Number(taskForm.metric_baseline_value) : null,
+      metric_result_value: taskForm.metric_result_value ? Number(taskForm.metric_result_value) : null,
+      // Recurrence only meaningful for a "root" task (one nothing else points
+      // at via parent_recurring_id) — editing an already-generated occurrence
+      // still shows the toggle disabled-off (see the form fields below).
+      recurrence: taskForm.recurrence_enabled
+        ? { freq: taskForm.recurrence_freq, interval: Number(taskForm.recurrence_interval) || 1, until: taskForm.recurrence_until || null }
+        : null,
     };
     if (taskForm.task_type === "campaign" && !taskForm.campaign_id) {
       setMessage({ type: "error", text: "Task loại Campaign bắt buộc phải chọn Campaign." });
@@ -716,6 +897,36 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
     const result = await safeFetchJson(`/api/campaign/tasks/${t.id}`, { method: "DELETE" });
     if (result.success) await loadTasks();
     else setMessage({ type: "error", text: result.error || "Xoá task thất bại." });
+  }
+
+  function toggleTimeLogPanel(taskId: string) {
+    setExpandedTimeLogTaskId((prev) => (prev === taskId ? null : taskId));
+    setTimeLogForm({ log_date: todayStr(), hours: "", note: "" });
+  }
+
+  async function handleAddTimeLog(taskId: string) {
+    const hours = Number(timeLogForm.hours);
+    if (!timeLogForm.log_date || !hours || hours <= 0) {
+      setMessage({ type: "error", text: "Cần nhập ngày và số giờ hợp lệ (> 0)." });
+      return;
+    }
+    const result = await safeFetchJson(`/api/campaign/tasks/${taskId}/time-logs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ log_date: timeLogForm.log_date, hours, note: timeLogForm.note || null }),
+    });
+    if (result.success) {
+      setTimeLogForm({ log_date: todayStr(), hours: "", note: "" });
+      await loadTimeLogs();
+    } else {
+      setMessage({ type: "error", text: result.error || "Log giờ thất bại." });
+    }
+  }
+
+  async function handleDeleteTimeLog(id: string) {
+    const result = await safeFetchJson(`/api/campaign/time-logs/${id}`, { method: "DELETE" });
+    if (result.success) await loadTimeLogs();
+    else setMessage({ type: "error", text: result.error || "Xoá bản ghi giờ làm việc thất bại." });
   }
 
   async function handleInlineStatusChange(t: Task, nextStatus: TaskStatus) {
@@ -767,6 +978,17 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
             }`}
           >
             <ListChecks className="h-3.5 w-3.5" /> Campaign Tasks
+          </button>
+          <button
+            onClick={() => {
+              setMessage(null);
+              setSection("workload");
+            }}
+            className={`flex items-center gap-1.5 rounded-md px-4 py-1 text-xs font-bold transition-all ${
+              section === "workload" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Users className="h-3.5 w-3.5" /> Theo nhân viên
           </button>
         </div>
       </div>
@@ -1309,7 +1531,7 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
             </table>
           </div>
         </div>
-      ) : (
+      ) : section === "tasks" ? (
         <div className="space-y-4">
           {/* Task type breakdown — trước đây AlwaysOn/Ad-hoc chỉ là 1 lựa
               chọn ẩn trong dropdown "Tất cả loại", không ai thấy có bao
@@ -1501,6 +1723,129 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
                   <option value="Done">Done</option>
                 </select>
               </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Nhóm việc</label>
+                <select
+                  value={taskForm.work_stream}
+                  onChange={(e) => setTaskForm({ ...taskForm, work_stream: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                >
+                  <option value="">-- Không phân loại --</option>
+                  {WORK_STREAMS.map((w) => (
+                    <option key={w} value={w}>{w}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-600">Giờ ước tính</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={taskForm.estimated_hours}
+                  onChange={(e) => setTaskForm({ ...taskForm, estimated_hours: e.target.value })}
+                  placeholder="VD: 4"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                />
+              </div>
+
+              {/* Recurrence chỉ thật sự áp dụng cho task "gốc" (task chưa
+                  được sinh ra từ 1 chuỗi lặp lại khác) — sửa 1 occurrence đã
+                  sinh ra không bật lại được recurrence riêng cho nó. */}
+              {!editingTaskId || !tasks.find((t) => t.id === editingTaskId)?.parent_recurring_id ? (
+                <div className="sm:col-span-2 space-y-1.5 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
+                  <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={taskForm.recurrence_enabled}
+                      onChange={(e) => setTaskForm({ ...taskForm, recurrence_enabled: e.target.checked })}
+                    />
+                    <Repeat className="h-3.5 w-3.5" /> Lặp lại
+                  </label>
+                  {taskForm.recurrence_enabled && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-slate-500">Mỗi</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={taskForm.recurrence_interval}
+                        onChange={(e) => setTaskForm({ ...taskForm, recurrence_interval: e.target.value })}
+                        className="w-14 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                      />
+                      <select
+                        value={taskForm.recurrence_freq}
+                        onChange={(e) => setTaskForm({ ...taskForm, recurrence_freq: e.target.value as TaskRecurrence["freq"] })}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                      >
+                        <option value="daily">ngày</option>
+                        <option value="weekly">tuần</option>
+                        <option value="monthly">tháng</option>
+                      </select>
+                      <span className="text-xs text-slate-500">đến ngày</span>
+                      <input
+                        type="date"
+                        value={taskForm.recurrence_until}
+                        onChange={(e) => setTaskForm({ ...taskForm, recurrence_until: e.target.value })}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                      />
+                      <span className="text-[11px] text-slate-400">(để trống = lặp vô thời hạn)</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="sm:col-span-2 flex items-center text-[11px] text-slate-400">
+                  Task này là 1 occurrence được sinh tự động từ task lặp lại — sửa recurrence ở task gốc.
+                </div>
+              )}
+
+              {/* Liên kết số liệu report thật — generic before/after, không
+                  phải foreign key vào bảng report nào (xem comment trong
+                  supabase/schema.sql). Điền tay hoặc tự điền sẵn từ nút
+                  "+ Task" trên Website Report/Digital Ads Report. */}
+              <div className="sm:col-span-4 space-y-1.5 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
+                <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <Target className="h-3.5 w-3.5" /> Liên kết số liệu (tuỳ chọn)
+                </label>
+                <div className="grid gap-2 sm:grid-cols-4">
+                  <input
+                    type="text"
+                    value={taskForm.metric_label}
+                    onChange={(e) => setTaskForm({ ...taskForm, metric_label: e.target.value })}
+                    placeholder='VD: Vị trí từ khoá "máy lọc nước"'
+                    className="sm:col-span-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    value={taskForm.metric_baseline_value}
+                    onChange={(e) => setTaskForm({ ...taskForm, metric_baseline_value: e.target.value })}
+                    placeholder="Giá trị ban đầu"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={taskForm.metric_unit}
+                    onChange={(e) => setTaskForm({ ...taskForm, metric_unit: e.target.value })}
+                    placeholder="Đơn vị (vị trí, đ, %...)"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none"
+                  />
+                </div>
+                {taskForm.metric_label && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">Kết quả sau khi làm xong:</span>
+                    <input
+                      type="number"
+                      step="any"
+                      value={taskForm.metric_result_value}
+                      onChange={(e) => setTaskForm({ ...taskForm, metric_result_value: e.target.value })}
+                      placeholder="Giá trị sau"
+                      className="w-32 rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-indigo-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="sm:col-span-4">
                 <button type="submit" className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700">
                   <PlusCircle className="h-3.5 w-3.5" />
@@ -1539,28 +1884,33 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
                 <tr>
                   <th className="px-3 py-2 text-left">Task</th>
                   <th className="px-3 py-2 text-left">Loại</th>
+                  <th className="px-3 py-2 text-left">Nhóm việc</th>
                   <th className="px-3 py-2 text-left">Campaign</th>
                   <th className="px-3 py-2 text-left">Người phụ trách</th>
                   <th className="px-3 py-2 text-left">End</th>
                   <th className="px-3 py-2 text-left">Priority</th>
                   <th className="px-3 py-2 text-left">Status</th>
+                  <th className="px-3 py-2 text-right">Giờ (log/ước tính)</th>
                   <th className="px-3 py-2 text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-slate-400">Đang tải...</td>
+                    <td colSpan={10} className="px-3 py-6 text-center text-slate-400">Đang tải...</td>
                   </tr>
                 ) : visibleTasks.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-6 text-center text-slate-400">Chưa có task nào khớp bộ lọc.</td>
+                    <td colSpan={10} className="px-3 py-6 text-center text-slate-400">Chưa có task nào khớp bộ lọc.</td>
                   </tr>
                 ) : (
                   visibleTasks.map((t) => {
                     const urgency = taskUrgency(t);
+                    const loggedHours = hoursByTask.get(t.id) || 0;
+                    const isExpanded = expandedTimeLogTaskId === t.id;
                     return (
-                      <tr key={t.id}>
+                      <React.Fragment key={t.id}>
+                      <tr>
                         <td className="px-3 py-2 font-medium text-slate-700">
                           {t.title}
                           {t.parent_task_id && (
@@ -1584,6 +1934,14 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
                           >
                             {t.task_type === "campaign" ? "Campaign" : t.task_type === "alwayson" ? "AlwaysOn" : "Ad-hoc"}
                           </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-500">
+                          {t.work_stream ? (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{t.work_stream}</span>
+                          ) : (
+                            "—"
+                          )}
+                          {t.recurrence && <Repeat className="ml-1 inline h-3 w-3 text-indigo-400" />}
                         </td>
                         <td className="px-3 py-2 text-slate-500">{t.campaign_id ? campaignNameById.get(t.campaign_id) || "—" : "—"}</td>
                         <td className="px-3 py-2 text-slate-500">{t.assignee_username ? userNameByUsername.get(t.assignee_username) || t.assignee_username : "—"}</td>
@@ -1622,6 +1980,17 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
                             </div>
                           )}
                         </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          <button
+                            onClick={() => toggleTimeLogPanel(t.id)}
+                            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-indigo-50 ${loggedHours > 0 ? "text-indigo-600" : "text-slate-400"}`}
+                            title="Xem/log giờ làm việc"
+                          >
+                            <Timer className="h-3 w-3" />
+                            {loggedHours ? loggedHours.toFixed(1) : "0"}
+                            {t.estimated_hours ? ` / ${t.estimated_hours}` : ""}
+                          </button>
+                        </td>
                         <td className="px-3 py-2 text-right">
                           {t.can_edit ? (
                             <div className="flex justify-end gap-1.5">
@@ -1637,8 +2006,127 @@ export default function CampaignManagement({ currentUser }: CampaignManagementPr
                           )}
                         </td>
                       </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={10} className="bg-slate-50/70 px-4 py-3">
+                            <div className="space-y-2">
+                              {t.metric_label && (
+                                <div className="text-xs text-slate-600">
+                                  <span className="font-semibold">{t.metric_label}:</span>{" "}
+                                  {t.metric_baseline_value ?? "—"}
+                                  {t.metric_result_value != null ? ` → ${t.metric_result_value}` : ""} {t.metric_unit || ""}
+                                </div>
+                              )}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-600">Log giờ mới:</span>
+                                <input
+                                  type="date"
+                                  value={timeLogForm.log_date}
+                                  onChange={(e) => setTimeLogForm({ ...timeLogForm, log_date: e.target.value })}
+                                  className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                                />
+                                <input
+                                  type="number"
+                                  min="0.5"
+                                  step="0.5"
+                                  placeholder="Số giờ"
+                                  value={timeLogForm.hours}
+                                  onChange={(e) => setTimeLogForm({ ...timeLogForm, hours: e.target.value })}
+                                  className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="Ghi chú (tuỳ chọn)"
+                                  value={timeLogForm.note}
+                                  onChange={(e) => setTimeLogForm({ ...timeLogForm, note: e.target.value })}
+                                  className="min-w-[160px] flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+                                />
+                                <button
+                                  onClick={() => handleAddTimeLog(t.id)}
+                                  className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                                >
+                                  + Log
+                                </button>
+                              </div>
+                              <div className="space-y-1">
+                                {(logsByTask.get(t.id) || []).length === 0 ? (
+                                  <p className="text-[11px] text-slate-400">Chưa có giờ nào được log cho task này.</p>
+                                ) : (
+                                  (logsByTask.get(t.id) || [])
+                                    .slice()
+                                    .sort((a, b) => (a.log_date < b.log_date ? 1 : -1))
+                                    .map((log) => (
+                                      <div key={log.id} className="flex items-center gap-2 text-[11px] text-slate-500">
+                                        <span className="w-20">{log.log_date}</span>
+                                        <span className="w-12 font-mono font-semibold text-slate-700">{log.hours}h</span>
+                                        <span className="flex-1">{userNameByUsername.get(log.username) || log.username}{log.note ? ` — ${log.note}` : ""}</span>
+                                        {(log.username.toLowerCase() === currentUser.username.toLowerCase() || currentUser.role === "Admin") && (
+                                          <button onClick={() => handleDeleteTimeLog(log.id)} className="text-rose-500 hover:underline">
+                                            Xoá
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500">Giai đoạn</span>
+            <input type="date" value={workloadSince} onChange={(e) => setWorkloadSince(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+            <span className="text-xs text-slate-400">→</span>
+            <input type="date" value={workloadUntil} onChange={(e) => setWorkloadUntil(e.target.value)} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
+            <span className="text-xs text-slate-400">
+              (giờ đã log trong khoảng này; task tính theo ngày kết thúc rơi vào khoảng này)
+            </span>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full min-w-[820px] text-xs">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-3 py-2 text-left">Nhân viên</th>
+                  <th className="px-3 py-2 text-right">Task (giai đoạn)</th>
+                  <th className="px-3 py-2 text-right">Hoàn thành</th>
+                  <th className="px-3 py-2 text-right">Trễ hạn</th>
+                  <th className="px-3 py-2 text-right">Tỉ lệ hoàn thành</th>
+                  <th className="px-3 py-2 text-right">Giờ ước tính</th>
+                  <th className="px-3 py-2 text-right">Giờ đã log</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-6 text-center text-slate-400">Đang tải...</td>
+                  </tr>
+                ) : workloadByUser.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-6 text-center text-slate-400">Chưa có task hoặc giờ log nào trong giai đoạn đã chọn.</td>
+                  </tr>
+                ) : (
+                  workloadByUser.map((w) => (
+                    <tr key={w.username}>
+                      <td className="px-3 py-2 font-medium text-slate-700">{w.name}</td>
+                      <td className="px-3 py-2 text-right font-mono">{w.totalTasks}</td>
+                      <td className="px-3 py-2 text-right font-mono">{w.doneTasks}</td>
+                      <td className={`px-3 py-2 text-right font-mono ${w.overdueTasks > 0 ? "font-bold text-rose-600" : "text-slate-500"}`}>{w.overdueTasks}</td>
+                      <td className="px-3 py-2 text-right font-mono">{w.totalTasks ? `${(w.completionRate * 100).toFixed(0)}%` : "—"}</td>
+                      <td className="px-3 py-2 text-right font-mono">{w.estimatedHours ? w.estimatedHours.toFixed(1) : "—"}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold text-indigo-600">{w.loggedHours ? w.loggedHours.toFixed(1) : "—"}</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>

@@ -124046,7 +124046,8 @@ async function readLocalCollections2() {
     campaign_members: Array.isArray(store.campaign_members) ? store.campaign_members : [],
     tasks: Array.isArray(store.tasks) ? store.tasks : [],
     task_activity_log: Array.isArray(store.task_activity_log) ? store.task_activity_log : [],
-    asset_links: Array.isArray(store.asset_links) ? store.asset_links : []
+    asset_links: Array.isArray(store.asset_links) ? store.asset_links : [],
+    task_time_logs: Array.isArray(store.task_time_logs) ? store.task_time_logs : []
   };
 }
 async function writeLocalCollections2(store, updates) {
@@ -124259,9 +124260,15 @@ async function createTask(input, creatorUsername) {
     blocked_reason: null,
     // Ad-hoc is by nature urgent — warn immediately instead of waiting 2 days.
     due_soon_threshold_days: input.due_soon_threshold_days ?? (input.task_type === "adhoc" ? 0 : 2),
-    recurrence: null,
+    recurrence: input.recurrence ?? null,
     parent_recurring_id: null,
     parent_task_id: input.parent_task_id ?? null,
+    work_stream: input.work_stream ?? null,
+    estimated_hours: input.estimated_hours ?? null,
+    metric_label: input.metric_label ?? null,
+    metric_unit: input.metric_unit ?? null,
+    metric_baseline_value: input.metric_baseline_value ?? null,
+    metric_result_value: null,
     created_by: creatorUsername,
     created_at: now,
     updated_at: now
@@ -124338,10 +124345,11 @@ async function updateTask(id, patch, actorUsername) {
 }
 async function deleteTask(id) {
   if (!isSupabaseConfigured) {
-    const { store, tasks, task_activity_log } = await readLocalCollections2();
+    const { store, tasks, task_activity_log, task_time_logs } = await readLocalCollections2();
     await writeLocalCollections2(store, {
       tasks: tasks.filter((t2) => t2.id !== id),
-      task_activity_log: task_activity_log.filter((l) => l.task_id !== id)
+      task_activity_log: task_activity_log.filter((l) => l.task_id !== id),
+      task_time_logs: task_time_logs.filter((l) => l.task_id !== id)
     });
     return;
   }
@@ -124373,6 +124381,135 @@ async function appendTaskLog(taskId, type, text, actorUsername) {
   }
   const { error } = await supabase.from("task_activity_log").insert(entry);
   if (error) console.error("appendTaskLog error:", error.message);
+}
+async function getTimeLogs(filters) {
+  if (!isSupabaseConfigured) {
+    const { task_time_logs } = await readLocalCollections2();
+    return task_time_logs.filter((l) => {
+      if (filters?.taskId && l.task_id !== filters.taskId) return false;
+      if (filters?.username && l.username.toLowerCase() !== filters.username.toLowerCase()) return false;
+      if (filters?.since && l.log_date < filters.since) return false;
+      if (filters?.until && l.log_date > filters.until) return false;
+      return true;
+    });
+  }
+  let query = supabase.from("task_time_logs").select("*");
+  if (filters?.taskId) query = query.eq("task_id", filters.taskId);
+  if (filters?.username) query = query.eq("username", filters.username);
+  if (filters?.since) query = query.gte("log_date", filters.since);
+  if (filters?.until) query = query.lte("log_date", filters.until);
+  const { data, error } = await query.order("log_date", { ascending: false });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc nh\u1EADt k\xFD gi\u1EDD l\xE0m vi\u1EC7c: ${error.message}`);
+  return data || [];
+}
+async function createTimeLog(input) {
+  if (!(input.hours > 0 && input.hours <= 24)) {
+    throw new Error("S\u1ED1 gi\u1EDD ph\u1EA3i l\u1EDBn h\u01A1n 0 v\xE0 kh\xF4ng qu\xE1 24.");
+  }
+  const log = {
+    id: newId(),
+    task_id: input.task_id,
+    username: input.username,
+    log_date: input.log_date,
+    hours: input.hours,
+    note: input.note ?? null,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, task_time_logs } = await readLocalCollections2();
+    await writeLocalCollections2(store, { task_time_logs: [...task_time_logs, log] });
+    return log;
+  }
+  const { error } = await supabase.from("task_time_logs").insert(log);
+  if (error) throw new Error(`L\u1ED7i l\u01B0u gi\u1EDD l\xE0m vi\u1EC7c: ${error.message}`);
+  return log;
+}
+async function getTimeLog(id) {
+  if (!isSupabaseConfigured) {
+    const { task_time_logs } = await readLocalCollections2();
+    return task_time_logs.find((l) => l.id === id) || null;
+  }
+  const { data, error } = await supabase.from("task_time_logs").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc gi\u1EDD l\xE0m vi\u1EC7c: ${error.message}`);
+  return data;
+}
+async function deleteTimeLog(id) {
+  if (!isSupabaseConfigured) {
+    const { store, task_time_logs } = await readLocalCollections2();
+    await writeLocalCollections2(store, { task_time_logs: task_time_logs.filter((l) => l.id !== id) });
+    return;
+  }
+  const { error } = await supabase.from("task_time_logs").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i xo\xE1 gi\u1EDD l\xE0m vi\u1EC7c: ${error.message}`);
+}
+function advanceDate(dateStr, recurrence) {
+  const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+  if (recurrence.freq === "daily") d.setDate(d.getDate() + recurrence.interval);
+  else if (recurrence.freq === "weekly") d.setDate(d.getDate() + recurrence.interval * 7);
+  else d.setMonth(d.getMonth() + recurrence.interval);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function daysBetween(a, b) {
+  return Math.round(((/* @__PURE__ */ new Date(b + "T00:00:00")).getTime() - (/* @__PURE__ */ new Date(a + "T00:00:00")).getTime()) / 864e5);
+}
+var RECURRING_GENERATION_HORIZON_DAYS = 14;
+async function generateDueRecurringTasks() {
+  const allTasks = await getTasks();
+  const roots = allTasks.filter((t2) => t2.recurrence);
+  const results = [];
+  const todayStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  for (const root of roots) {
+    if (!root.end_date) {
+      results.push({ root_task_id: root.id, skipped_reason: "Task g\u1ED1c ch\u01B0a c\xF3 ng\xE0y k\u1EBFt th\xFAc, kh\xF4ng t\xEDnh \u0111\u01B0\u1EE3c ng\xE0y l\u1EB7p ti\u1EBFp theo." });
+      continue;
+    }
+    const recurrence = root.recurrence;
+    const siblings = allTasks.filter((t2) => t2.parent_recurring_id === root.id);
+    const lastAnchor = [root, ...siblings].reduce((latest, t2) => (t2.end_date || "") > (latest.end_date || "") ? t2 : latest, root);
+    const nextEndDate = advanceDate(lastAnchor.end_date, recurrence);
+    if (recurrence.until && nextEndDate > recurrence.until) {
+      results.push({ root_task_id: root.id, skipped_reason: "\u0110\xE3 t\u1EDBi ng\xE0y k\u1EBFt th\xFAc l\u1EB7p l\u1EA1i (until)." });
+      continue;
+    }
+    if (daysBetween(todayStr, nextEndDate) > RECURRING_GENERATION_HORIZON_DAYS) {
+      results.push({ root_task_id: root.id, skipped_reason: "Ch\u01B0a t\u1EDBi trong ph\u1EA1m vi t\u1EA1o tr\u01B0\u1EDBc (14 ng\xE0y)." });
+      continue;
+    }
+    if (siblings.some((t2) => t2.end_date === nextEndDate) || root.end_date === nextEndDate) {
+      results.push({ root_task_id: root.id, skipped_reason: "Occurrence n\xE0y \u0111\xE3 t\u1ED3n t\u1EA1i." });
+      continue;
+    }
+    const span = lastAnchor.start_date ? daysBetween(lastAnchor.start_date, lastAnchor.end_date) : 0;
+    const nextStartDate = lastAnchor.start_date ? advanceDate(lastAnchor.start_date, recurrence) : null;
+    void span;
+    const created = await createTask(
+      {
+        title: root.title,
+        task_type: root.task_type,
+        campaign_id: root.campaign_id ?? void 0,
+        assignee_username: root.assignee_username ?? void 0,
+        start_date: nextStartDate ?? void 0,
+        end_date: nextEndDate,
+        priority: root.priority,
+        work_stream: root.work_stream ?? void 0,
+        estimated_hours: root.estimated_hours ?? void 0
+      },
+      "system-recurring"
+    );
+    await patchTaskRecurringParent(created.id, root.id);
+    results.push({ root_task_id: root.id, created_task_id: created.id });
+  }
+  return results;
+}
+async function patchTaskRecurringParent(taskId, rootId) {
+  if (!isSupabaseConfigured) {
+    const { store, tasks } = await readLocalCollections2();
+    await writeLocalCollections2(store, { tasks: tasks.map((t2) => t2.id === taskId ? { ...t2, parent_recurring_id: rootId } : t2) });
+    return;
+  }
+  const { error } = await supabase.from("tasks").update({ parent_recurring_id: rootId }).eq("id", taskId);
+  if (error) throw new Error(`L\u1ED7i g\xE1n task l\u1EB7p l\u1EA1i: ${error.message}`);
 }
 async function getAssetLinks() {
   if (!isSupabaseConfigured) {
@@ -128047,7 +128184,22 @@ app.get("/api/cron/facebook-sync", async (req, res) => {
       console.error("GET /api/cron/facebook-sync (expiry check) error:", err);
       return { checked: false, expiringCount: 0, notified: false, error: err.message };
     });
-    res.json({ success: true, results: pageResults, adsResults, googleAdsResults, tiktokAdsResults, tiktokResults, youtubeResults, googleWebsiteResults, expiryCheck });
+    const recurringTasksResult = await generateDueRecurringTasks().catch((err) => {
+      console.error("GET /api/cron/facebook-sync (recurring tasks) error:", err);
+      return [];
+    });
+    res.json({
+      success: true,
+      results: pageResults,
+      adsResults,
+      googleAdsResults,
+      tiktokAdsResults,
+      tiktokResults,
+      youtubeResults,
+      googleWebsiteResults,
+      expiryCheck,
+      recurringTasksResult
+    });
   } catch (err) {
     console.error("GET /api/cron/facebook-sync error:", err);
     res.status(500).json({ error: err.message || "L\u1ED7i \u0111\u1ED3ng b\u1ED9 Facebook \u0111\u1ECBnh k\u1EF3." });
@@ -129191,6 +129343,53 @@ app.post("/api/campaign/tasks/:id/notes", requireAuth("Editor"), async (req, res
       return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ghi ch\xFA task n\xE0y." });
     }
     await appendTaskLog(req.params.id, "note", text, session.username);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/time-logs", requireAuth(), async (req, res) => {
+  try {
+    const { task_id, username, since, until } = req.query;
+    const logs = await getTimeLogs({
+      taskId: typeof task_id === "string" && task_id ? task_id : void 0,
+      username: typeof username === "string" && username ? username : void 0,
+      since: typeof since === "string" && since ? since : void 0,
+      until: typeof until === "string" && until ? until : void 0
+    });
+    res.json({ success: true, logs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.post("/api/campaign/tasks/:id/time-logs", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTask(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y task." });
+    const session = req.session;
+    if (!await canEditTask(existing, session)) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n log gi\u1EDD cho task n\xE0y." });
+    }
+    const { log_date, hours, note } = req.body || {};
+    if (!log_date || typeof hours !== "number") {
+      return res.status(400).json({ error: "Thi\u1EBFu log_date ho\u1EB7c hours." });
+    }
+    const log = await createTimeLog({ task_id: req.params.id, username: session.username, log_date, hours, note: note || null });
+    await appendTaskLog(req.params.id, "note", `Log ${hours}h ng\xE0y ${log_date}${note ? ` \u2014 ${note}` : ""}`, session.username);
+    res.json({ success: true, log });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+app.delete("/api/campaign/time-logs/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const existing = await getTimeLog(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y b\u1EA3n ghi gi\u1EDD l\xE0m vi\u1EC7c." });
+    const session = req.session;
+    if (session.role !== "Admin" && existing.username.toLowerCase() !== session.username.toLowerCase()) {
+      return res.status(403).json({ error: "B\u1EA1n ch\u1EC9 c\xF3 th\u1EC3 xo\xE1 b\u1EA3n ghi gi\u1EDD l\xE0m vi\u1EC7c c\u1EE7a ch\xEDnh m\xECnh." });
+    }
+    await deleteTimeLog(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });

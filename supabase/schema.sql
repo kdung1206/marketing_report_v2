@@ -786,6 +786,48 @@ alter table tasks enable row level security;
 -- Existing projects created before task linking shipped.
 alter table tasks add column if not exists parent_task_id uuid references tasks(id) on delete set null;
 
+-- Work-management additions (quản lý hiệu suất/thời gian nhân viên) — see
+-- src/components/CampaignManagement.tsx's "Theo nhân viên" section and
+-- src/server/campaignStore.ts. Free text, not an enum: the set of work
+-- streams (Digital Ads/SEO/Content/Design/...) is a UI-level suggested list
+-- (see WORK_STREAMS in CampaignManagement.tsx), not fixed at the DB level —
+-- same reasoning as `type`/`channel` on campaigns above.
+alter table tasks add column if not exists work_stream text;
+alter table tasks add column if not exists estimated_hours numeric;
+-- Generic "did this task actually move a real number" tracker — deliberately
+-- NOT a foreign key into any report table: Website Report's keyword data is
+-- fetched live with no stable row id to reference (see googleWebsiteSync.ts's
+-- listSearchConsoleTopQueries), and a plain free-text label + two numeric
+-- snapshots works identically for a SEO keyword position, an Ads CPC, or
+-- anything else a task might target — see the "Tạo task tối ưu" quick-create
+-- button on WebsiteReport's striking-distance keyword rows for how the
+-- baseline gets pre-filled.
+alter table tasks add column if not exists metric_label text;
+alter table tasks add column if not exists metric_unit text;
+alter table tasks add column if not exists metric_baseline_value numeric;
+alter table tasks add column if not exists metric_result_value numeric;
+
+create index if not exists tasks_work_stream_idx on tasks (work_stream);
+
+-- One row per person per day per task — deliberately NOT one row per task
+-- (a task can span days/people) and NOT a running timer (a missed "stop
+-- click" would silently rack up hours) — end-of-day manual entry, summed
+-- for the "Theo nhân viên" workload view and per-task hour totals.
+create table if not exists task_time_logs (
+  id          uuid primary key default gen_random_uuid(),
+  task_id     uuid not null references tasks(id) on delete cascade,
+  username    text not null,
+  log_date    date not null,
+  hours       numeric not null check (hours > 0 and hours <= 24),
+  note        text,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists task_time_logs_task_id_idx on task_time_logs (task_id);
+create index if not exists task_time_logs_username_log_date_idx on task_time_logs (username, log_date);
+
+alter table task_time_logs enable row level security;
+
 create table if not exists task_activity_log (
   id          uuid primary key default gen_random_uuid(),
   task_id     uuid not null references tasks(id) on delete cascade,

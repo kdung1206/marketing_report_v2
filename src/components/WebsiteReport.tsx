@@ -184,12 +184,16 @@ function todayStr(offsetDays = 0): string {
 interface WebsiteReportProps {
   selectedBrand: "Livotec" | "Karofi";
   setSelectedBrand: (brand: "Livotec" | "Karofi") => void;
+  // Wired by App.tsx to open Campaign Marketing with a new task pre-filled —
+  // see the "+ Task" button on the striking-distance keyword rows below.
+  // Optional so this component still works standalone/in tests without it.
+  onCreateTask?: (prefill: { title: string; work_stream: string; metric_label: string; metric_unit: string; metric_baseline_value: number }) => void;
 }
 
 // GA4 + Search Console organic website insights, kept fully separate from
 // the manual "SEO Website" spreadsheet category (data.ts/dashboard) per
 // user request — this tab is additive, not a replacement.
-export default function WebsiteReport({ selectedBrand, setSelectedBrand }: WebsiteReportProps) {
+export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreateTask }: WebsiteReportProps) {
   const [activeSection, setActiveSection] = useState<"overview" | "ga4" | "search-console">("overview");
 
   // Search Console's ~2-3 day reporting lag means "today" is always empty —
@@ -845,6 +849,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                           <th className="pb-2 font-medium text-right">Clicks</th>
                           <th className="pb-2 font-medium text-right">CTR</th>
                           <th className="pb-2 font-medium text-right">Position</th>
+                          {onCreateTask && <th className="pb-2 font-medium text-right"></th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -858,6 +863,25 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                             <td className="py-2 text-right">
                               <span className={`rounded-md px-1.5 py-0.5 font-mono font-bold ${positionBadgeColor(row.position)}`}>{row.position.toFixed(1)}</span>
                             </td>
+                            {onCreateTask && (
+                              <td className="py-2 text-right">
+                                <button
+                                  onClick={() =>
+                                    onCreateTask({
+                                      title: `Tối ưu on-page: "${row.query}"`,
+                                      work_stream: "SEO",
+                                      metric_label: `Vị trí từ khoá "${row.query}"`,
+                                      metric_unit: "vị trí",
+                                      metric_baseline_value: row.position,
+                                    })
+                                  }
+                                  className="rounded-lg border border-indigo-200 px-2 py-1 text-[11px] font-semibold text-indigo-600 hover:bg-indigo-50"
+                                  title="Tạo task tối ưu on-page cho từ khoá này trong Campaign Marketing"
+                                >
+                                  + Task
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
