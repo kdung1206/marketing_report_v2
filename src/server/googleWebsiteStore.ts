@@ -89,6 +89,32 @@ export interface SearchConsolePageSummaryRow {
   position: number | null;
 }
 
+// Rolling ~30-day snapshots (Website Report redesign mục D) — same
+// "delete-then-insert wholesale" convention as the page summaries above.
+export interface Ga4GeoSummaryRow {
+  account_id: string;
+  country: string;
+  city: string;
+  sessions: number | null;
+  active_users: number | null;
+}
+
+export interface Ga4DeviceSummaryRow {
+  account_id: string;
+  device_category: string;
+  sessions: number | null;
+  active_users: number | null;
+}
+
+export interface SearchConsoleDeviceSummaryRow {
+  account_id: string;
+  device: string;
+  clicks: number | null;
+  impressions: number | null;
+  ctr: number | null;
+  position: number | null;
+}
+
 // Sessions broken down by GA4's `sessionDefaultChannelGroup` (raw channel
 // names as GA4 reports them — "Organic Search", "Paid Search", "Direct",
 // "Organic Social", "Referral", "Paid Social", "Display", ... — bucketing the
@@ -111,6 +137,9 @@ async function readLocalCollections(): Promise<{
   ga4_channel_sessions_daily: Ga4ChannelSessionsDailyRow[];
   ga4_pages_summary: Ga4PageSummaryRow[];
   search_console_pages_summary: SearchConsolePageSummaryRow[];
+  ga4_geo_summary: Ga4GeoSummaryRow[];
+  ga4_device_summary: Ga4DeviceSummaryRow[];
+  search_console_device_summary: SearchConsoleDeviceSummaryRow[];
 }> {
   const store = await getDatabaseData();
   return {
@@ -121,6 +150,9 @@ async function readLocalCollections(): Promise<{
     ga4_channel_sessions_daily: Array.isArray(store.ga4_channel_sessions_daily) ? store.ga4_channel_sessions_daily : [],
     ga4_pages_summary: Array.isArray(store.ga4_pages_summary) ? store.ga4_pages_summary : [],
     search_console_pages_summary: Array.isArray(store.search_console_pages_summary) ? store.search_console_pages_summary : [],
+    ga4_geo_summary: Array.isArray(store.ga4_geo_summary) ? store.ga4_geo_summary : [],
+    ga4_device_summary: Array.isArray(store.ga4_device_summary) ? store.ga4_device_summary : [],
+    search_console_device_summary: Array.isArray(store.search_console_device_summary) ? store.search_console_device_summary : [],
   };
 }
 
@@ -133,6 +165,9 @@ async function writeLocalCollections(
     ga4_channel_sessions_daily: Ga4ChannelSessionsDailyRow[];
     ga4_pages_summary: Ga4PageSummaryRow[];
     search_console_pages_summary: SearchConsolePageSummaryRow[];
+    ga4_geo_summary: Ga4GeoSummaryRow[];
+    ga4_device_summary: Ga4DeviceSummaryRow[];
+    search_console_device_summary: SearchConsoleDeviceSummaryRow[];
   }>
 ): Promise<void> {
   await saveDatabaseData({ ...store, ...updates });
@@ -190,6 +225,9 @@ export async function deleteGoogleWebsiteAccount(id: string): Promise<void> {
       ga4_channel_sessions_daily,
       ga4_pages_summary,
       search_console_pages_summary,
+      ga4_geo_summary,
+      ga4_device_summary,
+      search_console_device_summary,
     } = await readLocalCollections();
     await writeLocalCollections(store, {
       google_website_accounts: google_website_accounts.filter((a) => a.id !== id),
@@ -198,6 +236,9 @@ export async function deleteGoogleWebsiteAccount(id: string): Promise<void> {
       ga4_channel_sessions_daily: ga4_channel_sessions_daily.filter((r) => r.account_id !== id),
       ga4_pages_summary: ga4_pages_summary.filter((r) => r.account_id !== id),
       search_console_pages_summary: search_console_pages_summary.filter((r) => r.account_id !== id),
+      ga4_geo_summary: ga4_geo_summary.filter((r) => r.account_id !== id),
+      ga4_device_summary: ga4_device_summary.filter((r) => r.account_id !== id),
+      search_console_device_summary: search_console_device_summary.filter((r) => r.account_id !== id),
     });
     return;
   }
@@ -370,5 +411,90 @@ export async function getSearchConsolePagesSummary(accountIds: string[]): Promis
 
   const { data, error } = await supabase.from("search_console_pages_summary").select("*").in("account_id", accountIds);
   if (error) throw new Error(`Lỗi đọc dữ liệu trang Search Console: ${error.message}`);
+  return data || [];
+}
+
+// -- Geo/Device summaries (rolling ~30-day snapshot, mục D) ------------------
+
+export async function replaceGa4GeoSummary(accountId: string, rows: Omit<Ga4GeoSummaryRow, "account_id">[]): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, ga4_geo_summary } = await readLocalCollections();
+    const rest = ga4_geo_summary.filter((r) => r.account_id !== accountId);
+    const next = rows.map((r) => ({ account_id: accountId, ...r }));
+    await writeLocalCollections(store, { ga4_geo_summary: [...rest, ...next] });
+    return;
+  }
+
+  const { error: deleteError } = await supabase.from("ga4_geo_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`Lỗi xóa dữ liệu địa lý GA4 cũ: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("ga4_geo_summary").insert(rows.map((r) => ({ account_id: accountId, ...r, updated_at: new Date().toISOString() })));
+  if (error) throw new Error(`Lỗi lưu dữ liệu địa lý GA4: ${error.message}`);
+}
+
+export async function getGa4GeoSummary(accountIds: string[]): Promise<Ga4GeoSummaryRow[]> {
+  if (!isSupabaseConfigured) {
+    const { ga4_geo_summary } = await readLocalCollections();
+    return ga4_geo_summary.filter((r) => accountIds.includes(r.account_id));
+  }
+
+  const { data, error } = await supabase.from("ga4_geo_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`Lỗi đọc dữ liệu địa lý GA4: ${error.message}`);
+  return data || [];
+}
+
+export async function replaceGa4DeviceSummary(accountId: string, rows: Omit<Ga4DeviceSummaryRow, "account_id">[]): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, ga4_device_summary } = await readLocalCollections();
+    const rest = ga4_device_summary.filter((r) => r.account_id !== accountId);
+    const next = rows.map((r) => ({ account_id: accountId, ...r }));
+    await writeLocalCollections(store, { ga4_device_summary: [...rest, ...next] });
+    return;
+  }
+
+  const { error: deleteError } = await supabase.from("ga4_device_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`Lỗi xóa dữ liệu thiết bị GA4 cũ: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase.from("ga4_device_summary").insert(rows.map((r) => ({ account_id: accountId, ...r, updated_at: new Date().toISOString() })));
+  if (error) throw new Error(`Lỗi lưu dữ liệu thiết bị GA4: ${error.message}`);
+}
+
+export async function getGa4DeviceSummary(accountIds: string[]): Promise<Ga4DeviceSummaryRow[]> {
+  if (!isSupabaseConfigured) {
+    const { ga4_device_summary } = await readLocalCollections();
+    return ga4_device_summary.filter((r) => accountIds.includes(r.account_id));
+  }
+
+  const { data, error } = await supabase.from("ga4_device_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`Lỗi đọc dữ liệu thiết bị GA4: ${error.message}`);
+  return data || [];
+}
+
+export async function replaceSearchConsoleDeviceSummary(accountId: string, rows: Omit<SearchConsoleDeviceSummaryRow, "account_id">[]): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, search_console_device_summary } = await readLocalCollections();
+    const rest = search_console_device_summary.filter((r) => r.account_id !== accountId);
+    const next = rows.map((r) => ({ account_id: accountId, ...r }));
+    await writeLocalCollections(store, { search_console_device_summary: [...rest, ...next] });
+    return;
+  }
+
+  const { error: deleteError } = await supabase.from("search_console_device_summary").delete().eq("account_id", accountId);
+  if (deleteError) throw new Error(`Lỗi xóa dữ liệu thiết bị Search Console cũ: ${deleteError.message}`);
+  if (rows.length === 0) return;
+  const { error } = await supabase
+    .from("search_console_device_summary")
+    .insert(rows.map((r) => ({ account_id: accountId, ...r, updated_at: new Date().toISOString() })));
+  if (error) throw new Error(`Lỗi lưu dữ liệu thiết bị Search Console: ${error.message}`);
+}
+
+export async function getSearchConsoleDeviceSummary(accountIds: string[]): Promise<SearchConsoleDeviceSummaryRow[]> {
+  if (!isSupabaseConfigured) {
+    const { search_console_device_summary } = await readLocalCollections();
+    return search_console_device_summary.filter((r) => accountIds.includes(r.account_id));
+  }
+
+  const { data, error } = await supabase.from("search_console_device_summary").select("*").in("account_id", accountIds);
+  if (error) throw new Error(`Lỗi đọc dữ liệu thiết bị Search Console: ${error.message}`);
   return data || [];
 }

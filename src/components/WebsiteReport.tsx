@@ -9,6 +9,7 @@ import {
   YAxis,
   Tooltip,
   Legend,
+  Cell,
   ResponsiveContainer,
 } from "recharts";
 import { Globe, Search, Users, MousePointerClick, Eye, TrendingUp, RefreshCw, AlertCircle, Sparkles, Target } from "lucide-react";
@@ -88,6 +89,36 @@ interface SearchConsolePageSummaryRow {
   ctr: number | null;
   position: number | null;
 }
+
+interface Ga4GeoSummaryRow {
+  account_id: string;
+  country: string;
+  city: string;
+  sessions: number | null;
+  active_users: number | null;
+}
+
+interface Ga4DeviceSummaryRow {
+  account_id: string;
+  device_category: string;
+  sessions: number | null;
+  active_users: number | null;
+}
+
+interface SearchConsoleDeviceSummaryRow {
+  account_id: string;
+  device: string;
+  clicks: number | null;
+  impressions: number | null;
+  ctr: number | null;
+  position: number | null;
+}
+
+const DEVICE_COLORS: Record<string, string> = {
+  MOBILE: "#6366f1",
+  DESKTOP: "#0ea5e9",
+  TABLET: "#f59e0b",
+};
 
 // Page-type classification — CHỐT dựa trên 250 URL thật của karofi.com (xem
 // HANDOFF.md mục B). Áp dụng cho cả GA4 pagePath và Search Console page
@@ -173,6 +204,9 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const [ga4ChannelDaily, setGa4ChannelDaily] = useState<Ga4ChannelSessionsDailyRow[]>([]);
   const [ga4Pages, setGa4Pages] = useState<Ga4PageSummaryRow[]>([]);
   const [gscPages, setGscPages] = useState<SearchConsolePageSummaryRow[]>([]);
+  const [ga4Geo, setGa4Geo] = useState<Ga4GeoSummaryRow[]>([]);
+  const [ga4Device, setGa4Device] = useState<Ga4DeviceSummaryRow[]>([]);
+  const [gscDevice, setGscDevice] = useState<SearchConsoleDeviceSummaryRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -205,6 +239,9 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
           setGa4ChannelDaily(result.ga4ChannelDaily || []);
           setGa4Pages(result.ga4Pages || []);
           setGscPages(result.gscPages || []);
+          setGa4Geo(result.ga4Geo || []);
+          setGa4Device(result.ga4Device || []);
+          setGscDevice(result.gscDevice || []);
         } else {
           setError(result.error || "Không tải được dữ liệu Website Report.");
         }
@@ -253,6 +290,9 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const channelScoped = useMemo(() => ga4ChannelDaily.filter((r) => accountIds.includes(r.account_id)), [ga4ChannelDaily, accountIds]);
   const ga4PagesScoped = useMemo(() => ga4Pages.filter((r) => accountIds.includes(r.account_id)), [ga4Pages, accountIds]);
   const gscPagesScoped = useMemo(() => gscPages.filter((r) => accountIds.includes(r.account_id)), [gscPages, accountIds]);
+  const ga4GeoScoped = useMemo(() => ga4Geo.filter((r) => accountIds.includes(r.account_id)), [ga4Geo, accountIds]);
+  const ga4DeviceScoped = useMemo(() => ga4Device.filter((r) => accountIds.includes(r.account_id)), [ga4Device, accountIds]);
+  const gscDeviceScoped = useMemo(() => gscDevice.filter((r) => accountIds.includes(r.account_id)), [gscDevice, accountIds]);
   const keywordsScoped = useMemo(() => keywords.filter((r) => accountIds.includes(r.account_id)), [keywords, accountIds]);
 
   const ga4ByDate = useMemo(() => {
@@ -358,6 +398,61 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
     });
   }, [gscPagesScoped]);
 
+  // Mục D: GA4 Country/City (top 10 by sessions), Device category split, and
+  // Search Console's own Device breakdown — all rolling ~30-day snapshots,
+  // same independence-from-since/until caveat as ga4Pages/gscPages above.
+  const ga4TopGeo = useMemo(() => {
+    return [...ga4GeoScoped].sort((a, b) => n(b.sessions) - n(a.sessions)).slice(0, 10);
+  }, [ga4GeoScoped]);
+
+  const ga4DeviceBreakdown = useMemo(() => {
+    const totals = new Map<string, { sessions: number; active_users: number }>();
+    ga4DeviceScoped.forEach((r) => {
+      const key = r.device_category || "(not set)";
+      const entry = totals.get(key) || { sessions: 0, active_users: 0 };
+      entry.sessions += n(r.sessions);
+      entry.active_users += n(r.active_users);
+      totals.set(key, entry);
+    });
+    const grandTotal = Array.from(totals.values()).reduce((s, v) => s + v.sessions, 0);
+    return Array.from(totals.entries())
+      .map(([device_category, v]) => ({ device_category, ...v, share: grandTotal ? v.sessions / grandTotal : 0 }))
+      .sort((a, b) => b.sessions - a.sessions);
+  }, [ga4DeviceScoped]);
+
+  const gscDeviceBreakdown = useMemo(() => {
+    const totals = new Map<string, { clicks: number; impressions: number }>();
+    gscDeviceScoped.forEach((r) => {
+      const key = r.device || "(not set)";
+      const entry = totals.get(key) || { clicks: 0, impressions: 0 };
+      entry.clicks += n(r.clicks);
+      entry.impressions += n(r.impressions);
+      totals.set(key, entry);
+    });
+    return Array.from(totals.entries())
+      .map(([device, v]) => ({ device, ...v, ctr: v.impressions ? v.clicks / v.impressions : 0 }))
+      .sort((a, b) => b.clicks - a.clicks);
+  }, [gscDeviceScoped]);
+
+  // Per-card "đánh giá nhanh" — one short sentence each, same "derived from
+  // data already on screen" convention as mục A's narrative, scoped to just
+  // that card instead of the whole tab.
+  const ga4PagesInsight = useMemo(() => {
+    const totalViews = ga4PagesByType.reduce((s, r) => s + r.views, 0);
+    if (!totalViews) return null;
+    const top = [...ga4PagesByType].sort((a, b) => b.views - a.views)[0];
+    const share = (top.views / totalViews) * 100;
+    return `${top.type} chiếm ${share.toFixed(0)}% tổng pageviews (${fmt(top.views)} lượt xem) — nhóm trang đóng góp traffic lớn nhất.`;
+  }, [ga4PagesByType]);
+
+  const gscPagesInsight = useMemo(() => {
+    const totalClicks = gscPagesByType.reduce((s, r) => s + r.clicks, 0);
+    if (!totalClicks) return null;
+    const top = [...gscPagesByType].sort((a, b) => b.clicks - a.clicks)[0];
+    const share = (top.clicks / totalClicks) * 100;
+    return `${top.type} mang lại nhiều organic clicks nhất (${fmt(top.clicks)} clicks, ${share.toFixed(0)}% tổng), CTR ${fmtPercent(top.ctr)}.`;
+  }, [gscPagesByType]);
+
   // Brand vs Non-brand split — over every fetched keyword (not just the
   // striking-distance subset below), so it represents the whole organic
   // query mix (Website Report redesign mục C).
@@ -385,6 +480,13 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
       .filter((r) => r.position >= minPosition && r.position <= maxPosition && r.impressions >= minImpressions)
       .sort((a, b) => b.impressions - a.impressions);
   }, [keywordsScoped, minPosition, maxPosition, minImpressions]);
+
+  const keywordsInsight = useMemo(() => {
+    if (strikingDistanceKeywords.length === 0) return null;
+    const nonBrand = strikingDistanceKeywords.filter((r) => !isBrandQuery(r.query));
+    const top = strikingDistanceKeywords[0];
+    return `${nonBrand.length}/${strikingDistanceKeywords.length} từ khoá là non-brand — ưu tiên tối ưu on-page cho "${top.query}" trước (${fmt(top.impressions)} impressions, vị trí ${top.position.toFixed(1)}).`;
+  }, [strikingDistanceKeywords]);
 
   // "Nhận định nhanh" narrative — a handful of bullets derived purely from
   // data already on screen (no extra fetch), key numbers bolded — matches
@@ -592,6 +694,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                       ))}
                     </tbody>
                   </table>
+                  {ga4PagesInsight && <p className="pt-3 text-[11px] italic text-slate-400">{ga4PagesInsight}</p>}
                 </div>
 
                 <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
@@ -617,6 +720,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                       ))}
                     </tbody>
                   </table>
+                  {gscPagesInsight && <p className="pt-3 text-[11px] italic text-slate-400">{gscPagesInsight}</p>}
                 </div>
               </div>
 
@@ -700,6 +804,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                     </tbody>
                   </table>
                 )}
+                {keywordsInsight && <p className="pt-3 text-[11px] italic text-slate-400">{keywordsInsight}</p>}
               </div>
             </div>
           )}
@@ -732,6 +837,59 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                     <Line type="monotone" dataKey="new_users" name="New Users" stroke="#f59e0b" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
+
+              {/* Mục D: Country/City + Device category — rolling ~30-day snapshot */}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Quốc gia / Thành phố</span>
+                  <span className="block pb-3 text-[11px] text-slate-400">Top 10 theo sessions · 30 ngày gần nhất</span>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-left text-slate-400">
+                        <th className="pb-2 font-medium">Quốc gia</th>
+                        <th className="pb-2 font-medium">Thành phố</th>
+                        <th className="pb-2 font-medium text-right">Sessions</th>
+                        <th className="pb-2 font-medium text-right">Users</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ga4TopGeo.map((row, i) => (
+                        <tr key={`${row.country}-${row.city}-${i}`} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2">{row.country}</td>
+                          <td className="py-2 text-slate-500">{row.city}</td>
+                          <td className="py-2 text-right font-mono">{fmt(n(row.sessions))}</td>
+                          <td className="py-2 text-right font-mono">{fmt(n(row.active_users))}</td>
+                        </tr>
+                      ))}
+                      {ga4TopGeo.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-4 text-center text-slate-400">
+                            Chưa có dữ liệu.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="h-64 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Device category</span>
+                  <span className="block pb-2 text-[11px] text-slate-400">30 ngày gần nhất</span>
+                  <ResponsiveContainer width="100%" height="80%">
+                    <BarChart data={ga4DeviceBreakdown} layout="vertical" margin={{ left: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis type="number" tickFormatter={fmtCompact} />
+                      <YAxis type="category" dataKey="device_category" tick={{ fontSize: 11 }} width={70} />
+                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                      <Bar dataKey="sessions" name="Sessions" radius={[0, 4, 4, 0]}>
+                        {ga4DeviceBreakdown.map((row) => (
+                          <Cell key={row.device_category} fill={DEVICE_COLORS[row.device_category?.toUpperCase()] || "#94a3b8"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
           )}
@@ -774,6 +932,44 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                     <Line yAxisId="position" type="monotone" dataKey="position" name="Vị trí trung bình" stroke="#f59e0b" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
+              </div>
+
+              {/* Mục D: Search Console's own Device dimension (organic-only, khác GA4 Device) */}
+              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Device (Search Console)</span>
+                <span className="block pb-3 text-[11px] text-slate-400">30 ngày gần nhất</span>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left text-slate-400">
+                      <th className="pb-2 font-medium">Thiết bị</th>
+                      <th className="pb-2 font-medium text-right">Clicks</th>
+                      <th className="pb-2 font-medium text-right">Impressions</th>
+                      <th className="pb-2 font-medium text-right">CTR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gscDeviceBreakdown.map((row) => (
+                      <tr key={row.device} className="border-b border-slate-50 last:border-0">
+                        <td className="py-2">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DEVICE_COLORS[row.device?.toUpperCase()] || "#94a3b8" }} />
+                            {row.device}
+                          </span>
+                        </td>
+                        <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                        <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                        <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                      </tr>
+                    ))}
+                    {gscDeviceBreakdown.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-slate-400">
+                          Chưa có dữ liệu.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

@@ -20,6 +20,9 @@ import {
   upsertGa4ChannelSessionsDaily,
   replaceGa4PagesSummary,
   replaceSearchConsolePagesSummary,
+  replaceGa4GeoSummary,
+  replaceGa4DeviceSummary,
+  replaceSearchConsoleDeviceSummary,
   patchGoogleWebsiteAccount,
   GoogleWebsiteAccountConfig,
   GoogleWebsiteAvailableProperty,
@@ -27,6 +30,9 @@ import {
   SearchConsoleInsightsDailyRow,
   Ga4ChannelSessionsDailyRow,
   Ga4PageSummaryRow,
+  Ga4GeoSummaryRow,
+  Ga4DeviceSummaryRow,
+  SearchConsoleDeviceSummaryRow,
 } from "./googleWebsiteStore";
 
 const GA4_ADMIN_API_BASE = "https://analyticsadmin.googleapis.com/v1beta";
@@ -314,6 +320,64 @@ async function fetchGa4PageMetrics(accessToken: string, propertyId: string, sinc
   }));
 }
 
+// Rolling ~30-day GA4 Country/City snapshot (Website Report redesign mục D)
+// — GA4 always reports country/city regardless of traffic volume (unlike
+// GA4's Age/Gender/Interest, which Google withholds below a sample-size
+// threshold), so this card never has the "hidden by Google" gap those would.
+async function fetchGa4GeoMetrics(accessToken: string, propertyId: string, since: string, until: string): Promise<Omit<Ga4GeoSummaryRow, "account_id">[]> {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "country" }, { name: "city" }],
+    metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 50,
+  });
+  return rows.map((row: any) => ({
+    country: row.dimensionValues?.[0]?.value || "(not set)",
+    city: row.dimensionValues?.[1]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0,
+    active_users: Number(row.metricValues?.[1]?.value) || 0,
+  }));
+}
+
+// Rolling ~30-day GA4 device-category snapshot (mobile/desktop/tablet).
+async function fetchGa4DeviceMetrics(accessToken: string, propertyId: string, since: string, until: string): Promise<Omit<Ga4DeviceSummaryRow, "account_id">[]> {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "deviceCategory" }],
+    metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+  });
+  return rows.map((row: any) => ({
+    device_category: row.dimensionValues?.[0]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0,
+    active_users: Number(row.metricValues?.[1]?.value) || 0,
+  }));
+}
+
+// Search Console's own Device dimension (mobile/desktop/tablet) — distinct
+// from GA4 Device above: this is organic-search-only traffic, GA4's is every
+// channel. Live-shaped like listSearchConsoleTopPages/TopQueries but stored
+// as a snapshot (see replaceSearchConsoleDeviceSummary) since it's cheap and
+// low-cardinality (3 rows), unlike the query/page tables which stay live-only.
+async function fetchSearchConsoleDeviceMetrics(accessToken: string, siteUrl: string, since: string, until: string): Promise<Omit<SearchConsoleDeviceSummaryRow, "account_id">[]> {
+  const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ startDate: since, endDate: until, dimensions: ["device"], rowLimit: 10 }),
+  });
+  const body = await res.json();
+  if (!res.ok || body?.error) {
+    throw new GoogleWebsiteApiError(body?.error?.message || `Search Console searchAnalytics.query trả về lỗi HTTP ${res.status}`, res.status, body?.error?.status);
+  }
+  return (body?.rows || []).map((row: any) => ({
+    device: row.keys?.[0] || "(not set)",
+    clicks: row.clicks ?? 0,
+    impressions: row.impressions ?? 0,
+    ctr: row.ctr ?? 0,
+    position: row.position ?? 0,
+  }));
+}
+
 // Search Console's data has a ~2-3 day processing lag — querying "today"
 // always comes back empty/incomplete, unlike every other platform in this
 // codebase. Callers should bias `until` a few days into the past.
@@ -471,6 +535,12 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
 
         const pageRows = await fetchGa4PageMetrics(accessToken, account.ga4_property_id, since, until);
         await replaceGa4PagesSummary(account.id, pageRows);
+
+        const geoRows = await fetchGa4GeoMetrics(accessToken, account.ga4_property_id, since, until);
+        await replaceGa4GeoSummary(account.id, geoRows);
+
+        const deviceRows = await fetchGa4DeviceMetrics(accessToken, account.ga4_property_id, since, until);
+        await replaceGa4DeviceSummary(account.id, deviceRows);
       }
 
       let gscRowsSynced = 0;
@@ -482,6 +552,9 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
 
         const gscPageRows = await listSearchConsoleTopPages(accessToken, account.gsc_site_url, since, until, 500);
         await replaceSearchConsolePagesSummary(account.id, gscPageRows);
+
+        const gscDeviceRows = await fetchSearchConsoleDeviceMetrics(accessToken, account.gsc_site_url, since, until);
+        await replaceSearchConsoleDeviceSummary(account.id, gscDeviceRows);
       }
 
       await patchGoogleWebsiteAccount(account.id, {

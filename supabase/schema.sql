@@ -603,6 +603,47 @@ create table if not exists search_console_pages_summary (
 
 alter table search_console_pages_summary enable row level security;
 
+-- Rolling ~30-day snapshots for the Website Report "GA4"/"Search Console"
+-- tabs' Country/City, Device category, and Search Console Device cards
+-- (Website Report redesign mục D) — same "delete-then-insert wholesale on
+-- every sync" convention as ga4_pages_summary/search_console_pages_summary
+-- above, and same reasoning for why these aren't a daily time series.
+create table if not exists ga4_geo_summary (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  country text not null,
+  city text not null,
+  sessions int,
+  active_users int,
+  updated_at timestamptz not null default now(),
+  primary key (account_id, country, city)
+);
+
+alter table ga4_geo_summary enable row level security;
+
+create table if not exists ga4_device_summary (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  device_category text not null,
+  sessions int,
+  active_users int,
+  updated_at timestamptz not null default now(),
+  primary key (account_id, device_category)
+);
+
+alter table ga4_device_summary enable row level security;
+
+create table if not exists search_console_device_summary (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  device text not null,
+  clicks int,
+  impressions int,
+  ctr numeric,
+  position numeric,
+  updated_at timestamptz not null default now(),
+  primary key (account_id, device)
+);
+
+alter table search_console_device_summary enable row level security;
+
 -- ---------------------------------------------------------------------------
 -- Campaign Calendar & Campaign Task module (src/server/campaignStore.ts,
 -- src/components/CampaignManagement.tsx). Phase 1 (MVP) only — Activities

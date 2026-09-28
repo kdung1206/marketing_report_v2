@@ -96,6 +96,9 @@ import {
   getGa4ChannelSessionsDaily,
   getGa4PagesSummary,
   getSearchConsolePagesSummary,
+  getGa4GeoSummary,
+  getGa4DeviceSummary,
+  getSearchConsoleDeviceSummary,
 } from "./googleWebsiteStore";
 import {
   exchangeGoogleWebsiteCode,
@@ -2388,12 +2391,15 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
     // daily sync (see googleWebsiteSync.ts), independent of the since/until
     // range above — same "reuse pages-preview's fetch, just store it now"
     // shape as the Website Report redesign mục B spec calls for.
-    const [ga4Daily, gscDaily, ga4ChannelDaily, ga4Pages, gscPages] = await Promise.all([
+    const [ga4Daily, gscDaily, ga4ChannelDaily, ga4Pages, gscPages, ga4Geo, ga4Device, gscDevice] = await Promise.all([
       getGa4InsightsDaily(requestedIds, since, until),
       getSearchConsoleInsightsDaily(requestedIds, since, until),
       getGa4ChannelSessionsDaily(requestedIds, since, until),
       getGa4PagesSummary(requestedIds),
       getSearchConsolePagesSummary(requestedIds),
+      getGa4GeoSummary(requestedIds),
+      getGa4DeviceSummary(requestedIds),
+      getSearchConsoleDeviceSummary(requestedIds),
     ]);
 
     res.json({
@@ -2410,6 +2416,9 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       ga4ChannelDaily,
       ga4Pages,
       gscPages,
+      ga4Geo,
+      ga4Device,
+      gscDevice,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
