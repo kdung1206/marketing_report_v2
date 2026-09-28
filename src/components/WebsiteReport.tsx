@@ -217,7 +217,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   const [maxPosition, setMaxPosition] = useState(20);
   const [minImpressions, setMinImpressions] = useState(10);
   const [keywordsPage, setKeywordsPage] = useState(0);
-  const KEYWORDS_PAGE_SIZE = 50;
+  const [keywordsPageSize, setKeywordsPageSize] = useState(15);
   const [keywords, setKeywords] = useState<KeywordRow[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(true);
   const [keywordsError, setKeywordsError] = useState<string | null>(null);
@@ -504,13 +504,13 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
   // out-of-range empty page.
   useEffect(() => {
     setKeywordsPage(0);
-  }, [minPosition, maxPosition, minImpressions, keywordsScoped]);
+  }, [minPosition, maxPosition, minImpressions, keywordsScoped, keywordsPageSize]);
 
-  const keywordsTotalPages = Math.max(1, Math.ceil(strikingDistanceKeywords.length / KEYWORDS_PAGE_SIZE));
+  const keywordsTotalPages = Math.max(1, Math.ceil(strikingDistanceKeywords.length / keywordsPageSize));
   const keywordsPageClamped = Math.min(keywordsPage, keywordsTotalPages - 1);
   const keywordsPageRows = strikingDistanceKeywords.slice(
-    keywordsPageClamped * KEYWORDS_PAGE_SIZE,
-    keywordsPageClamped * KEYWORDS_PAGE_SIZE + KEYWORDS_PAGE_SIZE
+    keywordsPageClamped * keywordsPageSize,
+    keywordsPageClamped * keywordsPageSize + keywordsPageSize
   );
 
   const keywordsInsight = useMemo(() => {
@@ -862,11 +862,23 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand }: Websi
                         ))}
                       </tbody>
                     </table>
-                    <div className="flex items-center justify-between pt-3 text-[11px] text-slate-500">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-3 text-[11px] text-slate-500">
                       <span>
                         Trang {keywordsPageClamped + 1}/{keywordsTotalPages} · {strikingDistanceKeywords.length} từ khoá
                       </span>
                       <div className="flex items-center gap-1.5">
+                        <span>Xem</span>
+                        <select
+                          value={keywordsPageSize}
+                          onChange={(e) => setKeywordsPageSize(Number(e.target.value))}
+                          className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600"
+                        >
+                          <option value={15}>15</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                          <option value={200}>200</option>
+                        </select>
+                        <span>/ trang</span>
                         <button
                           type="button"
                           onClick={() => setKeywordsPage((p) => Math.max(0, p - 1))}

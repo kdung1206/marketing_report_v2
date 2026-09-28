@@ -86,7 +86,7 @@ const PostCard: React.FC<{ post: FbPostRow; reactions: number }> = ({ post, reac
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
-      <div className="relative aspect-[16/11] shrink-0 bg-gradient-to-br from-indigo-50 to-indigo-100">
+      <div className="relative aspect-[16/9] shrink-0 bg-gradient-to-br from-indigo-50 to-indigo-100">
         {post.thumbnail_url && !imgFailed ? (
           <img
             src={post.thumbnail_url}
@@ -96,12 +96,12 @@ const PostCard: React.FC<{ post: FbPostRow; reactions: number }> = ({ post, reac
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <ImageOff className="h-8 w-8 text-indigo-300" />
+            <ImageOff className="h-6 w-6 text-indigo-300" />
           </div>
         )}
         {post.ads && (
           <span
-            className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 shadow-sm ring-1 ring-amber-200"
+            className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 shadow-sm ring-1 ring-amber-200"
             title="Bài này có chạy Ads boost — số liệu từ Marketing API, không cộng gộp vào chỉ số organic bên dưới."
           >
             💰 {fmtCompact(post.ads.ads_spend)}đ
@@ -109,50 +109,61 @@ const PostCard: React.FC<{ post: FbPostRow; reactions: number }> = ({ post, reac
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3">
-        <span className="text-[10px] text-slate-400">{post.created_time.slice(0, 10)}</span>
-        <p className="line-clamp-2 min-h-[2.6em] text-xs font-semibold text-slate-700" title={caption}>
+      <div className="flex flex-1 flex-col gap-1.5 p-2.5">
+        <span className="text-[9px] text-slate-400">{post.created_time.slice(0, 10)}</span>
+        <p className="line-clamp-2 min-h-[2.2em] text-[11px] font-semibold leading-tight text-slate-700" title={caption}>
           {caption}
         </p>
 
-        <div className="grid grid-cols-3 gap-1.5 border-t border-slate-100 pt-2 text-center">
+        {/* One compact row (Reactions/Comments/Shares/Clicks) instead of two
+            3-col grids — Ads Impr./Ads Reach only take space when the post
+            actually has an ads-boost record, rather than showing "—" always. */}
+        <div className={`grid ${post.ads ? "grid-cols-3" : "grid-cols-4"} gap-1 border-t border-slate-100 pt-1.5 text-center`}>
           <div>
-            <span className="block font-mono text-sm font-bold text-slate-900">{fmtCompact(reactions)}</span>
-            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Reactions</span>
+            <span className="block font-mono text-xs font-bold text-slate-900">{fmtCompact(reactions)}</span>
+            <span className="block text-[8px] uppercase tracking-wide text-slate-400">Reactions</span>
           </div>
           <div>
-            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(n(post.comments))}</span>
-            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Comments</span>
+            <span className="block font-mono text-xs font-bold text-slate-900">{fmt(n(post.comments))}</span>
+            <span className="block text-[8px] uppercase tracking-wide text-slate-400">Comments</span>
           </div>
           <div>
-            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(n(post.shares))}</span>
-            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Shares</span>
+            <span className="block font-mono text-xs font-bold text-slate-900">{fmt(n(post.shares))}</span>
+            <span className="block text-[8px] uppercase tracking-wide text-slate-400">Shares</span>
           </div>
+          {!post.ads && (
+            <div>
+              <span className="block font-mono text-xs font-bold text-slate-900">{fmt(n(post.clicks))}</span>
+              <span className="block text-[8px] uppercase tracking-wide text-slate-400">Clicks</span>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 text-center">
-          <div>
-            <span className="block font-mono text-sm font-bold text-slate-900">{fmt(n(post.clicks))}</span>
-            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Clicks</span>
+        {post.ads && (
+          <div className="grid grid-cols-3 gap-1 text-center">
+            <div>
+              <span className="block font-mono text-xs font-bold text-slate-900">{fmt(n(post.clicks))}</span>
+              <span className="block text-[8px] uppercase tracking-wide text-slate-400">Clicks</span>
+            </div>
+            <div>
+              <span className="block font-mono text-xs font-bold text-slate-900">{fmtCompact(post.ads.ads_impressions)}</span>
+              <span className="block text-[8px] uppercase tracking-wide text-slate-400">Ads Impr.</span>
+            </div>
+            <div>
+              <span className="block font-mono text-xs font-bold text-slate-900">{fmtCompact(post.ads.ads_reach)}</span>
+              <span className="block text-[8px] uppercase tracking-wide text-slate-400">Ads Reach</span>
+            </div>
           </div>
-          <div>
-            <span className="block font-mono text-sm font-bold text-slate-900">{post.ads ? fmtCompact(post.ads.ads_impressions) : "—"}</span>
-            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Ads Impr.</span>
-          </div>
-          <div>
-            <span className="block font-mono text-sm font-bold text-slate-900">{post.ads ? fmtCompact(post.ads.ads_reach) : "—"}</span>
-            <span className="block text-[9px] uppercase tracking-wide text-slate-400">Ads Reach</span>
-          </div>
-        </div>
+        )}
 
         {post.permalink && (
           <a
             href={post.permalink}
             target="_blank"
             rel="noreferrer"
-            className="mt-auto flex items-center gap-1 pt-1 text-[11px] font-semibold text-indigo-600 hover:underline"
+            className="mt-auto flex items-center gap-1 pt-0.5 text-[10px] font-semibold text-indigo-600 hover:underline"
           >
-            Xem trên Facebook <ExternalLink className="h-3 w-3" />
+            Xem trên Facebook <ExternalLink className="h-2.5 w-2.5" />
           </a>
         )}
       </div>
@@ -542,7 +553,7 @@ export default function FacebookInsights({ selectedBrand, setSelectedBrand }: Fa
                 Chưa có bài đăng nào trong khoảng thời gian đã chọn.
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
                 {sortedPosts.map((post) => (
                   <PostCard key={post.post_id} post={post} reactions={reactionsOf(post)} />
                 ))}
