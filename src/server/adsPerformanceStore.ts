@@ -193,6 +193,63 @@ export async function getAdsPerformanceByPostIds(postIds: string[], since: strin
   return rows;
 }
 
+// Exact spend/performance for a Campaign Calendar entry's linked ad-platform
+// campaigns (see campaignAdsLinksStore.ts) — one query per distinct channel
+// (`.in("campaign_name", ...)`) rather than one per link, since a campaign
+// can be linked to several ads_campaign_name values on the same channel.
+// Deliberately no date bound: once a Calendar campaign is explicitly linked
+// to a real ad-platform campaign by name, that ad campaign's own actual
+// flight (which may run longer/shorter than the Calendar entry's planned
+// dates) is what should count, not the Calendar entry's estimated window.
+export async function getAdsPerformanceByCampaignNames(links: { channel: AdsChannel; ads_campaign_name: string }[]): Promise<AdsPerformanceRow[]> {
+  if (links.length === 0) return [];
+
+  const namesByChannel = new Map<AdsChannel, string[]>();
+  for (const l of links) {
+    const list = namesByChannel.get(l.channel) || [];
+    list.push(l.ads_campaign_name);
+    namesByChannel.set(l.channel, list);
+  }
+
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections();
+    return ads_performance.filter((r) => {
+      const names = namesByChannel.get(r.channel);
+      return names ? names.includes(r.campaign_name) : false;
+    });
+  }
+
+  const results = await Promise.all(
+    Array.from(namesByChannel.entries()).map(([channel, names]) =>
+      fetchAllRows<AdsPerformanceRow>((from, to) =>
+        supabase.from("ads_performance").select("*").eq("channel", channel).in("campaign_name", names).range(from, to)
+      )
+    )
+  ).catch((err: any) => {
+    throw new Error(`Lỗi đọc số liệu quảng cáo theo campaign đã gắn: ${err.message}`);
+  });
+  return results.flat();
+}
+
+// Distinct campaign_name values already synced for a brand+channel — powers
+// the "gắn campaign quảng cáo" autocomplete (CampaignManagement.tsx) so an
+// Editor picks from what actually exists instead of retyping a name by hand
+// (a typo there would silently link to nothing, with no error to notice).
+export async function getDistinctAdsCampaignNames(brand: string, channel: AdsChannel): Promise<string[]> {
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections();
+    const names = ads_performance.filter((r) => r.brand === brand && r.channel === channel).map((r) => r.campaign_name);
+    return Array.from(new Set(names)).sort();
+  }
+
+  const rows = await fetchAllRows<{ campaign_name: string }>((from, to) =>
+    supabase.from("ads_performance").select("campaign_name").eq("brand", brand).eq("channel", channel).range(from, to)
+  ).catch((err: any) => {
+    throw new Error(`Lỗi đọc danh sách tên campaign quảng cáo: ${err.message}`);
+  });
+  return Array.from(new Set(rows.map((r) => r.campaign_name))).sort();
+}
+
 // -- Facebook Ad Accounts (Marketing API config) -------------------------------
 
 export async function getFbAdAccounts(): Promise<FbAdAccountConfig[]> {

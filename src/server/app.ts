@@ -101,7 +101,10 @@ import {
   patchTiktokAdsAccountBrand,
   AdsChannel,
   AdsPerformanceRow,
+  getAdsPerformanceByCampaignNames,
+  getDistinctAdsCampaignNames,
 } from "./adsPerformanceStore";
+import { getCampaignAdsLinks, createCampaignAdsLink, deleteCampaignAdsLink, getCampaignAdsLink } from "./campaignAdsLinksStore";
 import { runFacebookAdsSync } from "./facebookAdsSync";
 import {
   exchangeGoogleAdsCode,
@@ -2947,6 +2950,89 @@ app.delete("/api/campaign/campaigns/:id/members/:username", requireAuth("Admin")
     res.json({ success: true });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Distinct ads_performance.campaign_name values already synced for a
+// brand+channel — autocomplete source for "gắn campaign quảng cáo" below, so
+// an Editor picks an existing name instead of retyping one by hand (a typo
+// would silently link to nothing).
+app.get("/api/campaign/ads-campaign-names", requireAuth(), async (req, res) => {
+  try {
+    const { brand, channel } = req.query;
+    if (typeof brand !== "string" || !brand || typeof channel !== "string" || !channel) {
+      return res.status(400).json({ success: false, error: "Thiếu brand hoặc channel." });
+    }
+    const names = await getDistinctAdsCampaignNames(brand, channel as AdsChannel);
+    res.json({ success: true, names });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/campaign/campaigns/:id/ads-links", requireAuth("Editor"), async (req, res) => {
+  try {
+    const session = (req as any).session;
+    if (!(await canEditCampaign(req.params.id, session))) {
+      return res.status(403).json({ success: false, error: "Bạn chưa được phân quyền chỉnh sửa campaign này." });
+    }
+    const { channel, ads_campaign_name } = req.body || {};
+    if (!channel || !ads_campaign_name) {
+      return res.status(400).json({ success: false, error: "Thiếu channel hoặc ads_campaign_name." });
+    }
+    const link = await createCampaignAdsLink({ campaign_id: req.params.id, channel, ads_campaign_name }, session.username);
+    await logAction(session, req, "campaign-add-ads-link", `Gắn campaign quảng cáo "${ads_campaign_name}" (${channel}) vào campaign ${req.params.id}`);
+    res.json({ success: true, link });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.delete("/api/campaign/ads-links/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const link = await getCampaignAdsLink(req.params.id);
+    if (!link) return res.status(404).json({ success: false, error: "Không tìm thấy liên kết." });
+    const session = (req as any).session;
+    if (!(await canEditCampaign(link.campaign_id, session))) {
+      return res.status(403).json({ success: false, error: "Bạn chưa được phân quyền chỉnh sửa campaign này." });
+    }
+    await deleteCampaignAdsLink(req.params.id);
+    await logAction(session, req, "campaign-remove-ads-link", `Gỡ campaign quảng cáo đã gắn ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Bundles everything the Campaign Calendar's per-campaign drilldown row
+// needs into 1 call (ad spend/outreach/organic posts) instead of several
+// round-trips — see CampaignManagement.tsx's expandable "All Campaigns" row.
+// Deliberately excludes tasks: the client already holds the full unfiltered
+// task list (GET /api/campaign/tasks) and filters by campaign_id locally,
+// so re-fetching them here would just be a redundant round-trip.
+app.get("/api/campaign/campaigns/:id/overview", requireAuth(), async (req, res) => {
+  try {
+    const campaign = await getCampaign(req.params.id);
+    if (!campaign) return res.status(404).json({ success: false, error: "Không tìm thấy campaign." });
+
+    const [adsLinks, outreachPosts, fbPages] = await Promise.all([
+      getCampaignAdsLinks(campaign.id),
+      getOutreachPosts({ campaignId: campaign.id }),
+      getFbPages(),
+    ]);
+
+    const adsPerformance = await getAdsPerformanceByCampaignNames(adsLinks.map((l) => ({ channel: l.channel, ads_campaign_name: l.ads_campaign_name })));
+
+    // Organic Page posts (fb_posts) have no real link to a Calendar campaign
+    // (see campaign_ads_links's schema comment for why) — approximated by
+    // brand + the campaign's own date range, same convention as
+    // budgetPacingNotifier.ts's ad-spend approximation.
+    const brandPageIds = fbPages.filter((p) => p.brand === campaign.brand).map((p) => p.page_id);
+    const organicPosts = brandPageIds.length > 0 ? await getFbPosts(brandPageIds, campaign.start_date, campaign.end_date) : [];
+
+    res.json({ success: true, adsLinks, adsPerformance, outreachPosts, organicPosts });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

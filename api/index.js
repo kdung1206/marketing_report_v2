@@ -20052,14 +20052,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto11 = require("crypto");
+    var crypto12 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto11.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto12.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22952,11 +22952,11 @@ var require_request = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto11 = require("crypto");
+    var crypto12 = require("crypto");
     exports2.sign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val2 + "." + crypto11.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
+      return val2 + "." + crypto12.createHmac("sha256", secret).update(val2).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(val2, secret) {
       if ("string" !== typeof val2) throw new TypeError("Signed cookie string must be provided.");
@@ -22965,7 +22965,7 @@ var require_cookie_signature = __commonJS({
       return sha1(mac) == sha1(val2) ? str : false;
     };
     function sha1(str) {
-      return crypto11.createHash("sha1").update(str).digest("hex");
+      return crypto12.createHash("sha1").update(str).digest("hex");
     }
   }
 });
@@ -23939,7 +23939,7 @@ var require_main = __commonJS({
     var fs4 = require("fs");
     var path3 = require("path");
     var os = require("os");
-    var crypto11 = require("crypto");
+    var crypto12 = require("crypto");
     var TIPS = [
       "\u25C8 encrypted .env [www.dotenvx.com]",
       "\u25C8 secrets for agents [www.dotenvx.com]",
@@ -24183,7 +24183,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto11.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto12.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -49252,22 +49252,22 @@ var require_crypto2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NodeCrypto = void 0;
-    var crypto11 = require("crypto");
+    var crypto12 = require("crypto");
     var NodeCrypto = class {
       async sha256DigestBase64(str) {
-        return crypto11.createHash("sha256").update(str).digest("base64");
+        return crypto12.createHash("sha256").update(str).digest("base64");
       }
       randomBytesBase64(count) {
-        return crypto11.randomBytes(count).toString("base64");
+        return crypto12.randomBytes(count).toString("base64");
       }
       async verify(pubkey, data, signature) {
-        const verifier = crypto11.createVerify("RSA-SHA256");
+        const verifier = crypto12.createVerify("RSA-SHA256");
         verifier.update(data);
         verifier.end();
         return verifier.verify(pubkey, signature, "base64");
       }
       async sign(privateKey, data) {
-        const signer = crypto11.createSign("RSA-SHA256");
+        const signer = crypto12.createSign("RSA-SHA256");
         signer.update(data);
         signer.end();
         return signer.sign(privateKey, "base64");
@@ -49285,7 +49285,7 @@ var require_crypto2 = __commonJS({
        *   string in hexadecimal encoding.
        */
       async sha256DigestHex(str) {
-        return crypto11.createHash("sha256").update(str).digest("hex");
+        return crypto12.createHash("sha256").update(str).digest("hex");
       }
       /**
        * Computes the HMAC hash of a message using the provided crypto key and the
@@ -49297,7 +49297,7 @@ var require_crypto2 = __commonJS({
        */
       async signWithHmacSha256(key, msg) {
         const cryptoKey = typeof key === "string" ? key : toBuffer(key);
-        return toArrayBuffer(crypto11.createHmac("sha256", cryptoKey).update(msg).digest());
+        return toArrayBuffer(crypto12.createHmac("sha256", cryptoKey).update(msg).digest());
       }
     };
     exports2.NodeCrypto = NodeCrypto;
@@ -50152,10 +50152,10 @@ var require_oauth2client = __commonJS({
        * https://github.com/googleapis/google-auth-library-nodejs/blob/main/samples/oauth2-codeVerifier.js
        */
       async generateCodeVerifierAsync() {
-        const crypto11 = (0, crypto_1.createCrypto)();
-        const randomString = crypto11.randomBytesBase64(96);
+        const crypto12 = (0, crypto_1.createCrypto)();
+        const randomString = crypto12.randomBytesBase64(96);
         const codeVerifier = randomString.replace(/\+/g, "~").replace(/=/g, "_").replace(/\//g, "-");
-        const unencodedCodeChallenge = await crypto11.sha256DigestBase64(codeVerifier);
+        const unencodedCodeChallenge = await crypto12.sha256DigestBase64(codeVerifier);
         const codeChallenge = unencodedCodeChallenge.split("=")[0].replace(/\+/g, "-").replace(/\//g, "_");
         return { codeVerifier, codeChallenge };
       }
@@ -50596,7 +50596,7 @@ var require_oauth2client = __commonJS({
        * @return Returns a promise resolving to LoginTicket on verification.
        */
       async verifySignedJwtWithCertsAsync(jwt, certs, requiredAudience, issuers, maxExpiry) {
-        const crypto11 = (0, crypto_1.createCrypto)();
+        const crypto12 = (0, crypto_1.createCrypto)();
         if (!maxExpiry) {
           maxExpiry = _OAuth2Client.DEFAULT_MAX_TOKEN_LIFETIME_SECS_;
         }
@@ -50609,7 +50609,7 @@ var require_oauth2client = __commonJS({
         let envelope;
         let payload;
         try {
-          envelope = JSON.parse(crypto11.decodeBase64StringUtf8(segments[0]));
+          envelope = JSON.parse(crypto12.decodeBase64StringUtf8(segments[0]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token envelope: ${segments[0]}': ${err.message}`;
@@ -50620,7 +50620,7 @@ var require_oauth2client = __commonJS({
           throw new Error("Can't parse token envelope: " + segments[0]);
         }
         try {
-          payload = JSON.parse(crypto11.decodeBase64StringUtf8(segments[1]));
+          payload = JSON.parse(crypto12.decodeBase64StringUtf8(segments[1]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token payload '${segments[0]}`;
@@ -50637,7 +50637,7 @@ var require_oauth2client = __commonJS({
         if (envelope.alg === "ES256") {
           signature = formatEcdsa.joseToDer(signature, "ES256").toString("base64");
         }
-        const verified = await crypto11.verify(cert, signed, signature);
+        const verified = await crypto12.verify(cert, signed, signature);
         if (!verified) {
           throw new Error("Invalid token signature: " + jwt);
         }
@@ -51012,14 +51012,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "node_modules/jwa/index.js"(exports2, module2) {
     var Buffer4 = require_safe_buffer().Buffer;
-    var crypto11 = require("crypto");
+    var crypto12 = require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util = require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto11.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto12.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -51109,17 +51109,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac = crypto11.createHmac("sha" + bits, secret);
+        var hmac = crypto12.createHmac("sha" + bits, secret);
         var sig = (hmac.update(thing), hmac.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto11 ? function timingSafeEqual2(a, b) {
+    var timingSafeEqual = "timingSafeEqual" in crypto12 ? function timingSafeEqual2(a, b) {
       if (a.byteLength !== b.byteLength) {
         return false;
       }
-      return crypto11.timingSafeEqual(a, b);
+      return crypto12.timingSafeEqual(a, b);
     } : function timingSafeEqual2(a, b) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -51136,7 +51136,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto11.createSign("RSA-SHA" + bits);
+        var signer = crypto12.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -51146,7 +51146,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto11.createVerify("RSA-SHA" + bits);
+        var verifier = crypto12.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -51155,11 +51155,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto11.createSign("RSA-SHA" + bits);
+        var signer = crypto12.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto11.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto11.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto12.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto12.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -51169,12 +51169,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto11.createVerify("RSA-SHA" + bits);
+        var verifier = crypto12.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto11.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto11.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto12.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto12.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -53750,14 +53750,14 @@ var require_awsrequestsigner = __commonJS({
       }
     };
     exports2.AwsRequestSigner = AwsRequestSigner;
-    async function sign(crypto11, key, msg) {
-      return await crypto11.signWithHmacSha256(key, msg);
+    async function sign(crypto12, key, msg) {
+      return await crypto12.signWithHmacSha256(key, msg);
     }
-    async function getSigningKey(crypto11, key, dateStamp, region, serviceName) {
-      const kDate = await sign(crypto11, `AWS4${key}`, dateStamp);
-      const kRegion = await sign(crypto11, kDate, region);
-      const kService = await sign(crypto11, kRegion, serviceName);
-      const kSigning = await sign(crypto11, kService, "aws4_request");
+    async function getSigningKey(crypto12, key, dateStamp, region, serviceName) {
+      const kDate = await sign(crypto12, `AWS4${key}`, dateStamp);
+      const kRegion = await sign(crypto12, kDate, region);
+      const kService = await sign(crypto12, kRegion, serviceName);
+      const kSigning = await sign(crypto12, kService, "aws4_request");
       return kSigning;
     }
     async function generateAuthenticationHeaderMap(options) {
@@ -54723,7 +54723,7 @@ var require_gdchclient = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.GdchClient = exports2.GDCH_SERVICE_ACCOUNT_TYPE = void 0;
-    var crypto11 = require("crypto");
+    var crypto12 = require("crypto");
     var fs4 = require("fs");
     var https2 = require("https");
     var oauth2client_1 = require_oauth2client();
@@ -54914,7 +54914,7 @@ var require_gdchclient = __commonJS({
         const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
         const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
         const signingInput = `${encodedHeader}.${encodedPayload}`;
-        const signature = crypto11.sign("sha256", Buffer.from(signingInput), {
+        const signature = crypto12.sign("sha256", Buffer.from(signingInput), {
           key: this.privateKey,
           dsaEncoding: "ieee-p1363"
         });
@@ -55775,24 +55775,24 @@ var require_googleauth = __commonJS({
           const signed = await client2.sign(data);
           return signed.signedBlob;
         }
-        const crypto11 = (0, crypto_1.createCrypto)();
+        const crypto12 = (0, crypto_1.createCrypto)();
         if (client2 instanceof jwtclient_1.JWT && client2.key) {
-          const sign = await crypto11.sign(client2.key, data);
+          const sign = await crypto12.sign(client2.key, data);
           return sign;
         }
         const creds = await this.getCredentials();
         if (!creds.client_email) {
           throw new Error("Cannot sign data without `client_email`.");
         }
-        return this.signBlob(crypto11, creds.client_email, data, endpoint);
+        return this.signBlob(crypto12, creds.client_email, data, endpoint);
       }
-      async signBlob(crypto11, emailOrUniqueId, data, endpoint) {
+      async signBlob(crypto12, emailOrUniqueId, data, endpoint) {
         const url = new URL(endpoint + `${emailOrUniqueId}:signBlob`);
         const res = await this.request({
           method: "POST",
           url: url.href,
           data: {
-            payload: crypto11.encodeBase64StringUtf8(data)
+            payload: crypto12.encodeBase64StringUtf8(data)
           },
           retry: true,
           retryConfig: {
@@ -59895,7 +59895,7 @@ __export(app_exports, {
   default: () => app_default
 });
 module.exports = __toCommonJS(app_exports);
-var import_crypto18 = __toESM(require("crypto"), 1);
+var import_crypto19 = __toESM(require("crypto"), 1);
 var import_express = __toESM(require_express2(), 1);
 var import_dotenv2 = __toESM(require_main(), 1);
 
@@ -103159,6 +103159,15 @@ async function getCampaigns(filters) {
   });
   return rows;
 }
+async function getCampaign(id) {
+  if (!isSupabaseConfigured) {
+    const { campaigns } = await readLocalCollections2();
+    return campaigns.find((c) => c.id === id) || null;
+  }
+  const { data, error } = await supabase.from("campaigns").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc campaign: ${error.message}`);
+  return data;
+}
 async function createCampaign(input, creatorUsername) {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const campaign = {
@@ -104591,6 +104600,45 @@ async function getAdsPerformanceByPostIds(postIds, since, until) {
   });
   return rows;
 }
+async function getAdsPerformanceByCampaignNames(links) {
+  if (links.length === 0) return [];
+  const namesByChannel = /* @__PURE__ */ new Map();
+  for (const l of links) {
+    const list = namesByChannel.get(l.channel) || [];
+    list.push(l.ads_campaign_name);
+    namesByChannel.set(l.channel, list);
+  }
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections3();
+    return ads_performance.filter((r2) => {
+      const names = namesByChannel.get(r2.channel);
+      return names ? names.includes(r2.campaign_name) : false;
+    });
+  }
+  const results = await Promise.all(
+    Array.from(namesByChannel.entries()).map(
+      ([channel, names]) => fetchAllRows(
+        (from, to) => supabase.from("ads_performance").select("*").eq("channel", channel).in("campaign_name", names).range(from, to)
+      )
+    )
+  ).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o theo campaign \u0111\xE3 g\u1EAFn: ${err.message}`);
+  });
+  return results.flat();
+}
+async function getDistinctAdsCampaignNames(brand, channel) {
+  if (!isSupabaseConfigured) {
+    const { ads_performance } = await readLocalCollections3();
+    const names = ads_performance.filter((r2) => r2.brand === brand && r2.channel === channel).map((r2) => r2.campaign_name);
+    return Array.from(new Set(names)).sort();
+  }
+  const rows = await fetchAllRows(
+    (from, to) => supabase.from("ads_performance").select("campaign_name").eq("brand", brand).eq("channel", channel).range(from, to)
+  ).catch((err) => {
+    throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch t\xEAn campaign qu\u1EA3ng c\xE1o: ${err.message}`);
+  });
+  return Array.from(new Set(rows.map((r2) => r2.campaign_name))).sort();
+}
 async function getFbAdAccounts() {
   if (!isSupabaseConfigured) {
     const { fb_ad_accounts } = await readLocalCollections3();
@@ -104815,6 +104863,70 @@ async function patchTiktokAdsAccountBrand(advertiserId, brand) {
   }
   const { error } = await supabase.from("tiktok_ads_accounts").update({ brand }).eq("advertiser_id", advertiserId);
   if (error) throw new Error(`L\u1ED7i g\xE1n th\u01B0\u01A1ng hi\u1EC7u: ${error.message}`);
+}
+
+// src/server/campaignAdsLinksStore.ts
+var import_crypto12 = __toESM(require("crypto"), 1);
+function newId5() {
+  return import_crypto12.default.randomUUID();
+}
+async function readLocal5() {
+  const store = await getDatabaseData();
+  return { store, campaign_ads_links: Array.isArray(store.campaign_ads_links) ? store.campaign_ads_links : [] };
+}
+async function writeLocal5(store, campaign_ads_links) {
+  await saveDatabaseData({ ...store, campaign_ads_links });
+}
+async function getCampaignAdsLinks(campaignId) {
+  if (!isSupabaseConfigured) {
+    const { campaign_ads_links } = await readLocal5();
+    return campaign_ads_links.filter((l) => l.campaign_id === campaignId);
+  }
+  const { data, error } = await supabase.from("campaign_ads_links").select("*").eq("campaign_id", campaignId).order("created_at", { ascending: true });
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc danh s\xE1ch campaign qu\u1EA3ng c\xE1o \u0111\xE3 g\u1EAFn: ${error.message}`);
+  return data || [];
+}
+async function getCampaignAdsLink(id) {
+  if (!isSupabaseConfigured) {
+    const { campaign_ads_links } = await readLocal5();
+    return campaign_ads_links.find((l) => l.id === id) || null;
+  }
+  const { data, error } = await supabase.from("campaign_ads_links").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc campaign qu\u1EA3ng c\xE1o \u0111\xE3 g\u1EAFn: ${error.message}`);
+  return data;
+}
+async function createCampaignAdsLink(input, addedBy) {
+  const link = {
+    id: newId5(),
+    campaign_id: input.campaign_id,
+    channel: input.channel,
+    ads_campaign_name: input.ads_campaign_name.trim(),
+    added_by: addedBy,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  if (!isSupabaseConfigured) {
+    const { store, campaign_ads_links } = await readLocal5();
+    if (campaign_ads_links.some((l) => l.campaign_id === link.campaign_id && l.channel === link.channel && l.ads_campaign_name === link.ads_campaign_name)) {
+      throw new Error("Campaign qu\u1EA3ng c\xE1o n\xE0y \u0111\xE3 \u0111\u01B0\u1EE3c g\u1EAFn r\u1ED3i.");
+    }
+    await writeLocal5(store, [...campaign_ads_links, link]);
+    return link;
+  }
+  const { error } = await supabase.from("campaign_ads_links").insert(link);
+  if (error) {
+    if (error.code === "23505") throw new Error("Campaign qu\u1EA3ng c\xE1o n\xE0y \u0111\xE3 \u0111\u01B0\u1EE3c g\u1EAFn r\u1ED3i.");
+    throw new Error(`L\u1ED7i g\u1EAFn campaign qu\u1EA3ng c\xE1o: ${error.message}`);
+  }
+  return link;
+}
+async function deleteCampaignAdsLink(id) {
+  if (!isSupabaseConfigured) {
+    const { store, campaign_ads_links } = await readLocal5();
+    await writeLocal5(store, campaign_ads_links.filter((l) => l.id !== id));
+    return;
+  }
+  const { error } = await supabase.from("campaign_ads_links").delete().eq("id", id);
+  if (error) throw new Error(`L\u1ED7i g\u1EE1 campaign qu\u1EA3ng c\xE1o: ${error.message}`);
 }
 
 // src/server/facebookAdsSync.ts
@@ -127703,17 +127815,17 @@ var GEMINI_MODEL = "gemini-3.5-flash";
 function checkKey(r2) {
   return `${r2.account_id}|${r2.check_type}|${r2.url}`;
 }
-async function readLocal5() {
+async function readLocal6() {
   const store = await getDatabaseData();
   return { store, checks: Array.isArray(store.technical_seo_checks) ? store.technical_seo_checks : [] };
 }
-async function writeLocal5(store, checks) {
+async function writeLocal6(store, checks) {
   await saveDatabaseData({ ...store, technical_seo_checks: checks });
 }
 async function getTechnicalSeoChecks(accountIds) {
   if (accountIds.length === 0) return [];
   if (!isSupabaseConfigured) {
-    const { checks } = await readLocal5();
+    const { checks } = await readLocal6();
     const idSet = new Set(accountIds);
     return checks.filter((c) => idSet.has(c.account_id));
   }
@@ -127727,13 +127839,13 @@ async function getTechnicalSeoChecks(accountIds) {
 async function upsertTechnicalSeoChecks(rows) {
   if (rows.length === 0) return;
   if (!isSupabaseConfigured) {
-    const { store, checks } = await readLocal5();
+    const { store, checks } = await readLocal6();
     const byKey = new Map(checks.map((c) => [checkKey(c), c]));
     for (const row of rows) {
       const existing2 = byKey.get(checkKey(row));
       byKey.set(checkKey(row), { ...row, first_detected_at: existing2?.first_detected_at || row.first_detected_at });
     }
-    await writeLocal5(store, Array.from(byKey.values()));
+    await writeLocal6(store, Array.from(byKey.values()));
     return;
   }
   const existing = await fetchAllRows(
@@ -127752,10 +127864,10 @@ async function upsertTechnicalSeoChecks(rows) {
 }
 async function pruneStaleTechnicalSeoChecks(accountId, checkType, currentUrls) {
   if (!isSupabaseConfigured) {
-    const { store, checks } = await readLocal5();
+    const { store, checks } = await readLocal6();
     const currentSet = new Set(currentUrls);
     const next = checks.filter((c) => !(c.account_id === accountId && c.check_type === checkType && !currentSet.has(c.url)));
-    await writeLocal5(store, next);
+    await writeLocal6(store, next);
     return;
   }
   let query = supabase.from("technical_seo_checks").delete().eq("account_id", accountId).eq("check_type", checkType);
@@ -128755,9 +128867,9 @@ function isValidCronRequest(req) {
   const expected = process.env.CRON_SECRET;
   const provided = req.headers.authorization;
   if (!expected || !provided) return false;
-  const expectedDigest = import_crypto18.default.createHash("sha256").update(`Bearer ${expected}`).digest();
-  const providedDigest = import_crypto18.default.createHash("sha256").update(provided).digest();
-  return import_crypto18.default.timingSafeEqual(expectedDigest, providedDigest);
+  const expectedDigest = import_crypto19.default.createHash("sha256").update(`Bearer ${expected}`).digest();
+  const providedDigest = import_crypto19.default.createHash("sha256").update(provided).digest();
+  return import_crypto19.default.timingSafeEqual(expectedDigest, providedDigest);
 }
 app.get("/api/cron/weekly-backup", async (req, res) => {
   try {
@@ -129729,8 +129841,8 @@ app.get("/api/tiktok/oauth/start", requireAuth("Admin"), (req, res) => {
     });
   }
   const brand = typeof req.query.brand === "string" ? req.query.brand : null;
-  const codeVerifier = import_crypto18.default.randomBytes(48).toString("base64url");
-  const codeChallenge = import_crypto18.default.createHash("sha256").update(codeVerifier).digest("base64url");
+  const codeVerifier = import_crypto19.default.randomBytes(48).toString("base64url");
+  const codeChallenge = import_crypto19.default.createHash("sha256").update(codeVerifier).digest("base64url");
   const state = signOAuthState({ brand, username: req.session.username, codeVerifier });
   const params = new URLSearchParams({
     client_key: TIKTOK_CLIENT_KEY,
@@ -130370,6 +130482,67 @@ app.delete("/api/campaign/campaigns/:id/members/:username", requireAuth("Admin")
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+app.get("/api/campaign/ads-campaign-names", requireAuth(), async (req, res) => {
+  try {
+    const { brand, channel } = req.query;
+    if (typeof brand !== "string" || !brand || typeof channel !== "string" || !channel) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu brand ho\u1EB7c channel." });
+    }
+    const names = await getDistinctAdsCampaignNames(brand, channel);
+    res.json({ success: true, names });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/campaign/campaigns/:id/ads-links", requireAuth("Editor"), async (req, res) => {
+  try {
+    const session = req.session;
+    if (!await canEditCampaign(req.params.id, session)) {
+      return res.status(403).json({ success: false, error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ch\u1EC9nh s\u1EEDa campaign n\xE0y." });
+    }
+    const { channel, ads_campaign_name } = req.body || {};
+    if (!channel || !ads_campaign_name) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu channel ho\u1EB7c ads_campaign_name." });
+    }
+    const link = await createCampaignAdsLink({ campaign_id: req.params.id, channel, ads_campaign_name }, session.username);
+    await logAction(session, req, "campaign-add-ads-link", `G\u1EAFn campaign qu\u1EA3ng c\xE1o "${ads_campaign_name}" (${channel}) v\xE0o campaign ${req.params.id}`);
+    res.json({ success: true, link });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/campaign/ads-links/:id", requireAuth("Editor"), async (req, res) => {
+  try {
+    const link = await getCampaignAdsLink(req.params.id);
+    if (!link) return res.status(404).json({ success: false, error: "Kh\xF4ng t\xECm th\u1EA5y li\xEAn k\u1EBFt." });
+    const session = req.session;
+    if (!await canEditCampaign(link.campaign_id, session)) {
+      return res.status(403).json({ success: false, error: "B\u1EA1n ch\u01B0a \u0111\u01B0\u1EE3c ph\xE2n quy\u1EC1n ch\u1EC9nh s\u1EEDa campaign n\xE0y." });
+    }
+    await deleteCampaignAdsLink(req.params.id);
+    await logAction(session, req, "campaign-remove-ads-link", `G\u1EE1 campaign qu\u1EA3ng c\xE1o \u0111\xE3 g\u1EAFn ${req.params.id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/campaign/campaigns/:id/overview", requireAuth(), async (req, res) => {
+  try {
+    const campaign = await getCampaign(req.params.id);
+    if (!campaign) return res.status(404).json({ success: false, error: "Kh\xF4ng t\xECm th\u1EA5y campaign." });
+    const [adsLinks, outreachPosts, fbPages] = await Promise.all([
+      getCampaignAdsLinks(campaign.id),
+      getOutreachPosts({ campaignId: campaign.id }),
+      getFbPages()
+    ]);
+    const adsPerformance = await getAdsPerformanceByCampaignNames(adsLinks.map((l) => ({ channel: l.channel, ads_campaign_name: l.ads_campaign_name })));
+    const brandPageIds = fbPages.filter((p) => p.brand === campaign.brand).map((p) => p.page_id);
+    const organicPosts = brandPageIds.length > 0 ? await getFbPosts(brandPageIds, campaign.start_date, campaign.end_date) : [];
+    res.json({ success: true, adsLinks, adsPerformance, outreachPosts, organicPosts });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 app.get("/api/campaign/tasks", requireAuth(), async (req, res) => {

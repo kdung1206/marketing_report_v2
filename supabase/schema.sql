@@ -776,6 +776,28 @@ create table if not exists campaign_members (
 
 alter table campaign_members enable row level security;
 
+-- Links a Campaign Calendar entry to the real campaign_name(s) it runs as on
+-- each ad platform (ads_performance.campaign_name/channel) — added so the
+-- Campaign Calendar's per-campaign drilldown can show EXACT ad spend instead
+-- of the brand+channel+date-range approximation budgetPacingNotifier.ts uses
+-- (there is deliberately no campaign_id column on ads_performance itself —
+-- see that table's comment — because one Calendar campaign can span several
+-- ad-platform campaigns, or none yet; this join table is the explicit,
+-- opt-in link an Editor sets up per campaign instead of a guessed match).
+create table if not exists campaign_ads_links (
+  id               uuid primary key default gen_random_uuid(),
+  campaign_id      uuid not null references campaigns(id) on delete cascade,
+  channel          text not null check (channel in ('facebook', 'google', 'tiktok')),
+  ads_campaign_name text not null,
+  added_by         text not null,
+  created_at       timestamptz not null default now(),
+  unique (campaign_id, channel, ads_campaign_name)
+);
+
+create index if not exists campaign_ads_links_campaign_id_idx on campaign_ads_links (campaign_id);
+
+alter table campaign_ads_links enable row level security;
+
 create table if not exists tasks (
   id                       uuid primary key default gen_random_uuid(),
   title                    text not null,

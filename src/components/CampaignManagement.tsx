@@ -22,6 +22,7 @@ import {
   Repeat,
   Target,
   TrendingUp,
+  DollarSign,
 } from "lucide-react";
 import { safeFetchJson } from "../App";
 import type { UserAccount } from "../lib/defaultUsers";
@@ -63,6 +64,47 @@ interface Campaign {
   visual_gallery_url: string | null;
   visual_urls: string[];
   can_edit: boolean;
+}
+
+type AdsChannel = "facebook" | "google" | "tiktok";
+
+interface CampaignAdsLink {
+  id: string;
+  campaign_id: string;
+  channel: AdsChannel;
+  ads_campaign_name: string;
+  added_by: string;
+  created_at: string;
+}
+
+// Minimal mirror of AdsPerformanceRow (src/server/adsPerformanceStore.ts) —
+// only the fields the drilldown's "Chi phí quảng cáo" tab actually sums.
+interface AdsPerformanceMini {
+  channel: AdsChannel;
+  campaign_name: string;
+  spend: number | null;
+  impressions: number | null;
+  clicks: number | null;
+}
+
+// Minimal mirror of FbPostRow (src/server/facebookStore.ts) — organic Page
+// posts, approximated by brand + campaign date range (no real campaign_id
+// link — see campaign_ads_links's schema comment for why ad spend needed an
+// explicit link but this doesn't try to fake one).
+interface OrganicPostMini {
+  post_id: string;
+  created_time: string;
+  message: string | null;
+  permalink: string | null;
+  reach: number | null;
+  engaged_users: number | null;
+}
+
+interface CampaignOverview {
+  adsLinks: CampaignAdsLink[];
+  adsPerformance: AdsPerformanceMini[];
+  outreachPosts: unknown[]; // only used for a count badge — OutreachPanel fetches/manages its own data
+  organicPosts: OrganicPostMini[];
 }
 
 type AssetGroupKey = "Branding" | "Performance" | "Project";
@@ -342,9 +384,19 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
   const [campaignMembers, setCampaignMembers] = useState<CampaignMember[]>([]);
   const [newMemberUsername, setNewMemberUsername] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
-  // Social Outreach (KOC/KOL) — which campaign's outreach panel is expanded,
-  // see OutreachPanel.tsx.
-  const [expandedOutreachCampaignId, setExpandedOutreachCampaignId] = useState<string | null>(null);
+  // "All Campaigns" drilldown row — click a campaign to expand it (same
+  // chevron-expand pattern as DigitalAdsReport.tsx's Campaign→Ad set→Ad
+  // tree), showing that campaign's tasks/ad spend/organic posts. Only 1
+  // campaign expanded at a time, same as the outreach panel this replaced.
+  const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
+  const [drilldownTab, setDrilldownTab] = useState<"tasks" | "ads" | "organic">("tasks");
+  const [campaignOverview, setCampaignOverview] = useState<CampaignOverview | null>(null);
+  const [campaignOverviewLoading, setCampaignOverviewLoading] = useState(false);
+  const [campaignOverviewError, setCampaignOverviewError] = useState<string | null>(null);
+  // "Gắn campaign quảng cáo" mini-form — single shared state since only 1
+  // campaign row is ever expanded at a time.
+  const [adsLinkForm, setAdsLinkForm] = useState<{ channel: AdsChannel; name: string }>({ channel: "facebook", name: "" });
+  const [adsCampaignNameSuggestions, setAdsCampaignNameSuggestions] = useState<string[]>([]);
   const [campaignStatusFilter, setCampaignStatusFilter] = useState<string>("");
   // Campaign Marketing is NOT split by brand (unlike the other report tabs) —
   // Livotec and Karofi campaigns show together; brand is just a filter here,
@@ -479,6 +531,53 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
     setIsLoading(true);
     await Promise.all([loadCategories(), loadCampaigns(), loadTasks(), loadBasicUsers(), loadAssetLinks(), loadTimeLogs()]);
     setIsLoading(false);
+  }
+
+  async function loadCampaignOverview(campaignId: string) {
+    setCampaignOverviewLoading(true);
+    setCampaignOverviewError(null);
+    try {
+      const result = await safeFetchJson(`/api/campaign/campaigns/${campaignId}/overview`);
+      if (result.success) {
+        setCampaignOverview({ adsLinks: result.adsLinks || [], adsPerformance: result.adsPerformance || [], outreachPosts: result.outreachPosts || [], organicPosts: result.organicPosts || [] });
+      } else {
+        setCampaignOverviewError(result.error || "Không tải được chi tiết campaign.");
+      }
+    } catch (err: any) {
+      setCampaignOverviewError(err.message || "Không tải được chi tiết campaign.");
+    } finally {
+      setCampaignOverviewLoading(false);
+    }
+  }
+
+  const expandedCampaign = useMemo(() => campaigns.find((c) => c.id === expandedCampaignId) || null, [campaigns, expandedCampaignId]);
+
+  useEffect(() => {
+    if (!expandedCampaign) {
+      setAdsCampaignNameSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const result = await safeFetchJson(`/api/campaign/ads-campaign-names?brand=${encodeURIComponent(expandedCampaign.brand)}&channel=${adsLinkForm.channel}`);
+      if (!cancelled && result.success) setAdsCampaignNameSuggestions(result.names || []);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedCampaign, adsLinkForm.channel]);
+
+  function toggleCampaignExpand(campaignId: string) {
+    if (expandedCampaignId === campaignId) {
+      setExpandedCampaignId(null);
+      setCampaignOverview(null);
+      return;
+    }
+    setExpandedCampaignId(campaignId);
+    setDrilldownTab("tasks");
+    setCampaignOverview(null);
+    loadCampaignOverview(campaignId);
   }
 
   useEffect(() => {
@@ -769,6 +868,29 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
       }
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Xoá campaign thất bại." });
+    }
+  }
+
+  async function handleAddAdsLink(campaignId: string, channel: AdsChannel, adsCampaignName: string) {
+    if (!adsCampaignName.trim()) return;
+    const result = await safeFetchJson(`/api/campaign/campaigns/${campaignId}/ads-links`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel, ads_campaign_name: adsCampaignName.trim() }),
+    });
+    if (result.success) {
+      await loadCampaignOverview(campaignId);
+    } else {
+      setMessage({ type: "error", text: result.error || "Gắn campaign quảng cáo thất bại." });
+    }
+  }
+
+  async function handleDeleteAdsLink(campaignId: string, linkId: string) {
+    const result = await safeFetchJson(`/api/campaign/ads-links/${linkId}`, { method: "DELETE" });
+    if (result.success) {
+      await loadCampaignOverview(campaignId);
+    } else {
+      setMessage({ type: "error", text: result.error || "Gỡ liên kết thất bại." });
     }
   }
 
@@ -1524,10 +1646,21 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                     <td colSpan={10} className="px-3 py-6 text-center text-slate-400">Chưa có campaign nào.</td>
                   </tr>
                 ) : (
-                  campaigns.map((c) => (
+                  campaigns.map((c) => {
+                    const isExpanded = expandedCampaignId === c.id;
+                    const campaignTasks = tasks.filter((t) => t.campaign_id === c.id);
+                    return (
                     <React.Fragment key={c.id}>
-                    <tr>
-                      <td className="px-3 py-2 font-medium text-slate-700">{c.name}</td>
+                    <tr className="cursor-pointer hover:bg-slate-50" onClick={() => toggleCampaignExpand(c.id)}>
+                      <td className="px-3 py-2 font-medium text-slate-700">
+                        <div className="flex items-center gap-1.5">
+                          <ChevronRight className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                          {c.name}
+                          <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                            {campaignTasks.length} task{campaignTasks.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      </td>
                       <td className="px-3 py-2">
                         <span className={`rounded px-1.5 py-0.5 font-semibold ${c.brand === "Livotec" ? "bg-indigo-50 text-indigo-700" : "bg-sky-50 text-sky-700"}`}>
                           {c.brand}
@@ -1548,14 +1681,8 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                           {c.status}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1.5">
-                          <button
-                            onClick={() => setExpandedOutreachCampaignId((prev) => (prev === c.id ? null : c.id))}
-                            className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 px-2 py-1 text-indigo-600 hover:bg-indigo-50"
-                          >
-                            <Users className="h-3 w-3" /> Outreach
-                          </button>
                           {c.can_edit ? (
                             <>
                               <button onClick={() => startEditCampaign(c)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-slate-600 hover:bg-slate-50">
@@ -1571,15 +1698,29 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                         </div>
                       </td>
                     </tr>
-                    {expandedOutreachCampaignId === c.id && (
+                    {isExpanded && (
                       <tr>
                         <td colSpan={10} className="bg-slate-50/70 px-4 py-3">
-                          <OutreachPanel campaignId={c.id} campaignName={c.name} canEdit={c.can_edit} />
+                          <CampaignDrilldown
+                            campaign={c}
+                            tasks={campaignTasks}
+                            overview={campaignOverview}
+                            isLoading={campaignOverviewLoading}
+                            error={campaignOverviewError}
+                            activeTab={drilldownTab}
+                            onTabChange={setDrilldownTab}
+                            adsLinkForm={adsLinkForm}
+                            onAdsLinkFormChange={setAdsLinkForm}
+                            adsCampaignNameSuggestions={adsCampaignNameSuggestions}
+                            onAddAdsLink={(channel, name) => handleAddAdsLink(c.id, channel, name)}
+                            onDeleteAdsLink={(linkId) => handleDeleteAdsLink(c.id, linkId)}
+                          />
                         </td>
                       </tr>
                     )}
                     </React.Fragment>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -2226,6 +2367,244 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
         </div>
       ) : (
         <OutreachOverview />
+      )}
+    </div>
+  );
+}
+
+const TASK_STATUS_COLOR: Record<TaskStatus, string> = {
+  "To do": "bg-slate-100 text-slate-500",
+  "In progress": "bg-sky-100 text-sky-700",
+  Blocked: "bg-rose-100 text-rose-700",
+  Done: "bg-emerald-100 text-emerald-700",
+};
+
+const ADS_CHANNEL_LABEL: Record<AdsChannel, string> = { facebook: "Facebook", google: "Google", tiktok: "TikTok" };
+
+// "All Campaigns" row drilldown (CampaignManagement's main table) — Tasks /
+// Chi phí quảng cáo / Organic, in 1 expandable panel per campaign (chevron
+// click, same interaction as DigitalAdsReport.tsx's Campaign→Ad set→Ad tree).
+// Ad spend here is EXACT (via campaign_ads_links, an explicit admin-set
+// link), unlike budgetPacingNotifier.ts's brand+channel+date-range
+// approximation — see campaign_ads_links's schema comment for why campaigns
+// need an opt-in link instead of a guessed match. Organic posts are 2
+// different things shown together: Outreach (KOC/KOL, embeds the existing
+// OutreachPanel — already has a real campaign_id link) and the brand's own
+// Fanpage posts (fb_posts, approximated by brand + campaign date range,
+// same reasoning as the ad-spend approximation elsewhere in this app).
+function CampaignDrilldown({
+  campaign,
+  tasks,
+  overview,
+  isLoading,
+  error,
+  activeTab,
+  onTabChange,
+  adsLinkForm,
+  onAdsLinkFormChange,
+  adsCampaignNameSuggestions,
+  onAddAdsLink,
+  onDeleteAdsLink,
+}: {
+  campaign: Campaign;
+  tasks: Task[];
+  overview: CampaignOverview | null;
+  isLoading: boolean;
+  error: string | null;
+  activeTab: "tasks" | "ads" | "organic";
+  onTabChange: (tab: "tasks" | "ads" | "organic") => void;
+  adsLinkForm: { channel: AdsChannel; name: string };
+  onAdsLinkFormChange: (form: { channel: AdsChannel; name: string }) => void;
+  adsCampaignNameSuggestions: string[];
+  onAddAdsLink: (channel: AdsChannel, name: string) => void;
+  onDeleteAdsLink: (linkId: string) => void;
+}) {
+  if (isLoading && !overview) {
+    return <div className="py-3 text-center text-xs text-slate-400">Đang tải chi tiết campaign...</div>;
+  }
+  if (error) {
+    return <div className="py-3 text-center text-xs text-rose-500">{error}</div>;
+  }
+
+  const adsTotals = (overview?.adsPerformance || []).reduce(
+    (acc, r) => ({ spend: acc.spend + (r.spend || 0), impressions: acc.impressions + (r.impressions || 0), clicks: acc.clicks + (r.clicks || 0) }),
+    { spend: 0, impressions: 0, clicks: 0 }
+  );
+  const spendByLink = new Map<string, { spend: number; impressions: number; clicks: number }>();
+  for (const r of overview?.adsPerformance || []) {
+    const key = `${r.channel}|${r.campaign_name}`;
+    const entry = spendByLink.get(key) || { spend: 0, impressions: 0, clicks: 0 };
+    entry.spend += r.spend || 0;
+    entry.impressions += r.impressions || 0;
+    entry.clicks += r.clicks || 0;
+    spendByLink.set(key, entry);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1 border-b border-slate-200 text-xs font-semibold">
+        {(
+          [
+            { key: "tasks", label: `Task (${tasks.length})`, icon: ListChecks },
+            { key: "ads", label: "Chi phí quảng cáo", icon: DollarSign },
+            { key: "organic", label: `Organic (${(overview?.outreachPosts.length || 0) + (overview?.organicPosts.length || 0)})`, icon: Users },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => onTabChange(t.key)}
+            className={`flex items-center gap-1.5 border-b-2 px-3 py-1.5 ${
+              activeTab === t.key ? "border-indigo-600 text-indigo-700" : "border-transparent text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            <t.icon className="h-3.5 w-3.5" /> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "tasks" && (
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left text-slate-400">
+              <th className="pb-1.5 font-medium">Task</th>
+              <th className="pb-1.5 font-medium">Trạng thái</th>
+              <th className="pb-1.5 font-medium">Ưu tiên</th>
+              <th className="pb-1.5 font-medium">Người phụ trách</th>
+              <th className="pb-1.5 font-medium">Hạn</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {tasks.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-3 text-center text-slate-400">Chưa có task nào cho campaign này.</td>
+              </tr>
+            ) : (
+              tasks.map((t) => (
+                <tr key={t.id}>
+                  <td className="py-1.5 font-medium text-slate-700">{t.title}</td>
+                  <td className="py-1.5">
+                    <span className={`rounded px-1.5 py-0.5 font-semibold ${TASK_STATUS_COLOR[t.status]}`}>{t.status}</span>
+                  </td>
+                  <td className="py-1.5 text-slate-500">{t.priority}</td>
+                  <td className="py-1.5 text-slate-500">{t.assignee_username || "—"}</td>
+                  <td className="py-1.5 text-slate-500">{t.end_date ? formatDateTime(t.end_date) : "—"}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      )}
+
+      {activeTab === "ads" && (
+        <div className="space-y-3">
+          <div className="flex gap-4 rounded-lg border border-slate-100 bg-white p-2.5 text-xs">
+            <div><span className="text-slate-400">Tổng chi phí: </span><span className="font-bold text-slate-700">{adsTotals.spend.toLocaleString("vi-VN")}đ</span></div>
+            <div><span className="text-slate-400">Impressions: </span><span className="font-semibold text-slate-600">{adsTotals.impressions.toLocaleString("vi-VN")}</span></div>
+            <div><span className="text-slate-400">Clicks: </span><span className="font-semibold text-slate-600">{adsTotals.clicks.toLocaleString("vi-VN")}</span></div>
+          </div>
+
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-slate-400">
+                <th className="pb-1.5 font-medium">Kênh</th>
+                <th className="pb-1.5 font-medium">Tên campaign quảng cáo</th>
+                <th className="pb-1.5 font-medium text-right">Chi phí</th>
+                <th className="pb-1.5 font-medium text-right">Impressions</th>
+                <th className="pb-1.5 font-medium text-right">Clicks</th>
+                <th className="pb-1.5 font-medium text-right"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {(overview?.adsLinks || []).length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-3 text-center text-slate-400">Chưa gắn campaign quảng cáo nào — chi phí sẽ hiện 0 cho tới khi gắn.</td>
+                </tr>
+              ) : (
+                (overview?.adsLinks || []).map((l) => {
+                  const totals = spendByLink.get(`${l.channel}|${l.ads_campaign_name}`) || { spend: 0, impressions: 0, clicks: 0 };
+                  return (
+                    <tr key={l.id}>
+                      <td className="py-1.5"><span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{ADS_CHANNEL_LABEL[l.channel]}</span></td>
+                      <td className="py-1.5 text-slate-700">{l.ads_campaign_name}</td>
+                      <td className="py-1.5 text-right text-slate-600">{totals.spend.toLocaleString("vi-VN")}đ</td>
+                      <td className="py-1.5 text-right text-slate-500">{totals.impressions.toLocaleString("vi-VN")}</td>
+                      <td className="py-1.5 text-right text-slate-500">{totals.clicks.toLocaleString("vi-VN")}</td>
+                      <td className="py-1.5 text-right">
+                        <button onClick={() => onDeleteAdsLink(l.id)} className="text-rose-500 hover:underline">Gỡ</button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+
+          {campaign.can_edit && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2.5">
+              <span className="text-[11px] font-semibold text-slate-500">Gắn campaign quảng cáo:</span>
+              <select
+                value={adsLinkForm.channel}
+                onChange={(e) => onAdsLinkFormChange({ ...adsLinkForm, channel: e.target.value as AdsChannel })}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+              >
+                <option value="facebook">Facebook</option>
+                <option value="google">Google</option>
+                <option value="tiktok">TikTok</option>
+              </select>
+              <input
+                list="ads-campaign-name-suggestions"
+                value={adsLinkForm.name}
+                onChange={(e) => onAdsLinkFormChange({ ...adsLinkForm, name: e.target.value })}
+                placeholder="Tên campaign quảng cáo thật"
+                className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+              />
+              <datalist id="ads-campaign-name-suggestions">
+                {adsCampaignNameSuggestions.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+              <button
+                onClick={() => {
+                  onAddAdsLink(adsLinkForm.channel, adsLinkForm.name);
+                  onAdsLinkFormChange({ ...adsLinkForm, name: "" });
+                }}
+                className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700"
+              >
+                <PlusCircle className="h-3 w-3" /> Gắn
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "organic" && (
+        <div className="space-y-4">
+          <div>
+            <div className="pb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">Outreach (KOC/KOL)</div>
+            <OutreachPanel campaignId={campaign.id} campaignName={campaign.name} canEdit={campaign.can_edit} />
+          </div>
+          <div>
+            <div className="pb-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+              Bài viết Fanpage ({(overview?.organicPosts || []).length}) — ước tính theo brand + khoảng ngày campaign, không có liên kết trực tiếp
+            </div>
+            {(overview?.organicPosts || []).length === 0 ? (
+              <div className="py-2 text-xs text-slate-400">Không có bài Fanpage nào trong khoảng ngày của campaign này.</div>
+            ) : (
+              <ul className="space-y-1.5 text-xs">
+                {(overview?.organicPosts || []).map((p) => (
+                  <li key={p.post_id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-white px-2.5 py-1.5">
+                    <a href={p.permalink || "#"} target="_blank" rel="noreferrer" className="max-w-[380px] truncate text-slate-600 hover:underline" title={p.message || ""}>
+                      {p.message ? (p.message.length > 80 ? `${p.message.slice(0, 80)}…` : p.message) : "(không có nội dung)"}
+                    </a>
+                    <span className="shrink-0 text-slate-400">
+                      {formatDateTime(p.created_time)} · Reach {(p.reach || 0).toLocaleString("vi-VN")} · Tương tác {(p.engaged_users || 0).toLocaleString("vi-VN")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
