@@ -7,6 +7,8 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
+Cập nhật lần gần nhất: tính đến hết ngày **28/09/2026** (Giai đoạn 1-17).
+
 ---
 
 ## Giai đoạn 1 — Khởi tạo (05/07 – 18/07/2026)
@@ -134,26 +136,144 @@ brand="Livotec" do kết nối rơi đúng vài phút trước khi commit `e5166
 trong Supabase, xác nhận qua log thời gian deploy vs thời gian kết nối.
 
 **Trạng thái**: ✅ Card redesign — đã deploy, verify bằng dữ liệu thật. ✅ Bug id_token — đã sửa,
-user xác nhận kết nối thành công. 🟡 **Website Report redesign (KPI/chart/table theo kênh, Top
-pages, Organic pages, từ khoá SEO) — đã duyệt hướng đầy đủ, CHƯA CODE** — xem đặc tả chi tiết trong
-`HANDOFF.md` mục 0.
+user xác nhận kết nối thành công. 🟡 Website Report redesign (KPI/chart/table theo kênh, Top pages,
+Organic pages, từ khoá SEO) — đã duyệt hướng đầy đủ, CHƯA CODE ở thời điểm này — **xem tiếp Giai
+đoạn 12/13, hoàn tất ngay sau đó cùng chuỗi làm việc**.
+
+**Lưu ý về ranh giới phiên**: từ Giai đoạn 12 trở đi là **1 hoặc nhiều phiên Claude Code khác chạy
+tiếp nối** (không phải phiên đã viết Giai đoạn 1-11) — đúng theo cảnh báo ở mục 1 của `HANDOFF.md`
+về việc từng có nhiều phiên chạy song song trong cùng thư mục. Toàn bộ chi tiết dưới đây tổng hợp lại
+từ commit log + `HANDOFF.md` (đã được các phiên đó cập nhật 3 lần trong ngày 28/09), không phải quan
+sát trực tiếp.
+
+## Giai đoạn 12 — Hoàn tất Website Report redesign mục A-C (26/09/2026 tối)
+
+- `3b9757a` Redesign tab "Tổng hợp" Website Report: KPI tiles, narrative "Nhận định nhanh", biểu đồ
+  Sessions theo kênh (Organic/Paid/Direct/Social/Referral/Khác).
+- `0209f67` Thêm "Top pages" (GA4 theo pageview) + "Organic pages" (Search Console theo click),
+  nhóm theo loại trang đúng quy tắc đã chốt ở Giai đoạn 11 (dựa 250 URL thật karofi.com).
+- `a5310c7` Thêm card "Từ khoá tiềm năng SEO" (striking-distance) + tách Brand/Non-brand.
+
+**Trạng thái**: ✅ Mục A, B, C của đặc tả Website Report redesign — hoàn tất, đúng theo demo đã
+duyệt ở Giai đoạn 11.
+
+## Giai đoạn 13 — Tinh chỉnh Website Report + Social Report, thêm mục D (28/09/2026 sáng)
+
+- `935263b` Thêm nhận định nhanh cho từng card mục B/C; thêm mục D (GA4 Country/City, GA4 Device,
+  Search Console Device breakdown) — đã duyệt ở Giai đoạn 11 nhưng ưu tiên thấp hơn, làm ở đây.
+- `98e0d30` Chuyển nhận định của mục B/C lên đầu card (thay vì chân bảng); ghi chú giải thích các
+  kênh GA4 gốc nằm trong nhóm "Khác" (tỉ trọng lớn trong dữ liệu thật); phân trang bảng từ khoá
+  (mặc định 15/trang, chọn được 15/50/100/200).
+- `d91fab8` Thu gọn thẻ bài viết Social Report (ảnh 16:9 thay vì gần vuông, ẩn cột Ads khi bài
+  không chạy ads, lưới tới 6 cột màn hình rộng).
+
+**Trạng thái**: ✅ Website Report redesign — **toàn bộ mục A-D đã hoàn tất**, không còn gì tồn đọng
+từ đặc tả Giai đoạn 11. Social Report — tinh chỉnh thêm cho gọn, không phải bug.
+
+## Giai đoạn 14 — OAuth cho Facebook/TikTok Ads, thay thế dán token thủ công (28/09/2026)
+
+- `336ac2b` Đổi luồng kết nối Facebook Ads + TikTok Ads từ dán access token tay sang OAuth + màn
+  hình chọn tài khoản (1 lần đăng nhập Facebook lấy được cả Page lẫn Ad Account để tick chọn).
+
+**Trạng thái**: ✅ Facebook — đã cấu hình `FB_APP_ID`/`FB_APP_SECRET`/`FACEBOOK_REDIRECT_URI` đầy
+đủ trên `.env.local` **và** Vercel production, chạy được thật. ⏸️ TikTok Ads OAuth — code xong
+nhưng **chưa cấu hình biến môi trường**, user chủ động yêu cầu "hold" chờ TikTok duyệt app Marketing
+API — đừng tự ý cấu hình tiếp cho tới khi user báo đã duyệt.
+
+## Giai đoạn 15 — Quản lý công việc nâng cao cho Campaign Marketing (28/09/2026)
+
+- `b6bc802` Thêm `work_stream`/`estimated_hours` cho Task; bảng `task_time_logs` (log giờ thủ
+  công); tab "Theo nhân viên" (workload dashboard); Task lặp lại (`recurrence`, tự sinh occurrence
+  qua cron hàng ngày, giới hạn tạo trước 14 ngày); liên kết Task ↔ số liệu report thật (nút "+ Task"
+  từ bảng từ khoá SEO); Content Brief cho Task loại SEO.
+
+**Trạng thái**: ✅ Code + migration Supabase production xong, đã test logic (không qua UI, dùng
+script trực tiếp trên `db_store.json`). ⚠️ **Vẫn 0 campaign/task thật nào trong production** — như
+các giai đoạn trước, tính năng sẵn sàng nhưng chưa có dữ liệu thật để vận hành.
+
+## Giai đoạn 16 — 4 tool SEO/Ads mới: Keyword Rank Tracker, Brand SOV, Backlink Tracker, Social Outreach (28/09/2026)
+
+- `5075a9d` Theo yêu cầu "phân tích công việc SEO-Ads để xây tool tích hợp":
+  - **Keyword Rank Tracker + Brand SOV** (tab mới "SEO Tools") — dùng serper.dev (API **trả phí**
+    theo credit, khác mọi tích hợp khác trong app). Seed sẵn 22 từ khoá đã chốt với user (8 dùng
+    chung Karofi+Livotec, 6 riêng Karofi, 8 riêng Livotec — domain Livotec xác nhận là
+    `livotec.com`). Cron riêng thứ Hai hàng tuần, ~27 credit/tuần (đủ dùng ~21 tháng trên 2500
+    credit free). `SERPER_API_KEY` đã set cả local + Vercel.
+  - **Backlink Tracker** (miễn phí) — cron hàng ngày tự kiểm tra backlink còn tồn tại không.
+  - **Social Outreach (KOC/KOL)** — nhập tay số liệu (không có API public đáng tin), roster tái
+    dùng được, nút "Outreach" trên mỗi campaign, tab tổng hợp riêng trong Campaign Marketing —
+    **chạy song song với** scorecard "KOC/KOL Air Bài Tuần" cũ trên Dashboard chính, chưa nối vào
+    nhau (user đồng ý để 2 nguồn tồn tại song song trước).
+  - Toàn bộ migration Supabase (cột mới trên `tasks`, bảng `task_time_logs`,
+    `keyword_rank_targets`/`keyword_rank_history`/`sov_mentions_history`, `backlinks`,
+    `koc_kol_accounts`/`outreach_posts`/`outreach_post_metrics`) đã chạy trên production.
+
+**Trạng thái**: ✅ Backlink Tracker — đã test thật (fetch thật 1 backlink trỏ wikipedia.org). ⚠️
+Keyword Rank Tracker/SOV — code + migrate + key đã sẵn sàng, nhưng **chưa từng gọi serper.dev thật
+lần nào** (cố tình tránh tốn credit lúc code) — cần user tự bấm "Đồng bộ ngay" 1 lần để xác nhận. ✅
+Social Outreach — code xong theo đúng 7 câu trả lời user đã chốt trước đó.
+
+## Giai đoạn 17 — Hoàn tất 3/5 tool phân tích từ file Excel SEO/Ads Automation (28/09/2026)
+
+Tiếp nối việc phân tích file `Phan_Tich_Cong_Viec_SEO_Ads_Automation.xlsx` user cung cấp — user đã
+chốt làm cả 5 mục theo thứ tự, 3 mục đầu hoàn tất trong giai đoạn này:
+
+- `9c2726a` **Ngân sách & Pacing (Ads)** — so `ads_performance.spend` với `budget`/thời gian đã qua
+  của campaign, cảnh báo Telegram khi lệch >15%. **Technical SEO Monitor** — crawl sitemap.xml +
+  PageSpeed Insights + Search Console Sitemaps API, cron riêng thứ Hai 04:00. **On-page
+  Optimization Scanner** — trích xuất SEO on-page (title/meta/H1/alt/link/số từ) + Gemini gợi ý sửa,
+  chỉ chạy tay, giới hạn domain đã kết nối Website Report (chống SSRF).
+- `3504253`, `d7777db` Cập nhật `HANDOFF.md` theo kết quả test/deploy 3 tool trên.
+
+**Phát hiện thật từ lúc test (không phải giả định)**:
+- ⚠️ `karofi.com/sitemap1.xml` đang lỗi HTTP 500 thật trên production website — nên báo team dev
+  website, không phải lỗi của app này.
+- ⚠️ Quota PageSpeed Insights không-key đã hết toàn cục (429 ngay lập tức) — `PAGESPEED_API_KEY` là
+  **bắt buộc**. Lần đầu set trên Vercel không thành công (verify qua API thấy biến chưa tồn tại) —
+  **đã set lại thành công qua Composio** (`VERCEL_ADD_ENVIRONMENT_VARIABLE`), verify số env var tăng
+  26→27, redeploy commit `3504253` — có hiệu lực từ đây.
+- Sửa 1 bug thật: lỗi ở bước Search Console Sitemaps API từng làm mất luôn kết quả crawl +
+  PageSpeed đã chạy thành công trước đó — đã tách try/catch riêng từng bước.
+- Xác nhận lại với user (lo lắng hợp lý): app chỉ có quyền **đọc** GA4/Search Console, không thể
+  sửa/xoá — cả ở tầng scope OAuth (`*.readonly`) lẫn code (không có route ghi nào).
+- **Đã giải quyết vấn đề tồn đọng nhiều phiên**: cách đăng nhập UI ở local dev khi không có mật
+  khẩu admin thật — thêm 1 user với username MỚI (khác 5 tài khoản mặc định) thẳng vào
+  `db_store.json`, không bị `reconcileUsers()` ghi đè. Áp dụng cho cả việc giả lập 1 kết nối Website
+  Report để test (điền `gsc_site_url` thật, token giả) — luôn backup/khôi phục `db_store.json` sau
+  khi test xong.
+
+**Trạng thái**: ✅ Cả 3 tool — code + migration Supabase production + redeploy xong. Budget Pacing:
+⚠️ 0 campaign thật nào có `budget` set. Technical SEO Monitor: ✅ đã test thật qua UI, bắt đúng lỗi
+sitemap thật của site. On-page Scanner: ✅ đã test thật phần trích xuất; phần gợi ý sửa bằng Gemini
+chưa verify được ở local (thiếu `GEMINI_API_KEY` local, chỉ có ở Vercel) nhưng tái dùng nguyên logic
+`/api/analyze` đã chạy thật trước đó. 🟡 **Còn treo 2/5 mục theo thứ tự user đã chốt**: #3 Creative
+Frequency Monitor (dữ liệu `ads_performance.frequency` đã có sẵn, chỉ cần viết logic cảnh báo), #5
+AI Content Planning Assistant (dùng Gemini + serper.dev "related searches"/"people also ask") — CHƯA
+BẮT ĐẦU, xem `HANDOFF.md` mục "Đang dở" để code tiếp.
 
 ---
 
-## Tổng hợp trạng thái theo tính năng (tính đến 26/09/2026)
+## Tổng hợp trạng thái theo tính năng (tính đến hết 28/09/2026)
 
 | Tính năng | Trạng thái |
 |---|---|
 | Báo cáo tuần (dashboard chính) | ✅ Ổn định |
-| Facebook Page Insights + Ads | ✅ Ổn định, cron tự động hàng ngày |
-| TikTok organic + Ads (upload Excel) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, dùng key Sandbox |
+| Facebook Page Insights + Ads (OAuth) | ✅ Ổn định, cron tự động hàng ngày, kết nối qua OAuth |
+| TikTok organic (Social Report) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, OAuth code xong nhưng chưa cấu hình (hold theo yêu cầu user) |
 | YouTube organic | ✅ Chạy được · ⚠️ Token hết hạn mỗi 7 ngày (OAuth consent screen ở chế độ Testing) |
 | Digital Ads Report (drilldown + Top Ads) | ✅ Ổn định |
-| Social Report (card redesign) | ✅ Ổn định |
-| Website Report (GA4 + Search Console) | ⚠️ Kết nối được, đồng bộ được · 🟡 Giao diện redesign đang chờ code |
-| Campaign Calendar & Task | ✅ Code + schema xong · 🟡 Chưa dùng thật trên production |
+| Social Report (card redesign, đã thu gọn) | ✅ Ổn định |
+| Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO |
+| Campaign Calendar & Task (+ quản lý công việc nâng cao) | ✅ Code + schema xong · 🟡 Chưa dùng thật trên production |
+| SEO Tools — Keyword Rank Tracker + Brand SOV | ✅ Code + migrate xong · ⚠️ Chưa gọi serper.dev thật lần nào |
+| SEO Tools — Backlink Tracker | ✅ Ổn định, đã test thật |
+| SEO Tools — Technical SEO Monitor | ✅ Ổn định, đã phát hiện lỗi sitemap thật của site |
+| SEO Tools — On-page Optimization Scanner | ✅ Đã test thật phần trích xuất · ⚠️ Phần Gemini chưa verify ở local |
+| SEO Tools — Creative Frequency Monitor (Ads) | 🟡 Chưa bắt đầu, dữ liệu đã sẵn sàng |
+| SEO Tools — AI Content Planning Assistant | 🟡 Chưa bắt đầu |
+| Budget & Pacing alerts (Ads) | ✅ Code xong · ⚠️ 0 campaign thật có budget set |
+| Social Outreach (KOC/KOL) | ✅ Code xong, chạy song song với scorecard cũ · chưa nối vào nhau |
 | Google Ads API (đọc dữ liệu) | 🟡 Đang chờ Google duyệt hồ sơ |
 | Backup Google Drive + cảnh báo Telegram | ✅ Ổn định |
 | ads_manager (viết campaign quảng cáo thật) | ⏸️ Tạm dừng, chưa quyết hướng tích hợp |
-| Social Outreach (KOC/KOL) | ⏸️ Mới phân tích, tạm dừng |
-| Brand Health/SOV (serper.dev) | ⏸️ Mới đề xuất mockup, chưa duyệt code |
+| Brand Health/SOV qua serper.dev (mockup cũ) | ❌ Đã thay bằng SEO Tools' Brand SOV thật (Giai đoạn 16) |
