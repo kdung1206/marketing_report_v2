@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **28/09/2026** (Giai đoạn 1-17).
+Cập nhật lần gần nhất: tính đến hết ngày **01/10/2026** (Giai đoạn 1-18).
 
 ---
 
@@ -253,7 +253,57 @@ BẮT ĐẦU, xem `HANDOFF.md` mục "Đang dở" để code tiếp.
 
 ---
 
-## Tổng hợp trạng thái theo tính năng (tính đến hết 28/09/2026)
+## Giai đoạn 18 — Campaign Calendar drilldown + sự cố Supabase JWT trên production (29/09 – 01/10/2026)
+
+**Tính năng mới — Campaign Calendar "All Campaigns" drilldown** (user yêu cầu xem task/chi phí
+quảng cáo/organic post ngay trong bảng, giống kiểu dropdown cây của Digital Ads Report):
+
+- `03d27ce` Click vào 1 campaign (chevron xoay, cùng kiểu tương tác với cây Campaign→Ad set→Ad của
+  Digital Ads Report) mở ra 3 tab:
+  - **Task** — danh sách task thuộc campaign, kèm trạng thái/ưu tiên/người phụ trách/hạn (lấy từ
+    danh sách task đã tải sẵn ở client, không gọi API riêng).
+  - **Chi phí quảng cáo** — **chính xác theo từng campaign** (user chọn phương án này thay vì ước
+    tính) qua bảng mới `campaign_ads_links`: Editor "gắn" tên campaign quảng cáo thật
+    (Facebook/Google/TikTok Ads) vào Calendar campaign, có autocomplete gợi ý tên đã đồng bộ để
+    tránh gõ sai. Khác hẳn cách tính gộp theo brand+kênh+ngày của Budget Pacing (Giai đoạn 17) —
+    đây là liên kết tường minh do người dùng tự gắn, không phải suy đoán.
+  - **Organic** — gộp cả 2 loại (user chọn "cả 2"): panel Outreach (KOC/KOL, liên kết thật qua
+    `campaign_id`, dùng lại `OutreachPanel` có sẵn) + bài viết Fanpage thương hiệu trong khoảng ngày
+    campaign (ước tính theo brand + ngày, không có liên kết thật — có ghi chú rõ trong UI).
+- Migration bảng `campaign_ads_links` đã chạy trên Supabase production.
+- **Đã test thật qua UI** (không chỉ `tsc`/build): dùng kỹ thuật "thêm user mới vào `db_store.json`"
+  từ Giai đoạn 17 để đăng nhập local, seed 1 campaign + task + `ads_performance` + link giả, xác
+  nhận cả 3 tab hiển thị đúng — tab Organic hiện đúng 25 bài Fanpage Karofi **thật** đã đồng bộ sẵn
+  trong khoảng ngày test. Đã xoá sạch dữ liệu test, khôi phục `db_store.json` sau khi xong.
+
+**Sự cố thật trên production — lỗi "JWT issued at future" (Asset Library) + 504 (tab SEO Tools)**:
+
+- User báo lỗi `Lỗi đọc Asset Library: JWT issued at future` ở Campaign Marketing, sau đó thêm lỗi
+  `API returned invalid JSON/HTML response (status: 504)` ở Website Report → SEO Tools.
+- Chẩn đoán trực tiếp qua Supabase (không qua key của app): project hoàn toàn khoẻ (DB đọc/ghi bình
+  thường, không tạm dừng, không read-only, đồng hồ server đúng giờ thực). Lấy đúng giá trị
+  `service_role` key **hiện tại** từ Supabase, giải mã JWT thấy `iat` = 23/07/2026 (quá khứ, hợp
+  lệ) — tức bản thân key không có vấn đề, nên kết luận: giá trị `SUPABASE_URL`/
+  `SUPABASE_SERVICE_ROLE_KEY` đang lưu trên Vercel bị sai lệch so với giá trị thật.
+- **Đã sửa**: ghi đè lại đúng 2 biến này trên Vercel (production) bằng giá trị xác thực lấy trực
+  tiếp từ Supabase qua Composio, redeploy (`dpl_6B2hiWPVX2pKpw5SDCC7cesr8NyJ`). Không có commit code
+  nào — thuần chỉnh sửa cấu hình Vercel.
+- User test lại On-page Optimization Scanner sau fix, gặp lỗi Gemini `503 UNAVAILABLE` ("model
+  đang quá tải") — xác nhận đây là lỗi tạm thời từ phía Google (server Gemini quá tải), KHÔNG phải
+  lỗi app: request đã đi trọn pipeline (qua auth → kiểm tra domain qua Supabase → tải HTML thật →
+  trích tín hiệu → gọi Gemini) mới dừng ở bước cuối, nghĩa là fix JWT ở trên đã có hiệu lực. Đồng
+  thời xác nhận luôn tên model `"gemini-3.5-flash"` (từng bị nghi ngờ "tên lạ" ở các giai đoạn
+  trước) **là tên hợp lệ** — model sai tên sẽ trả lỗi 404 "not found", không phải 503 "quá tải".
+
+**Trạng thái**: ✅ Campaign Calendar drilldown — code + migration + test thật xong. ✅ Sự cố Supabase
+JWT — đã xác định nguyên nhân (biến môi trường Vercel sai lệch, không phải Supabase hay code có
+lỗi) và sửa xong, đã redeploy. 🟡 Chưa có xác nhận cuối cùng từ user rằng cả Asset Library lẫn tab
+SEO Tools đã hết lỗi hẳn trên production sau redeploy — phiên sau nên hỏi lại nếu chưa thấy user
+xác nhận.
+
+---
+
+## Tổng hợp trạng thái theo tính năng (tính đến hết 01/10/2026)
 
 | Tính năng | Trạng thái |
 |---|---|
@@ -264,11 +314,11 @@ BẮT ĐẦU, xem `HANDOFF.md` mục "Đang dở" để code tiếp.
 | Digital Ads Report (drilldown + Top Ads) | ✅ Ổn định |
 | Social Report (card redesign, đã thu gọn) | ✅ Ổn định |
 | Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO |
-| Campaign Calendar & Task (+ quản lý công việc nâng cao) | ✅ Code + schema xong · 🟡 Chưa dùng thật trên production |
+| Campaign Calendar & Task (+ quản lý công việc nâng cao + drilldown task/ads/organic) | ✅ Code + schema xong, đã test thật qua UI (Giai đoạn 18) · 🟡 Chưa dùng thật trên production |
 | SEO Tools — Keyword Rank Tracker + Brand SOV | ✅ Code + migrate xong · ⚠️ Chưa gọi serper.dev thật lần nào |
 | SEO Tools — Backlink Tracker | ✅ Ổn định, đã test thật |
 | SEO Tools — Technical SEO Monitor | ✅ Ổn định, đã phát hiện lỗi sitemap thật của site |
-| SEO Tools — On-page Optimization Scanner | ✅ Đã test thật phần trích xuất · ⚠️ Phần Gemini chưa verify ở local |
+| SEO Tools — On-page Optimization Scanner | ✅ Đã test thật trên production (trích xuất + gọi Gemini, model name hợp lệ) · ⚠️ Gemini thỉnh thoảng 503 "quá tải" (lỗi tạm thời phía Google) |
 | SEO Tools — Creative Frequency Monitor (Ads) | 🟡 Chưa bắt đầu, dữ liệu đã sẵn sàng |
 | SEO Tools — AI Content Planning Assistant | 🟡 Chưa bắt đầu |
 | Budget & Pacing alerts (Ads) | ✅ Code xong · ⚠️ 0 campaign thật có budget set |
