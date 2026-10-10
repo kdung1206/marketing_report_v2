@@ -86,12 +86,17 @@ const PostCard: React.FC<{ post: FbPostRow; reactions: number }> = ({ post, reac
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
-      <div className="relative aspect-[16/9] shrink-0 bg-gradient-to-br from-indigo-50 to-indigo-100">
+      {/* Fixed 1:1 frame (the Livotec NFC card is the reference size). The img
+          is absolutely positioned so its intrinsic height can't feed back into
+          the box: with a plain `h-full` img inside an aspect-ratio flex item,
+          min-height:auto lets portrait thumbnails stretch the card and wide
+          ones shrink it, which is what made card heights uneven. */}
+      <div className="relative aspect-square shrink-0 overflow-hidden bg-gradient-to-br from-indigo-50 to-indigo-100">
         {post.thumbnail_url && !imgFailed ? (
           <img
             src={post.thumbnail_url}
             alt=""
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
             onError={() => setImgFailed(true)}
           />
         ) : (

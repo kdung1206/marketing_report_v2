@@ -11,7 +11,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Facebook, Music2, Youtube, Eye, Heart, Users, RefreshCw, AlertCircle } from "lucide-react";
+import { Facebook, Music2, Youtube, Eye, Heart, Users, RefreshCw, AlertCircle, ImageOff, ExternalLink } from "lucide-react";
 import { safeFetchJson } from "../App";
 import FacebookInsights from "./FacebookInsights";
 
@@ -399,6 +399,61 @@ export default function SocialReport({ selectedBrand, setSelectedBrand }: Social
   );
 }
 
+// One TikTok/YouTube video as a card — same layout as FacebookInsights.tsx's
+// PostCard (fixed-ratio thumbnail frame, date, 2-line caption, compact metric
+// row, source link) so all 3 platforms scan the same way. The frame ratio is
+// the only per-platform difference: TikTok covers are always 3:4 portrait
+// (the API serves them as `cropcenter-q:300:400`), YouTube thumbnails 16:9
+// (`mqdefault`, 320x180). The img is absolutely positioned inside the frame
+// so its intrinsic size can never stretch the card — see the same note on
+// PostCard.
+const VideoCard: React.FC<{
+  aspectClass: string;
+  thumbnailUrl: string | null;
+  date: string;
+  title: string | null;
+  href: string | null;
+  linkLabel: string;
+  metrics: { label: string; value: string }[];
+}> = ({ aspectClass, thumbnailUrl, date, title, href, linkLabel, metrics }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  const caption = title || "(không có tiêu đề)";
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
+      <div className={`relative ${aspectClass} shrink-0 overflow-hidden bg-gradient-to-br from-indigo-50 to-indigo-100`}>
+        {thumbnailUrl && !imgFailed ? (
+          <img src={thumbnailUrl} alt="" className="absolute inset-0 h-full w-full object-cover" onError={() => setImgFailed(true)} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <ImageOff className="h-6 w-6 text-indigo-300" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 p-2.5">
+        <span className="text-[9px] text-slate-400">{date}</span>
+        <p className="line-clamp-2 min-h-[2.2em] text-[11px] font-semibold leading-tight text-slate-700" title={caption}>
+          {caption}
+        </p>
+        <div className={`grid gap-1 border-t border-slate-100 pt-1.5 text-center`} style={{ gridTemplateColumns: `repeat(${metrics.length}, minmax(0, 1fr))` }}>
+          {metrics.map((m) => (
+            <div key={m.label}>
+              <span className="block font-mono text-xs font-bold text-slate-900">{m.value}</span>
+              <span className="block text-[8px] uppercase tracking-wide text-slate-400">{m.label}</span>
+            </div>
+          ))}
+        </div>
+        {href && (
+          <a href={href} target="_blank" rel="noreferrer" className="mt-auto flex items-center gap-1 pt-0.5 text-[10px] font-semibold text-indigo-600 hover:underline">
+            {linkLabel} <ExternalLink className="h-2.5 w-2.5" />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+};
+
 function PlatformStat({ icon: Icon, label, value, color }: { icon: typeof Facebook; label: string; value: string; color: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -505,48 +560,31 @@ function TiktokSection({
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Video gần đây</span>
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[720px] text-xs">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Ngày</th>
-                <th className="px-3 py-2 text-left">Tiêu đề</th>
-                <th className="px-3 py-2 text-right">Views</th>
-                <th className="px-3 py-2 text-right">Likes</th>
-                <th className="px-3 py-2 text-right">Comments</th>
-                <th className="px-3 py-2 text-right">Shares</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {posts.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
-                    Chưa có video nào trong khoảng thời gian đã chọn.
-                  </td>
-                </tr>
-              ) : (
-                posts.slice(0, 50).map((p) => (
-                  <tr key={p.video_id}>
-                    <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{new Date(p.create_time).toLocaleDateString("vi-VN")}</td>
-                    <td className="max-w-xs truncate px-3 py-2 text-slate-700" title={p.title || ""}>
-                      {p.share_url ? (
-                        <a href={p.share_url} target="_blank" rel="noreferrer" className="hover:underline">
-                          {p.title || "(không có tiêu đề)"}
-                        </a>
-                      ) : (
-                        p.title || "(không có tiêu đề)"
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right">{fmt(n(p.view_count))}</td>
-                    <td className="px-3 py-2 text-right">{fmt(n(p.like_count))}</td>
-                    <td className="px-3 py-2 text-right">{fmt(n(p.comment_count))}</td>
-                    <td className="px-3 py-2 text-right">{fmt(n(p.share_count))}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {posts.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-6 text-center text-xs text-slate-400">
+            Chưa có video nào trong khoảng thời gian đã chọn.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+            {posts.slice(0, 50).map((p) => (
+              <VideoCard
+                key={p.video_id}
+                aspectClass="aspect-[3/4]"
+                thumbnailUrl={p.cover_image_url}
+                date={new Date(p.create_time).toLocaleDateString("vi-VN")}
+                title={p.title}
+                href={p.share_url}
+                linkLabel="Xem trên TikTok"
+                metrics={[
+                  { label: "Views", value: fmtCompact(n(p.view_count)) },
+                  { label: "Likes", value: fmtCompact(n(p.like_count)) },
+                  { label: "Comments", value: fmt(n(p.comment_count)) },
+                  { label: "Shares", value: fmt(n(p.share_count)) },
+                ]}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -649,42 +687,30 @@ function YoutubeSection({
 
       <div>
         <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Video gần đây</span>
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[720px] text-xs">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Ngày đăng</th>
-                <th className="px-3 py-2 text-left">Tiêu đề</th>
-                <th className="px-3 py-2 text-right">Views organic</th>
-                <th className="px-3 py-2 text-right">Views quảng cáo</th>
-                <th className="px-3 py-2 text-right">Tổng views</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {videos.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
-                    Chưa có video nào trong khoảng thời gian đã chọn.
-                  </td>
-                </tr>
-              ) : (
-                videos.slice(0, 50).map((v) => (
-                  <tr key={v.video_id}>
-                    <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{new Date(v.published_at).toLocaleDateString("vi-VN")}</td>
-                    <td className="max-w-xs truncate px-3 py-2 text-slate-700" title={v.title || ""}>
-                      <a href={`https://www.youtube.com/watch?v=${v.video_id}`} target="_blank" rel="noreferrer" className="hover:underline">
-                        {v.title || "(không có tiêu đề)"}
-                      </a>
-                    </td>
-                    <td className="px-3 py-2 text-right">{fmt(n(v.organic_views))}</td>
-                    <td className="px-3 py-2 text-right">{fmt(n(v.advertising_views))}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{fmt(n(v.views))}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        {videos.length === 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-6 text-center text-xs text-slate-400">
+            Chưa có video nào trong khoảng thời gian đã chọn.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {videos.slice(0, 50).map((v) => (
+              <VideoCard
+                key={v.video_id}
+                aspectClass="aspect-video"
+                thumbnailUrl={v.thumbnail_url}
+                date={new Date(v.published_at).toLocaleDateString("vi-VN")}
+                title={v.title}
+                href={`https://www.youtube.com/watch?v=${v.video_id}`}
+                linkLabel="Xem trên YouTube"
+                metrics={[
+                  { label: "Organic", value: fmtCompact(n(v.organic_views)) },
+                  { label: "Quảng cáo", value: fmtCompact(n(v.advertising_views)) },
+                  { label: "Tổng views", value: fmtCompact(n(v.views)) },
+                ]}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
