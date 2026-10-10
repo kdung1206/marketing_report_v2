@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **01/10/2026** (Giai đoạn 1-18).
+Cập nhật lần gần nhất: tính đến hết ngày **10/10/2026** (Giai đoạn 1-19).
 
 ---
 
@@ -303,7 +303,36 @@ xác nhận.
 
 ---
 
-## Tổng hợp trạng thái theo tính năng (tính đến hết 01/10/2026)
+## Giai đoạn 19 — Đồng bộ kích thước thẻ Social Report: Facebook, TikTok, YouTube (10/10/2026)
+
+User phản ánh các thẻ bài trong Social Report cao thấp không đều (ảnh dọc làm thẻ cao vọt, ảnh ngang
+thì thấp) và yêu cầu chuẩn hoá theo mẫu cụ thể cho từng nền tảng.
+
+- `012d3ec` **Facebook** — tìm ra nguyên nhân gốc: khung ảnh dùng `aspect-[16/9]` nhưng thẻ `<img>`
+  bên trong dùng `h-full`; trong flex column, `min-height: auto` của hộp có aspect-ratio cho phép nó
+  giãn theo chiều cao tự nhiên của ảnh. Sửa: khung cố định **1:1** (đo từ thẻ mẫu Livotec NFC của
+  user: rộng ~210px, ảnh cao ~210px) + `overflow-hidden`, ảnh đặt `absolute inset-0` để kích thước tự
+  nhiên của ảnh không còn ảnh hưởng bố cục. Đánh đổi: ảnh dọc/ngang bị cắt giữa (`object-cover`).
+- `012d3ec` **TikTok + YouTube** — 2 bảng "Video gần đây" (trước đó chỉ có chữ, không có ảnh) đổi
+  thành lưới thẻ giống Facebook qua component dùng chung `VideoCard` trong `SocialReport.tsx`
+  (ngày, tiêu đề 2 dòng, hàng chỉ số gọn, link nguồn). Chỉ khác nhau tỉ lệ khung ảnh: TikTok **3:4**
+  (API luôn trả ảnh bìa dạng crop 300×400), YouTube **16:9** (thumbnail `mqdefault` 320×180, đo từ
+  video mẫu "MÁY LỌC NƯỚC LIVOTEC: HIỆU QUẢ VƯỢT TRỘI" trong dữ liệu production qua Supabase).
+  Chỉ số TikTok: Views/Likes/Comments/Shares; YouTube: Organic/Quảng cáo/Tổng views.
+
+**Đã test thật qua UI** (kỹ thuật thêm user mới vào `db_store.json` từ Giai đoạn 17, seed tạm thumbnail
+nhiều tỉ lệ khác nhau rồi đo bằng JS, sau đó khôi phục `db_store.json`): Facebook 50/50 khung đều
+218×218 và mọi thẻ cao 351px — **đối chứng với code cũ** ra khung 413/122/544px tuỳ ảnh, tái hiện
+đúng lỗi user chụp; TikTok 12/12 khung 218×290; YouTube 10/10 khung 276×155.
+
+**Trạng thái**: ✅ Cả 3 nền tảng — code + test thật xong. ⚠️ Không tìm thấy video TikTok mẫu "BÍ QUYẾT
+CHĂM SÓC DA VÀ TÓC SAU SPA TẠI NHÀ" trong dữ liệu production theo tiêu đề nên chuẩn 3:4 dựa trên
+định dạng ảnh bìa chung của TikTok, không đo riêng thẻ đó. ⚠️ Ảnh bìa TikTok có URL ký hết hạn
+(`x-expires`) — ảnh hết hạn hiện icon ảnh hỏng, kích thước thẻ vẫn giữ nguyên.
+
+---
+
+## Tổng hợp trạng thái theo tính năng (tính đến hết 10/10/2026)
 
 | Tính năng | Trạng thái |
 |---|---|
@@ -312,7 +341,7 @@ xác nhận.
 | TikTok organic (Social Report) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, OAuth code xong nhưng chưa cấu hình (hold theo yêu cầu user) |
 | YouTube organic | ✅ Chạy được · ⚠️ Token hết hạn mỗi 7 ngày (OAuth consent screen ở chế độ Testing) |
 | Digital Ads Report (drilldown + Top Ads) | ✅ Ổn định |
-| Social Report (card redesign, đã thu gọn) | ✅ Ổn định |
+| Social Report (thẻ Facebook 1:1, TikTok 3:4, YouTube 16:9 — kích thước đồng bộ) | ✅ Ổn định, đã test thật qua UI (Giai đoạn 19) |
 | Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO |
 | Campaign Calendar & Task (+ quản lý công việc nâng cao + drilldown task/ads/organic) | ✅ Code + schema xong, đã test thật qua UI (Giai đoạn 18) · 🟡 Chưa dùng thật trên production |
 | SEO Tools — Keyword Rank Tracker + Brand SOV | ✅ Code + migrate xong · ⚠️ Chưa gọi serper.dev thật lần nào |
