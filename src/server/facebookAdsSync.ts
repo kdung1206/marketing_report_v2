@@ -55,6 +55,7 @@ function dateRangeChunks(since: string, until: string): { since: string; until: 
 
 const INSIGHTS_FIELDS = [
   "ad_id",
+  "campaign_id",
   "campaign_name",
   "adset_name",
   "ad_name",
@@ -67,17 +68,23 @@ const INSIGHTS_FIELDS = [
   "video_play_actions",
 ].join(",");
 
-// Action types (from the `actions` breakdown) that count as a "conversion"
-// for this report — matches the "Leads" KPI used elsewhere (Facebook tab).
-// Summed rather than picking one, since an ad can report both depending on
-// how its lead objective/pixel is configured.
-const CONVERSION_ACTION_TYPES = new Set(["lead", "onsite_conversion.lead_grouped"]);
-
 function sumActionValues(actions: Array<{ action_type: string; value: string }> | undefined, types: Set<string>): number {
   if (!Array.isArray(actions)) return 0;
   return actions
     .filter((a) => types.has(a.action_type))
     .reduce((sum, a) => sum + (Number(a.value) || 0), 0);
+}
+
+// Meta reports the SAME lead twice in `actions`: `lead` (the total) and
+// `onsite_conversion.lead_grouped` (a grouped view of the on-platform ones).
+// This used to SUM them, doubling every lead — confirmed on production data:
+// all 149 Facebook rows with leads > 0 held an even number (0 odd), which
+// can't happen by chance. Take the larger of the two instead: `lead` when
+// present, `lead_grouped` alone only for ads that report just that one.
+function leadCount(actions: Array<{ action_type: string; value: string }> | undefined): { leads: number; lead: number; lead_grouped: number } {
+  const lead = sumActionValues(actions, new Set(["lead"]));
+  const lead_grouped = sumActionValues(actions, new Set(["onsite_conversion.lead_grouped"]));
+  return { leads: Math.max(lead, lead_grouped), lead, lead_grouped };
 }
 
 function sumAllActionValues(actions: Array<{ value: string }> | undefined): number {
@@ -122,6 +129,57 @@ async function fetchAdPostMap(adAccountId: string, accessToken: string, tokenSta
   return map;
 }
 
+// Maps ad_id -> a creative image URL, for the Digital Ads Report's Top Ads
+// cards (previously always a placeholder: nothing in this sync ever asked
+// Meta for the creative image). `image_url` is the full-size image for image
+// ads; video ads have none, so fall back to `thumbnail_url` — Meta serves
+// that at 64x64 unless asked for a size, hence the first attempt requests
+// 480x480 via the field-expansion size modifiers. If Meta rejects that syntax
+// the second attempt asks for the plain fields, so a wrong guess costs
+// resolution, never the whole map. Deliberately a SEPARATE request from
+// fetchAdPostMap: a failure here must never lose the post_id mapping.
+// Signed CDN URLs do expire eventually; the daily cron re-pulls them for the
+// rolling window, and the UI falls back to the placeholder on a dead image.
+async function fetchAdThumbnailMap(adAccountId: string, accessToken: string, tokenStatus: TokenStatus): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const attempts = [
+    `/${adAccountId}/ads?fields=id,creative.thumbnail_width(480).thumbnail_height(480){image_url,thumbnail_url}&limit=200`,
+    `/${adAccountId}/ads?fields=id,creative{image_url,thumbnail_url}&limit=200`,
+  ];
+
+  for (const path of attempts) {
+    let body: any;
+    try {
+      body = await graphGet(path, accessToken);
+    } catch (err: any) {
+      if (isTokenInvalidError(err)) {
+        tokenStatus.invalid = true;
+        return map;
+      }
+      console.error(`Facebook Ads → thumbnail map (${adAccountId}) lỗi:`, err.message || err);
+      continue; // try the simpler field list
+    }
+
+    while (body) {
+      for (const item of body.data || []) {
+        const url = item.creative?.image_url || item.creative?.thumbnail_url;
+        if (item.id && url) map.set(item.id, url);
+      }
+      const nextUrl = body.paging?.next;
+      if (!nextUrl) break;
+      try {
+        const res = await fetch(nextUrl);
+        body = await res.json();
+        if (!res.ok || body?.error) break;
+      } catch {
+        break;
+      }
+    }
+    return map;
+  }
+  return map;
+}
+
 async function fetchAdAccountInsights(
   adAccountId: string,
   accessToken: string,
@@ -129,7 +187,8 @@ async function fetchAdAccountInsights(
   until: string,
   brand: string | null,
   tokenStatus: TokenStatus,
-  adPostMap: Map<string, string>
+  adPostMap: Map<string, string>,
+  adThumbnailMap: Map<string, string>
 ): Promise<AdsPerformanceRow[]> {
   const rows: AdsPerformanceRow[] = [];
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
@@ -151,6 +210,7 @@ async function fetchAdAccountInsights(
   while (body) {
     for (const item of body.data || []) {
       if (!item.date_start || !item.campaign_name) continue;
+      const leads = leadCount(item.actions);
       rows.push({
         channel: "facebook",
         brand,
@@ -164,13 +224,24 @@ async function fetchAdAccountInsights(
         reach: item.reach != null ? Number(item.reach) : null,
         frequency: item.frequency != null ? Number(item.frequency) : null,
         video_views: item.video_play_actions ? sumAllActionValues(item.video_play_actions) : null,
-        conversions: sumActionValues(item.actions, CONVERSION_ACTION_TYPES),
+        conversions: leads.leads,
         // Only set when this ad boosts an existing Page post — see
         // fetchAdPostMap above. Lets the same post's paid spend/reach be
         // joined against its organic row in fb_posts (post_id there is the
         // same "{page_id}_{post_id}" string).
         post_id: item.ad_id ? adPostMap.get(item.ad_id) || null : null,
-        extra: {},
+        // ad_id/campaign_id are exactly what this account's ads put in their
+        // UTM tags ({{ad.id}} → GA4 sessionManualAdContent, {{campaign.id}} →
+        // sessionCampaignName — confirmed against live GA4 data), so keeping
+        // them is what lets web time-on-site be matched back to each ad.
+        // lead_actions keeps Meta's raw lead/lead_grouped values for auditing
+        // the Leads definition (see leadCount).
+        extra: {
+          ad_id: item.ad_id || null,
+          campaign_id: item.campaign_id || null,
+          thumbnail_url: item.ad_id ? adThumbnailMap.get(item.ad_id) || null : null,
+          lead_actions: { lead: leads.lead, lead_grouped: leads.lead_grouped },
+        },
       });
     }
 
@@ -227,6 +298,7 @@ export async function runFacebookAdsSync(overrides?: { since?: string; until?: s
         // Fetched once per account, reused across every date-chunk below —
         // barely changes day to day, no reason to re-fetch it per chunk.
         const adPostMap = await fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus);
+        const adThumbnailMap = await fetchAdThumbnailMap(account.ad_account_id, accessToken, tokenStatus);
 
         // Chunks for one account stay sequential — each is saved as soon as
         // it's fetched, so a failure on a later chunk (rate limit, transient
@@ -240,7 +312,8 @@ export async function runFacebookAdsSync(overrides?: { since?: string; until?: s
             chunk.until,
             account.brand,
             tokenStatus,
-            adPostMap
+            adPostMap,
+            adThumbnailMap
           );
           if (rows.length > 0) await upsertAdsPerformance(rows);
           rowsSynced += rows.length;

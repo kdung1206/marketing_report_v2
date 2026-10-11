@@ -12,7 +12,7 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
-import { Globe, Search, Users, MousePointerClick, Eye, TrendingUp, RefreshCw, AlertCircle, Sparkles, Target } from "lucide-react";
+import { Globe, Search, Users, MousePointerClick, Eye, TrendingUp, RefreshCw, AlertCircle, Sparkles, Target, Clock } from "lucide-react";
 import { safeFetchJson } from "../App";
 import SeoToolsSection from "./SeoToolsSection";
 
@@ -53,6 +53,7 @@ interface Ga4ChannelSessionsDailyRow {
   date: string;
   channel: string;
   sessions: number | null;
+  avg_session_duration: number | null;
 }
 
 // Named groups the "Tổng hợp" tab's channel chart/table show individually —
@@ -175,6 +176,12 @@ const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(Math.round(v));
 const fmtCompact = (v: number) => new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(v);
 const fmtPercent = (v: number) => `${(v * 100).toFixed(1)}%`;
 const fmtPercent2 = (v: number) => `${(v * 100).toFixed(2)}%`;
+// Seconds -> "m:ss" (e.g. 135 -> "2:15"); "—" when there's no data to average.
+const fmtDuration = (seconds: number | null) => {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return "—";
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
 
 function todayStr(offsetDays = 0): string {
   const d = new Date();
@@ -347,14 +354,26 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
 
   const channelTotals = useMemo(() => {
     const totals = new Map<string, number>(CHANNEL_ORDER.map((c) => [c, 0]));
+    // Session-weighted average of each row's averageSessionDuration, using
+    // only rows that have one (rows synced before the column existed are null
+    // until the daily sync's rolling window refreshes them) — the weight is
+    // those rows' own sessions, so a gap lowers coverage, not accuracy.
+    const durationWeighted = new Map<string, { seconds: number; sessions: number }>();
     channelScoped.forEach((r) => {
       const bucket = bucketChannel(r.channel);
       totals.set(bucket, (totals.get(bucket) || 0) + n(r.sessions));
+      if (r.avg_session_duration != null && n(r.sessions) > 0) {
+        const entry = durationWeighted.get(bucket) || { seconds: 0, sessions: 0 };
+        entry.seconds += r.avg_session_duration * n(r.sessions);
+        entry.sessions += n(r.sessions);
+        durationWeighted.set(bucket, entry);
+      }
     });
     const grandTotal = Array.from(totals.values()).reduce((s, v) => s + v, 0);
     return CHANNEL_ORDER.map((channel) => {
       const sessions = totals.get(channel) || 0;
-      return { channel, sessions, share: grandTotal ? sessions / grandTotal : 0 };
+      const d = durationWeighted.get(channel);
+      return { channel, sessions, share: grandTotal ? sessions / grandTotal : 0, avgSessionSeconds: d && d.sessions ? d.seconds / d.sessions : null };
     });
   }, [channelScoped]);
 
@@ -375,6 +394,22 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
   }, [channelScoped]);
 
   const sessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.sessions), 0);
+  // Site-wide average session duration for the period, weighted by each day's
+  // sessions (a plain mean of daily averages would let a quiet day count as
+  // much as a busy one). Note ga4_insights_daily.avg_engagement_time_seconds
+  // is actually GA4's averageSessionDuration despite the column name — see
+  // fetchGa4DailyMetrics in googleWebsiteSync.ts.
+  const avgSessionSeconds = (() => {
+    let seconds = 0;
+    let sessions = 0;
+    ga4Scoped.forEach((r) => {
+      if (r.avg_engagement_time_seconds != null && n(r.sessions) > 0) {
+        seconds += r.avg_engagement_time_seconds * n(r.sessions);
+        sessions += n(r.sessions);
+      }
+    });
+    return sessions ? seconds / sessions : null;
+  })();
   const organicSessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.organic_sessions), 0);
   const activeUsersTotal = ga4Scoped.reduce((s, r) => s + n(r.active_users), 0);
   const newUsersTotal = ga4Scoped.reduce((s, r) => s + n(r.new_users), 0);
@@ -633,8 +668,15 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
           {activeSection === "overview" && (
             <div className="space-y-6">
               {/* 1. KPI tổng quan */}
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                 <PlatformStat icon={Users} label="Sessions" value={fmtCompact(sessionsTotal)} sub={`${periodWeeks} tuần`} color="text-indigo-600 bg-indigo-50 border-indigo-200" />
+                <PlatformStat
+                  icon={Clock}
+                  label="Time on site"
+                  value={fmtDuration(avgSessionSeconds)}
+                  sub="TB / session (phút:giây)"
+                  color="text-indigo-600 bg-indigo-50 border-indigo-200"
+                />
                 <PlatformStat
                   icon={TrendingUp}
                   label="Organic Sessions"
@@ -686,6 +728,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                       <tr className="border-b border-slate-100 text-left text-slate-400">
                         <th className="pb-2 font-medium">Kênh</th>
                         <th className="pb-2 font-medium text-right">Sessions</th>
+                        <th className="pb-2 font-medium text-right" title="Thời gian trung bình mỗi session (phút:giây), trung bình có trọng số theo sessions">Time on site</th>
                         <th className="pb-2 font-medium text-right">Tỉ trọng</th>
                       </tr>
                     </thead>
@@ -699,6 +742,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                             </span>
                           </td>
                           <td className="py-2 text-right font-mono">{fmt(row.sessions)}</td>
+                          <td className="py-2 text-right font-mono">{fmtDuration(row.avgSessionSeconds)}</td>
                           <td className="py-2 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <span className="font-mono">{fmtPercent2(row.share)}</span>
@@ -742,6 +786,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                         <th className="pb-2 font-medium">Loại trang</th>
                         <th className="pb-2 font-medium text-right">Pageviews</th>
                         <th className="pb-2 font-medium text-right">Users</th>
+                        <th className="pb-2 font-medium text-right" title="Thời gian tương tác trung bình trên mỗi user (phút:giây) = tổng thời gian tương tác ÷ users của các trang thuộc loại này (GA4: Average engagement time per user)">Time on page</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -750,6 +795,7 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                           <td className="py-2">{row.type}</td>
                           <td className="py-2 text-right font-mono">{fmt(row.views)}</td>
                           <td className="py-2 text-right font-mono">{fmt(row.users)}</td>
+                          <td className="py-2 text-right font-mono">{fmtDuration(row.users > 0 ? row.engagement / row.users : null)}</td>
                         </tr>
                       ))}
                     </tbody>

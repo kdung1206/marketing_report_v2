@@ -125,6 +125,7 @@ export interface Ga4ChannelSessionsDailyRow {
   date: string; // YYYY-MM-DD
   channel: string;
   sessions: number | null;
+  avg_session_duration: number | null; // seconds, GA4 averageSessionDuration — see schema.sql
 }
 
 // -- Local (src/db_store.json) helpers ---------------------------------------

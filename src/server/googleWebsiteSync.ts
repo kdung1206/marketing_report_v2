@@ -13,6 +13,7 @@
 // ---------------------------------------------------------------------------
 import { encrypt, decrypt } from "./crypto";
 import { YOUTUBE_CLIENT_ID, YOUTUBE_AUTHORIZE_URL } from "./youtubeSync";
+import { upsertGa4AdTrafficDaily, Ga4AdTrafficDailyRow } from "./ga4AdTrafficStore";
 import {
   getGoogleWebsiteAccounts,
   upsertGa4InsightsDaily,
@@ -288,12 +289,43 @@ async function fetchGa4ChannelSessionsDaily(accessToken: string, propertyId: str
   const rows = await runGa4Report(accessToken, propertyId, {
     dateRanges: [{ startDate: since, endDate: until }],
     dimensions: [{ name: "date" }, { name: "sessionDefaultChannelGroup" }],
-    metrics: [{ name: "sessions" }],
+    // averageSessionDuration is an average, not a count — safe here (unlike
+    // folding it into the total-sessions report above) because this report is
+    // already one row per date+channel, so each row's average is for exactly
+    // that slice; combine across rows later weighted by `sessions`.
+    metrics: [{ name: "sessions" }, { name: "averageSessionDuration" }],
   });
   return rows.map((row: any) => ({
     date: formatGa4Date(row.dimensionValues?.[0]?.value || ""),
     channel: row.dimensionValues?.[1]?.value || "(not set)",
     sessions: Number(row.metricValues?.[0]?.value) || 0,
+    avg_session_duration: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+  }));
+}
+
+// Sessions + average session duration per paid campaign/ad per day, for the
+// Digital Ads Report's Top Ads cards (time on site per creative). Filtered to
+// medium = "paid" (what these accounts' ad UTMs use — confirmed against live
+// GA4 data: Facebook placements fb/an/ig/th and TikTok all report medium
+// "paid") so organic/direct/referral rows don't pile in. Deliberately omits
+// sessionSource from the dimensions: Facebook splits one ad across several
+// placements (fb/an/ig/th), and GA4 can compute a correct averageSessionDuration
+// for the merged campaign+ad slice itself — re-averaging per-placement
+// averages here would need the very weighting GA4 already does.
+async function fetchGa4AdTrafficDaily(accessToken: string, propertyId: string, since: string, until: string): Promise<Omit<Ga4AdTrafficDailyRow, "account_id">[]> {
+  const rows = await runGa4Report(accessToken, propertyId, {
+    dateRanges: [{ startDate: since, endDate: until }],
+    dimensions: [{ name: "date" }, { name: "sessionCampaignName" }, { name: "sessionManualAdContent" }],
+    metrics: [{ name: "sessions" }, { name: "averageSessionDuration" }],
+    dimensionFilter: { filter: { fieldName: "sessionMedium", stringFilter: { matchType: "EXACT", value: "paid", caseSensitive: false } } },
+    limit: 100000,
+  });
+  return rows.map((row: any) => ({
+    date: formatGa4Date(row.dimensionValues?.[0]?.value || ""),
+    campaign_key: row.dimensionValues?.[1]?.value || "(not set)",
+    ad_key: row.dimensionValues?.[2]?.value || "(not set)",
+    sessions: Number(row.metricValues?.[0]?.value) || 0,
+    avg_session_duration: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
   }));
 }
 
@@ -532,6 +564,17 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
         const channelRowsWithAccount: Ga4ChannelSessionsDailyRow[] = channelRows.map((r) => ({ account_id: account.id, ...r }));
         await upsertGa4ChannelSessionsDaily(channelRowsWithAccount);
         ga4ChannelRowsSynced = channelRowsWithAccount.length;
+
+        // Own try/catch: this feeds an auxiliary card (Top Ads time on site),
+        // so a failure here (e.g. a property with no UTM-tagged traffic, or a
+        // transient GA4 error) must not fail the core GA4/Search Console sync
+        // around it.
+        try {
+          const adTrafficRows = await fetchGa4AdTrafficDaily(accessToken, account.ga4_property_id, since, until);
+          await upsertGa4AdTrafficDaily(adTrafficRows.map((r) => ({ account_id: account.id, ...r })) as Ga4AdTrafficDailyRow[]);
+        } catch (err: any) {
+          console.error(`Đồng bộ GA4 theo quảng cáo thất bại cho ${account.id}:`, err?.message || err);
+        }
 
         const pageRows = await fetchGa4PageMetrics(accessToken, account.ga4_property_id, since, until);
         await replaceGa4PagesSummary(account.id, pageRows);

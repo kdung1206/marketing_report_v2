@@ -598,6 +598,31 @@ create table if not exists ga4_channel_sessions_daily (
 
 alter table ga4_channel_sessions_daily enable row level security;
 
+-- GA4 averageSessionDuration (seconds) for that day's sessions in that channel
+-- group — powers the "thời gian TB/session" column of Website Report's
+-- "Nguồn traffic" table. Stored as the per-row AVERAGE (weight by `sessions`
+-- when combining rows) because GA4 has no raw total-duration metric to sum.
+-- Null on rows synced before this column existed, until the daily sync's
+-- rolling window re-upserts them.
+alter table ga4_channel_sessions_daily add column if not exists avg_session_duration numeric;
+
+-- Web sessions + time on site per paid campaign/ad (GA4 sessionCampaignName /
+-- sessionManualAdContent, medium = paid) — see src/server/ga4AdTrafficStore.ts
+-- for how Facebook (exact, via {{campaign.id}}/{{ad.id}} UTMs) and TikTok
+-- (campaign-name only) rows get matched to ads_performance. One row per
+-- account+date+campaign+ad, upserted over the daily sync's rolling window.
+create table if not exists ga4_ad_traffic_daily (
+  account_id text not null references google_website_accounts(id) on delete cascade,
+  date date not null,
+  campaign_key text not null,
+  ad_key text not null,
+  sessions int not null default 0,
+  avg_session_duration numeric, -- seconds; an average, weight by sessions
+  primary key (account_id, date, campaign_key, ad_key)
+);
+
+alter table ga4_ad_traffic_daily enable row level security;
+
 -- Rolling ~30-day snapshot of per-page metrics, one row per account per page
 -- — refreshed wholesale (delete-then-insert, not upsert) on every daily sync
 -- so pages that dropped out of the top set don't linger forever. Powers the

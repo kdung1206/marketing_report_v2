@@ -171,6 +171,7 @@ import { checkExpiringConnectionsAndNotify } from "./expiryNotifier";
 import { checkBudgetPacingAndNotify } from "./budgetPacingNotifier";
 import { geminiClient, GEMINI_MODEL } from "./geminiClient";
 import { getTechnicalSeoChecks } from "./technicalSeoStore";
+import { getGa4AdTrafficSummary } from "./ga4AdTrafficStore";
 import { runTechnicalSeoSync } from "./technicalSeoSync";
 import { scanPage } from "./onpageScanner";
 import {
@@ -2756,6 +2757,27 @@ app.get("/api/google-website/insights", requireAuth(), async (req, res) => {
       ga4Device,
       gscDevice,
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/google-website/ad-traffic?brand=&since=&until= — GA4 sessions +
+// time on site per paid campaign/ad for the brand's connected Website
+// account(s), already collapsed to one row per campaign_key+ad_key. The
+// Digital Ads Report joins this to ads_performance client-side (see
+// ga4AdTrafficStore.ts). Empty (not an error) when the brand has no GA4
+// account connected — e.g. Livotec today — so the report just hides the metric.
+app.get("/api/google-website/ad-traffic", requireAuth(), async (req, res) => {
+  try {
+    const brand = typeof req.query.brand === "string" ? req.query.brand : "";
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date().toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since
+      ? req.query.since
+      : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active && a.ga4_property_id && (!brand || a.brand === brand));
+    const rows = await getGa4AdTrafficSummary(accounts.map((a) => a.id), since, until);
+    res.json({ success: true, rows });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -48,6 +48,29 @@ const n = (v: number | null | undefined) => v || 0;
 const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(Math.round(v));
 const fmtCompact = (v: number) => new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(v);
 const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`;
+// Seconds -> "m:ss" (135 -> "2:15").
+const fmtDuration = (seconds: number) => {
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
+
+// GA4 web traffic per paid campaign/ad (GET /api/google-website/ad-traffic),
+// shared with every AdCard through context because TopAdsGallery is rendered
+// by 4 different tabs — threading it through each tab's props would touch all
+// of them for no reason. Facebook ads match EXACTLY by ad id (their UTMs carry
+// {{ad.id}}); other channels (TikTok) only tag the campaign name, so they
+// match at campaign level. See ga4AdTrafficStore.ts.
+interface AdTrafficRow {
+  campaign_key: string;
+  ad_key: string;
+  sessions: number;
+  avg_session_duration: number | null;
+}
+interface AdTrafficLookup {
+  byAdId: Map<string, AdTrafficRow>;
+  byCampaignName: Map<string, AdTrafficRow>;
+}
+const AdTrafficContext = React.createContext<AdTrafficLookup | null>(null);
 
 function todayStr(offsetDays = 0): string {
   const d = new Date();
@@ -79,20 +102,27 @@ function sumRows(rows: Pick<AdsPerformanceRow, "spend" | "impressions" | "clicks
 }
 
 function aggregateByCampaign(rows: AdsPerformanceRow[]) {
-  const byKey = new Map<string, { channel: AdsChannel; campaign_name: string; ad_group_name: string; ad_name: string } & ReturnType<typeof sumRows>>();
+  const byKey = new Map<string, { channel: AdsChannel; campaign_name: string; ad_group_name: string; ad_name: string; thumbnail_url: string | null; ad_id: string | null } & ReturnType<typeof sumRows>>();
   for (const r of rows) {
     const key = `${r.channel}|${r.campaign_name}|${r.ad_group_name}|${r.ad_name}`;
     const existing = byKey.get(key);
     const totals = sumRows([r]);
+    // Only Facebook rows carry a creative image (extra.thumbnail_url, see
+    // facebookAdsSync.ts). Rows arrive date-ascending, so the last non-null
+    // one is the freshest signed CDN URL.
+    const thumb = typeof r.extra?.thumbnail_url === "string" ? (r.extra.thumbnail_url as string) : null;
+    const adId = typeof r.extra?.ad_id === "string" ? (r.extra.ad_id as string) : null;
     if (existing) {
+      if (adId) existing.ad_id = adId;
       existing.spend += totals.spend;
       existing.impressions += totals.impressions;
       existing.clicks += totals.clicks;
       existing.reach += totals.reach;
       existing.video_views += totals.video_views;
       existing.conversions += totals.conversions;
+      if (thumb) existing.thumbnail_url = thumb;
     } else {
-      byKey.set(key, { channel: r.channel, campaign_name: r.campaign_name, ad_group_name: r.ad_group_name, ad_name: r.ad_name, ...totals });
+      byKey.set(key, { channel: r.channel, campaign_name: r.campaign_name, ad_group_name: r.ad_group_name, ad_name: r.ad_name, thumbnail_url: thumb, ad_id: adId, ...totals });
     }
   }
   return Array.from(byKey.values()).sort((a, b) => b.spend - a.spend);
@@ -226,26 +256,55 @@ function metricCells(m: ReturnType<typeof sumRows>, extraColumns?: { label: stri
 
 const TOP_ADS_GALLERY_SIZE = 8;
 
-// A single ad as a card — thumbnail placeholder (channel-colored; Google/
-// TikTok ads have no creative image in this data model, and Facebook ads
-// aren't joined to their boosted post's thumbnail here) + campaign/ad-set
+// A single ad as a card — creative image for Facebook ads (extra.thumbnail_url,
+// synced from the Marketing API), placeholder otherwise (Google/TikTok ads come
+// from Excel uploads with no creative image, and Facebook rows synced before
+// this was added have none until the next sync) + campaign/ad-set
 // context + 2 metric rows. Row 2 is CTR/CPM/Video views instead of
 // Conversions/CPC (approved change from the original card demo) — Video
 // views is omitted entirely when the ad has none (most Facebook/Google ads
 // aren't video), rather than showing a misleading "0".
 const AdCard: React.FC<{ ad: AdsDrilldownRow }> = ({ ad }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  const traffic = React.useContext(AdTrafficContext);
   const ctr = safeDiv(ad.clicks, ad.impressions);
   const cpm = safeDiv(ad.spend, ad.impressions) * 1000;
+
+  // Exact per-ad match for Facebook (UTM {{ad.id}} == Meta ad_id); campaign
+  // level for everything else, which is said so in the label/tooltip rather
+  // than passing a campaign average off as this ad's own time on site.
+  const exact = ad.channel === "facebook" && ad.ad_id ? traffic?.byAdId.get(ad.ad_id) : undefined;
+  const campaignLevel = !exact && ad.channel !== "facebook" ? traffic?.byCampaignName.get(ad.campaign_name) : undefined;
+  const web = exact || campaignLevel;
+  const webMetric =
+    web && web.avg_session_duration != null && web.sessions > 0
+      ? {
+          label: campaignLevel ? "Time on site (camp.)" : "Time on site",
+          value: fmtDuration(web.avg_session_duration),
+          title: `${fmt(web.sessions)} sessions từ GA4${campaignLevel ? " — số liệu cả campaign (quảng cáo TikTok chỉ gắn UTM theo tên campaign, không theo từng ad)" : ""}`,
+        }
+      : null;
+
   const row2 = [
     { label: "CTR", value: fmtPct(ctr) },
     ad.impressions > 0 ? { label: "CPM", value: fmt(cpm) } : null,
     ad.video_views > 0 ? { label: "Video views", value: fmtCompact(ad.video_views) } : null,
-  ].filter((m): m is { label: string; value: string } => m !== null);
+    webMetric,
+  ].filter((m): m is { label: string; value: string; title?: string } => m !== null);
 
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
-      <div className="relative flex aspect-[16/11] shrink-0 items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        <Megaphone className="h-8 w-8 text-slate-300" />
+      <div className="relative flex aspect-[16/11] shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+        {ad.thumbnail_url && !imgFailed ? (
+          <img
+            src={ad.thumbnail_url}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <Megaphone className="h-8 w-8 text-slate-300" />
+        )}
         <span
           className="absolute left-1.5 top-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold text-white"
           style={{ backgroundColor: CHANNEL_COLORS[ad.channel] }}
@@ -280,7 +339,7 @@ const AdCard: React.FC<{ ad: AdsDrilldownRow }> = ({ ad }) => {
         {row2.length > 0 && (
           <div className="grid gap-1.5 text-center" style={{ gridTemplateColumns: `repeat(${row2.length}, minmax(0, 1fr))` }}>
             {row2.map((m) => (
-              <div key={m.label}>
+              <div key={m.label} title={m.title}>
                 <span className="block font-mono text-sm font-bold text-slate-900">{m.value}</span>
                 <span className="block text-[9px] uppercase tracking-wide text-slate-400">{m.label}</span>
               </div>
@@ -529,6 +588,36 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
     };
   }, [since, until, selectedBrand, activeChannel]);
 
+  // GA4 time on site per ad — best-effort and independent of the ads fetch
+  // above: a brand with no GA4 connected (Livotec today) or a failed request
+  // just leaves the cards without that metric, never an error banner.
+  const [adTraffic, setAdTraffic] = useState<AdTrafficRow[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams({ since, until, brand: selectedBrand });
+        const result = await safeFetchJson(`/api/google-website/ad-traffic?${params.toString()}`);
+        if (!cancelled) setAdTraffic(result.success ? result.rows || [] : []);
+      } catch {
+        if (!cancelled) setAdTraffic([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [since, until, selectedBrand]);
+
+  const adTrafficLookup = useMemo<AdTrafficLookup>(() => {
+    const byAdId = new Map<string, AdTrafficRow>();
+    const byCampaignName = new Map<string, AdTrafficRow>();
+    for (const r of adTraffic) {
+      if (r.ad_key && r.ad_key !== "(not set)") byAdId.set(r.ad_key, r);
+      else byCampaignName.set(r.campaign_key, r);
+    }
+    return { byAdId, byCampaignName };
+  }, [adTraffic]);
+
   const totals = useMemo(() => sumRows(rows), [rows]);
   const byCampaign = useMemo(() => aggregateByCampaign(rows), [rows]);
   const byDate = useMemo(() => aggregateByDate(rows), [rows]);
@@ -555,6 +644,7 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
   ];
 
   return (
+    <AdTrafficContext.Provider value={adTrafficLookup}>
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
@@ -619,6 +709,7 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
         <TiktokTab rows={rows} totals={totals} byCampaign={byCampaign} byDate={byDate} />
       )}
     </div>
+    </AdTrafficContext.Provider>
   );
 }
 
@@ -714,6 +805,7 @@ function AllChannelTab({
 // pulled by this sync — see the approved plan for why).
 // ---------------------------------------------------------------------------
 function FacebookTab({
+  rows,
   totals,
   byCampaign,
   byDate,
@@ -723,6 +815,16 @@ function FacebookTab({
   byCampaign: ReturnType<typeof aggregateByCampaign>;
   byDate: ReturnType<typeof aggregateByDate>;
 }) {
+  // Cost / Lead only divides the spend of campaigns that actually generated
+  // leads. Dividing ALL spend (awareness/traffic campaigns included, which
+  // never produce Meta leads) by the lead total made it meaningless: on
+  // production that was ~3.3 billion VND spread over a few hundred leads.
+  const leadCampaigns = new Set<string>();
+  const campaignLeadTotals = new Map<string, number>();
+  for (const r of rows) campaignLeadTotals.set(r.campaign_name, (campaignLeadTotals.get(r.campaign_name) || 0) + n(r.conversions));
+  for (const [name, leads] of campaignLeadTotals) if (leads > 0) leadCampaigns.add(name);
+  const leadCampaignSpend = rows.reduce((s, r) => s + (leadCampaigns.has(r.campaign_name) ? n(r.spend) : 0), 0);
+
   const cards: KpiCard[] = [
     { title: "Impressions", value: fmtCompact(totals.impressions), icon: Eye, color: "border-amber-200 bg-amber-50 text-amber-600" },
     { title: "Reach", value: fmtCompact(totals.reach), icon: Users, color: "border-sky-200 bg-sky-50 text-sky-600" },
@@ -731,7 +833,7 @@ function FacebookTab({
     { title: "CPC", value: fmt(safeDiv(totals.spend, totals.clicks)), icon: DollarSign, color: "border-rose-200 bg-rose-50 text-rose-600" },
     { title: "CPM", value: fmt(safeDiv(totals.spend, totals.impressions) * 1000), icon: DollarSign, color: "border-sky-200 bg-sky-50 text-sky-600" },
     { title: "Leads", value: fmtCompact(totals.conversions), icon: Target, color: "border-violet-200 bg-violet-50 text-violet-600" },
-    { title: "Cost / Lead", value: fmt(safeDiv(totals.spend, totals.conversions)), icon: DollarSign, color: "border-indigo-200 bg-indigo-50 text-indigo-600" },
+    { title: "Cost / Lead", value: totals.conversions > 0 ? fmt(safeDiv(leadCampaignSpend, totals.conversions)) : "—", icon: DollarSign, color: "border-indigo-200 bg-indigo-50 text-indigo-600" },
     { title: "Chi phí", value: fmtCompact(totals.spend), icon: DollarSign, color: "border-blue-200 bg-blue-50 text-blue-600" },
   ];
 
@@ -776,13 +878,18 @@ function FacebookTab({
       <TopAdsGallery rows={byCampaign} />
 
       <div>
-        <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
+        <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-400">Campaign Performance</span>
+        <p className="mb-2 text-[11px] leading-snug text-slate-400">
+          <b>Leads</b> = số lead Meta ghi nhận (hành động <code>lead</code> — form tức thì, pixel, v.v.); chỉ campaign mục tiêu thu lead mới có, nên
+          campaign Awareness/Traffic hiện "—". <b>Cost per Lead</b> = chi phí ÷ Leads của đúng dòng đó. Lưu ý: dữ liệu đồng bộ trước ngày 11/10/2026
+          đang bị đếm gấp đôi Leads (CPL thấp hơn thực tế một nửa) cho tới khi đồng bộ lại.
+        </p>
         <AdsDrilldownTable
           rows={byCampaign}
           extraColumns={[
             { label: "Reach", render: (r) => fmt(r.reach) },
             { label: "Frequency", render: (r) => safeDiv(r.impressions, r.reach).toFixed(2) },
-            { label: "Leads / Cost per Lead", render: (r) => `${fmt(r.conversions)} · ${fmt(safeDiv(r.spend, r.conversions))}` },
+            { label: "Leads / Cost per Lead", render: (r) => (r.conversions > 0 ? `${fmt(r.conversions)} · ${fmt(safeDiv(r.spend, r.conversions))}` : "—") },
           ]}
         />
       </div>
