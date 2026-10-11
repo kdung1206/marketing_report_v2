@@ -349,9 +349,14 @@ thì về icon. ⚠️ Cú pháp xin ảnh 480px của Meta chưa test được 
 - Tile "Cost / Lead" trước chia **toàn bộ** chi phí (~3,3 tỷ, gồm cả campaign Awareness/Traffic không bao giờ
   có lead) cho tổng Leads — vô nghĩa. Nay chỉ tính chi phí của campaign có phát sinh lead (đã đối chiếu
   độc lập: 70.706 khớp giao diện). Bảng Campaign Performance hiện "—" thay vì "0 · 0" + thêm dòng định nghĩa.
-- ⚠️ **Dữ liệu cũ vẫn gấp đôi** tới khi đồng bộ lại: cron tự sửa 30 ngày gần nhất; cũ hơn cần đồng bộ
-  thủ công với ngày bắt đầu sớm hơn, hoặc chia đôi bằng SQL (an toàn vì toàn bộ giá trị đều chẵn) — chờ
-  user quyết. Nhãn "Link Clicks" của tab Facebook thực chất là tổng clicks của Meta (chưa sửa).
+- ✅ **Dữ liệu cũ đã được sửa (cùng ngày, theo yêu cầu "tự động fix")**: kiểm tra production thấy 1.206 dòng
+  đồng bộ bằng công thức mới có `lead` = `lead_grouped` ở **100%** dòng (xác nhận Meta ghi trùng), còn 145
+  dòng cũ có Leads đều chẵn (tổng 514). Migration `halve_double_counted_facebook_leads` chia đôi đúng nhóm
+  dòng cũ (không có `extra.lead_actions`, Leads chẵn), đánh dấu `extra.leads_deduped = true` để **không bao
+  giờ chia đôi lần hai** và hoàn tác được (×2 các dòng có dấu đó). Kết quả: 514 → **257** (+4 từ dòng mới =
+  261 leads thật), đều là số nguyên; 13.760 dòng cũ không có lead giữ nguyên. Dòng nào được cron đồng bộ
+  lại sau này sẽ tự ghi đè bằng giá trị đúng. Nhãn "Link Clicks" của tab Facebook thực chất là tổng clicks
+  của Meta (chưa sửa).
 
 **Digital Ads Report — time on site theo từng quảng cáo**: kiểm tra GA4 thật của Karofi cho thấy UTM của
 quảng cáo Facebook đã gắn `utm_campaign` = ID campaign và `utm_content` = ID ad (trùng đúng `campaign_id`/
@@ -371,8 +376,7 @@ site" trong bảng Nguồn traffic (cột `avg_session_duration` mới trên `ga
 Nguồn traffic trống tới khi cron GA4 hàng ngày chạy lần đầu sau deploy.
 
 **Trạng thái**: ✅ Code + migration production + test thật qua UI cho cả 4 mục. 🟡 Chờ user bấm đồng bộ
-Facebook Ads/GA4 sau deploy để có ảnh, Leads đúng và time on site theo ad; 🟡 chờ user quyết cách xử lý dữ
-liệu Leads cũ.
+Facebook Ads/GA4 sau deploy để có ảnh và time on site theo ad (Leads cũ đã được sửa xong, không cần chờ).
 
 ---
 
@@ -384,7 +388,7 @@ liệu Leads cũ.
 | Facebook Page Insights + Ads (OAuth) | ✅ Ổn định, cron tự động hàng ngày, kết nối qua OAuth |
 | TikTok organic (Social Report) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, OAuth code xong nhưng chưa cấu hình (hold theo yêu cầu user) |
 | YouTube organic | ✅ Chạy được · ⚠️ Token hết hạn mỗi 7 ngày (OAuth consent screen ở chế độ Testing) |
-| Digital Ads Report (drilldown + Top Ads) | ✅ Có ảnh creative FB + Leads đã sửa + time on site theo ad (Giai đoạn 20) · ⚠️ cần đồng bộ lại để có ảnh/Leads đúng; Leads cũ hơn 30 ngày còn gấp đôi |
+| Digital Ads Report (drilldown + Top Ads) | ✅ Có ảnh creative FB + Leads đã sửa + time on site theo ad (Giai đoạn 20) · ✅ Leads cũ đã sửa (514 → 257) · ⚠️ cần đồng bộ lại để có ảnh/time on site theo ad |
 | Social Report (thẻ Facebook 1:1, TikTok 3:4, YouTube 16:9 — kích thước đồng bộ) | ✅ Ổn định, đã test thật qua UI (Giai đoạn 19) |
 | Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO + time on site (Giai đoạn 20) |
 | Campaign Calendar & Task (+ quản lý công việc nâng cao + drilldown task/ads/organic) | ✅ Code + schema xong, đã test thật qua UI (Giai đoạn 18) · 🟡 Chưa dùng thật trên production |
