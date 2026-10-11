@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-20).
+Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-21).
 
 ---
 
@@ -380,6 +380,39 @@ Facebook Ads/GA4 sau deploy để có ảnh và time on site theo ad (Leads cũ 
 
 ---
 
+## Giai đoạn 21 — "Time on page" thống nhất, tối ưu dung lượng ảnh, sync Facebook Ads bền hơn (11/10/2026)
+
+- `a465ff0` **Time on page thay "Time on site"** ở mọi chỗ (tile + bảng Nguồn traffic của Website Report,
+  thẻ Top Ads của Digital Ads Report; Top pages giữ nguyên): = `userEngagementDuration` ÷ `totalUsers` (GA4).
+  Lưu dạng **tổng cộng được** (`engagement_seconds`, `total_users`) ở `ga4_insights_daily`,
+  `ga4_channel_sessions_daily`, `ga4_ad_traffic_daily` nên mọi khoảng ngày là sum/sum, không còn trung bình
+  của trung bình. Đã bỏ cột `avg_session_duration` (tôi thêm hôm trước) khỏi 2 bảng. Test qua UI với dữ liệu
+  seed có đáp án (1:00 / 0:30 / 2:30 / 1:15, ngày thiếu dữ liệu bị bỏ qua đúng). Số mới chỉ có sau lần đồng
+  bộ GA4 kế tiếp.
+- **Giảm dung lượng ảnh**: ảnh quảng cáo chỉ là URL (~700 ký tự) nhưng bị lặp ở từng dòng theo ngày — production
+  có 1.206 dòng chứa chỉ **84 URL khác nhau** (~650 kB, tăng ~30 kB/ngày). Bảng mới `ad_creatives` (1 dòng/ad),
+  dòng theo ngày chỉ giữ `ad_id`; `/api/ads-performance` trả thêm map `ad_id → url` chỉ cho ad đang hiển thị.
+  Migration theo 3 bước an toàn (tạo+sao chép 84/84 → deploy code → xoá `thumbnail_url` khỏi `extra`, có câu
+  lệnh hoàn tác): cột `extra` của các dòng đó **1.319 kB → 172 kB (−87%)**, 0 dòng còn chứa URL. Ảnh Fanpage/
+  TikTok/YouTube chỉ ~130 kB tổng nên không động tới.
+- **Sync Facebook Ads bền hơn**: chẩn đoán "Livotec - Ngành 1" kẹt từ 07/10 không báo lỗi — nghi vấn mạnh là
+  cron/nút "Đồng bộ ngay" chạy mọi account trong 1 request giới hạn 60s và code chỉ lưu sau khi tải xong cả
+  account nên bị cắt = không lưu gì. Sửa: lưu từng trang Graph ngay khi nhận, tải bản đồ post + ảnh song song,
+  ưu tiên thumbnail 640px (ảnh gốc có thể 1,6MB/thẻ); `vercel.json` `maxDuration` 60 → **300** (project dùng
+  Fluid compute; Vercel đã chấp nhận, deploy READY). ⚠️ Nguyên nhân timeout chưa xác nhận trực tiếp (không đọc
+  được log chạy cũ) — cách kiểm tra: bấm "Đồng bộ ngay" Facebook Ads sau deploy, nếu "Livotec - Ngành 1" cập
+  nhật `last_synced_at` thì đúng. Cú pháp xin ảnh Meta kích thước lớn đã được Meta chấp nhận (URL lưu có
+  `p480x480`).
+- **Kiểm tra kết nối Facebook (user báo "không load được")**: chưa tái hiện được. Local Control Panel → Kết
+  nối nền tảng → Facebook tải bình thường; production trả 401/400 đúng và nhanh (<1s); `fb_pages`/
+  `fb_ad_accounts` không có lỗi, token chưa hết hạn, 2 Page đồng bộ lúc 05:07 11/10; trang đăng nhập Facebook
+  chấp nhận App ID (chuyển sang `login.php`, không báo lỗi). Cần user mô tả đúng màn hình/thông báo lỗi.
+
+**Trạng thái**: ✅ Time on page, dung lượng ảnh, sync bền hơn — đã deploy, migration xong. 🟡 Lỗi "không load được"
+kết nối Facebook chờ thêm thông tin; 🟡 chờ xác nhận "Livotec - Ngành 1" sau khi bấm đồng bộ.
+
+---
+
 ## Tổng hợp trạng thái theo tính năng (tính đến hết 11/10/2026)
 
 | Tính năng | Trạng thái |
@@ -388,9 +421,9 @@ Facebook Ads/GA4 sau deploy để có ảnh và time on site theo ad (Leads cũ 
 | Facebook Page Insights + Ads (OAuth) | ✅ Ổn định, cron tự động hàng ngày, kết nối qua OAuth |
 | TikTok organic (Social Report) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, OAuth code xong nhưng chưa cấu hình (hold theo yêu cầu user) |
 | YouTube organic | ✅ Chạy được · ⚠️ Token hết hạn mỗi 7 ngày (OAuth consent screen ở chế độ Testing) |
-| Digital Ads Report (drilldown + Top Ads) | ✅ Có ảnh creative FB + Leads đã sửa + time on site theo ad (Giai đoạn 20) · ✅ Leads cũ đã sửa (514 → 257) · ⚠️ cần đồng bộ lại để có ảnh/time on site theo ad |
+| Digital Ads Report (drilldown + Top Ads) | ✅ Có ảnh creative FB + Leads đã sửa + time on site theo ad (Giai đoạn 20-21: time on page, ảnh lưu 1 lần/ad) · ✅ Leads cũ đã sửa (514 → 257) · ⚠️ cần bấm đồng bộ Facebook Ads/GA4 để có ảnh và time on page theo ad |
 | Social Report (thẻ Facebook 1:1, TikTok 3:4, YouTube 16:9 — kích thước đồng bộ) | ✅ Ổn định, đã test thật qua UI (Giai đoạn 19) |
-| Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO + time on site (Giai đoạn 20) |
+| Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO + time on page (Giai đoạn 20-21) |
 | Campaign Calendar & Task (+ quản lý công việc nâng cao + drilldown task/ads/organic) | ✅ Code + schema xong, đã test thật qua UI (Giai đoạn 18) · 🟡 Chưa dùng thật trên production |
 | SEO Tools — Keyword Rank Tracker + Brand SOV | ✅ Code + migrate xong · ⚠️ Chưa gọi serper.dev thật lần nào |
 | SEO Tools — Backlink Tracker | ✅ Ổn định, đã test thật |
