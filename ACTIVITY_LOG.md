@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **10/10/2026** (Giai đoạn 1-19).
+Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-20).
 
 ---
 
@@ -332,7 +332,51 @@ CHĂM SÓC DA VÀ TÓC SAU SPA TẠI NHÀ" trong dữ liệu production theo ti�
 
 ---
 
-## Tổng hợp trạng thái theo tính năng (tính đến hết 10/10/2026)
+## Giai đoạn 20 — Digital Ads Report: ảnh quảng cáo, sửa Leads, time on site theo ad; Website Report time on site (11/10/2026)
+
+Gồm 3 yêu cầu của user về Digital Ads Report và 1 về Website Report.
+
+**Digital Ads Report — thẻ Top Ads không có ảnh**: đây là thiết kế cũ (sync Facebook Ads chưa từng xin
+ảnh creative từ Meta), không phải lỗi hiển thị. Nay sync lấy `image_url` (rơi về `thumbnail_url`) và lưu
+vào `ads_performance.extra` cùng `ad_id`/`campaign_id`; thẻ hiển thị ảnh trong khung cố định, ảnh hỏng
+thì về icon. ⚠️ Cú pháp xin ảnh 480px của Meta chưa test được với API thật (có nhánh thử lại bằng trường
+đơn giản — khi đó ảnh video có thể chỉ 64px). Ảnh chỉ xuất hiện sau lần đồng bộ Facebook Ads kế tiếp.
+
+**Digital Ads Report — định nghĩa Leads/Cost per Lead đang sai, đã sửa**:
+- Leads bị **đếm gấp đôi**: code cũ cộng `lead` + `onsite_conversion.lead_grouped` (Meta ghi cùng 1 lead ở
+  cả hai). Bằng chứng trên production: **149/149 dòng có Leads > 0 đều là số chẵn, 0 dòng lẻ**. Sửa: lấy
+  giá trị lớn hơn của hai loại; lưu raw `lead_actions` trong `extra` để đối chiếu sau.
+- Tile "Cost / Lead" trước chia **toàn bộ** chi phí (~3,3 tỷ, gồm cả campaign Awareness/Traffic không bao giờ
+  có lead) cho tổng Leads — vô nghĩa. Nay chỉ tính chi phí của campaign có phát sinh lead (đã đối chiếu
+  độc lập: 70.706 khớp giao diện). Bảng Campaign Performance hiện "—" thay vì "0 · 0" + thêm dòng định nghĩa.
+- ⚠️ **Dữ liệu cũ vẫn gấp đôi** tới khi đồng bộ lại: cron tự sửa 30 ngày gần nhất; cũ hơn cần đồng bộ
+  thủ công với ngày bắt đầu sớm hơn, hoặc chia đôi bằng SQL (an toàn vì toàn bộ giá trị đều chẵn) — chờ
+  user quyết. Nhãn "Link Clicks" của tab Facebook thực chất là tổng clicks của Meta (chưa sửa).
+
+**Digital Ads Report — time on site theo từng quảng cáo**: kiểm tra GA4 thật của Karofi cho thấy UTM của
+quảng cáo Facebook đã gắn `utm_campaign` = ID campaign và `utm_content` = ID ad (trùng đúng `campaign_id`/
+`ad_id` Meta), nên khớp chính xác từng ad (gộp các placement fb/an/ig/th); TikTok chỉ gắn tên campaign nên
+chỉ khớp cấp campaign (nhãn "Time on site (camp.)" + tooltip). Bảng mới `ga4_ad_traffic_daily` (migration
+đã chạy production), báo cáo GA4 mới (dimension date + sessionCampaignName + sessionManualAdContent, lọc
+medium = paid) trong cron GA4 hàng ngày — có try/catch riêng để lỗi ở đây không làm hỏng sync GA4 chính;
+route `GET /api/google-website/ad-traffic`; ô "Time on site" trên thẻ Top Ads (trung bình có trọng số theo
+sessions, tooltip hiện số sessions). Đã test qua UI với dữ liệu seed có đáp án biết trước (2:30 = trung
+bình có trọng số 400 sessions; ad không có dữ liệu GA4 thì ẩn ô; TikTok nhãn camp.).
+⚠️ Livotec chưa kết nối GA4 nên chưa có số; placement `an` (Audience Network) có time on site 236–299s so
+với `fb` 7–36s — nhiều khả năng không phản ánh người dùng thật.
+
+**Website Report — time on site**: tile "Time on site" (TB/session, trung bình có trọng số), cột "Time on
+site" trong bảng Nguồn traffic (cột `avg_session_duration` mới trên `ga4_channel_sessions_daily`, migration
+đã chạy production) và cột "Time on page" (thời gian tương tác TB/user) trong bảng Top pages (GA4). Cột
+Nguồn traffic trống tới khi cron GA4 hàng ngày chạy lần đầu sau deploy.
+
+**Trạng thái**: ✅ Code + migration production + test thật qua UI cho cả 4 mục. 🟡 Chờ user bấm đồng bộ
+Facebook Ads/GA4 sau deploy để có ảnh, Leads đúng và time on site theo ad; 🟡 chờ user quyết cách xử lý dữ
+liệu Leads cũ.
+
+---
+
+## Tổng hợp trạng thái theo tính năng (tính đến hết 11/10/2026)
 
 | Tính năng | Trạng thái |
 |---|---|
@@ -340,9 +384,9 @@ CHĂM SÓC DA VÀ TÓC SAU SPA TẠI NHÀ" trong dữ liệu production theo ti�
 | Facebook Page Insights + Ads (OAuth) | ✅ Ổn định, cron tự động hàng ngày, kết nối qua OAuth |
 | TikTok organic (Social Report) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, OAuth code xong nhưng chưa cấu hình (hold theo yêu cầu user) |
 | YouTube organic | ✅ Chạy được · ⚠️ Token hết hạn mỗi 7 ngày (OAuth consent screen ở chế độ Testing) |
-| Digital Ads Report (drilldown + Top Ads) | ✅ Ổn định |
+| Digital Ads Report (drilldown + Top Ads) | ✅ Có ảnh creative FB + Leads đã sửa + time on site theo ad (Giai đoạn 20) · ⚠️ cần đồng bộ lại để có ảnh/Leads đúng; Leads cũ hơn 30 ngày còn gấp đôi |
 | Social Report (thẻ Facebook 1:1, TikTok 3:4, YouTube 16:9 — kích thước đồng bộ) | ✅ Ổn định, đã test thật qua UI (Giai đoạn 19) |
-| Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO |
+| Website Report (GA4 + Search Console) | ✅ Redesign mục A-D hoàn tất — KPI/nhận định/kênh/Top pages/Organic pages/từ khoá SEO + time on site (Giai đoạn 20) |
 | Campaign Calendar & Task (+ quản lý công việc nâng cao + drilldown task/ads/organic) | ✅ Code + schema xong, đã test thật qua UI (Giai đoạn 18) · 🟡 Chưa dùng thật trên production |
 | SEO Tools — Keyword Rank Tracker + Brand SOV | ✅ Code + migrate xong · ⚠️ Chưa gọi serper.dev thật lần nào |
 | SEO Tools — Backlink Tracker | ✅ Ổn định, đã test thật |
