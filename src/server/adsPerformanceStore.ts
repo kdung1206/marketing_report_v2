@@ -250,6 +250,52 @@ export async function getDistinctAdsCampaignNames(brand: string, channel: AdsCha
   return Array.from(new Set(rows.map((r) => r.campaign_name))).sort();
 }
 
+// -- Ad creative images (one row per ad — see supabase/schema.sql) --------------
+
+export interface AdCreativeRow {
+  ad_id: string;
+  thumbnail_url: string;
+}
+
+export async function upsertAdCreatives(rows: AdCreativeRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  const stamped = rows.map((r) => ({ ad_id: r.ad_id, channel: "facebook" as const, thumbnail_url: r.thumbnail_url, updated_at: new Date().toISOString() }));
+
+  if (!isSupabaseConfigured) {
+    const { store } = await readLocalCollections();
+    const existing: any[] = Array.isArray(store.ad_creatives) ? store.ad_creatives : [];
+    const byId = new Map(existing.map((r) => [r.ad_id, r]));
+    for (const row of stamped) byId.set(row.ad_id, row);
+    await writeLocalCollections(store, { ad_creatives: Array.from(byId.values()) } as any);
+    return;
+  }
+
+  const { error } = await supabase.from("ad_creatives").upsert(stamped, { onConflict: "ad_id" });
+  if (error) throw new Error(`Lỗi lưu ảnh quảng cáo: ${error.message}`);
+}
+
+// ad_id -> image URL for just the ads a report is showing (chunked: each id is
+// 18 digits and PostgREST carries the list in the URL).
+export async function getAdCreatives(adIds: string[]): Promise<Record<string, string>> {
+  const ids = Array.from(new Set(adIds.filter(Boolean)));
+  const out: Record<string, string> = {};
+  if (ids.length === 0) return out;
+
+  if (!isSupabaseConfigured) {
+    const { store } = await readLocalCollections();
+    const idSet = new Set(ids);
+    for (const r of Array.isArray(store.ad_creatives) ? store.ad_creatives : []) if (idSet.has(r.ad_id)) out[r.ad_id] = r.thumbnail_url;
+    return out;
+  }
+
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase.from("ad_creatives").select("ad_id,thumbnail_url").in("ad_id", ids.slice(i, i + 100));
+    if (error) throw new Error(`Lỗi đọc ảnh quảng cáo: ${error.message}`);
+    for (const r of data || []) out[r.ad_id] = r.thumbnail_url;
+  }
+  return out;
+}
+
 // -- Facebook Ad Accounts (Marketing API config) -------------------------------
 
 export async function getFbAdAccounts(): Promise<FbAdAccountConfig[]> {

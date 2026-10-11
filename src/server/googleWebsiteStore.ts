@@ -53,7 +53,11 @@ export interface Ga4InsightsDailyRow {
   active_users: number | null;
   new_users: number | null;
   engaged_sessions: number | null;
-  avg_engagement_time_seconds: number | null;
+  avg_engagement_time_seconds: number | null; // legacy, no longer written
+  // "Time on page" = engagement_seconds / total_users (GA4 userEngagementDuration
+  // and totalUsers) — additive, so any date range is sum/sum.
+  engagement_seconds: number | null;
+  total_users: number | null;
   conversions: number | null;
   bounce_rate: number | null;
 }
@@ -125,7 +129,8 @@ export interface Ga4ChannelSessionsDailyRow {
   date: string; // YYYY-MM-DD
   channel: string;
   sessions: number | null;
-  avg_session_duration: number | null; // seconds, GA4 averageSessionDuration — see schema.sql
+  engagement_seconds: number | null; // GA4 userEngagementDuration — see schema.sql
+  total_users: number | null;
 }
 
 // -- Local (src/db_store.json) helpers ---------------------------------------

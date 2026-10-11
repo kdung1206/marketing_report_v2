@@ -357,6 +357,21 @@ create table if not exists ads_performance (
 -- no-op there.
 alter table ads_performance add column if not exists post_id text;
 
+-- One creative image URL per ad, stored ONCE here instead of inside every
+-- daily ads_performance row's `extra` (an ad runs ~30 days in the rolling sync
+-- window, so the same ~700-char signed URL used to be repeated ~14x per ad on
+-- production: 1,206 rows holding only 84 distinct URLs, ~650 kB and growing
+-- ~30 kB/day). Rows keep just extra.ad_id; the report joins on it. Signed CDN
+-- URLs expire (~7 days), so the daily sync overwrites each ad's row.
+create table if not exists ad_creatives (
+  ad_id text primary key,
+  channel text not null default 'facebook' check (channel in ('facebook', 'google', 'tiktok')),
+  thumbnail_url text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table ad_creatives enable row level security;
+
 create index if not exists ads_performance_channel_date_idx on ads_performance (channel, date);
 create index if not exists ads_performance_brand_date_idx on ads_performance (brand, date);
 create index if not exists ads_performance_post_id_idx on ads_performance (post_id);
@@ -598,15 +613,21 @@ create table if not exists ga4_channel_sessions_daily (
 
 alter table ga4_channel_sessions_daily enable row level security;
 
--- GA4 averageSessionDuration (seconds) for that day's sessions in that channel
--- group — powers the "thời gian TB/session" column of Website Report's
--- "Nguồn traffic" table. Stored as the per-row AVERAGE (weight by `sessions`
--- when combining rows) because GA4 has no raw total-duration metric to sum.
--- Null on rows synced before this column existed, until the daily sync's
--- rolling window re-upserts them.
-alter table ga4_channel_sessions_daily add column if not exists avg_session_duration numeric;
+-- "Time on page" inputs for that day's sessions in that channel group — GA4
+-- userEngagementDuration (total seconds) and totalUsers, both ADDITIVE, so the
+-- Website Report's "Nguồn traffic" column is sum(engagement_seconds)/sum(total_users)
+-- over any range (same definition as the Top pages table). Null on rows synced
+-- before these columns existed, until the daily sync's rolling window rewrites
+-- them. (An earlier version stored averageSessionDuration here — dropped.)
+alter table ga4_channel_sessions_daily add column if not exists engagement_seconds numeric;
+alter table ga4_channel_sessions_daily add column if not exists total_users int;
+alter table ga4_channel_sessions_daily drop column if exists avg_session_duration;
 
--- Web sessions + time on site per paid campaign/ad (GA4 sessionCampaignName /
+-- Same two inputs for the site-wide "Time on page" tile.
+alter table ga4_insights_daily add column if not exists engagement_seconds numeric;
+alter table ga4_insights_daily add column if not exists total_users int;
+
+-- Web sessions + time on page per paid campaign/ad (GA4 sessionCampaignName /
 -- sessionManualAdContent, medium = paid) — see src/server/ga4AdTrafficStore.ts
 -- for how Facebook (exact, via {{campaign.id}}/{{ad.id}} UTMs) and TikTok
 -- (campaign-name only) rows get matched to ads_performance. One row per
@@ -617,7 +638,8 @@ create table if not exists ga4_ad_traffic_daily (
   campaign_key text not null,
   ad_key text not null,
   sessions int not null default 0,
-  avg_session_duration numeric, -- seconds; an average, weight by sessions
+  engagement_seconds numeric, -- GA4 userEngagementDuration; additive
+  total_users int, -- GA4 totalUsers for the slice; Time on page = sum(seconds)/sum(users)
   primary key (account_id, date, campaign_key, ad_key)
 );
 

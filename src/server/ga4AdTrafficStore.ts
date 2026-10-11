@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
-// Storage for ga4_ad_traffic_daily — web sessions + time on site per
+// Storage for ga4_ad_traffic_daily — web sessions + time on page per
 // paid-campaign/ad, keyed by the UTM values GA4 reports (sessionCampaignName /
-// sessionManualAdContent). Used to put "time on site" on the Digital Ads
+// sessionManualAdContent). Used to put "Time on page" on the Digital Ads
 // Report's Top Ads cards by matching GA4 against ads_performance:
 //   - Facebook ads tag their links with {{campaign.id}} / {{ad.id}}, so
 //     campaign_key/ad_key equal the Meta campaign_id/ad_id that
@@ -22,7 +22,8 @@ export interface Ga4AdTrafficDailyRow {
   campaign_key: string; // GA4 sessionCampaignName
   ad_key: string; // GA4 sessionManualAdContent ("(not set)" when untagged)
   sessions: number;
-  avg_session_duration: number | null; // seconds — an average, weight by sessions when combining
+  engagement_seconds: number | null; // GA4 userEngagementDuration (total seconds)
+  total_users: number | null; // GA4 totalUsers for that day+campaign+ad slice
 }
 
 const rowKey = (r: Pick<Ga4AdTrafficDailyRow, "account_id" | "date" | "campaign_key" | "ad_key">) =>
@@ -54,11 +55,13 @@ export interface Ga4AdTrafficSummaryRow {
   campaign_key: string;
   ad_key: string;
   sessions: number;
-  avg_session_duration: number | null;
+  // Time on page in seconds = sum(engagement_seconds) / sum(total_users) over
+  // the range; null when no row has both.
+  avg_time_on_page: number | null;
 }
 
 // One row per campaign_key+ad_key for the requested date range, already
-// collapsed across days/accounts with a session-weighted average duration —
+// collapsed across days/accounts (engagement seconds and users are both additive) —
 // the client only ever needs the per-ad total, so there's no reason to ship
 // the daily rows.
 export async function getGa4AdTrafficSummary(accountIds: string[], since: string, until: string): Promise<Ga4AdTrafficSummaryRow[]> {
@@ -77,14 +80,14 @@ export async function getGa4AdTrafficSummary(accountIds: string[], since: string
     });
   }
 
-  const byKey = new Map<string, { campaign_key: string; ad_key: string; sessions: number; weightedSeconds: number; weightedSessions: number }>();
+  const byKey = new Map<string, { campaign_key: string; ad_key: string; sessions: number; engagement: number; users: number }>();
   for (const r of rows) {
     const key = `${r.campaign_key}|${r.ad_key}`;
-    const entry = byKey.get(key) || { campaign_key: r.campaign_key, ad_key: r.ad_key, sessions: 0, weightedSeconds: 0, weightedSessions: 0 };
+    const entry = byKey.get(key) || { campaign_key: r.campaign_key, ad_key: r.ad_key, sessions: 0, engagement: 0, users: 0 };
     entry.sessions += r.sessions || 0;
-    if (r.avg_session_duration != null && r.sessions > 0) {
-      entry.weightedSeconds += Number(r.avg_session_duration) * r.sessions;
-      entry.weightedSessions += r.sessions;
+    if (r.engagement_seconds != null && r.total_users != null) {
+      entry.engagement += Number(r.engagement_seconds);
+      entry.users += Number(r.total_users);
     }
     byKey.set(key, entry);
   }
@@ -92,6 +95,6 @@ export async function getGa4AdTrafficSummary(accountIds: string[], since: string
     campaign_key: e.campaign_key,
     ad_key: e.ad_key,
     sessions: e.sessions,
-    avg_session_duration: e.weightedSessions > 0 ? e.weightedSeconds / e.weightedSessions : null,
+    avg_time_on_page: e.users > 0 ? e.engagement / e.users : null,
   }));
 }

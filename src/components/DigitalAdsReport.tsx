@@ -64,7 +64,7 @@ interface AdTrafficRow {
   campaign_key: string;
   ad_key: string;
   sessions: number;
-  avg_session_duration: number | null;
+  avg_time_on_page: number | null; // seconds = engagement time / users
 }
 interface AdTrafficLookup {
   byAdId: Map<string, AdTrafficRow>;
@@ -101,17 +101,16 @@ function sumRows(rows: Pick<AdsPerformanceRow, "spend" | "impressions" | "clicks
   );
 }
 
-function aggregateByCampaign(rows: AdsPerformanceRow[]) {
+function aggregateByCampaign(rows: AdsPerformanceRow[], creatives: Record<string, string>) {
   const byKey = new Map<string, { channel: AdsChannel; campaign_name: string; ad_group_name: string; ad_name: string; thumbnail_url: string | null; ad_id: string | null } & ReturnType<typeof sumRows>>();
   for (const r of rows) {
     const key = `${r.channel}|${r.campaign_name}|${r.ad_group_name}|${r.ad_name}`;
     const existing = byKey.get(key);
     const totals = sumRows([r]);
-    // Only Facebook rows carry a creative image (extra.thumbnail_url, see
-    // facebookAdsSync.ts). Rows arrive date-ascending, so the last non-null
-    // one is the freshest signed CDN URL.
-    const thumb = typeof r.extra?.thumbnail_url === "string" ? (r.extra.thumbnail_url as string) : null;
+    // Only Facebook ads have a creative image: stored once per ad in
+    // ad_creatives (see schema.sql) and joined here by ad_id.
     const adId = typeof r.extra?.ad_id === "string" ? (r.extra.ad_id as string) : null;
+    const thumb = adId ? creatives[adId] || null : null;
     if (existing) {
       if (adId) existing.ad_id = adId;
       existing.spend += totals.spend;
@@ -256,8 +255,7 @@ function metricCells(m: ReturnType<typeof sumRows>, extraColumns?: { label: stri
 
 const TOP_ADS_GALLERY_SIZE = 8;
 
-// A single ad as a card — creative image for Facebook ads (extra.thumbnail_url,
-// synced from the Marketing API), placeholder otherwise (Google/TikTok ads come
+// A single ad as a card — creative image for Facebook ads (ad_creatives, synced from the Marketing API), placeholder otherwise (Google/TikTok ads come
 // from Excel uploads with no creative image, and Facebook rows synced before
 // this was added have none until the next sync) + campaign/ad-set
 // context + 2 metric rows. Row 2 is CTR/CPM/Video views instead of
@@ -272,16 +270,16 @@ const AdCard: React.FC<{ ad: AdsDrilldownRow }> = ({ ad }) => {
 
   // Exact per-ad match for Facebook (UTM {{ad.id}} == Meta ad_id); campaign
   // level for everything else, which is said so in the label/tooltip rather
-  // than passing a campaign average off as this ad's own time on site.
+  // than passing a campaign average off as this ad's own time on page.
   const exact = ad.channel === "facebook" && ad.ad_id ? traffic?.byAdId.get(ad.ad_id) : undefined;
   const campaignLevel = !exact && ad.channel !== "facebook" ? traffic?.byCampaignName.get(ad.campaign_name) : undefined;
   const web = exact || campaignLevel;
   const webMetric =
-    web && web.avg_session_duration != null && web.sessions > 0
+    web && web.avg_time_on_page != null && web.sessions > 0
       ? {
-          label: campaignLevel ? "Time on site (camp.)" : "Time on site",
-          value: fmtDuration(web.avg_session_duration),
-          title: `${fmt(web.sessions)} sessions từ GA4${campaignLevel ? " — số liệu cả campaign (quảng cáo TikTok chỉ gắn UTM theo tên campaign, không theo từng ad)" : ""}`,
+          label: campaignLevel ? "Time on page (camp.)" : "Time on page",
+          value: fmtDuration(web.avg_time_on_page),
+          title: `Thời gian tương tác TB trên mỗi user (GA4) · ${fmt(web.sessions)} sessions${campaignLevel ? " — số liệu cả campaign (quảng cáo TikTok chỉ gắn UTM theo tên campaign, không theo từng ad)" : ""}`,
         }
       : null;
 
@@ -559,6 +557,7 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
   const [since, setSince] = useState(todayStr(-30));
   const [until, setUntil] = useState(todayStr());
   const [rows, setRows] = useState<AdsPerformanceRow[]>([]);
+  const [creatives, setCreatives] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -574,6 +573,7 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
         if (cancelled) return;
         if (result.success) {
           setRows(result.rows || []);
+          setCreatives(result.creatives || {});
         } else {
           setError(result.error || "Không tải được dữ liệu quảng cáo.");
         }
@@ -588,7 +588,7 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
     };
   }, [since, until, selectedBrand, activeChannel]);
 
-  // GA4 time on site per ad — best-effort and independent of the ads fetch
+  // GA4 time on page per ad — best-effort and independent of the ads fetch
   // above: a brand with no GA4 connected (Livotec today) or a failed request
   // just leaves the cards without that metric, never an error banner.
   const [adTraffic, setAdTraffic] = useState<AdTrafficRow[]>([]);
@@ -619,7 +619,7 @@ export default function DigitalAdsReport({ selectedBrand, setSelectedBrand }: Di
   }, [adTraffic]);
 
   const totals = useMemo(() => sumRows(rows), [rows]);
-  const byCampaign = useMemo(() => aggregateByCampaign(rows), [rows]);
+  const byCampaign = useMemo(() => aggregateByCampaign(rows, creatives), [rows, creatives]);
   const byDate = useMemo(() => aggregateByDate(rows), [rows]);
 
   const byChannelTotals = useMemo(() => {

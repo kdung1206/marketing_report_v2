@@ -104639,6 +104639,37 @@ async function getDistinctAdsCampaignNames(brand, channel) {
   });
   return Array.from(new Set(rows.map((r2) => r2.campaign_name))).sort();
 }
+async function upsertAdCreatives(rows) {
+  if (rows.length === 0) return;
+  const stamped = rows.map((r2) => ({ ad_id: r2.ad_id, channel: "facebook", thumbnail_url: r2.thumbnail_url, updated_at: (/* @__PURE__ */ new Date()).toISOString() }));
+  if (!isSupabaseConfigured) {
+    const { store } = await readLocalCollections3();
+    const existing = Array.isArray(store.ad_creatives) ? store.ad_creatives : [];
+    const byId = new Map(existing.map((r2) => [r2.ad_id, r2]));
+    for (const row of stamped) byId.set(row.ad_id, row);
+    await writeLocalCollections3(store, { ad_creatives: Array.from(byId.values()) });
+    return;
+  }
+  const { error } = await supabase.from("ad_creatives").upsert(stamped, { onConflict: "ad_id" });
+  if (error) throw new Error(`L\u1ED7i l\u01B0u \u1EA3nh qu\u1EA3ng c\xE1o: ${error.message}`);
+}
+async function getAdCreatives(adIds) {
+  const ids = Array.from(new Set(adIds.filter(Boolean)));
+  const out = {};
+  if (ids.length === 0) return out;
+  if (!isSupabaseConfigured) {
+    const { store } = await readLocalCollections3();
+    const idSet = new Set(ids);
+    for (const r2 of Array.isArray(store.ad_creatives) ? store.ad_creatives : []) if (idSet.has(r2.ad_id)) out[r2.ad_id] = r2.thumbnail_url;
+    return out;
+  }
+  for (let i2 = 0; i2 < ids.length; i2 += 100) {
+    const { data, error } = await supabase.from("ad_creatives").select("ad_id,thumbnail_url").in("ad_id", ids.slice(i2, i2 + 100));
+    if (error) throw new Error(`L\u1ED7i \u0111\u1ECDc \u1EA3nh qu\u1EA3ng c\xE1o: ${error.message}`);
+    for (const r2 of data || []) out[r2.ad_id] = r2.thumbnail_url;
+  }
+  return out;
+}
 async function getFbAdAccounts() {
   if (!isSupabaseConfigured) {
     const { fb_ad_accounts } = await readLocalCollections3();
@@ -105001,8 +105032,8 @@ async function fetchAdPostMap(adAccountId, accessToken, tokenStatus) {
 async function fetchAdThumbnailMap(adAccountId, accessToken, tokenStatus) {
   const map = /* @__PURE__ */ new Map();
   const attempts = [
-    `/${adAccountId}/ads?fields=id,creative.thumbnail_width(480).thumbnail_height(480){image_url,thumbnail_url}&limit=200`,
-    `/${adAccountId}/ads?fields=id,creative{image_url,thumbnail_url}&limit=200`
+    `/${adAccountId}/ads?fields=id,creative.thumbnail_width(640).thumbnail_height(640){image_url,thumbnail_url}&limit=500`,
+    `/${adAccountId}/ads?fields=id,creative{image_url,thumbnail_url}&limit=500`
   ];
   for (const path3 of attempts) {
     let body;
@@ -105018,7 +105049,7 @@ async function fetchAdThumbnailMap(adAccountId, accessToken, tokenStatus) {
     }
     while (body) {
       for (const item of body.data || []) {
-        const url = item.creative?.image_url || item.creative?.thumbnail_url;
+        const url = item.creative?.thumbnail_url || item.creative?.image_url;
         if (item.id && url) map.set(item.id, url);
       }
       const nextUrl = body.paging?.next;
@@ -105035,8 +105066,8 @@ async function fetchAdThumbnailMap(adAccountId, accessToken, tokenStatus) {
   }
   return map;
 }
-async function fetchAdAccountInsights(adAccountId, accessToken, since, until, brand, tokenStatus, adPostMap, adThumbnailMap) {
-  const rows = [];
+async function fetchAdAccountInsights(adAccountId, accessToken, since, until, brand, tokenStatus, adPostMap, adThumbnailMap, savePage) {
+  let total = 0;
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
   let body;
   try {
@@ -105049,9 +105080,13 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
     throw err;
   }
   while (body) {
+    const rows = [];
+    const creatives = /* @__PURE__ */ new Map();
     for (const item of body.data || []) {
       if (!item.date_start || !item.campaign_name) continue;
       const leads = leadCount(item.actions);
+      const thumbnail = item.ad_id ? adThumbnailMap.get(item.ad_id) : void 0;
+      if (item.ad_id && thumbnail) creatives.set(item.ad_id, { ad_id: item.ad_id, thumbnail_url: thumbnail });
       rows.push({
         channel: "facebook",
         brand,
@@ -105074,17 +105109,18 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
         // ad_id/campaign_id are exactly what this account's ads put in their
         // UTM tags ({{ad.id}} → GA4 sessionManualAdContent, {{campaign.id}} →
         // sessionCampaignName — confirmed against live GA4 data), so keeping
-        // them is what lets web time-on-site be matched back to each ad.
+        // them is what lets web time-on-page be matched back to each ad.
         // lead_actions keeps Meta's raw lead/lead_grouped values for auditing
         // the Leads definition (see leadCount).
         extra: {
           ad_id: item.ad_id || null,
           campaign_id: item.campaign_id || null,
-          thumbnail_url: item.ad_id ? adThumbnailMap.get(item.ad_id) || null : null,
           lead_actions: { lead: leads.lead, lead_grouped: leads.lead_grouped }
         }
       });
     }
+    if (rows.length > 0) await savePage(rows, Array.from(creatives.values()));
+    total += rows.length;
     const nextUrl = body.paging?.next;
     if (!nextUrl) break;
     try {
@@ -105103,7 +105139,7 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
       break;
     }
   }
-  return rows;
+  return total;
 }
 async function runFacebookAdsSync(overrides) {
   const accounts = (await getFbAdAccounts()).filter((a) => a.is_active);
@@ -105118,10 +105154,12 @@ async function runFacebookAdsSync(overrides) {
       try {
         const accessToken = decrypt(account.access_token_encrypted);
         if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
-        const adPostMap = await fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus);
-        const adThumbnailMap = await fetchAdThumbnailMap(account.ad_account_id, accessToken, tokenStatus);
+        const [adPostMap, adThumbnailMap] = await Promise.all([
+          fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus),
+          fetchAdThumbnailMap(account.ad_account_id, accessToken, tokenStatus)
+        ]);
         for (const chunk of chunks) {
-          const rows = await fetchAdAccountInsights(
+          rowsSynced += await fetchAdAccountInsights(
             account.ad_account_id,
             accessToken,
             chunk.since,
@@ -105129,10 +105167,12 @@ async function runFacebookAdsSync(overrides) {
             account.brand,
             tokenStatus,
             adPostMap,
-            adThumbnailMap
+            adThumbnailMap,
+            async (rows, creatives) => {
+              await upsertAdsPerformance(rows);
+              await upsertAdCreatives(creatives);
+            }
           );
-          if (rows.length > 0) await upsertAdsPerformance(rows);
-          rowsSynced += rows.length;
         }
         await setFbAdAccountSyncStatus(account.ad_account_id, {
           last_synced_at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -106299,11 +106339,11 @@ async function getGa4AdTrafficSummary(accountIds, since, until) {
   const byKey = /* @__PURE__ */ new Map();
   for (const r2 of rows) {
     const key = `${r2.campaign_key}|${r2.ad_key}`;
-    const entry = byKey.get(key) || { campaign_key: r2.campaign_key, ad_key: r2.ad_key, sessions: 0, weightedSeconds: 0, weightedSessions: 0 };
+    const entry = byKey.get(key) || { campaign_key: r2.campaign_key, ad_key: r2.ad_key, sessions: 0, engagement: 0, users: 0 };
     entry.sessions += r2.sessions || 0;
-    if (r2.avg_session_duration != null && r2.sessions > 0) {
-      entry.weightedSeconds += Number(r2.avg_session_duration) * r2.sessions;
-      entry.weightedSessions += r2.sessions;
+    if (r2.engagement_seconds != null && r2.total_users != null) {
+      entry.engagement += Number(r2.engagement_seconds);
+      entry.users += Number(r2.total_users);
     }
     byKey.set(key, entry);
   }
@@ -106311,7 +106351,7 @@ async function getGa4AdTrafficSummary(accountIds, since, until) {
     campaign_key: e2.campaign_key,
     ad_key: e2.ad_key,
     sessions: e2.sessions,
-    avg_session_duration: e2.weightedSessions > 0 ? e2.weightedSeconds / e2.weightedSessions : null
+    avg_time_on_page: e2.users > 0 ? e2.engagement / e2.users : null
   }));
 }
 
@@ -106435,9 +106475,13 @@ async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
         { name: "activeUsers" },
         { name: "newUsers" },
         { name: "engagedSessions" },
-        { name: "averageSessionDuration" },
+        // "Time on page" is userEngagementDuration (total seconds) / totalUsers
+        // — summed, not averaged, so it can be combined across days exactly
+        // (see ga4_insights_daily.engagement_seconds in schema.sql).
+        { name: "userEngagementDuration" },
         { name: "conversions" },
-        { name: "bounceRate" }
+        { name: "bounceRate" },
+        { name: "totalUsers" }
       ]
     }),
     runGa4Report(accessToken, propertyId, {
@@ -106459,7 +106503,7 @@ async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
   }
   return totalRows.map((row) => {
     const date = formatGa4Date(row.dimensionValues?.[0]?.value || "");
-    const [sessions, activeUsers, newUsers, engagedSessions, avgSessionDuration, conversions, bounceRate] = (row.metricValues || []).map(
+    const [sessions, activeUsers, newUsers, engagedSessions, engagementSeconds, conversions, bounceRate, totalUsers] = (row.metricValues || []).map(
       (m2) => Number(m2.value)
     );
     return {
@@ -106469,7 +106513,11 @@ async function fetchGa4DailyMetrics(accessToken, propertyId, since, until) {
       active_users: activeUsers ?? null,
       new_users: newUsers ?? null,
       engaged_sessions: engagedSessions ?? null,
-      avg_engagement_time_seconds: avgSessionDuration ?? null,
+      // Legacy column (it held averageSessionDuration despite its name); no
+      // longer written — the report now uses engagement_seconds/total_users.
+      avg_engagement_time_seconds: null,
+      engagement_seconds: engagementSeconds ?? null,
+      total_users: totalUsers ?? null,
       conversions: conversions ?? null,
       bounce_rate: bounceRate ?? null
     };
@@ -106479,24 +106527,24 @@ async function fetchGa4ChannelSessionsDaily(accessToken, propertyId, since, unti
   const rows = await runGa4Report(accessToken, propertyId, {
     dateRanges: [{ startDate: since, endDate: until }],
     dimensions: [{ name: "date" }, { name: "sessionDefaultChannelGroup" }],
-    // averageSessionDuration is an average, not a count — safe here (unlike
-    // folding it into the total-sessions report above) because this report is
-    // already one row per date+channel, so each row's average is for exactly
-    // that slice; combine across rows later weighted by `sessions`.
-    metrics: [{ name: "sessions" }, { name: "averageSessionDuration" }]
+    // Total engagement seconds + users (both additive), so "Time on page" for
+    // a channel over any date range is sum(engagement)/sum(users) — no
+    // averaging of averages.
+    metrics: [{ name: "sessions" }, { name: "userEngagementDuration" }, { name: "totalUsers" }]
   });
   return rows.map((row) => ({
     date: formatGa4Date(row.dimensionValues?.[0]?.value || ""),
     channel: row.dimensionValues?.[1]?.value || "(not set)",
     sessions: Number(row.metricValues?.[0]?.value) || 0,
-    avg_session_duration: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null
+    engagement_seconds: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+    total_users: row.metricValues?.[2]?.value != null ? Number(row.metricValues[2].value) : null
   }));
 }
 async function fetchGa4AdTrafficDaily(accessToken, propertyId, since, until) {
   const rows = await runGa4Report(accessToken, propertyId, {
     dateRanges: [{ startDate: since, endDate: until }],
     dimensions: [{ name: "date" }, { name: "sessionCampaignName" }, { name: "sessionManualAdContent" }],
-    metrics: [{ name: "sessions" }, { name: "averageSessionDuration" }],
+    metrics: [{ name: "sessions" }, { name: "userEngagementDuration" }, { name: "totalUsers" }],
     dimensionFilter: { filter: { fieldName: "sessionMedium", stringFilter: { matchType: "EXACT", value: "paid", caseSensitive: false } } },
     limit: 1e5
   });
@@ -106505,7 +106553,8 @@ async function fetchGa4AdTrafficDaily(accessToken, propertyId, since, until) {
     campaign_key: row.dimensionValues?.[1]?.value || "(not set)",
     ad_key: row.dimensionValues?.[2]?.value || "(not set)",
     sessions: Number(row.metricValues?.[0]?.value) || 0,
-    avg_session_duration: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null
+    engagement_seconds: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+    total_users: row.metricValues?.[2]?.value != null ? Number(row.metricValues[2].value) : null
   }));
 }
 async function fetchGa4PageMetrics(accessToken, propertyId, since, until) {
@@ -129603,7 +129652,8 @@ app.get("/api/ads-performance", requireAuth(), async (req, res) => {
     const until = typeof req.query.until === "string" && req.query.until ? req.query.until : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
     const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
     const rows = await getAdsPerformance({ channels, brand, since, until });
-    res.json({ success: true, rows });
+    const creatives = await getAdCreatives(rows.map((r2) => typeof r2.extra?.ad_id === "string" ? r2.extra.ad_id : ""));
+    res.json({ success: true, rows, creatives });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

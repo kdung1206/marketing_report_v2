@@ -233,9 +233,13 @@ async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, sin
         { name: "activeUsers" },
         { name: "newUsers" },
         { name: "engagedSessions" },
-        { name: "averageSessionDuration" },
+        // "Time on page" is userEngagementDuration (total seconds) / totalUsers
+        // — summed, not averaged, so it can be combined across days exactly
+        // (see ga4_insights_daily.engagement_seconds in schema.sql).
+        { name: "userEngagementDuration" },
         { name: "conversions" },
         { name: "bounceRate" },
+        { name: "totalUsers" },
       ],
     }),
     runGa4Report(accessToken, propertyId, {
@@ -259,7 +263,7 @@ async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, sin
 
   return totalRows.map((row: any) => {
     const date = formatGa4Date(row.dimensionValues?.[0]?.value || "");
-    const [sessions, activeUsers, newUsers, engagedSessions, avgSessionDuration, conversions, bounceRate] = (row.metricValues || []).map(
+    const [sessions, activeUsers, newUsers, engagedSessions, engagementSeconds, conversions, bounceRate, totalUsers] = (row.metricValues || []).map(
       (m: any) => Number(m.value)
     );
     return {
@@ -269,7 +273,11 @@ async function fetchGa4DailyMetrics(accessToken: string, propertyId: string, sin
       active_users: activeUsers ?? null,
       new_users: newUsers ?? null,
       engaged_sessions: engagedSessions ?? null,
-      avg_engagement_time_seconds: avgSessionDuration ?? null,
+      // Legacy column (it held averageSessionDuration despite its name); no
+      // longer written — the report now uses engagement_seconds/total_users.
+      avg_engagement_time_seconds: null,
+      engagement_seconds: engagementSeconds ?? null,
+      total_users: totalUsers ?? null,
       conversions: conversions ?? null,
       bounce_rate: bounceRate ?? null,
     } as Omit<Ga4InsightsDailyRow, "account_id">;
@@ -289,34 +297,33 @@ async function fetchGa4ChannelSessionsDaily(accessToken: string, propertyId: str
   const rows = await runGa4Report(accessToken, propertyId, {
     dateRanges: [{ startDate: since, endDate: until }],
     dimensions: [{ name: "date" }, { name: "sessionDefaultChannelGroup" }],
-    // averageSessionDuration is an average, not a count — safe here (unlike
-    // folding it into the total-sessions report above) because this report is
-    // already one row per date+channel, so each row's average is for exactly
-    // that slice; combine across rows later weighted by `sessions`.
-    metrics: [{ name: "sessions" }, { name: "averageSessionDuration" }],
+    // Total engagement seconds + users (both additive), so "Time on page" for
+    // a channel over any date range is sum(engagement)/sum(users) — no
+    // averaging of averages.
+    metrics: [{ name: "sessions" }, { name: "userEngagementDuration" }, { name: "totalUsers" }],
   });
   return rows.map((row: any) => ({
     date: formatGa4Date(row.dimensionValues?.[0]?.value || ""),
     channel: row.dimensionValues?.[1]?.value || "(not set)",
     sessions: Number(row.metricValues?.[0]?.value) || 0,
-    avg_session_duration: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+    engagement_seconds: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+    total_users: row.metricValues?.[2]?.value != null ? Number(row.metricValues[2].value) : null,
   }));
 }
 
-// Sessions + average session duration per paid campaign/ad per day, for the
-// Digital Ads Report's Top Ads cards (time on site per creative). Filtered to
+// Sessions + engagement time + users per paid campaign/ad per day, for the
+// Digital Ads Report's Top Ads cards ("Time on page" per creative). Filtered to
 // medium = "paid" (what these accounts' ad UTMs use — confirmed against live
 // GA4 data: Facebook placements fb/an/ig/th and TikTok all report medium
 // "paid") so organic/direct/referral rows don't pile in. Deliberately omits
 // sessionSource from the dimensions: Facebook splits one ad across several
-// placements (fb/an/ig/th), and GA4 can compute a correct averageSessionDuration
-// for the merged campaign+ad slice itself — re-averaging per-placement
-// averages here would need the very weighting GA4 already does.
+// placements (fb/an/ig/th), and GA4 returns the merged campaign+ad slice's own
+// engagement total and user count, which add up exactly across days.
 async function fetchGa4AdTrafficDaily(accessToken: string, propertyId: string, since: string, until: string): Promise<Omit<Ga4AdTrafficDailyRow, "account_id">[]> {
   const rows = await runGa4Report(accessToken, propertyId, {
     dateRanges: [{ startDate: since, endDate: until }],
     dimensions: [{ name: "date" }, { name: "sessionCampaignName" }, { name: "sessionManualAdContent" }],
-    metrics: [{ name: "sessions" }, { name: "averageSessionDuration" }],
+    metrics: [{ name: "sessions" }, { name: "userEngagementDuration" }, { name: "totalUsers" }],
     dimensionFilter: { filter: { fieldName: "sessionMedium", stringFilter: { matchType: "EXACT", value: "paid", caseSensitive: false } } },
     limit: 100000,
   });
@@ -325,7 +332,8 @@ async function fetchGa4AdTrafficDaily(accessToken: string, propertyId: string, s
     campaign_key: row.dimensionValues?.[1]?.value || "(not set)",
     ad_key: row.dimensionValues?.[2]?.value || "(not set)",
     sessions: Number(row.metricValues?.[0]?.value) || 0,
-    avg_session_duration: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+    engagement_seconds: row.metricValues?.[1]?.value != null ? Number(row.metricValues[1].value) : null,
+    total_users: row.metricValues?.[2]?.value != null ? Number(row.metricValues[2].value) : null,
   }));
 }
 
@@ -565,7 +573,7 @@ export async function runGoogleWebsiteSync(): Promise<GoogleWebsiteSyncResult[]>
         await upsertGa4ChannelSessionsDaily(channelRowsWithAccount);
         ga4ChannelRowsSynced = channelRowsWithAccount.length;
 
-        // Own try/catch: this feeds an auxiliary card (Top Ads time on site),
+        // Own try/catch: this feeds an auxiliary card (Top Ads time on page),
         // so a failure here (e.g. a property with no UTM-tagged traffic, or a
         // transient GA4 error) must not fail the core GA4/Search Console sync
         // around it.

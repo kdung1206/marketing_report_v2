@@ -18,8 +18,10 @@ import { graphGet, isTokenInvalidError, toDateStr, GraphApiError, TokenStatus } 
 import {
   getFbAdAccounts,
   upsertAdsPerformance,
+  upsertAdCreatives,
   setFbAdAccountSyncStatus,
   AdsPerformanceRow,
+  AdCreativeRow,
 } from "./adsPerformanceStore";
 
 // Ads insights (unlike Page Insights) don't get revised as aggressively after
@@ -131,20 +133,22 @@ async function fetchAdPostMap(adAccountId: string, accessToken: string, tokenSta
 
 // Maps ad_id -> a creative image URL, for the Digital Ads Report's Top Ads
 // cards (previously always a placeholder: nothing in this sync ever asked
-// Meta for the creative image). `image_url` is the full-size image for image
-// ads; video ads have none, so fall back to `thumbnail_url` — Meta serves
-// that at 64x64 unless asked for a size, hence the first attempt requests
-// 480x480 via the field-expansion size modifiers. If Meta rejects that syntax
-// the second attempt asks for the plain fields, so a wrong guess costs
-// resolution, never the whole map. Deliberately a SEPARATE request from
+// Meta for the creative image). `thumbnail_url` works for image AND video ads
+// but Meta serves it at 64x64 unless asked for a size, hence the first attempt
+// requests 640x640 via the field-expansion size modifiers (confirmed accepted
+// by Meta on production: stored URLs carry `p480x480`/sized crops). It is
+// preferred over `image_url`, which is the original upload — up to ~1.6MB per
+// card, 8 cards per gallery. If Meta rejects the modifiers the second attempt
+// asks for the plain fields, so a wrong guess costs resolution, never the whole
+// map. Deliberately a SEPARATE request from
 // fetchAdPostMap: a failure here must never lose the post_id mapping.
 // Signed CDN URLs do expire eventually; the daily cron re-pulls them for the
 // rolling window, and the UI falls back to the placeholder on a dead image.
 async function fetchAdThumbnailMap(adAccountId: string, accessToken: string, tokenStatus: TokenStatus): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   const attempts = [
-    `/${adAccountId}/ads?fields=id,creative.thumbnail_width(480).thumbnail_height(480){image_url,thumbnail_url}&limit=200`,
-    `/${adAccountId}/ads?fields=id,creative{image_url,thumbnail_url}&limit=200`,
+    `/${adAccountId}/ads?fields=id,creative.thumbnail_width(640).thumbnail_height(640){image_url,thumbnail_url}&limit=500`,
+    `/${adAccountId}/ads?fields=id,creative{image_url,thumbnail_url}&limit=500`,
   ];
 
   for (const path of attempts) {
@@ -162,7 +166,7 @@ async function fetchAdThumbnailMap(adAccountId: string, accessToken: string, tok
 
     while (body) {
       for (const item of body.data || []) {
-        const url = item.creative?.image_url || item.creative?.thumbnail_url;
+        const url = item.creative?.thumbnail_url || item.creative?.image_url;
         if (item.id && url) map.set(item.id, url);
       }
       const nextUrl = body.paging?.next;
@@ -188,9 +192,10 @@ async function fetchAdAccountInsights(
   brand: string | null,
   tokenStatus: TokenStatus,
   adPostMap: Map<string, string>,
-  adThumbnailMap: Map<string, string>
-): Promise<AdsPerformanceRow[]> {
-  const rows: AdsPerformanceRow[] = [];
+  adThumbnailMap: Map<string, string>,
+  savePage: (rows: AdsPerformanceRow[], creatives: AdCreativeRow[]) => Promise<void>
+): Promise<number> {
+  let total = 0;
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
 
   let body: any;
@@ -208,9 +213,14 @@ async function fetchAdAccountInsights(
   // token already embedded) — fetched directly rather than through graphGet,
   // which always appends its own access_token param.
   while (body) {
+    const rows: AdsPerformanceRow[] = [];
+    // One image per ad (not per daily row) — see ad_creatives in schema.sql.
+    const creatives = new Map<string, AdCreativeRow>();
     for (const item of body.data || []) {
       if (!item.date_start || !item.campaign_name) continue;
       const leads = leadCount(item.actions);
+      const thumbnail = item.ad_id ? adThumbnailMap.get(item.ad_id) : undefined;
+      if (item.ad_id && thumbnail) creatives.set(item.ad_id, { ad_id: item.ad_id, thumbnail_url: thumbnail });
       rows.push({
         channel: "facebook",
         brand,
@@ -233,17 +243,23 @@ async function fetchAdAccountInsights(
         // ad_id/campaign_id are exactly what this account's ads put in their
         // UTM tags ({{ad.id}} → GA4 sessionManualAdContent, {{campaign.id}} →
         // sessionCampaignName — confirmed against live GA4 data), so keeping
-        // them is what lets web time-on-site be matched back to each ad.
+        // them is what lets web time-on-page be matched back to each ad.
         // lead_actions keeps Meta's raw lead/lead_grouped values for auditing
         // the Leads definition (see leadCount).
         extra: {
           ad_id: item.ad_id || null,
           campaign_id: item.campaign_id || null,
-          thumbnail_url: item.ad_id ? adThumbnailMap.get(item.ad_id) || null : null,
           lead_actions: { lead: leads.lead, lead_grouped: leads.lead_grouped },
         },
       });
     }
+
+    // Saved page by page, not after the whole account has been downloaded: the
+    // request runs under a hard function time limit, and a big account that got
+    // cut off mid-download used to save NOTHING (no rows, no error) — that is
+    // what left "Livotec - Ngành 1" stale for days. Partial progress now sticks.
+    if (rows.length > 0) await savePage(rows, Array.from(creatives.values()));
+    total += rows.length;
 
     const nextUrl = body.paging?.next;
     if (!nextUrl) break;
@@ -260,11 +276,11 @@ async function fetchAdAccountInsights(
     } catch (err: any) {
       if (isTokenInvalidError(err)) tokenStatus.invalid = true;
       console.error(`Facebook Ads insights (paging, ${adAccountId}) lỗi:`, err.message || err);
-      break; // partial data already collected is still worth keeping
+      break; // pages already saved above are still worth keeping
     }
   }
 
-  return rows;
+  return total;
 }
 
 export interface FacebookAdsSyncResult {
@@ -297,15 +313,18 @@ export async function runFacebookAdsSync(overrides?: { since?: string; until?: s
 
         // Fetched once per account, reused across every date-chunk below —
         // barely changes day to day, no reason to re-fetch it per chunk.
-        const adPostMap = await fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus);
-        const adThumbnailMap = await fetchAdThumbnailMap(account.ad_account_id, accessToken, tokenStatus);
+        // Independent requests — run together to save wall-clock time.
+        const [adPostMap, adThumbnailMap] = await Promise.all([
+          fetchAdPostMap(account.ad_account_id, accessToken, tokenStatus),
+          fetchAdThumbnailMap(account.ad_account_id, accessToken, tokenStatus),
+        ]);
 
         // Chunks for one account stay sequential — each is saved as soon as
         // it's fetched, so a failure on a later chunk (rate limit, transient
         // API error) still keeps everything fetched so far instead of losing
         // the whole backfill.
         for (const chunk of chunks) {
-          const rows = await fetchAdAccountInsights(
+          rowsSynced += await fetchAdAccountInsights(
             account.ad_account_id,
             accessToken,
             chunk.since,
@@ -313,10 +332,12 @@ export async function runFacebookAdsSync(overrides?: { since?: string; until?: s
             account.brand,
             tokenStatus,
             adPostMap,
-            adThumbnailMap
+            adThumbnailMap,
+            async (rows, creatives) => {
+              await upsertAdsPerformance(rows);
+              await upsertAdCreatives(creatives);
+            }
           );
-          if (rows.length > 0) await upsertAdsPerformance(rows);
-          rowsSynced += rows.length;
         }
 
         await setFbAdAccountSyncStatus(account.ad_account_id, {

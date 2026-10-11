@@ -103,6 +103,7 @@ import {
   AdsPerformanceRow,
   getAdsPerformanceByCampaignNames,
   getDistinctAdsCampaignNames,
+  getAdCreatives,
 } from "./adsPerformanceStore";
 import { getCampaignAdsLinks, createCampaignAdsLink, deleteCampaignAdsLink, getCampaignAdsLink } from "./campaignAdsLinksStore";
 import { runFacebookAdsSync } from "./facebookAdsSync";
@@ -1648,7 +1649,10 @@ app.get("/api/ads-performance", requireAuth(), async (req, res) => {
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const rows = await getAdsPerformance({ channels, brand, since, until });
-    res.json({ success: true, rows });
+    // Creative images live once per ad in ad_creatives (not inside every daily
+    // row), so ship just the ones these rows reference as an ad_id -> url map.
+    const creatives = await getAdCreatives(rows.map((r) => (typeof r.extra?.ad_id === "string" ? (r.extra.ad_id as string) : "")));
+    res.json({ success: true, rows, creatives });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
