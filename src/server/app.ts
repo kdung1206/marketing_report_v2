@@ -72,6 +72,8 @@ import {
   exchangeForLongLivedToken,
   listOwnedPages,
   listOwnedAdAccounts,
+  listPagesForToken,
+  inspectAccessToken,
   detectBrandFromFacebookName,
   FACEBOOK_REDIRECT_URI,
 } from "./facebookSync";
@@ -1351,6 +1353,55 @@ app.get("/api/facebook/oauth/callback", async (req, res) => {
   } catch (err: any) {
     console.error("GET /api/facebook/oauth/callback error:", err);
     res.status(500).send(`Kết nối Facebook thất bại: ${err.message}`);
+  }
+});
+
+// POST /api/facebook/token/connect — connect by pasting a System User Access
+// Token (Business Settings → System Users → Generate token, "Never" expires)
+// instead of the OAuth redirect. Validates the token, lists the Pages and Ad
+// Accounts assigned to it, and stashes them behind a pending id so the same
+// picker + POST .../pending/:id/complete used by the OAuth flow does the rest.
+app.post("/api/facebook/token/connect", requireAuth("Admin"), async (req, res) => {
+  const token = String(req.body?.access_token || "").trim();
+  if (!token) return res.status(400).json({ success: false, error: "Vui lòng dán Access Token." });
+  try {
+    let info;
+    try {
+      info = await inspectAccessToken(token);
+    } catch (err: any) {
+      return res.status(400).json({ success: false, error: `Token không hợp lệ hoặc đã hết hạn: ${err.message}` });
+    }
+
+    const [pagesResult, adAccountsResult] = await Promise.allSettled([listPagesForToken(token), listOwnedAdAccounts(token)]);
+    const pages = pagesResult.status === "fulfilled" ? pagesResult.value : [];
+    const adAccounts = adAccountsResult.status === "fulfilled" ? adAccountsResult.value : [];
+    if (pages.length === 0 && adAccounts.length === 0) {
+      const reason = [pagesResult, adAccountsResult].map((r) => (r.status === "rejected" ? (r.reason as any)?.message : null)).filter(Boolean).join(" | ");
+      return res.status(400).json({
+        success: false,
+        error: `Token hợp lệ nhưng không thấy Page hay Ad Account nào được gán cho System User này.${reason ? ` (${reason})` : ""} Hãy gán Asset trong Business Settings → System Users → Add Assets.`,
+      });
+    }
+
+    const pendingId = await createOAuthPending("facebook", token, {
+      pages: pages.map((p) => ({ id: p.id, name: p.name, category: p.category || null, brandGuess: detectBrandFromFacebookName(p.name) })),
+      pageTokens: Object.fromEntries(pages.map((p) => [p.id, p.access_token])),
+      adAccounts: adAccounts.map((a) => ({ id: a.id, name: a.name, brandGuess: detectBrandFromFacebookName(a.name) })),
+    });
+
+    await logAction((req as any).session, req, "connect-facebook-token", `Nhập System User Token (${info.name || "?"}) — ${pages.length} Page, ${adAccounts.length} Ad Account khả dụng`);
+    res.json({
+      success: true,
+      pendingId,
+      token: { name: info.name, type: info.type, neverExpires: info.expires_at === null, expires_at: info.expires_at, scopes: info.scopes },
+      warnings: [
+        pagesResult.status === "rejected" ? `Không lấy được danh sách Page: ${(pagesResult.reason as any)?.message}` : null,
+        adAccountsResult.status === "rejected" ? `Không lấy được danh sách Ad Account: ${(adAccountsResult.reason as any)?.message}` : null,
+      ].filter(Boolean),
+    });
+  } catch (err: any) {
+    console.error("POST /api/facebook/token/connect error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

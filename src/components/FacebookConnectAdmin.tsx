@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Facebook, ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
+import { Facebook, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 import { safeFetchJson } from "../App";
 
 interface PageCandidate {
@@ -15,14 +15,16 @@ interface AdAccountCandidate {
   brandGuess: "Livotec" | "Karofi" | null;
 }
 
-// One Facebook Login covers both fb_pages and fb_ad_accounts — the admin
-// authorizes once here, then checks which Pages/Ad Accounts to import into
-// the tables below (FacebookPagesAdmin/FbAdAccountsAdmin). Replaces the old
-// "paste a Page/Marketing API Access Token you fished out by hand" setup —
-// see GET /api/facebook/oauth/start|callback and POST
-// /api/facebook/oauth/pending/:id/complete in src/server/app.ts.
+// Connect by pasting a System User Access Token (Business Settings → System
+// Users → Generate token, expiry "Never"): the server validates it, lists the
+// Pages and Ad Accounts assigned to that System User, and the admin picks which
+// to import and sets the brand for each — see POST /api/facebook/token/connect
+// and POST /api/facebook/oauth/pending/:id/complete in src/server/app.ts. No
+// Facebook Login / App Domains / Redirect URI setup needed (the old OAuth
+// redirect routes still exist server-side but are no longer offered here).
 export default function FacebookConnectAdmin({ onImported }: { onImported: () => void }) {
-  const [configured, setConfigured] = useState(true);
+  const [tokenInput, setTokenInput] = useState("");
+  const [tokenInfo, setTokenInfo] = useState<{ name: string | null; neverExpires: boolean; expires_at: string | null } | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -34,21 +36,7 @@ export default function FacebookConnectAdmin({ onImported }: { onImported: () =>
   const [isLoadingPending, setIsLoadingPending] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
-  // Only used to render the "chưa cấu hình" notice — the actual configured
-  // flag comes from GET /api/fb/pages (loaded by the sibling
-  // FacebookPagesAdmin component); fetched here too so this card can show
-  // its own warning even before that component's first load resolves.
   useEffect(() => {
-    (async () => {
-      try {
-        const result = await safeFetchJson("/api/fb/pages");
-        if (result.success) setConfigured(result.facebookOAuthConfigured !== false);
-      } catch {
-        // Non-fatal — worst case the button is enabled and the start route
-        // itself reports "chưa cấu hình" when clicked.
-      }
-    })();
-
     const params = new URLSearchParams(window.location.search);
     const id = params.get("fbPendingId");
     if (id) {
@@ -86,17 +74,29 @@ export default function FacebookConnectAdmin({ onImported }: { onImported: () =>
   }, [pendingId]);
 
   async function handleConnect() {
+    const token = tokenInput.trim();
+    if (!token) {
+      setMessage({ type: "error", text: "Vui lòng dán Access Token." });
+      return;
+    }
     setIsConnecting(true);
     setMessage(null);
     try {
-      const result = await safeFetchJson("/api/facebook/oauth/start");
-      if (result.success && result.authorizeUrl) {
-        window.location.href = result.authorizeUrl;
+      const result = await safeFetchJson("/api/facebook/token/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: token }),
+      });
+      if (result.success && result.pendingId) {
+        setTokenInput(""); // don't keep the secret in component state once the server has it
+        setTokenInfo(result.token || null);
+        if (result.warnings?.length) setMessage({ type: "error", text: result.warnings.join(" ") });
+        setPendingId(result.pendingId);
       } else {
-        setMessage({ type: "error", text: result.error || "Không tạo được liên kết kết nối Facebook." });
+        setMessage({ type: "error", text: result.error || "Không kết nối được bằng Access Token này." });
       }
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Không tạo được liên kết kết nối Facebook." });
+      setMessage({ type: "error", text: err.message || "Không kết nối được bằng Access Token này." });
     } finally {
       setIsConnecting(false);
     }
@@ -118,6 +118,7 @@ export default function FacebookConnectAdmin({ onImported }: { onImported: () =>
       if (result.success) {
         setMessage({ type: "success", text: `Đã nhập ${result.pagesImported} Page + ${result.adAccountsImported} Ad Account.` });
         setPendingId(null);
+        setTokenInfo(null);
         setPages([]);
         setAdAccounts([]);
         onImported();
@@ -134,6 +135,7 @@ export default function FacebookConnectAdmin({ onImported }: { onImported: () =>
   async function handleDismiss() {
     if (pendingId) await safeFetchJson(`/api/oauth-pending/${encodeURIComponent(pendingId)}`, { method: "DELETE" }).catch(() => {});
     setPendingId(null);
+    setTokenInfo(null);
     setPages([]);
     setAdAccounts([]);
   }
@@ -147,21 +149,11 @@ export default function FacebookConnectAdmin({ onImported }: { onImported: () =>
         <div>
           <h3 className="text-sm font-bold text-slate-900">Kết Nối Facebook</h3>
           <p className="text-[11px] text-slate-500">
-            Đăng nhập Facebook một lần để lấy danh sách Page và Ad Account bạn quản lý — chọn cái nào cần nhập vào Page Insights /
-            Ads bên dưới, không cần tự dán Access Token nữa.
+            Dán Access Token của System User (không hết hạn) → hệ thống tải danh sách Page và Ad Account được gán → chọn cái cần nhập
+            và gán brand cho từng cái.
           </p>
         </div>
       </div>
-
-      {!configured && (
-        <div className="space-y-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
-          <p className="font-semibold">Chưa cấu hình đầy đủ.</p>
-          <p>
-            Cần khai báo <code className="rounded bg-amber-100 px-1">FB_APP_ID</code>, <code className="rounded bg-amber-100 px-1">FB_APP_SECRET</code>,{" "}
-            <code className="rounded bg-amber-100 px-1">FACEBOOK_REDIRECT_URI</code> — xem hướng dẫn tạo Facebook App trong .env.example.
-          </p>
-        </div>
-      )}
 
       {message && (
         <div
@@ -175,19 +167,44 @@ export default function FacebookConnectAdmin({ onImported }: { onImported: () =>
       )}
 
       {!pendingId ? (
-        <button
-          type="button"
-          onClick={handleConnect}
-          disabled={isConnecting || !configured}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          {isConnecting ? "Đang tạo liên kết..." : "Kết nối Facebook"}
-        </button>
+        <div className="space-y-2">
+          <textarea
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+            rows={2}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="Dán System User Access Token (EAAB...)"
+            className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] text-slate-700 outline-none focus:border-indigo-400"
+          />
+          <button
+            type="button"
+            onClick={handleConnect}
+            disabled={isConnecting || !tokenInput.trim()}
+            className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+            {isConnecting ? "Đang kiểm tra token..." : "Tải danh sách Page & Ad Account"}
+          </button>
+          <p className="text-[11px] text-slate-400">
+            Tạo token: Business Settings → Users → System Users → chọn System User → Add Assets (gán Page + Ad Account) → Generate New
+            Token, Token expiration = Never, quyền: ads_read, pages_show_list, pages_read_engagement, read_insights.
+          </p>
+        </div>
       ) : isLoadingPending ? (
         <p className="text-xs text-slate-400">Đang tải danh sách Page/Ad Account...</p>
       ) : (
         <div className="space-y-4">
+          {tokenInfo && (
+            <p className="rounded-lg bg-slate-50 px-2.5 py-1.5 text-[11px] text-slate-600">
+              Token: <span className="font-semibold">{tokenInfo.name || "System User"}</span> —{" "}
+              {tokenInfo.neverExpires ? (
+                <span className="font-semibold text-emerald-600">không hết hạn</span>
+              ) : (
+                <span className="font-semibold text-amber-600">hết hạn {tokenInfo.expires_at ? new Date(tokenInfo.expires_at).toLocaleDateString("vi-VN") : ""}</span>
+              )}
+            </p>
+          )}
           <div>
             <p className="pb-1.5 text-xs font-bold text-slate-700">Page ({pages.length})</p>
             <div className="space-y-1.5">

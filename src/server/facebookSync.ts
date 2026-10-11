@@ -127,6 +127,65 @@ export async function listOwnedAdAccounts(userAccessToken: string): Promise<Face
   return body?.data || [];
 }
 
+// -- System User token (paste-a-token connect) -------------------------------
+//
+// Alternative to OAuth: an Admin pastes a System User Access Token generated in
+// Business Settings → System Users ("Never" expires). It needs no Facebook
+// Login / App Domains / Redirect URI setup at all, and it never hits the
+// 60-day / 90-day deadlines a User token does. Differences from the OAuth path:
+//  - /me/accounts is usually EMPTY for a System User (it only lists Pages the
+//    user personally "manages"); the Pages assigned to it as business assets
+//    come from /me/assigned_pages instead, so both are queried and merged.
+//  - A Page row from /me/assigned_pages may or may not carry its own
+//    access_token; when it doesn't, the System User token itself is used as the
+//    Page token (it is allowed to read that Page's insights when the Page was
+//    assigned with the matching task, and it never expires either).
+export interface SystemUserTokenInfo {
+  name: string | null;
+  type: string | null;
+  expires_at: string | null; // null = never expires
+  scopes: string[];
+  isValid: boolean;
+}
+
+export async function inspectAccessToken(accessToken: string): Promise<SystemUserTokenInfo> {
+  const me = await graphGet(`/me?fields=id,name`, accessToken); // throws GraphApiError on an invalid/expired token
+  const expiry = await fetchTokenExpiry(accessToken);
+  let type: string | null = null;
+  let scopes: string[] = [];
+  try {
+    const appId = process.env.FB_APP_ID;
+    const appSecret = process.env.FB_APP_SECRET;
+    const inspectorToken = appId && appSecret ? `${appId}|${appSecret}` : accessToken;
+    const dbg = await graphGet(`/debug_token?input_token=${encodeURIComponent(accessToken)}`, inspectorToken);
+    type = dbg?.data?.type || null;
+    scopes = Array.isArray(dbg?.data?.scopes) ? dbg.data.scopes : [];
+  } catch {
+    // Informational only — name/validity already came from /me above.
+  }
+  return { name: me?.name || null, type, expires_at: expiry?.expires_at ?? null, scopes, isValid: true };
+}
+
+export async function listPagesForToken(accessToken: string): Promise<FacebookPageCandidate[]> {
+  const fields = "id,name,access_token,category";
+  const byId = new Map<string, FacebookPageCandidate>();
+  let lastError: any = null;
+  for (const edge of ["assigned_pages", "accounts"]) {
+    try {
+      const body = await graphGet(`/me/${edge}?fields=${fields}&limit=200`, accessToken);
+      for (const p of (body?.data || []) as FacebookPageCandidate[]) {
+        if (!p?.id) continue;
+        const existing = byId.get(p.id);
+        if (!existing || (!existing.access_token && p.access_token)) byId.set(p.id, p);
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (byId.size === 0 && lastError) throw lastError;
+  return Array.from(byId.values()).map((p) => ({ ...p, access_token: p.access_token || accessToken }));
+}
+
 // Same "karofi"/"livotec" case-insensitive substring convention as
 // googleWebsiteSync.ts's detectBrandFromName — Page/Ad Account names in this
 // app consistently contain the brand name, so a simple match is reliable in

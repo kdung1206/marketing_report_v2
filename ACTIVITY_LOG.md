@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-21).
+Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-22).
 
 ---
 
@@ -413,12 +413,26 @@ kết nối Facebook chờ thêm thông tin; 🟡 chờ xác nhận "Livotec - N
 
 ---
 
+## Giai đoạn 22 — Kết nối Facebook bằng System User Token thay cho OAuth (11/10/2026)
+
+**Lý do:** nút "Kết nối Facebook" (OAuth) báo "Can't load URL — domain isn't included in the app's domains" vì Facebook App chưa khai App Domains/Redirect URI; kèm theo đó là App Review/Advanced Access. User chọn bỏ OAuth, dùng System User Access Token (Never expires).
+
+**Luồng mới:** dán token → server xác thực (`/me`, `debug_token`) → tải Page (`/me/assigned_pages` + `/me/accounts`, gộp theo id) và Ad Account (`/me/adaccounts`) → chọn + gán brand (Livotec/Karofi, tự đoán theo tên) → "Xác nhận & Nhập".
+
+**Thay đổi:**
+- `src/server/facebookSync.ts`: `inspectAccessToken`, `listPagesForToken` (Page không có token riêng thì dùng chính System User token).
+- `src/server/app.ts`: `POST /api/facebook/token/connect` (Admin) → tạo pending, dùng lại picker `GET /api/oauth-pending/:id` + `POST /api/facebook/oauth/pending/:id/complete`. Các route OAuth cũ giữ nguyên nhưng không còn nút gọi.
+- `src/components/FacebookConnectAdmin.tsx`: ô dán token + hiển thị tên token/"không hết hạn"; token bị xóa khỏi state ngay sau khi gửi.
+- Token luôn được mã hóa (AES-256-CBC) khi lưu; không trả về frontend.
+
+**Kiểm thử:** `tsc` sạch; token giả trả "Invalid OAuth access token" (đường lỗi OK). Chưa test với System User Token thật.
+
 ## Tổng hợp trạng thái theo tính năng (tính đến hết 11/10/2026)
 
 | Tính năng | Trạng thái |
 |---|---|
 | Báo cáo tuần (dashboard chính) | ✅ Ổn định |
-| Facebook Page Insights + Ads (OAuth) | ✅ Ổn định, cron tự động hàng ngày, kết nối qua OAuth |
+| Facebook Page Insights + Ads | ✅ Ổn định, cron tự động hàng ngày · kết nối bằng System User Token (Giai đoạn 22, thay OAuth) |
 | TikTok organic (Social Report) | ✅ Ổn định · ⚠️ TikTok Ads API thật đang chờ duyệt, OAuth code xong nhưng chưa cấu hình (hold theo yêu cầu user) |
 | YouTube organic | ✅ Chạy được · ⚠️ Token hết hạn mỗi 7 ngày (OAuth consent screen ở chế độ Testing) |
 | Digital Ads Report (drilldown + Top Ads) | ✅ Có ảnh creative FB + Leads đã sửa + time on site theo ad (Giai đoạn 20-21: time on page, ảnh lưu 1 lần/ad) · ✅ Leads cũ đã sửa (514 → 257) · ⚠️ cần bấm đồng bộ Facebook Ads/GA4 để có ảnh và time on page theo ad |
