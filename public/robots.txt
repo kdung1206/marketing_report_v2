@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://marketing-report-v2.vercel.app/sitemap.xml

@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-22).
+Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-23).
 
 ---
 
@@ -426,6 +426,20 @@ kết nối Facebook chờ thêm thông tin; 🟡 chờ xác nhận "Livotec - N
 - Token luôn được mã hóa (AES-256-CBC) khi lưu; không trả về frontend.
 
 **Kiểm thử:** `tsc` sạch; token giả trả "Invalid OAuth access token" (đường lỗi OK). Chưa test với System User Token thật.
+
+## Giai đoạn 23 — URL riêng cho từng hạng mục + sitemap (12/10/2026)
+
+**Trước:** chỉ có `/` (báo cáo, mọi tab) và `/admin` (Control Panel, mọi mục) → refresh/bookmark/mở tab mới luôn quay về mục đầu.
+
+**Địa chỉ mới** (bảng định tuyến ở đầu `src/App.tsx`: `REPORT_TAB_PATHS`, `CONTROL_PANEL_SECTION_SLUGS`):
+- Báo cáo: `/dashboard`, `/social-report`, `/digital-ads-report`, `/website-report`, `/campaign-marketing`.
+- Control Panel: `/admin/nhap-lieu`, `/admin/nhan-xet`, `/admin/co-so-du-lieu`, `/admin/nguoi-dung`, `/admin/sao-luu`, `/admin/ket-noi/{facebook|google|tiktok}`, `/admin/log/{dang-nhap|thao-tac}`.
+
+**Hành vi:** URL ⇄ state hai chiều (push khi chuyển mục, replace khi chỉ hoàn thiện địa chỉ thiếu như `/`, `/admin`, `/admin/ket-noi`); Back/Forward đúng mục; refresh giữ nguyên mục; mở deep link khi chưa đăng nhập → thẳng form đăng nhập, đăng nhập xong về đúng mục; Viewer vào `/admin/...` → dashboard; Editor vào mục Admin-only (`co-so-du-lieu`, `nguoi-dung`, `sao-luu`) → `nhap-lieu`, vào `ket-noi/facebook` → `ket-noi/google`. Trang công khai `/`, `/about`, `/privacy`, `/terms` giữ nguyên.
+
+**Sitemap:** `public/sitemap.xml` (19 URL: 4 công khai + 5 báo cáo + 10 Control Panel) và `public/robots.txt` (trỏ tới sitemap, chặn `/api/`). Khi thêm/đổi route phải sửa sitemap theo.
+
+**Kiểm thử thật trên local** (Admin + Editor): chuyển mọi mục/sub-tab → URL đúng; Back; refresh; `/` khi đã đăng nhập → `/dashboard`; deep link khi chưa đăng nhập; phân quyền Editor; `/sitemap.xml` trả 200 `text/xml`.
 
 ## Tổng hợp trạng thái theo tính năng (tính đến hết 11/10/2026)
 

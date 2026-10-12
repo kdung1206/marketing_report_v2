@@ -115,18 +115,94 @@ function AppLogoMark() {
 // Default user metadata
 const USER_EMAIL = "ntkdung1206@gmail.com";
 
-// The Control Panel's own address. Every other view stays on "/" — the report
-// tabs are a view switch within one report, not separate pages. Both hosting
-// setups already serve index.html for an unknown path, so deep-linking here
-// works without extra routing config: vercel.json rewrites "/(.*)" to
+// Every view has its own address, so refresh / bookmark / "open in a new tab" /
+// Back-Forward all land where the user was:
+//   Reports        /dashboard  /social-report  /digital-ads-report
+//                  /website-report  /campaign-marketing
+//   Control Panel  /admin/nhap-lieu  /admin/nhan-xet  /admin/co-so-du-lieu
+//                  /admin/nguoi-dung  /admin/sao-luu
+//                  /admin/ket-noi/{facebook|google|tiktok}
+//                  /admin/log/{dang-nhap|thao-tac}
+// Both hosting setups already serve index.html for an unknown path, so deep
+// links need no extra routing config: vercel.json rewrites "/(.*)" to
 // "/index.html" in production, and the dev server runs Vite in appType "spa"
-// (see server.ts).
-const ADMIN_PATH = "/admin";
+// (see server.ts). Keep public/sitemap.xml in step with this table.
+type AppTab = "dashboard" | "control-panel" | "fb-insights" | "digital-ads" | "website-report" | "campaign";
+type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "platform-connections" | "logs";
+type PlatformSubTab = "facebook" | "google" | "tiktok";
+type LogsSubTab = "login" | "action";
 
-// Tolerates a trailing slash and odd casing so "/Admin/" doesn't silently
-// render the report dashboard at an admin-looking URL.
-function isAdminPath(pathname: string): boolean {
-  return pathname.replace(/\/+$/, "").toLowerCase() === ADMIN_PATH;
+const ADMIN_BASE = "/admin";
+const REPORT_TAB_PATHS: Record<Exclude<AppTab, "control-panel">, string> = {
+  dashboard: "/dashboard",
+  "fb-insights": "/social-report",
+  "digital-ads": "/digital-ads-report",
+  "website-report": "/website-report",
+  campaign: "/campaign-marketing",
+};
+const CONTROL_PANEL_SECTION_SLUGS: Record<ControlPanelSection, string> = {
+  "data-entry": "nhap-lieu",
+  comments: "nhan-xet",
+  "db-admin": "co-so-du-lieu",
+  users: "nguoi-dung",
+  backup: "sao-luu",
+  "platform-connections": "ket-noi",
+  logs: "log",
+};
+const LOGS_SUBTAB_SLUGS: Record<LogsSubTab, string> = { login: "dang-nhap", action: "thao-tac" };
+const ADMIN_ONLY_SECTIONS: ControlPanelSection[] = ["db-admin", "users", "backup"];
+
+interface AppRoute {
+  tab: AppTab;
+  section?: ControlPanelSection;
+  platformSubTab?: PlatformSubTab;
+  logsSubTab?: LogsSubTab;
+}
+
+// Tolerates a trailing slash and odd casing ("/Admin/" must not silently
+// render the dashboard at an admin-looking URL).
+function normalizePath(pathname: string): string {
+  return pathname.replace(/\/+$/, "").toLowerCase() || "/";
+}
+
+// null = not one of the app's view addresses (e.g. "/", the public landing).
+// A partial admin address ("/admin", "/admin/ket-noi", an unknown slug) still
+// means the Control Panel — the missing parts keep their current value.
+function parseRoute(pathname: string): AppRoute | null {
+  const path = normalizePath(pathname);
+  for (const [tab, tabPath] of Object.entries(REPORT_TAB_PATHS)) {
+    if (tabPath === path) return { tab: tab as AppTab };
+  }
+  if (path === ADMIN_BASE) return { tab: "control-panel" };
+  if (!path.startsWith(ADMIN_BASE + "/")) return null;
+
+  const [slug, sub] = path.slice(ADMIN_BASE.length + 1).split("/");
+  const section = (Object.keys(CONTROL_PANEL_SECTION_SLUGS) as ControlPanelSection[]).find((k) => CONTROL_PANEL_SECTION_SLUGS[k] === slug);
+  if (!section) return { tab: "control-panel" };
+
+  const route: AppRoute = { tab: "control-panel", section };
+  if (section === "platform-connections" && (sub === "facebook" || sub === "google" || sub === "tiktok")) route.platformSubTab = sub;
+  if (section === "logs") {
+    const logsSub = (Object.keys(LOGS_SUBTAB_SLUGS) as LogsSubTab[]).find((k) => LOGS_SUBTAB_SLUGS[k] === sub);
+    if (logsSub) route.logsSubTab = logsSub;
+  }
+  return route;
+}
+
+function buildPath(tab: AppTab, section: ControlPanelSection, platformSubTab: PlatformSubTab, logsSubTab: LogsSubTab): string {
+  if (tab !== "control-panel") return REPORT_TAB_PATHS[tab];
+  let path = `${ADMIN_BASE}/${CONTROL_PANEL_SECTION_SLUGS[section]}`;
+  if (section === "platform-connections") path += `/${platformSubTab}`;
+  if (section === "logs") path += `/${LOGS_SUBTAB_SLUGS[logsSubTab]}`;
+  return path;
+}
+
+// A complete address (every part present), as opposed to "/", "/admin" or
+// "/admin/ket-noi" — those get rewritten in place instead of adding a history entry.
+function isCompleteRoutePath(pathname: string): boolean {
+  const route = parseRoute(pathname);
+  if (!route) return false;
+  return buildPath(route.tab, route.section ?? "data-entry", route.platformSubTab ?? "facebook", route.logsSubTab ?? "login") === normalizePath(pathname);
 }
 
 // Session token issued by POST /api/login (see src/server/auth.ts). Kept as a
@@ -562,7 +638,9 @@ export default function App() {
   // served as a static page); this makes "/" itself satisfy that too,
   // regardless of which URL ends up registered as "Application home page"
   // in Google Cloud Console.
-  const [showLoginForm, setShowLoginForm] = useState(false);
+  // A deep link to an app view (e.g. /admin/nhap-lieu) skips the landing and
+  // goes straight to the login form.
+  const [showLoginForm, setShowLoginForm] = useState(() => parseRoute(window.location.pathname) !== null);
 
   // User Manager states (Add/Edit User Form)
   const [managerUsername, setManagerUsername] = useState("");
@@ -572,9 +650,8 @@ export default function App() {
   const [editingUsername, setEditingUsername] = useState<string | null>(null);
 
   // Navigation & Brand States
-  const [activeTab, setActiveTab] = useState<"dashboard" | "control-panel" | "fb-insights" | "digital-ads" | "website-report" | "campaign">(() =>
-    isAdminPath(window.location.pathname) ? "control-panel" : "dashboard"
-  );
+  const [initialRoute] = useState(() => parseRoute(window.location.pathname));
+  const [activeTab, setActiveTab] = useState<AppTab>(initialRoute?.tab ?? "dashboard");
 
   // Set by a report tab's "+ Task" button (e.g. Website Report's
   // striking-distance keyword rows) — consumed once by CampaignManagement,
@@ -595,51 +672,11 @@ export default function App() {
   // tell there were more tabs to swipe to, so this is now the only mobile nav.
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // Keep the URL and the Control Panel view in step, in both directions.
-  //
-  // Everything used to live at "/", so refreshing (or bookmarking, or opening
-  // a second tab) always dropped whoever was in the Control Panel back onto
-  // the report dashboard. The Control Panel now has its own address; the
-  // report tabs deliberately stay on "/" since they're a view switch inside
-  // one report, not separate pages.
-  //
-  // pushState (not replaceState) so Back/Forward walks between the report and
-  // the Control Panel the way the browser buttons are expected to behave. The
-  // query string is carried across untouched — the OAuth callbacks land back
-  // here with markers on it (see the tiktokConnected/youtubeConnected effect
-  // below) and stripping it here would race that.
-  useEffect(() => {
-    // Logged out, the login screen is all there is to show and the tab state
-    // underneath it is meaningless — leave the address alone so that opening
-    // /admin directly still lands in the Control Panel after signing in
-    // (handleLogin restores it), instead of being rewritten to "/" by the
-    // Viewer guard that also fires while nobody is logged in.
-    if (!currentUser) return;
-    const wantsAdminPath = activeTab === "control-panel";
-    if (wantsAdminPath === isAdminPath(window.location.pathname)) return;
-    window.history.pushState({}, "", (wantsAdminPath ? ADMIN_PATH : "/") + window.location.search);
-  }, [activeTab, currentUser]);
-
-  // Back/Forward changes the URL without re-mounting this component, so the
-  // view has to follow it. Leaving from /admin returns to the report the user
-  // was last on rather than forcing "dashboard" — the report tabs share "/",
-  // so the path alone can't say which one it was.
-  useEffect(() => {
-    const syncTabFromUrl = () => {
-      setActiveTab((prev) => {
-        if (isAdminPath(window.location.pathname)) return "control-panel";
-        return prev === "control-panel" ? "dashboard" : prev;
-      });
-    };
-    window.addEventListener("popstate", syncTabFromUrl);
-    return () => window.removeEventListener("popstate", syncTabFromUrl);
-  }, []);
-
   // Left sidebar on the Control Panel view: which work-group section is
   // showing. Only shown when `activeTab === "control-panel"` — the report
   // (dashboard) view has no sidebar of its own.
-  type ControlPanelSection = "data-entry" | "comments" | "db-admin" | "users" | "backup" | "platform-connections" | "logs";
   const [controlPanelSection, setControlPanelSection] = useState<ControlPanelSection>(() => {
+    if (initialRoute?.section) return initialRoute.section;
     const saved = localStorage.getItem("marketing_control_panel_section");
     return (["data-entry", "comments", "db-admin", "users", "backup", "platform-connections", "logs"] as const).includes(saved as any)
       ? (saved as ControlPanelSection)
@@ -660,8 +697,8 @@ export default function App() {
   // user request — same "section + sub-tab" shape as "Log hệ thống" below.
   // Editors never see "facebook" (credentials are Admin-only) so they default
   // straight to "google" instead of landing on a sub-tab they can't use.
-  const [platformSubTab, setPlatformSubTab] = useState<"facebook" | "google" | "tiktok">(() =>
-    currentUser?.role === "Admin" ? "facebook" : "google"
+  const [platformSubTab, setPlatformSubTab] = useState<PlatformSubTab>(
+    () => initialRoute?.platformSubTab ?? (currentUser?.role === "Admin" ? "facebook" : "google")
   );
 
   // TikTok's OAuth callback is a real server-side redirect (full page reload,
@@ -709,12 +746,61 @@ export default function App() {
 
   // "Log hệ thống" has two sub-views; Editor accounts only ever see "action"
   // (Login Logs is Admin-only), so default accordingly per role below.
-  const [logsSubTab, setLogsSubTab] = useState<"login" | "action">("login");
+  const [logsSubTab, setLogsSubTab] = useState<LogsSubTab>(initialRoute?.logsSubTab ?? "login");
+  // Admin-only sections/sub-tabs reached through an address (or a saved view)
+  // fall back to what the role may actually use.
+  useEffect(() => {
+    if (!currentUser || currentUser.role === "Admin") return;
+    if (ADMIN_ONLY_SECTIONS.includes(controlPanelSection)) setControlPanelSection("data-entry");
+    if (platformSubTab === "facebook") setPlatformSubTab("google");
+  }, [currentUser, controlPanelSection, platformSubTab]);
   useEffect(() => {
     if (currentUser && currentUser.role !== "Admin" && logsSubTab === "login") {
       setLogsSubTab("action");
     }
   }, [currentUser, logsSubTab]);
+
+  // Keep the URL and the current view (report tab, Control Panel section and
+  // its sub-tab) in step, in both directions — see the route table at the top
+  // of this file.
+  //
+  // pushState for a real navigation so Back/Forward walks between views;
+  // replaceState when the current address is only a partial one ("/", "/admin",
+  // "/admin/ket-noi") that is just being completed. The query string is carried
+  // across untouched — the OAuth callbacks land back here with markers on it
+  // (see the tiktokConnected/youtubeConnected effect below) and stripping it
+  // here would race that.
+  const applyRoute = (route: AppRoute) => {
+    setActiveTab(route.tab);
+    if (route.section) setControlPanelSection(route.section);
+    if (route.platformSubTab) setPlatformSubTab(route.platformSubTab);
+    if (route.logsSubTab) setLogsSubTab(route.logsSubTab);
+  };
+
+  useEffect(() => {
+    // Logged out, the login screen is all there is to show and the tab state
+    // underneath it is meaningless — leave the address alone so that opening
+    // /admin/nhap-lieu directly still lands there after signing in
+    // (handleLogin restores it), instead of being rewritten to "/dashboard" by
+    // the guard that also fires while nobody is logged in.
+    if (!currentUser) return;
+    const target = buildPath(activeTab, controlPanelSection, platformSubTab, logsSubTab);
+    if (normalizePath(window.location.pathname) === target) return;
+    const url = target + window.location.search;
+    if (isCompleteRoutePath(window.location.pathname)) window.history.pushState({}, "", url);
+    else window.history.replaceState({}, "", url);
+  }, [activeTab, controlPanelSection, platformSubTab, logsSubTab, currentUser]);
+
+  // Back/Forward changes the URL without re-mounting this component, so the
+  // view has to follow it.
+  useEffect(() => {
+    const syncStateFromUrl = () => {
+      const route = parseRoute(window.location.pathname);
+      if (route) applyRoute(route);
+    };
+    window.addEventListener("popstate", syncStateFromUrl);
+    return () => window.removeEventListener("popstate", syncStateFromUrl);
+  }, []);
 
   const CONTROL_PANEL_SECTIONS: { id: ControlPanelSection; label: string; icon: typeof FileSpreadsheet; adminOnly: boolean }[] = [
     { id: "data-entry", label: "Nhập liệu", icon: Upload, adminOnly: false },
@@ -1518,13 +1604,14 @@ export default function App() {
       setCurrentUser(result.user);
       localStorage.setItem("marketing_current_user", JSON.stringify(result.user));
       triggerNotification("success", `Chào mừng ${result.user.name} (${result.user.role}) quay lại hệ thống!`);
+      // Signed in from a deep link (or a refresh on one) — land where the
+      // address says, not on the report dashboard. Viewers have no Control
+      // Panel at all, so for them an /admin address falls back to the dashboard.
+      const route = parseRoute(window.location.pathname);
       if (result.user.role === "Viewer") {
-        setActiveTab("dashboard");
-      } else if (isAdminPath(window.location.pathname)) {
-        // Signed in from a /admin link (or a refresh there) — land where the
-        // address says, not on the report dashboard. The Viewer branch above
-        // still wins: Viewers have no Control Panel at all.
-        setActiveTab("control-panel");
+        setActiveTab(route && route.tab !== "control-panel" ? route.tab : "dashboard");
+      } else if (route) {
+        applyRoute(route);
       }
       fetchServerData();
     } catch (err) {
