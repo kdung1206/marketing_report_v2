@@ -7,7 +7,7 @@ Khác với `HANDOFF.md` (dùng để *tiếp tục code ngay*, chỉ giữ vi�
 Quy ước trạng thái: ✅ Xong, đang chạy ổn định · ⚠️ Xong nhưng có lưu ý/giới hạn · 🟡 Đang dở/chờ ·
 ⏸️ Tạm dừng theo yêu cầu · ❌ Đã bỏ/không làm.
 
-Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-23).
+Cập nhật lần gần nhất: tính đến hết ngày **11/10/2026** (Giai đoạn 1-24).
 
 ---
 
@@ -440,6 +440,20 @@ kết nối Facebook chờ thêm thông tin; 🟡 chờ xác nhận "Livotec - N
 **Sitemap:** `public/sitemap.xml` (19 URL: 4 công khai + 5 báo cáo + 10 Control Panel) và `public/robots.txt` (trỏ tới sitemap, chặn `/api/`). Khi thêm/đổi route phải sửa sitemap theo.
 
 **Kiểm thử thật trên local** (Admin + Editor): chuyển mọi mục/sub-tab → URL đúng; Back; refresh; `/` khi đã đăng nhập → `/dashboard`; deep link khi chưa đăng nhập; phân quyền Editor; `/sitemap.xml` trả 200 `text/xml`.
+
+## Giai đoạn 24 — Campaign Marketing: gắn danh sách chiến dịch quảng cáo khi campaign chuyển sang Live (12/10/2026)
+
+**Yêu cầu:** khi một campaign trong Campaign Calendar chuyển sang Live thì gắn các chiến dịch quảng cáo thật vào để theo dõi dữ liệu triển khai.
+
+**Hành vi:**
+- Lưu campaign với Status = Live (tạo mới đang Live, hoặc đổi Planned/Done → Live) → mở hộp thoại **Gắn chiến dịch quảng cáo**: liệt kê chiến dịch thật của đúng brand (Facebook/Google/TikTok) kèm Chi phí, Leads/KQ, ngày dữ liệu mới nhất; lọc theo kênh, tìm theo tên; mặc định xem quanh thời gian campaign (từ 14 ngày trước ngày bắt đầu đến hôm nay/ngày kết thúc), có tuỳ chọn xem toàn bộ thời gian.
+- Tick/bỏ tick rồi "Lưu liên kết": thêm liên kết mới, gỡ liên kết bị bỏ tick (dùng lại POST/DELETE `ads-links` cũ, giữ nguyên phân quyền). Chiến dịch đã gắn từ trước tự được tick sẵn. Có ô nhập tên thủ công cho chiến dịch chưa đồng bộ về. "Để sau" đóng hộp thoại không gắn gì.
+- Lưu xong tự mở drilldown của campaign ở tab "Chi phí quảng cáo". Nút "Chọn từ danh sách chiến dịch" cũng có sẵn trong drilldown (form nhập tên cũ vẫn còn).
+- Tab theo dõi bổ sung **Leads/KQ** và **Chi phí/Lead (CPL)** (tổng và từng chiến dịch gắn) bên cạnh Chi phí/Impressions/Clicks.
+
+**Thay đổi:** `GET /api/campaign/ads-campaign-options` (src/server/app.ts), `src/components/CampaignAdsLinkPicker.tsx` (mới), `src/components/CampaignManagement.tsx`.
+
+**Kiểm thử thật trên local:** Planned → Live mở đúng hộp thoại (55 chiến dịch Livotec); chọn 2, tìm "Ngành 2" còn 6 dòng, lưu → drilldown hiện tổng 429.396.165đ; mở lại: 2 chiến dịch đã tick sẵn, bỏ 1 + thêm 1 tên thủ công → danh sách cập nhật đúng. Dữ liệu local đã khôi phục.
 
 ## Tổng hợp trạng thái theo tính năng (tính đến hết 11/10/2026)
 

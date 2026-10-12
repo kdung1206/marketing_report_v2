@@ -27,6 +27,7 @@ import {
 import { safeFetchJson } from "../App";
 import type { UserAccount } from "../lib/defaultUsers";
 import OutreachPanel from "./OutreachPanel";
+import CampaignAdsLinkPicker from "./CampaignAdsLinkPicker";
 import OutreachOverview from "./OutreachOverview";
 
 // Campaign Calendar & Campaign Task. See
@@ -85,6 +86,7 @@ interface AdsPerformanceMini {
   spend: number | null;
   impressions: number | null;
   clicks: number | null;
+  conversions: number | null;
 }
 
 // Minimal mirror of FbPostRow (src/server/facebookStore.ts) — organic Page
@@ -397,6 +399,9 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
   // campaign row is ever expanded at a time.
   const [adsLinkForm, setAdsLinkForm] = useState<{ channel: AdsChannel; name: string }>({ channel: "facebook", name: "" });
   const [adsCampaignNameSuggestions, setAdsCampaignNameSuggestions] = useState<string[]>([]);
+  // "Gắn chiến dịch quảng cáo" picker — opened when a campaign is switched to
+  // Live (see handleSubmitCampaign) or from the drilldown's Chi phí tab.
+  const [adsLinkPicker, setAdsLinkPicker] = useState<{ campaign: Campaign; links: CampaignAdsLink[] } | null>(null);
   const [campaignStatusFilter, setCampaignStatusFilter] = useState<string>("");
   // Campaign Marketing is NOT split by brand (unlike the other report tabs) —
   // Livotec and Karofi campaigns show together; brand is just a filter here,
@@ -567,6 +572,19 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedCampaign, adsLinkForm.channel]);
+
+  // Loads the campaign's existing links first so the picker opens with them
+  // already ticked (a Planned campaign may have had some linked in advance).
+  async function openAdsLinkPicker(c: Campaign) {
+    let links: CampaignAdsLink[] = [];
+    try {
+      const result = await safeFetchJson(`/api/campaign/campaigns/${c.id}/overview`);
+      if (result.success) links = result.adsLinks || [];
+    } catch {
+      // Non-fatal — the picker still opens, just without the pre-ticked links.
+    }
+    setAdsLinkPicker({ campaign: c, links });
+  }
 
   function toggleCampaignExpand(campaignId: string) {
     if (expandedCampaignId === campaignId) {
@@ -833,6 +851,7 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
         .map((s) => s.trim())
         .filter(Boolean),
     };
+    const previousStatus = editingCampaignId ? campaigns.find((c) => c.id === editingCampaignId)?.status : undefined;
     try {
       const result = editingCampaignId
         ? await safeFetchJson(`/api/campaign/campaigns/${editingCampaignId}`, {
@@ -849,6 +868,11 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
         setMessage({ type: "success", text: editingCampaignId ? "Đã cập nhật campaign." : "Đã tạo campaign." });
         resetCampaignForm();
         await loadCampaigns();
+        // Just went Live (created as Live, or moved Planned/Done → Live): ask
+        // which real ad campaigns run under it so delivery can be tracked.
+        if (payload.status === "Live" && previousStatus !== "Live" && result.campaign?.id) {
+          await openAdsLinkPicker(result.campaign as Campaign);
+        }
       } else {
         setMessage({ type: "error", text: result.error || "Lưu campaign thất bại." });
       }
@@ -1099,6 +1123,23 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
 
   return (
     <div className="space-y-6">
+      {adsLinkPicker && (
+        <CampaignAdsLinkPicker
+          campaign={adsLinkPicker.campaign}
+          existingLinks={adsLinkPicker.links}
+          onClose={() => setAdsLinkPicker(null)}
+          onSaved={() => {
+            const id = adsLinkPicker.campaign.id;
+            setAdsLinkPicker(null);
+            // Show the result right away: open the campaign's "Chi phí quảng cáo" tab.
+            setSection("campaigns");
+            setExpandedCampaignId(id);
+            setDrilldownTab("ads");
+            setCampaignOverview(null);
+            loadCampaignOverview(id);
+          }}
+        />
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
           <h1 className="text-sm font-bold uppercase tracking-wider text-slate-800">Campaign Marketing</h1>
@@ -1714,6 +1755,7 @@ export default function CampaignManagement({ currentUser, taskPrefill, onTaskPre
                             adsCampaignNameSuggestions={adsCampaignNameSuggestions}
                             onAddAdsLink={(channel, name) => handleAddAdsLink(c.id, channel, name)}
                             onDeleteAdsLink={(linkId) => handleDeleteAdsLink(c.id, linkId)}
+                            onOpenAdsPicker={() => openAdsLinkPicker(c)}
                           />
                         </td>
                       </tr>
@@ -2405,6 +2447,7 @@ function CampaignDrilldown({
   adsCampaignNameSuggestions,
   onAddAdsLink,
   onDeleteAdsLink,
+  onOpenAdsPicker,
 }: {
   campaign: Campaign;
   tasks: Task[];
@@ -2418,6 +2461,7 @@ function CampaignDrilldown({
   adsCampaignNameSuggestions: string[];
   onAddAdsLink: (channel: AdsChannel, name: string) => void;
   onDeleteAdsLink: (linkId: string) => void;
+  onOpenAdsPicker: () => void;
 }) {
   if (isLoading && !overview) {
     return <div className="py-3 text-center text-xs text-slate-400">Đang tải chi tiết campaign...</div>;
@@ -2427,16 +2471,22 @@ function CampaignDrilldown({
   }
 
   const adsTotals = (overview?.adsPerformance || []).reduce(
-    (acc, r) => ({ spend: acc.spend + (r.spend || 0), impressions: acc.impressions + (r.impressions || 0), clicks: acc.clicks + (r.clicks || 0) }),
-    { spend: 0, impressions: 0, clicks: 0 }
+    (acc, r) => ({
+      spend: acc.spend + (r.spend || 0),
+      impressions: acc.impressions + (r.impressions || 0),
+      clicks: acc.clicks + (r.clicks || 0),
+      conversions: acc.conversions + (r.conversions || 0),
+    }),
+    { spend: 0, impressions: 0, clicks: 0, conversions: 0 }
   );
-  const spendByLink = new Map<string, { spend: number; impressions: number; clicks: number }>();
+  const spendByLink = new Map<string, { spend: number; impressions: number; clicks: number; conversions: number }>();
   for (const r of overview?.adsPerformance || []) {
     const key = `${r.channel}|${r.campaign_name}`;
-    const entry = spendByLink.get(key) || { spend: 0, impressions: 0, clicks: 0 };
+    const entry = spendByLink.get(key) || { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
     entry.spend += r.spend || 0;
     entry.impressions += r.impressions || 0;
     entry.clicks += r.clicks || 0;
+    entry.conversions += r.conversions || 0;
     spendByLink.set(key, entry);
   }
 
@@ -2501,6 +2551,8 @@ function CampaignDrilldown({
             <div><span className="text-slate-400">Tổng chi phí: </span><span className="font-bold text-slate-700">{adsTotals.spend.toLocaleString("vi-VN")}đ</span></div>
             <div><span className="text-slate-400">Impressions: </span><span className="font-semibold text-slate-600">{adsTotals.impressions.toLocaleString("vi-VN")}</span></div>
             <div><span className="text-slate-400">Clicks: </span><span className="font-semibold text-slate-600">{adsTotals.clicks.toLocaleString("vi-VN")}</span></div>
+            <div><span className="text-slate-400">Leads/KQ: </span><span className="font-semibold text-slate-600">{adsTotals.conversions.toLocaleString("vi-VN")}</span></div>
+            <div><span className="text-slate-400">Chi phí/Lead: </span><span className="font-semibold text-slate-600">{adsTotals.conversions > 0 ? `${Math.round(adsTotals.spend / adsTotals.conversions).toLocaleString("vi-VN")}đ` : "—"}</span></div>
           </div>
 
           <table className="w-full text-xs">
@@ -2511,17 +2563,19 @@ function CampaignDrilldown({
                 <th className="pb-1.5 font-medium text-right">Chi phí</th>
                 <th className="pb-1.5 font-medium text-right">Impressions</th>
                 <th className="pb-1.5 font-medium text-right">Clicks</th>
+                <th className="pb-1.5 font-medium text-right">Leads/KQ</th>
+                <th className="pb-1.5 font-medium text-right">CPL</th>
                 <th className="pb-1.5 font-medium text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {(overview?.adsLinks || []).length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-3 text-center text-slate-400">Chưa gắn campaign quảng cáo nào — chi phí sẽ hiện 0 cho tới khi gắn.</td>
+                  <td colSpan={8} className="py-3 text-center text-slate-400">Chưa gắn campaign quảng cáo nào — chi phí sẽ hiện 0 cho tới khi gắn.</td>
                 </tr>
               ) : (
                 (overview?.adsLinks || []).map((l) => {
-                  const totals = spendByLink.get(`${l.channel}|${l.ads_campaign_name}`) || { spend: 0, impressions: 0, clicks: 0 };
+                  const totals = spendByLink.get(`${l.channel}|${l.ads_campaign_name}`) || { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
                   return (
                     <tr key={l.id}>
                       <td className="py-1.5"><span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600">{ADS_CHANNEL_LABEL[l.channel]}</span></td>
@@ -2529,6 +2583,8 @@ function CampaignDrilldown({
                       <td className="py-1.5 text-right text-slate-600">{totals.spend.toLocaleString("vi-VN")}đ</td>
                       <td className="py-1.5 text-right text-slate-500">{totals.impressions.toLocaleString("vi-VN")}</td>
                       <td className="py-1.5 text-right text-slate-500">{totals.clicks.toLocaleString("vi-VN")}</td>
+                      <td className="py-1.5 text-right text-slate-500">{totals.conversions.toLocaleString("vi-VN")}</td>
+                      <td className="py-1.5 text-right text-slate-500">{totals.conversions > 0 ? `${Math.round(totals.spend / totals.conversions).toLocaleString("vi-VN")}đ` : "—"}</td>
                       <td className="py-1.5 text-right">
                         <button onClick={() => onDeleteAdsLink(l.id)} className="text-rose-500 hover:underline">Gỡ</button>
                       </td>
@@ -2541,7 +2597,13 @@ function CampaignDrilldown({
 
           {campaign.can_edit && (
             <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2.5">
-              <span className="text-[11px] font-semibold text-slate-500">Gắn campaign quảng cáo:</span>
+              <button
+                onClick={onOpenAdsPicker}
+                className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700"
+              >
+                <Link2 className="h-3 w-3" /> Chọn từ danh sách chiến dịch
+              </button>
+              <span className="text-[11px] font-semibold text-slate-500">hoặc nhập tên:</span>
               <select
                 value={adsLinkForm.channel}
                 onChange={(e) => onAdsLinkFormChange({ ...adsLinkForm, channel: e.target.value as AdsChannel })}

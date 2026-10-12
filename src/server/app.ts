@@ -3047,6 +3047,43 @@ app.get("/api/campaign/ads-campaign-names", requireAuth(), async (req, res) => {
   }
 });
 
+// Real ad campaigns (all channels) with figures, for the "Gắn chiến dịch quảng
+// cáo" picker shown when a Calendar campaign goes Live: one row per
+// channel + ads campaign_name for the brand, aggregated over the window, so
+// the Editor can see which campaigns are actually delivering before linking.
+// No window = all synced history.
+app.get("/api/campaign/ads-campaign-options", requireAuth(), async (req, res) => {
+  try {
+    const { brand, since, until } = req.query;
+    if (typeof brand !== "string" || !brand) {
+      return res.status(400).json({ success: false, error: "Thiếu brand." });
+    }
+    const dateOk = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const rows = await getAdsPerformance({
+      brand,
+      since: dateOk(since) ? (since as string) : "2000-01-01",
+      until: dateOk(until) ? (until as string) : "2999-12-31",
+    });
+
+    const byKey = new Map<string, { channel: string; campaign_name: string; spend: number; impressions: number; clicks: number; conversions: number; first_date: string; last_date: string }>();
+    for (const r of rows) {
+      const key = `${r.channel}|${r.campaign_name}`;
+      const e = byKey.get(key) || { channel: r.channel, campaign_name: r.campaign_name, spend: 0, impressions: 0, clicks: 0, conversions: 0, first_date: r.date, last_date: r.date };
+      e.spend += r.spend || 0;
+      e.impressions += r.impressions || 0;
+      e.clicks += r.clicks || 0;
+      e.conversions += r.conversions || 0;
+      if (r.date < e.first_date) e.first_date = r.date;
+      if (r.date > e.last_date) e.last_date = r.date;
+      byKey.set(key, e);
+    }
+    const options = Array.from(byKey.values()).sort((a, b) => (a.last_date < b.last_date ? 1 : a.last_date > b.last_date ? -1 : b.spend - a.spend));
+    res.json({ success: true, options });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post("/api/campaign/campaigns/:id/ads-links", requireAuth("Editor"), async (req, res) => {
   try {
     const session = (req as any).session;
