@@ -184,6 +184,41 @@ async function fetchAdThumbnailMap(adAccountId: string, accessToken: string, tok
   return map;
 }
 
+// ads_performance is keyed by (channel, campaign, ad group, ad NAME, date), not
+// by ad_id — so two different ads with the same name inside one ad group
+// collide on the same date. Postgres rejects such a batch outright ("ON
+// CONFLICT DO UPDATE command cannot affect row a second time"), which left an
+// account stuck on "Chưa đồng bộ". They are indistinguishable in this table
+// anyway, so their figures are summed into one row (totals stay correct).
+function addNullable(a: number | null, b: number | null): number | null {
+  if (a == null && b == null) return null;
+  return (a ?? 0) + (b ?? 0);
+}
+
+function adRowKey(r: AdsPerformanceRow): string {
+  return `${r.campaign_name}|${r.ad_group_name}|${r.ad_name}|${r.date}`;
+}
+
+function mergeAdRows(into: AdsPerformanceRow, add: AdsPerformanceRow): void {
+  into.spend = addNullable(into.spend, add.spend);
+  into.impressions = addNullable(into.impressions, add.impressions);
+  into.clicks = addNullable(into.clicks, add.clicks);
+  into.reach = addNullable(into.reach, add.reach);
+  into.video_views = addNullable(into.video_views, add.video_views);
+  into.conversions = addNullable(into.conversions, add.conversions);
+  into.frequency = into.reach && into.impressions ? into.impressions / into.reach : into.frequency;
+  into.post_id = into.post_id || add.post_id || null;
+  const a: any = into.extra;
+  const b: any = add.extra;
+  a.merged_ads = (a.merged_ads || 1) + 1;
+  if (a.lead_actions && b?.lead_actions) {
+    a.lead_actions = {
+      lead: (a.lead_actions.lead || 0) + (b.lead_actions.lead || 0),
+      lead_grouped: (a.lead_actions.lead_grouped || 0) + (b.lead_actions.lead_grouped || 0),
+    };
+  }
+}
+
 async function fetchAdAccountInsights(
   adAccountId: string,
   accessToken: string,
@@ -196,6 +231,10 @@ async function fetchAdAccountInsights(
   savePage: (rows: AdsPerformanceRow[], creatives: AdCreativeRow[]) => Promise<void>
 ): Promise<number> {
   let total = 0;
+  // Every row stored so far in this run, by key — a duplicate that turns up on
+  // a LATER Graph page is merged into the saved row and re-saved with the
+  // combined figures, instead of overwriting it.
+  const seen = new Map<string, AdsPerformanceRow>();
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
 
   let body: any;
@@ -213,7 +252,7 @@ async function fetchAdAccountInsights(
   // token already embedded) — fetched directly rather than through graphGet,
   // which always appends its own access_token param.
   while (body) {
-    const rows: AdsPerformanceRow[] = [];
+    const pageKeys = new Set<string>();
     // One image per ad (not per daily row) — see ad_creatives in schema.sql.
     const creatives = new Map<string, AdCreativeRow>();
     for (const item of body.data || []) {
@@ -221,7 +260,7 @@ async function fetchAdAccountInsights(
       const leads = leadCount(item.actions);
       const thumbnail = item.ad_id ? adThumbnailMap.get(item.ad_id) : undefined;
       if (item.ad_id && thumbnail) creatives.set(item.ad_id, { ad_id: item.ad_id, thumbnail_url: thumbnail });
-      rows.push({
+      const row: AdsPerformanceRow = {
         channel: "facebook",
         brand,
         campaign_name: item.campaign_name,
@@ -251,8 +290,14 @@ async function fetchAdAccountInsights(
           campaign_id: item.campaign_id || null,
           lead_actions: { lead: leads.lead, lead_grouped: leads.lead_grouped },
         },
-      });
+      };
+      const key = adRowKey(row);
+      const existing = seen.get(key);
+      if (existing) mergeAdRows(existing, row);
+      else seen.set(key, row);
+      pageKeys.add(key);
     }
+    const rows = Array.from(pageKeys, (k) => seen.get(k)!);
 
     // Saved page by page, not after the whole account has been downloaded: the
     // request runs under a hard function time limit, and a big account that got

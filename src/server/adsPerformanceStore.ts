@@ -128,9 +128,13 @@ export async function upsertAdsPerformance(rows: AdsPerformanceRow[]): Promise<v
     return;
   }
 
+  // Postgres refuses a single upsert that touches the same key twice, so a
+  // batch with duplicate keys (e.g. two ads sharing a name) would fail whole.
+  // Last one wins here; callers that can SUM duplicates (facebookAdsSync) do so first.
+  const unique = Array.from(new Map(rows.map((r) => [adsPerformanceKey(r), r])).values());
   const { error } = await supabase
     .from("ads_performance")
-    .upsert(rows, { onConflict: "channel,campaign_name,ad_group_name,ad_name,date" });
+    .upsert(unique, { onConflict: "channel,campaign_name,ad_group_name,ad_name,date" });
   if (error) throw new Error(`Lỗi lưu số liệu quảng cáo: ${error.message}`);
 }
 
