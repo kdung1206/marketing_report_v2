@@ -82,6 +82,7 @@ import {
   buildTiktokAdsAuthorizeUrl,
   exchangeTiktokAdsCode,
   fetchAdvertiserNames,
+  listAdvertiserIdsForToken,
   detectBrandFromAdvertiserName,
   TIKTOK_MARKETING_REDIRECT_URI,
 } from "./tiktokAdsOAuth";
@@ -2117,6 +2118,38 @@ app.get("/api/tiktok-ads/oauth/callback", async (req, res) => {
   } catch (err: any) {
     console.error("GET /api/tiktok-ads/oauth/callback error:", err);
     res.status(500).send(`Kết nối TikTok Ads thất bại: ${err.message}`);
+  }
+});
+
+// POST /api/tiktok-ads/token/connect — paste an access token instead of the
+// OAuth redirect (mirrors POST /api/facebook/token/connect). Lists the
+// advertisers it covers and stashes them behind a pending id so the same
+// picker + .../pending/:id/complete below finishes the job.
+app.post("/api/tiktok-ads/token/connect", requireAuth("Admin"), async (req, res) => {
+  const token = String(req.body?.access_token || "").trim();
+  if (!token) return res.status(400).json({ success: false, error: "Vui lòng dán Access Token." });
+  if (!isTiktokAdsOAuthConfigured) {
+    return res.status(400).json({ success: false, error: "TIKTOK_MARKETING_APP_ID / TIKTOK_MARKETING_APP_SECRET / TIKTOK_MARKETING_REDIRECT_URI chưa được cấu hình đầy đủ." });
+  }
+  try {
+    let ids: string[];
+    try {
+      ids = await listAdvertiserIdsForToken(token);
+    } catch (err: any) {
+      return res.status(400).json({ success: false, error: `Token không hợp lệ hoặc không thuộc app này: ${err.message}` });
+    }
+    if (ids.length === 0) {
+      return res.status(400).json({ success: false, error: "Token hợp lệ nhưng chưa ủy quyền Advertiser nào cho app này." });
+    }
+    const advertisers = await fetchAdvertiserNames(token, ids);
+    const pendingId = await createOAuthPending("tiktok_ads", token, {
+      advertisers: advertisers.map((a) => ({ id: a.advertiser_id, name: a.name, brandGuess: detectBrandFromAdvertiserName(a.name) })),
+    });
+    await logAction((req as any).session, req, "connect-tiktok-ads-token", `Nhập Access Token TikTok Ads — ${advertisers.length} Advertiser khả dụng`);
+    res.json({ success: true, pendingId });
+  } catch (err: any) {
+    console.error("POST /api/tiktok-ads/token/connect error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

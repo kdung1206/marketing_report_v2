@@ -59,6 +59,22 @@ export async function exchangeTiktokAdsCode(authCode: string): Promise<TiktokAds
   return body.data;
 }
 
+// For the "paste a token" connect path: the OAuth exchange hands back
+// advertiser_ids itself, but a token pasted in by hand doesn't, so ask TikTok
+// which advertisers this token (for this app) is authorized for. Also doubles
+// as token validation — a bad/revoked token fails here with TikTok's message.
+export async function listAdvertiserIdsForToken(accessToken: string): Promise<string[]> {
+  const params = new URLSearchParams({ app_id: TIKTOK_MARKETING_APP_ID, secret: TIKTOK_MARKETING_APP_SECRET });
+  const res = await fetch(`${TIKTOK_MARKETING_API_BASE}/oauth2/advertiser/get/?${params.toString()}`, {
+    headers: { "Access-Token": accessToken },
+  });
+  const body = await res.json();
+  if (!res.ok || body?.code !== 0) {
+    throw new TiktokMarketingApiError(body?.message || `TikTok oauth2/advertiser/get trả về lỗi HTTP ${res.status}`, body?.code);
+  }
+  return (body?.data?.list || []).map((a: any) => String(a.advertiser_id));
+}
+
 export interface TiktokAdvertiserCandidate {
   advertiser_id: string;
   name: string;

@@ -19,6 +19,10 @@ export default function TiktokAdsConnectAdmin({ onImported }: { onImported: () =
   const [isConnecting, setIsConnecting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [tokenInput, setTokenInput] = useState("");
+  const [isConnectingToken, setIsConnectingToken] = useState(false);
+
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [advertisers, setAdvertisers] = useState<AdvertiserCandidate[]>([]);
   const [selected, setSelected] = useState<Record<string, { checked: boolean; brand: string }>>({});
@@ -82,6 +86,30 @@ export default function TiktokAdsConnectAdmin({ onImported }: { onImported: () =
       setMessage({ type: "error", text: err.message || "Không tạo được liên kết kết nối TikTok Ads." });
     } finally {
       setIsConnecting(false);
+    }
+  }
+
+  async function handleTokenConnect() {
+    if (!tokenInput.trim()) return;
+    setIsConnectingToken(true);
+    setMessage(null);
+    try {
+      const result = await safeFetchJson("/api/tiktok-ads/token/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: tokenInput.trim() }),
+      });
+      if (result.success && result.pendingId) {
+        setTokenInput("");
+        setShowTokenInput(false);
+        setPendingId(result.pendingId);
+      } else {
+        setMessage({ type: "error", text: result.error || "Token không hợp lệ." });
+      }
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Token không hợp lệ." });
+    } finally {
+      setIsConnectingToken(false);
     }
   }
 
@@ -157,15 +185,46 @@ export default function TiktokAdsConnectAdmin({ onImported }: { onImported: () =
       )}
 
       {!pendingId ? (
-        <button
-          type="button"
-          onClick={handleConnect}
-          disabled={isConnecting || !configured}
-          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          {isConnecting ? "Đang tạo liên kết..." : "Kết nối TikTok Ads"}
-        </button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleConnect}
+              disabled={isConnecting || !configured}
+              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              {isConnecting ? "Đang tạo liên kết..." : "Kết nối TikTok Ads"}
+            </button>
+            <button type="button" onClick={() => setShowTokenInput((v) => !v)} className="text-xs font-semibold text-indigo-600 hover:underline">
+              Hoặc dán Access Token
+            </button>
+          </div>
+          {showTokenInput && (
+            <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] text-slate-500">
+                Dán Access Token của app TikTok Marketing này (token phải thuộc đúng App ID đang cấu hình). Hệ thống sẽ liệt kê các
+                Advertiser token có quyền để bạn chọn và gán brand.
+              </p>
+              <input
+                type="password"
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                placeholder="Access Token"
+                autoComplete="off"
+                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 font-mono text-xs"
+              />
+              <button
+                type="button"
+                onClick={handleTokenConnect}
+                disabled={isConnectingToken || !tokenInput.trim() || !configured}
+                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {isConnectingToken ? "Đang kiểm tra..." : "Kiểm tra & lấy danh sách"}
+              </button>
+            </div>
+          )}
+        </div>
       ) : isLoadingPending ? (
         <p className="text-xs text-slate-400">Đang tải danh sách Advertiser...</p>
       ) : (

@@ -104162,6 +104162,41 @@ async function listOwnedAdAccounts(userAccessToken) {
   );
   return body?.data || [];
 }
+async function inspectAccessToken(accessToken) {
+  const me = await graphGet(`/me?fields=id,name`, accessToken);
+  const expiry = await fetchTokenExpiry(accessToken);
+  let type = null;
+  let scopes = [];
+  try {
+    const appId = process.env.FB_APP_ID;
+    const appSecret = process.env.FB_APP_SECRET;
+    const inspectorToken = appId && appSecret ? `${appId}|${appSecret}` : accessToken;
+    const dbg = await graphGet(`/debug_token?input_token=${encodeURIComponent(accessToken)}`, inspectorToken);
+    type = dbg?.data?.type || null;
+    scopes = Array.isArray(dbg?.data?.scopes) ? dbg.data.scopes : [];
+  } catch {
+  }
+  return { name: me?.name || null, type, expires_at: expiry?.expires_at ?? null, scopes, isValid: true };
+}
+async function listPagesForToken(accessToken) {
+  const fields = "id,name,access_token,category";
+  const byId = /* @__PURE__ */ new Map();
+  let lastError = null;
+  for (const edge of ["assigned_pages", "accounts"]) {
+    try {
+      const body = await graphGet(`/me/${edge}?fields=${fields}&limit=200`, accessToken);
+      for (const p of body?.data || []) {
+        if (!p?.id) continue;
+        const existing = byId.get(p.id);
+        if (!existing || !existing.access_token && p.access_token) byId.set(p.id, p);
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  if (byId.size === 0 && lastError) throw lastError;
+  return Array.from(byId.values()).map((p) => ({ ...p, access_token: p.access_token || accessToken }));
+}
 function detectBrandFromFacebookName(name) {
   const haystack = (name || "").toLowerCase();
   const hasLivotec = haystack.includes("livotec");
@@ -104458,6 +104493,17 @@ async function exchangeTiktokAdsCode(authCode) {
   }
   return body.data;
 }
+async function listAdvertiserIdsForToken(accessToken) {
+  const params = new URLSearchParams({ app_id: TIKTOK_MARKETING_APP_ID, secret: TIKTOK_MARKETING_APP_SECRET });
+  const res = await fetch(`${TIKTOK_MARKETING_API_BASE}/oauth2/advertiser/get/?${params.toString()}`, {
+    headers: { "Access-Token": accessToken }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.code !== 0) {
+    throw new TiktokMarketingApiError(body?.message || `TikTok oauth2/advertiser/get tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`, body?.code);
+  }
+  return (body?.data?.list || []).map((a) => String(a.advertiser_id));
+}
 async function fetchAdvertiserNames(accessToken, advertiserIds) {
   if (advertiserIds.length === 0) return [];
   const params = new URLSearchParams({ advertiser_ids: JSON.stringify(advertiserIds), fields: JSON.stringify(["advertiser_id", "name"]) });
@@ -104563,7 +104609,8 @@ async function upsertAdsPerformance(rows) {
     await writeLocalCollections3(store, { ads_performance: Array.from(byKey.values()) });
     return;
   }
-  const { error } = await supabase.from("ads_performance").upsert(rows, { onConflict: "channel,campaign_name,ad_group_name,ad_name,date" });
+  const unique = Array.from(new Map(rows.map((r2) => [adsPerformanceKey(r2), r2])).values());
+  const { error } = await supabase.from("ads_performance").upsert(unique, { onConflict: "channel,campaign_name,ad_group_name,ad_name,date" });
   if (error) throw new Error(`L\u1ED7i l\u01B0u s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o: ${error.message}`);
 }
 async function getAdsPerformance(params) {
@@ -105066,8 +105113,35 @@ async function fetchAdThumbnailMap(adAccountId, accessToken, tokenStatus) {
   }
   return map;
 }
+function addNullable(a, b) {
+  if (a == null && b == null) return null;
+  return (a ?? 0) + (b ?? 0);
+}
+function adRowKey(r2) {
+  return `${r2.campaign_name}|${r2.ad_group_name}|${r2.ad_name}|${r2.date}`;
+}
+function mergeAdRows(into, add) {
+  into.spend = addNullable(into.spend, add.spend);
+  into.impressions = addNullable(into.impressions, add.impressions);
+  into.clicks = addNullable(into.clicks, add.clicks);
+  into.reach = addNullable(into.reach, add.reach);
+  into.video_views = addNullable(into.video_views, add.video_views);
+  into.conversions = addNullable(into.conversions, add.conversions);
+  into.frequency = into.reach && into.impressions ? into.impressions / into.reach : into.frequency;
+  into.post_id = into.post_id || add.post_id || null;
+  const a = into.extra;
+  const b = add.extra;
+  a.merged_ads = (a.merged_ads || 1) + 1;
+  if (a.lead_actions && b?.lead_actions) {
+    a.lead_actions = {
+      lead: (a.lead_actions.lead || 0) + (b.lead_actions.lead || 0),
+      lead_grouped: (a.lead_actions.lead_grouped || 0) + (b.lead_actions.lead_grouped || 0)
+    };
+  }
+}
 async function fetchAdAccountInsights(adAccountId, accessToken, since, until, brand, tokenStatus, adPostMap, adThumbnailMap, savePage) {
   let total = 0;
+  const seen = /* @__PURE__ */ new Map();
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
   let body;
   try {
@@ -105080,14 +105154,14 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
     throw err;
   }
   while (body) {
-    const rows = [];
+    const pageKeys = /* @__PURE__ */ new Set();
     const creatives = /* @__PURE__ */ new Map();
     for (const item of body.data || []) {
       if (!item.date_start || !item.campaign_name) continue;
       const leads = leadCount(item.actions);
       const thumbnail = item.ad_id ? adThumbnailMap.get(item.ad_id) : void 0;
       if (item.ad_id && thumbnail) creatives.set(item.ad_id, { ad_id: item.ad_id, thumbnail_url: thumbnail });
-      rows.push({
+      const row = {
         channel: "facebook",
         brand,
         campaign_name: item.campaign_name,
@@ -105117,8 +105191,14 @@ async function fetchAdAccountInsights(adAccountId, accessToken, since, until, br
           campaign_id: item.campaign_id || null,
           lead_actions: { lead: leads.lead, lead_grouped: leads.lead_grouped }
         }
-      });
+      };
+      const key = adRowKey(row);
+      const existing = seen.get(key);
+      if (existing) mergeAdRows(existing, row);
+      else seen.set(key, row);
+      pageKeys.add(key);
     }
+    const rows = Array.from(pageKeys, (k) => seen.get(k));
     if (rows.length > 0) await savePage(rows, Array.from(creatives.values()));
     total += rows.length;
     const nextUrl = body.paging?.next;
@@ -129473,6 +129553,46 @@ app.get("/api/facebook/oauth/callback", async (req, res) => {
     res.status(500).send(`K\u1EBFt n\u1ED1i Facebook th\u1EA5t b\u1EA1i: ${err.message}`);
   }
 });
+app.post("/api/facebook/token/connect", requireAuth("Admin"), async (req, res) => {
+  const token = String(req.body?.access_token || "").trim();
+  if (!token) return res.status(400).json({ success: false, error: "Vui l\xF2ng d\xE1n Access Token." });
+  try {
+    let info;
+    try {
+      info = await inspectAccessToken(token);
+    } catch (err) {
+      return res.status(400).json({ success: false, error: `Token kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c \u0111\xE3 h\u1EBFt h\u1EA1n: ${err.message}` });
+    }
+    const [pagesResult, adAccountsResult] = await Promise.allSettled([listPagesForToken(token), listOwnedAdAccounts(token)]);
+    const pages = pagesResult.status === "fulfilled" ? pagesResult.value : [];
+    const adAccounts = adAccountsResult.status === "fulfilled" ? adAccountsResult.value : [];
+    if (pages.length === 0 && adAccounts.length === 0) {
+      const reason = [pagesResult, adAccountsResult].map((r2) => r2.status === "rejected" ? r2.reason?.message : null).filter(Boolean).join(" | ");
+      return res.status(400).json({
+        success: false,
+        error: `Token h\u1EE3p l\u1EC7 nh\u01B0ng kh\xF4ng th\u1EA5y Page hay Ad Account n\xE0o \u0111\u01B0\u1EE3c g\xE1n cho System User n\xE0y.${reason ? ` (${reason})` : ""} H\xE3y g\xE1n Asset trong Business Settings \u2192 System Users \u2192 Add Assets.`
+      });
+    }
+    const pendingId = await createOAuthPending("facebook", token, {
+      pages: pages.map((p) => ({ id: p.id, name: p.name, category: p.category || null, brandGuess: detectBrandFromFacebookName(p.name) })),
+      pageTokens: Object.fromEntries(pages.map((p) => [p.id, p.access_token])),
+      adAccounts: adAccounts.map((a) => ({ id: a.id, name: a.name, brandGuess: detectBrandFromFacebookName(a.name) }))
+    });
+    await logAction(req.session, req, "connect-facebook-token", `Nh\u1EADp System User Token (${info.name || "?"}) \u2014 ${pages.length} Page, ${adAccounts.length} Ad Account kh\u1EA3 d\u1EE5ng`);
+    res.json({
+      success: true,
+      pendingId,
+      token: { name: info.name, type: info.type, neverExpires: info.expires_at === null, expires_at: info.expires_at, scopes: info.scopes },
+      warnings: [
+        pagesResult.status === "rejected" ? `Kh\xF4ng l\u1EA5y \u0111\u01B0\u1EE3c danh s\xE1ch Page: ${pagesResult.reason?.message}` : null,
+        adAccountsResult.status === "rejected" ? `Kh\xF4ng l\u1EA5y \u0111\u01B0\u1EE3c danh s\xE1ch Ad Account: ${adAccountsResult.reason?.message}` : null
+      ].filter(Boolean)
+    });
+  } catch (err) {
+    console.error("POST /api/facebook/token/connect error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 app.get("/api/oauth-pending/:id", requireAuth("Admin"), async (req, res) => {
   try {
     const pending = await getOAuthPending(req.params.id);
@@ -129988,6 +130108,33 @@ app.get("/api/tiktok-ads/oauth/callback", async (req, res) => {
   } catch (err) {
     console.error("GET /api/tiktok-ads/oauth/callback error:", err);
     res.status(500).send(`K\u1EBFt n\u1ED1i TikTok Ads th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.post("/api/tiktok-ads/token/connect", requireAuth("Admin"), async (req, res) => {
+  const token = String(req.body?.access_token || "").trim();
+  if (!token) return res.status(400).json({ success: false, error: "Vui l\xF2ng d\xE1n Access Token." });
+  if (!isTiktokAdsOAuthConfigured) {
+    return res.status(400).json({ success: false, error: "TIKTOK_MARKETING_APP_ID / TIKTOK_MARKETING_APP_SECRET / TIKTOK_MARKETING_REDIRECT_URI ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7." });
+  }
+  try {
+    let ids;
+    try {
+      ids = await listAdvertiserIdsForToken(token);
+    } catch (err) {
+      return res.status(400).json({ success: false, error: `Token kh\xF4ng h\u1EE3p l\u1EC7 ho\u1EB7c kh\xF4ng thu\u1ED9c app n\xE0y: ${err.message}` });
+    }
+    if (ids.length === 0) {
+      return res.status(400).json({ success: false, error: "Token h\u1EE3p l\u1EC7 nh\u01B0ng ch\u01B0a \u1EE7y quy\u1EC1n Advertiser n\xE0o cho app n\xE0y." });
+    }
+    const advertisers = await fetchAdvertiserNames(token, ids);
+    const pendingId = await createOAuthPending("tiktok_ads", token, {
+      advertisers: advertisers.map((a) => ({ id: a.advertiser_id, name: a.name, brandGuess: detectBrandFromAdvertiserName(a.name) }))
+    });
+    await logAction(req.session, req, "connect-tiktok-ads-token", `Nh\u1EADp Access Token TikTok Ads \u2014 ${advertisers.length} Advertiser kh\u1EA3 d\u1EE5ng`);
+    res.json({ success: true, pendingId });
+  } catch (err) {
+    console.error("POST /api/tiktok-ads/token/connect error:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 app.post("/api/tiktok-ads/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
@@ -130687,6 +130834,36 @@ app.get("/api/campaign/ads-campaign-names", requireAuth(), async (req, res) => {
     }
     const names = await getDistinctAdsCampaignNames(brand, channel);
     res.json({ success: true, names });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/campaign/ads-campaign-options", requireAuth(), async (req, res) => {
+  try {
+    const { brand, since, until } = req.query;
+    if (typeof brand !== "string" || !brand) {
+      return res.status(400).json({ success: false, error: "Thi\u1EBFu brand." });
+    }
+    const dateOk = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+    const rows = await getAdsPerformance({
+      brand,
+      since: dateOk(since) ? since : "2000-01-01",
+      until: dateOk(until) ? until : "2999-12-31"
+    });
+    const byKey = /* @__PURE__ */ new Map();
+    for (const r2 of rows) {
+      const key = `${r2.channel}|${r2.campaign_name}`;
+      const e2 = byKey.get(key) || { channel: r2.channel, campaign_name: r2.campaign_name, spend: 0, impressions: 0, clicks: 0, conversions: 0, first_date: r2.date, last_date: r2.date };
+      e2.spend += r2.spend || 0;
+      e2.impressions += r2.impressions || 0;
+      e2.clicks += r2.clicks || 0;
+      e2.conversions += r2.conversions || 0;
+      if (r2.date < e2.first_date) e2.first_date = r2.date;
+      if (r2.date > e2.last_date) e2.last_date = r2.date;
+      byKey.set(key, e2);
+    }
+    const options = Array.from(byKey.values()).sort((a, b) => a.last_date < b.last_date ? 1 : a.last_date > b.last_date ? -1 : b.spend - a.spend);
+    res.json({ success: true, options });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
