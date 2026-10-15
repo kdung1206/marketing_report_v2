@@ -287,7 +287,21 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
     try {
       const result = await safeFetchJson("/api/technical-seo/sync-now", { method: "POST" });
       if (result.success) {
-        setMessage({ type: "success", text: "Đã kiểm tra Technical SEO Monitor." });
+        // The route answers success even when a single account's check threw
+        // or one of its three parts was skipped — surface those instead of a
+        // blanket "done", otherwise a half-empty result looks like a bug.
+        const results: { brand: string | null; ok: boolean; error?: string; broken_links_found?: number; urls_crawled?: number; pagespeed_score?: number | null; sitemap_issues_found?: number }[] = result.results || [];
+        const problems = results.filter((r) => !r.ok || r.error).map((r) => `${r.brand || "Website"}: ${r.error || "lỗi không rõ"}`);
+        if (results.length === 0) {
+          setMessage({ type: "error", text: "Chưa có Website nào có Search Console (gsc_site_url) để kiểm tra — kết nối ở Control Panel → Kết nối nền tảng → Google." });
+        } else if (problems.length > 0) {
+          setMessage({ type: "error", text: `Kiểm tra xong nhưng có phần bị lỗi — ${problems.join(" | ")}` });
+        } else {
+          const summary = results
+            .map((r) => `${r.brand || "Website"}: ${r.urls_crawled ?? 0} URL quét, ${r.broken_links_found ?? 0} lỗi, PageSpeed ${r.pagespeed_score ?? "chưa có"}, ${r.sitemap_issues_found ?? 0} sitemap cảnh báo`)
+            .join(" · ");
+          setMessage({ type: "success", text: `Đã kiểm tra Technical SEO Monitor — ${summary}` });
+        }
         await loadAll();
       } else {
         setMessage({ type: "error", text: result.error || "Kiểm tra thất bại." });

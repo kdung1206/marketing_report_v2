@@ -200,8 +200,9 @@ async function fetchPageSpeed(url: string, strategy: "mobile" | "desktop" = "mob
 
   try {
     // PSI genuinely takes a while (it runs a real Lighthouse audit
-    // server-side) — a longer timeout than the plain fetch checks above.
-    const res = await fetch(`${PAGESPEED_API_BASE}?${params.toString()}`, { signal: withTimeout(30_000) });
+    // server-side; ~50s for karofi.com in practice) — a much longer timeout
+    // than the plain fetch checks above, or it aborts and never reports a score.
+    const res = await fetch(`${PAGESPEED_API_BASE}?${params.toString()}`, { signal: withTimeout(90_000) });
     const body = await res.json();
     if (!res.ok || body?.error) {
       return { ok: false, performance_score: null, lcp_ms: null, cls: null, error: body?.error?.message || `HTTP ${res.status}` };
@@ -277,6 +278,13 @@ async function runAccountCheck(account: GoogleWebsiteAccountConfig, fullDigest: 
   const alertLines: string[] = [];
   const rows: TechnicalSeoCheck[] = [];
 
+  // Previous state, read BEFORE any upsert below overwrites it (used for the
+  // "only alert on NEW problems" diff further down).
+  const previousChecks = await getTechnicalSeoChecks([account.id]);
+
+  // PageSpeed is the slow one (~50s) and independent of the crawl — start it now.
+  const pagespeedPromise = fetchPageSpeed(origin, "mobile");
+
   // 1. Broken-link crawl
   const { urls, sitemapFailures } = await discoverSitemapUrls(origin);
   const crawlResults = urls.length > 0 ? await crawlUrls(urls) : [];
@@ -312,8 +320,13 @@ async function runAccountCheck(account: GoogleWebsiteAccountConfig, fullDigest: 
     await pruneStaleTechnicalSeoChecks(account.id, "broken_link", [...urls, ...sitemapFailures.map((f) => f.url)]);
   }
 
+  // Save the crawl results right away: if PageSpeed/Search Console below is
+  // slow or fails, the crawl isn't lost.
+  await upsertTechnicalSeoChecks(rows);
+  const savedRows = rows.splice(0);
+
   // 2. PageSpeed Insights (homepage only, mobile — see header comment)
-  const pagespeed = await fetchPageSpeed(origin, "mobile");
+  const pagespeed = await pagespeedPromise;
   const pagespeedStatus: "ok" | "error" | "warning" = !pagespeed.ok
     ? "warning" // PSI itself failing (rate limit, timeout) isn't a site problem worth alerting on
     : pagespeed.performance_score !== null && pagespeed.performance_score < PAGESPEED_WARN_THRESHOLD
@@ -362,10 +375,10 @@ async function runAccountCheck(account: GoogleWebsiteAccountConfig, fullDigest: 
   // BEFORE the upsert overwrites it) and only alert on problems that weren't
   // already errors — unless this is the weekly reminder run (fullDigest),
   // which re-lists everything still outstanding.
-  const previousChecks = await getTechnicalSeoChecks([account.id]);
   const prevErrorKeys = new Set(previousChecks.filter((c) => c.status === "error").map((c) => `${c.check_type}|${c.url}`));
   const isNew = (type: TechnicalSeoCheckType, url: string) => fullDigest || !prevErrorKeys.has(`${type}|${url}`);
-  const currentErrorKeys = new Set(rows.filter((r) => r.status === "error").map((r) => `${r.check_type}|${r.url}`));
+  const allRows = [...savedRows, ...rows];
+  const currentErrorKeys = new Set(allRows.filter((r) => r.status === "error").map((r) => `${r.check_type}|${r.url}`));
   const resolvedCount = Array.from(prevErrorKeys).filter((k) => !currentErrorKeys.has(k)).length;
 
   await upsertTechnicalSeoChecks(rows);
@@ -388,7 +401,7 @@ async function runAccountCheck(account: GoogleWebsiteAccountConfig, fullDigest: 
   if (pagespeedStatus === "error" && isNew("pagespeed", origin)) {
     alertLines.push(`🟡 <b>PageSpeed điểm thấp</b>${brandLabel}: ${pagespeed.performance_score}/100 (trang chủ, mobile) — LCP ${pagespeed.lcp_ms ? Math.round(pagespeed.lcp_ms) : "?"}ms.`);
   }
-  const reportedSitemapIssues = rows.filter((r) => r.check_type === "sitemap" && r.status === "error" && isNew("sitemap", r.url));
+  const reportedSitemapIssues = allRows.filter((r) => r.check_type === "sitemap" && r.status === "error" && isNew("sitemap", r.url));
   if (reportedSitemapIssues.length > 0) {
     alertLines.push(`🟠 <b>${reportedSitemapIssues.length} sitemap có cảnh báo/lỗi</b>${brandLabel} theo Search Console.`);
   }

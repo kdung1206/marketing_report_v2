@@ -25,7 +25,7 @@
 // Editor access.
 // ---------------------------------------------------------------------------
 import { getGoogleWebsiteAccounts } from "./googleWebsiteStore";
-import { geminiClient, isGeminiConfigured, GEMINI_MODEL } from "./geminiClient";
+import { geminiClient, isGeminiConfigured, generateTextWithRetry } from "./geminiClient";
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_HTML_LENGTH = 3_000_000; // ~3MB of markup is already an extreme outlier for a normal page
@@ -184,11 +184,33 @@ Số từ nội dung ước tính: ${signals.word_count}
 
 Tiêu chí tham khảo: title nên 50-60 ký tự, meta description 120-160 ký tự, đúng 1 thẻ H1 mỗi trang, ảnh nên có alt text mô tả, nội dung quá ngắn (dưới ~300 từ) thường khó xếp hạng tốt cho từ khoá cạnh tranh.`;
 
-  const response = await geminiClient.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: prompt,
-  });
-  return response.text || "Gemini không trả về nội dung.";
+  // The scan itself (numbers above) already succeeded — an overloaded/failed
+  // Gemini must not turn the whole scan into an error banner. Retry/fall back
+  // across models first, and if it still fails, return rule-based advice from
+  // the same signals instead.
+  try {
+    return await generateTextWithRetry(prompt);
+  } catch (err: any) {
+    console.error("onpageScanner: Gemini thất bại, dùng gợi ý theo quy tắc:", err?.message || err);
+    return `${ruleBasedSuggestions(signals)}
+
+(Gợi ý AI tạm thời không khả dụng — Gemini đang quá tải, hãy bấm Quét lại sau ít phút. Phần trên là gợi ý theo quy tắc cố định.)`;
+  }
+}
+
+// Deterministic fallback using the same reference thresholds the AI prompt cites.
+function ruleBasedSuggestions(s: OnPageSignals): string {
+  const tips: string[] = [];
+  if (s.h1_count === 0) tips.push("- Trang chưa có thẻ H1 — thêm đúng 1 H1 chứa từ khoá chính.");
+  else if (s.h1_count > 1) tips.push(`- Trang có ${s.h1_count} thẻ H1 — nên chỉ giữ 1 H1, các tiêu đề còn lại dùng H2/H3.`);
+  if (!s.title) tips.push("- Thiếu thẻ title — cần thêm title 50-60 ký tự chứa từ khoá chính.");
+  else if (s.title_length < 30 || s.title_length > 65) tips.push(`- Title dài ${s.title_length} ký tự — nên 50-60 ký tự để hiển thị đủ trên Google.`);
+  if (!s.meta_description) tips.push("- Thiếu meta description — thêm mô tả 120-160 ký tự, có lời kêu gọi hành động.");
+  else if (s.meta_description_length < 100 || s.meta_description_length > 170) tips.push(`- Meta description dài ${s.meta_description_length} ký tự — nên 120-160 ký tự.`);
+  if (s.images_missing_alt > 0) tips.push(`- ${s.images_missing_alt}/${s.image_count} ảnh thiếu alt — bổ sung alt mô tả nội dung ảnh.`);
+  if (s.word_count < 300) tips.push(`- Nội dung chỉ khoảng ${s.word_count} từ — nên mở rộng (trên ~300 từ) để cạnh tranh từ khoá.`);
+  if (s.internal_link_count < 3) tips.push("- Ít internal link — thêm liên kết nội bộ tới sản phẩm/bài viết liên quan.");
+  return tips.length > 0 ? tips.join("\n") : "- Các tín hiệu on-page cơ bản đều đạt ngưỡng tham khảo.";
 }
 
 export interface OnPageScanResult {

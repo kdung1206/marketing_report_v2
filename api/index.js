@@ -29863,7 +29863,7 @@ var require_helpers = __commonJS({
     exports2.generateCallbackId = generateCallbackId;
     exports2.parseParametersFromURL = parseParametersFromURL;
     exports2.decodeJWT = decodeJWT;
-    exports2.sleep = sleep4;
+    exports2.sleep = sleep5;
     exports2.retryable = retryable;
     exports2.generatePKCEVerifier = generatePKCEVerifier;
     exports2.generatePKCEChallenge = generatePKCEChallenge;
@@ -30001,7 +30001,7 @@ var require_helpers = __commonJS({
       };
       return data;
     }
-    async function sleep4(time) {
+    async function sleep5(time) {
       return await new Promise((accept) => {
         setTimeout(() => accept(null), time);
       });
@@ -104686,9 +104686,9 @@ async function getDistinctAdsCampaignNames(brand, channel) {
   });
   return Array.from(new Set(rows.map((r2) => r2.campaign_name))).sort();
 }
-async function upsertAdCreatives(rows) {
+async function upsertAdCreatives(rows, channel = "facebook") {
   if (rows.length === 0) return;
-  const stamped = rows.map((r2) => ({ ad_id: r2.ad_id, channel: "facebook", thumbnail_url: r2.thumbnail_url, updated_at: (/* @__PURE__ */ new Date()).toISOString() }));
+  const stamped = rows.map((r2) => ({ ad_id: r2.ad_id, channel, thumbnail_url: r2.thumbnail_url, updated_at: (/* @__PURE__ */ new Date()).toISOString() }));
   if (!isSupabaseConfigured) {
     const { store } = await readLocalCollections3();
     const existing = Array.isArray(store.ad_creatives) ? store.ad_creatives : [];
@@ -105486,12 +105486,121 @@ async function fetchGoogleAdsRows(customerId, loginCustomerId, accessToken, sinc
       });
     }
   }
+  const covered = new Set(rows.map((r2) => `${r2.campaign_name}|${r2.date}`));
+  const campaignQuery = `
+    SELECT
+      segments.date,
+      campaign.name,
+      campaign.advertising_channel_type,
+      metrics.cost_micros,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.conversions,
+      metrics.video_trueview_views
+    FROM campaign
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND campaign.status != 'REMOVED'
+      AND metrics.impressions > 0
+  `;
+  const campRes = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${cleanCustomerId}/googleAds:searchStream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query: campaignQuery })
+  });
+  const campBody = await readResponseBody(campRes);
+  if (!campRes.ok || campBody?.error) {
+    console.error("Google Ads campaign-level fallback l\u1ED7i:", extractGoogleAdsApiError(campBody, `HTTP ${campRes.status}`));
+    return rows;
+  }
+  for (const batch of Array.isArray(campBody) ? campBody : []) {
+    for (const result of batch.results || []) {
+      const date = result.segments?.date;
+      const campaignName = result.campaign?.name;
+      if (!date || !campaignName || covered.has(`${campaignName}|${date}`)) continue;
+      rows.push({
+        channel: "google",
+        brand,
+        campaign_name: campaignName,
+        ad_group_name: "(c\u1EA5p chi\u1EBFn d\u1ECBch)",
+        ad_name: "(c\u1EA5p chi\u1EBFn d\u1ECBch)",
+        date,
+        spend: result.metrics?.costMicros != null ? Number(result.metrics.costMicros) / 1e6 : null,
+        impressions: result.metrics?.impressions != null ? Number(result.metrics.impressions) : null,
+        clicks: result.metrics?.clicks != null ? Number(result.metrics.clicks) : null,
+        reach: null,
+        frequency: null,
+        video_views: result.metrics?.videoTrueviewViews != null ? Number(result.metrics.videoTrueviewViews) : null,
+        conversions: result.metrics?.conversions != null ? Math.round(Number(result.metrics.conversions)) : null,
+        extra: { customer_id: customerId, campaign_type: result.campaign?.advertisingChannelType || null, level: "campaign" }
+      });
+    }
+  }
   return rows;
 }
 function tiktokNumber(raw) {
   if (raw === null || raw === void 0 || raw === "") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+async function tiktokGet(path3, accessToken, params) {
+  const res = await fetch(`${TIKTOK_BUSINESS_API_BASE}/${path3}?${new URLSearchParams(params).toString()}`, {
+    headers: { "Access-Token": accessToken }
+  });
+  const body = await res.json();
+  if (!res.ok || body?.code !== 0) throw new Error(body?.message || `HTTP ${res.status}`);
+  return body?.data || {};
+}
+async function fetchTiktokAdThumbnailMap(advertiserId, accessToken, adIds) {
+  const out = /* @__PURE__ */ new Map();
+  const adToVideo = /* @__PURE__ */ new Map();
+  const adToImage = /* @__PURE__ */ new Map();
+  for (let i2 = 0; i2 < adIds.length; i2 += 100) {
+    const batch = adIds.slice(i2, i2 + 100);
+    try {
+      const data = await tiktokGet("ad/get/", accessToken, {
+        advertiser_id: advertiserId,
+        filtering: JSON.stringify({ ad_ids: batch }),
+        fields: JSON.stringify(["ad_id", "video_id", "image_ids"]),
+        page_size: "100"
+      });
+      for (const ad of data.list || []) {
+        const adId = String(ad.ad_id);
+        if (ad.video_id) adToVideo.set(adId, String(ad.video_id));
+        else if (Array.isArray(ad.image_ids) && ad.image_ids[0]) adToImage.set(adId, String(ad.image_ids[0]));
+      }
+    } catch (err) {
+      console.error(`TikTok Ads \u2192 ad/get (${advertiserId}) l\u1ED7i:`, err.message || err);
+    }
+  }
+  const videoCover = /* @__PURE__ */ new Map();
+  const videoIds = Array.from(new Set(adToVideo.values()));
+  for (let i2 = 0; i2 < videoIds.length; i2 += 60) {
+    try {
+      const data = await tiktokGet("file/video/ad/info/", accessToken, { advertiser_id: advertiserId, video_ids: JSON.stringify(videoIds.slice(i2, i2 + 60)) });
+      for (const v of data.list || []) if (v.video_id && v.video_cover_url) videoCover.set(String(v.video_id), String(v.video_cover_url));
+    } catch (err) {
+      console.error(`TikTok Ads \u2192 file/video/ad/info (${advertiserId}) l\u1ED7i:`, err.message || err);
+    }
+  }
+  const imageUrl = /* @__PURE__ */ new Map();
+  const imageIds = Array.from(new Set(adToImage.values()));
+  for (let i2 = 0; i2 < imageIds.length; i2 += 60) {
+    try {
+      const data = await tiktokGet("file/image/ad/info/", accessToken, { advertiser_id: advertiserId, image_ids: JSON.stringify(imageIds.slice(i2, i2 + 60)) });
+      for (const im of data.list || []) if (im.image_id && im.image_url) imageUrl.set(String(im.image_id), String(im.image_url));
+    } catch (err) {
+      console.error(`TikTok Ads \u2192 file/image/ad/info (${advertiserId}) l\u1ED7i:`, err.message || err);
+    }
+  }
+  for (const [adId, videoId] of adToVideo) {
+    const url = videoCover.get(videoId);
+    if (url) out.set(adId, url);
+  }
+  for (const [adId, imageId] of adToImage) {
+    const url = imageUrl.get(imageId);
+    if (url) out.set(adId, url);
+  }
+  return out;
 }
 async function fetchTiktokAdsRows(advertiserId, accessToken, since, until, brand) {
   const params = new URLSearchParams({
@@ -105547,7 +105656,7 @@ async function fetchTiktokAdsRows(advertiserId, accessToken, since, until, brand
         frequency: tiktokNumber(metrics.frequency),
         video_views: tiktokNumber(metrics.video_watched_6s),
         conversions: tiktokNumber(metrics.conversion),
-        extra: { advertiser_id: advertiserId }
+        extra: { advertiser_id: advertiserId, ad_id: dimensions.ad_id ? String(dimensions.ad_id) : null }
       });
     }
     const pageInfo = body?.data?.page_info;
@@ -105567,6 +105676,7 @@ async function runGoogleAdsSync(overrides) {
   const chunks = dateRangeChunks2(since, until, MAX_GOOGLE_CHUNK_DAYS);
   return Promise.all(accounts.map(async (account) => {
     let rowsSynced = 0;
+    let latestDate = null;
     try {
       let accessToken = decrypt(account.access_token_encrypted);
       if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
@@ -105586,9 +105696,10 @@ async function runGoogleAdsSync(overrides) {
         const rows = await fetchGoogleAdsRows(account.customer_id, account.login_customer_id, accessToken, chunk.since, chunk.until, account.brand);
         if (rows.length > 0) await upsertAdsPerformance(rows);
         rowsSynced += rows.length;
+        for (const r2 of rows) if (!latestDate || r2.date > latestDate) latestDate = r2.date;
       }
       await setGoogleAdsAccountSyncStatus(account.customer_id, { last_synced_at: (/* @__PURE__ */ new Date()).toISOString(), last_sync_error: null, token_expired: false });
-      return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+      return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced, latest_date: latestDate };
     } catch (err) {
       const message = err?.message || String(err);
       await setGoogleAdsAccountSyncStatus(account.customer_id, { last_sync_error: message, token_expired: /invalid_grant|invalid_token/i.test(message) }).catch(() => {
@@ -105605,16 +105716,26 @@ async function runTiktokAdsSync(overrides) {
   const chunks = dateRangeChunks2(since, until, MAX_TIKTOK_CHUNK_DAYS);
   return Promise.all(accounts.map(async (account) => {
     let rowsSynced = 0;
+    let latestDate = null;
     try {
       const accessToken = decrypt(account.access_token_encrypted);
       if (!accessToken) throw new Error("Access token tr\u1ED1ng ho\u1EB7c gi\u1EA3i m\xE3 th\u1EA5t b\u1EA1i.");
+      const adIds = /* @__PURE__ */ new Set();
       for (const chunk of chunks) {
         const rows = await fetchTiktokAdsRows(account.advertiser_id, accessToken, chunk.since, chunk.until, account.brand);
         if (rows.length > 0) await upsertAdsPerformance(rows);
         rowsSynced += rows.length;
+        for (const r2 of rows) if (typeof r2.extra?.ad_id === "string") adIds.add(r2.extra.ad_id);
+        for (const r2 of rows) if (!latestDate || r2.date > latestDate) latestDate = r2.date;
+      }
+      try {
+        const thumbs = await fetchTiktokAdThumbnailMap(account.advertiser_id, accessToken, Array.from(adIds));
+        await upsertAdCreatives(Array.from(thumbs, ([ad_id, thumbnail_url]) => ({ ad_id, thumbnail_url })), "tiktok");
+      } catch (err) {
+        console.error(`TikTok Ads \u2192 l\u01B0u thumbnail (${account.advertiser_id}) l\u1ED7i:`, err.message || err);
       }
       await setTiktokAdsAccountSyncStatus(account.advertiser_id, { last_synced_at: (/* @__PURE__ */ new Date()).toISOString(), last_sync_error: null, token_expired: false });
-      return { account_id: account.advertiser_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+      return { account_id: account.advertiser_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced, latest_date: latestDate };
     } catch (err) {
       const message = err?.message || String(err);
       await setTiktokAdsAccountSyncStatus(account.advertiser_id, { last_sync_error: message, token_expired: /access token|invalid token|unauthorized/i.test(message) }).catch(() => {
@@ -128143,6 +128264,35 @@ try {
 var isGeminiConfigured = client !== null;
 var geminiClient = client;
 var GEMINI_MODEL = "gemini-3.5-flash";
+var FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+function isRetryableGeminiError(err) {
+  const text = `${err?.status ?? ""} ${err?.code ?? ""} ${err?.message ?? ""}`;
+  return /(429|500|503|504)|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|deadline/i.test(text);
+}
+var sleep3 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function generateTextWithRetry(prompt) {
+  if (!geminiClient) throw new Error("GEMINI_API_KEY ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh.");
+  const models = [GEMINI_MODEL, ...FALLBACK_MODELS];
+  let lastError = null;
+  for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await geminiClient.models.generateContent({ model, contents: prompt });
+        if (response.text) return response.text;
+        lastError = new Error("Gemini kh\xF4ng tr\u1EA3 v\u1EC1 n\u1ED9i dung.");
+        break;
+      } catch (err) {
+        lastError = err;
+        if (!isRetryableGeminiError(err)) {
+          if (/404|NOT_FOUND/i.test(`${err?.status ?? ""} ${err?.message ?? ""}`)) break;
+          throw err;
+        }
+        if (attempt === 0) await sleep3(1500);
+      }
+    }
+  }
+  throw lastError || new Error("Gemini kh\xF4ng ph\u1EA3n h\u1ED3i.");
+}
 
 // src/server/technicalSeoStore.ts
 function checkKey(r2) {
@@ -128304,7 +128454,7 @@ async function fetchPageSpeed(url, strategy = "mobile") {
   const params = new URLSearchParams({ url, strategy, category: "performance" });
   if (PAGESPEED_API_KEY) params.set("key", PAGESPEED_API_KEY);
   try {
-    const res = await fetch(`${PAGESPEED_API_BASE}?${params.toString()}`, { signal: withTimeout(3e4) });
+    const res = await fetch(`${PAGESPEED_API_BASE}?${params.toString()}`, { signal: withTimeout(9e4) });
     const body = await res.json();
     if (!res.ok || body?.error) {
       return { ok: false, performance_score: null, lcp_ms: null, cls: null, error: body?.error?.message || `HTTP ${res.status}` };
@@ -128353,6 +128503,8 @@ async function runAccountCheck(account, fullDigest) {
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const alertLines = [];
   const rows = [];
+  const previousChecks = await getTechnicalSeoChecks([account.id]);
+  const pagespeedPromise = fetchPageSpeed(origin, "mobile");
   const { urls, sitemapFailures } = await discoverSitemapUrls(origin);
   const crawlResults = urls.length > 0 ? await crawlUrls(urls) : [];
   let brokenCount = 0;
@@ -128383,7 +128535,9 @@ async function runAccountCheck(account, fullDigest) {
   if (crawlResults.length > 0 || sitemapFailures.length > 0) {
     await pruneStaleTechnicalSeoChecks(account.id, "broken_link", [...urls, ...sitemapFailures.map((f3) => f3.url)]);
   }
-  const pagespeed = await fetchPageSpeed(origin, "mobile");
+  await upsertTechnicalSeoChecks(rows);
+  const savedRows = rows.splice(0);
+  const pagespeed = await pagespeedPromise;
   const pagespeedStatus = !pagespeed.ok ? "warning" : pagespeed.performance_score !== null && pagespeed.performance_score < PAGESPEED_WARN_THRESHOLD ? "error" : "ok";
   rows.push({
     account_id: account.id,
@@ -128417,10 +128571,10 @@ async function runAccountCheck(account, fullDigest) {
     sitemapCheckError = err.message || String(err);
     console.error(`technicalSeoSync: l\u1ED7i ki\u1EC3m tra Search Console Sitemaps API cho account ${account.id}:`, sitemapCheckError);
   }
-  const previousChecks = await getTechnicalSeoChecks([account.id]);
   const prevErrorKeys = new Set(previousChecks.filter((c) => c.status === "error").map((c) => `${c.check_type}|${c.url}`));
   const isNew = (type, url) => fullDigest || !prevErrorKeys.has(`${type}|${url}`);
-  const currentErrorKeys = new Set(rows.filter((r2) => r2.status === "error").map((r2) => `${r2.check_type}|${r2.url}`));
+  const allRows = [...savedRows, ...rows];
+  const currentErrorKeys = new Set(allRows.filter((r2) => r2.status === "error").map((r2) => `${r2.check_type}|${r2.url}`));
   const resolvedCount = Array.from(prevErrorKeys).filter((k) => !currentErrorKeys.has(k)).length;
   await upsertTechnicalSeoChecks(rows);
   const brandLabel = account.brand ? ` (${escapeHtml3(account.brand)})` : "";
@@ -128442,7 +128596,7 @@ ${examples.map((e2) => `  ${e2}`).join("\n")}${reportedBroken.length > 5 ? `
   if (pagespeedStatus === "error" && isNew("pagespeed", origin)) {
     alertLines.push(`\u{1F7E1} <b>PageSpeed \u0111i\u1EC3m th\u1EA5p</b>${brandLabel}: ${pagespeed.performance_score}/100 (trang ch\u1EE7, mobile) \u2014 LCP ${pagespeed.lcp_ms ? Math.round(pagespeed.lcp_ms) : "?"}ms.`);
   }
-  const reportedSitemapIssues = rows.filter((r2) => r2.check_type === "sitemap" && r2.status === "error" && isNew("sitemap", r2.url));
+  const reportedSitemapIssues = allRows.filter((r2) => r2.check_type === "sitemap" && r2.status === "error" && isNew("sitemap", r2.url));
   if (reportedSitemapIssues.length > 0) {
     alertLines.push(`\u{1F7E0} <b>${reportedSitemapIssues.length} sitemap c\xF3 c\u1EA3nh b\xE1o/l\u1ED7i</b>${brandLabel} theo Search Console.`);
   }
@@ -128610,11 +128764,27 @@ Internal link: ${signals.internal_link_count}, External link: ${signals.external
 S\u1ED1 t\u1EEB n\u1ED9i dung \u01B0\u1EDBc t\xEDnh: ${signals.word_count}
 
 Ti\xEAu ch\xED tham kh\u1EA3o: title n\xEAn 50-60 k\xFD t\u1EF1, meta description 120-160 k\xFD t\u1EF1, \u0111\xFAng 1 th\u1EBB H1 m\u1ED7i trang, \u1EA3nh n\xEAn c\xF3 alt text m\xF4 t\u1EA3, n\u1ED9i dung qu\xE1 ng\u1EAFn (d\u01B0\u1EDBi ~300 t\u1EEB) th\u01B0\u1EDDng kh\xF3 x\u1EBFp h\u1EA1ng t\u1ED1t cho t\u1EEB kho\xE1 c\u1EA1nh tranh.`;
-  const response = await geminiClient.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: prompt
-  });
-  return response.text || "Gemini kh\xF4ng tr\u1EA3 v\u1EC1 n\u1ED9i dung.";
+  try {
+    return await generateTextWithRetry(prompt);
+  } catch (err) {
+    console.error("onpageScanner: Gemini th\u1EA5t b\u1EA1i, d\xF9ng g\u1EE3i \xFD theo quy t\u1EAFc:", err?.message || err);
+    return `${ruleBasedSuggestions(signals)}
+
+(G\u1EE3i \xFD AI t\u1EA1m th\u1EDDi kh\xF4ng kh\u1EA3 d\u1EE5ng \u2014 Gemini \u0111ang qu\xE1 t\u1EA3i, h\xE3y b\u1EA5m Qu\xE9t l\u1EA1i sau \xEDt ph\xFAt. Ph\u1EA7n tr\xEAn l\xE0 g\u1EE3i \xFD theo quy t\u1EAFc c\u1ED1 \u0111\u1ECBnh.)`;
+  }
+}
+function ruleBasedSuggestions(s2) {
+  const tips = [];
+  if (s2.h1_count === 0) tips.push("- Trang ch\u01B0a c\xF3 th\u1EBB H1 \u2014 th\xEAm \u0111\xFAng 1 H1 ch\u1EE9a t\u1EEB kho\xE1 ch\xEDnh.");
+  else if (s2.h1_count > 1) tips.push(`- Trang c\xF3 ${s2.h1_count} th\u1EBB H1 \u2014 n\xEAn ch\u1EC9 gi\u1EEF 1 H1, c\xE1c ti\xEAu \u0111\u1EC1 c\xF2n l\u1EA1i d\xF9ng H2/H3.`);
+  if (!s2.title) tips.push("- Thi\u1EBFu th\u1EBB title \u2014 c\u1EA7n th\xEAm title 50-60 k\xFD t\u1EF1 ch\u1EE9a t\u1EEB kho\xE1 ch\xEDnh.");
+  else if (s2.title_length < 30 || s2.title_length > 65) tips.push(`- Title d\xE0i ${s2.title_length} k\xFD t\u1EF1 \u2014 n\xEAn 50-60 k\xFD t\u1EF1 \u0111\u1EC3 hi\u1EC3n th\u1ECB \u0111\u1EE7 tr\xEAn Google.`);
+  if (!s2.meta_description) tips.push("- Thi\u1EBFu meta description \u2014 th\xEAm m\xF4 t\u1EA3 120-160 k\xFD t\u1EF1, c\xF3 l\u1EDDi k\xEAu g\u1ECDi h\xE0nh \u0111\u1ED9ng.");
+  else if (s2.meta_description_length < 100 || s2.meta_description_length > 170) tips.push(`- Meta description d\xE0i ${s2.meta_description_length} k\xFD t\u1EF1 \u2014 n\xEAn 120-160 k\xFD t\u1EF1.`);
+  if (s2.images_missing_alt > 0) tips.push(`- ${s2.images_missing_alt}/${s2.image_count} \u1EA3nh thi\u1EBFu alt \u2014 b\u1ED5 sung alt m\xF4 t\u1EA3 n\u1ED9i dung \u1EA3nh.`);
+  if (s2.word_count < 300) tips.push(`- N\u1ED9i dung ch\u1EC9 kho\u1EA3ng ${s2.word_count} t\u1EEB \u2014 n\xEAn m\u1EDF r\u1ED9ng (tr\xEAn ~300 t\u1EEB) \u0111\u1EC3 c\u1EA1nh tranh t\u1EEB kho\xE1.`);
+  if (s2.internal_link_count < 3) tips.push("- \xCDt internal link \u2014 th\xEAm li\xEAn k\u1EBFt n\u1ED9i b\u1ED9 t\u1EDBi s\u1EA3n ph\u1EA9m/b\xE0i vi\u1EBFt li\xEAn quan.");
+  return tips.length > 0 ? tips.join("\n") : "- C\xE1c t\xEDn hi\u1EC7u on-page c\u01A1 b\u1EA3n \u0111\u1EC1u \u0111\u1EA1t ng\u01B0\u1EE1ng tham kh\u1EA3o.";
 }
 async function scanPage(rawUrl) {
   const allowedHostnames = await getAllowedHostnames();
@@ -128882,7 +129052,7 @@ async function resetLoginAttempts(key) {
   const { error } = await supabase.rpc("reset_login_attempts", { p_key: key });
   if (error) console.error("reset_login_attempts error:", error.message);
 }
-var sleep3 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+var sleep4 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function getUserAgent(req) {
   return req.headers["user-agent"] || "unknown";
 }
@@ -128952,7 +129122,7 @@ app.post("/api/login", async (req, res) => {
     if (!candidate || !ok) {
       const failCount = await recordLoginFailure(attemptKey);
       await logLoginAttempt(String(username), "failure", req, null);
-      await sleep3(Math.min(failCount * 1e3, 8e3));
+      await sleep4(Math.min(failCount * 1e3, 8e3));
       return res.status(401).json({ error: "T\xEAn \u0111\u0103ng nh\u1EADp ho\u1EB7c m\u1EADt kh\u1EA9u kh\xF4ng ch\xEDnh x\xE1c." });
     }
     await resetLoginAttempts(attemptKey);

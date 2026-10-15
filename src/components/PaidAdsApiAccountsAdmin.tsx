@@ -20,6 +20,7 @@ interface SyncResult {
   account_name: string;
   ok: boolean;
   rows_synced?: number;
+  latest_date?: string | null;
   error?: string;
 }
 
@@ -257,7 +258,7 @@ export default function PaidAdsApiAccountsAdmin({ platform }: { platform: PaidAd
           {syncResults.map((r) => (
             <div key={r.account_id} className={`flex items-center gap-1.5 ${r.ok ? "text-emerald-700" : "text-rose-700"}`}>
               {r.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
-              <strong>{r.account_name}</strong>: {r.ok ? `Đồng bộ thành công (${r.rows_synced ?? 0} dòng)` : r.error}
+              <strong>{r.account_name}</strong>: {r.ok ? `Đồng bộ thành công (${r.rows_synced ?? 0} dòng${r.latest_date ? `, dữ liệu mới nhất ngày ${r.latest_date}` : r.rows_synced === 0 ? ", API không trả về dòng nào trong khoảng này" : ""})` : r.error}
             </div>
           ))}
         </div>

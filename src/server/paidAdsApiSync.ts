@@ -7,6 +7,7 @@ import {
   setTiktokAdsAccountSyncStatus,
   updateGoogleAdsAccountTokens,
   upsertAdsPerformance,
+  upsertAdCreatives,
 } from "./adsPerformanceStore";
 import { toDateStr } from "./facebookSync";
 
@@ -273,6 +274,63 @@ async function fetchGoogleAdsRows(
       });
     }
   }
+
+  // Campaign types with no ad_group_ad rows at all (Performance Max, Demand
+  // Gen/App campaigns — they run on asset groups, not ads) would otherwise
+  // silently report 0 spend however much they actually spent. Pull campaign-
+  // level metrics too and add a row for every (campaign, day) the ad-level
+  // query did not already cover, so the Digital Ads Report spend matches Google
+  // Ads. Ad-level rows win wherever both exist (no double counting).
+  const covered = new Set(rows.map((r) => `${r.campaign_name}|${r.date}`));
+  const campaignQuery = `
+    SELECT
+      segments.date,
+      campaign.name,
+      campaign.advertising_channel_type,
+      metrics.cost_micros,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.conversions,
+      metrics.video_trueview_views
+    FROM campaign
+    WHERE segments.date BETWEEN '${since}' AND '${until}'
+      AND campaign.status != 'REMOVED'
+      AND metrics.impressions > 0
+  `;
+  const campRes = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${cleanCustomerId}/googleAds:searchStream`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ query: campaignQuery }),
+  });
+  const campBody = await readResponseBody(campRes);
+  if (!campRes.ok || campBody?.error) {
+    // Best-effort: the ad-level rows above already succeeded and are worth keeping.
+    console.error("Google Ads campaign-level fallback lỗi:", extractGoogleAdsApiError(campBody, `HTTP ${campRes.status}`));
+    return rows;
+  }
+  for (const batch of Array.isArray(campBody) ? campBody : []) {
+    for (const result of batch.results || []) {
+      const date = result.segments?.date;
+      const campaignName = result.campaign?.name;
+      if (!date || !campaignName || covered.has(`${campaignName}|${date}`)) continue;
+      rows.push({
+        channel: "google",
+        brand,
+        campaign_name: campaignName,
+        ad_group_name: "(cấp chiến dịch)",
+        ad_name: "(cấp chiến dịch)",
+        date,
+        spend: result.metrics?.costMicros != null ? Number(result.metrics.costMicros) / 1_000_000 : null,
+        impressions: result.metrics?.impressions != null ? Number(result.metrics.impressions) : null,
+        clicks: result.metrics?.clicks != null ? Number(result.metrics.clicks) : null,
+        reach: null,
+        frequency: null,
+        video_views: result.metrics?.videoTrueviewViews != null ? Number(result.metrics.videoTrueviewViews) : null,
+        conversions: result.metrics?.conversions != null ? Math.round(Number(result.metrics.conversions)) : null,
+        extra: { customer_id: customerId, campaign_type: result.campaign?.advertisingChannelType || null, level: "campaign" },
+      });
+    }
+  }
   return rows;
 }
 
@@ -280,6 +338,80 @@ function tiktokNumber(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === "") return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+// Creative thumbnails for the Digital Ads Report's "Top Ads" cards — TikTok
+// counterpart of facebookAdsSync.ts's fetchAdThumbnailMap. Three hops, because
+// the report API only knows ad_id:
+//   ad/get                  ad_id -> video_id / image_ids
+//   file/video/ad/info      video_id -> video_cover_url (the video's cover frame)
+//   file/image/ad/info      image_id -> image_url (image ads / carousels)
+// Best-effort end to end: a failure just leaves that ad without a picture
+// (the card falls back to its placeholder), it never fails the sync.
+async function tiktokGet(path: string, accessToken: string, params: Record<string, string>): Promise<any> {
+  const res = await fetch(`${TIKTOK_BUSINESS_API_BASE}/${path}?${new URLSearchParams(params).toString()}`, {
+    headers: { "Access-Token": accessToken },
+  });
+  const body = await res.json();
+  if (!res.ok || body?.code !== 0) throw new Error(body?.message || `HTTP ${res.status}`);
+  return body?.data || {};
+}
+
+async function fetchTiktokAdThumbnailMap(advertiserId: string, accessToken: string, adIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const adToVideo = new Map<string, string>();
+  const adToImage = new Map<string, string>();
+
+  for (let i = 0; i < adIds.length; i += 100) {
+    const batch = adIds.slice(i, i + 100);
+    try {
+      const data = await tiktokGet("ad/get/", accessToken, {
+        advertiser_id: advertiserId,
+        filtering: JSON.stringify({ ad_ids: batch }),
+        fields: JSON.stringify(["ad_id", "video_id", "image_ids"]),
+        page_size: "100",
+      });
+      for (const ad of data.list || []) {
+        const adId = String(ad.ad_id);
+        if (ad.video_id) adToVideo.set(adId, String(ad.video_id));
+        else if (Array.isArray(ad.image_ids) && ad.image_ids[0]) adToImage.set(adId, String(ad.image_ids[0]));
+      }
+    } catch (err: any) {
+      console.error(`TikTok Ads → ad/get (${advertiserId}) lỗi:`, err.message || err);
+    }
+  }
+
+  const videoCover = new Map<string, string>();
+  const videoIds = Array.from(new Set(adToVideo.values()));
+  for (let i = 0; i < videoIds.length; i += 60) {
+    try {
+      const data = await tiktokGet("file/video/ad/info/", accessToken, { advertiser_id: advertiserId, video_ids: JSON.stringify(videoIds.slice(i, i + 60)) });
+      for (const v of data.list || []) if (v.video_id && v.video_cover_url) videoCover.set(String(v.video_id), String(v.video_cover_url));
+    } catch (err: any) {
+      console.error(`TikTok Ads → file/video/ad/info (${advertiserId}) lỗi:`, err.message || err);
+    }
+  }
+
+  const imageUrl = new Map<string, string>();
+  const imageIds = Array.from(new Set(adToImage.values()));
+  for (let i = 0; i < imageIds.length; i += 60) {
+    try {
+      const data = await tiktokGet("file/image/ad/info/", accessToken, { advertiser_id: advertiserId, image_ids: JSON.stringify(imageIds.slice(i, i + 60)) });
+      for (const im of data.list || []) if (im.image_id && im.image_url) imageUrl.set(String(im.image_id), String(im.image_url));
+    } catch (err: any) {
+      console.error(`TikTok Ads → file/image/ad/info (${advertiserId}) lỗi:`, err.message || err);
+    }
+  }
+
+  for (const [adId, videoId] of adToVideo) {
+    const url = videoCover.get(videoId);
+    if (url) out.set(adId, url);
+  }
+  for (const [adId, imageId] of adToImage) {
+    const url = imageUrl.get(imageId);
+    if (url) out.set(adId, url);
+  }
+  return out;
 }
 
 async function fetchTiktokAdsRows(
@@ -343,7 +475,7 @@ async function fetchTiktokAdsRows(
         frequency: tiktokNumber(metrics.frequency),
         video_views: tiktokNumber(metrics.video_watched_6s),
         conversions: tiktokNumber(metrics.conversion),
-        extra: { advertiser_id: advertiserId },
+        extra: { advertiser_id: advertiserId, ad_id: dimensions.ad_id ? String(dimensions.ad_id) : null },
       });
     }
     const pageInfo = body?.data?.page_info;
@@ -358,6 +490,7 @@ export interface PaidAdsApiSyncResult {
   account_name: string;
   ok: boolean;
   rows_synced?: number;
+  latest_date?: string | null; // newest day the API returned data for — shows "synced fine but nothing since X"
   error?: string;
 }
 
@@ -374,6 +507,7 @@ export async function runGoogleAdsSync(overrides?: { since?: string; until?: str
 
   return Promise.all(accounts.map(async (account): Promise<PaidAdsApiSyncResult> => {
     let rowsSynced = 0;
+    let latestDate: string | null = null;
     try {
       let accessToken = decrypt(account.access_token_encrypted);
       if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
@@ -395,9 +529,10 @@ export async function runGoogleAdsSync(overrides?: { since?: string; until?: str
         const rows = await fetchGoogleAdsRows(account.customer_id, account.login_customer_id, accessToken, chunk.since, chunk.until, account.brand);
         if (rows.length > 0) await upsertAdsPerformance(rows);
         rowsSynced += rows.length;
+        for (const r of rows) if (!latestDate || r.date > latestDate) latestDate = r.date;
       }
       await setGoogleAdsAccountSyncStatus(account.customer_id, { last_synced_at: new Date().toISOString(), last_sync_error: null, token_expired: false });
-      return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+      return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced, latest_date: latestDate };
     } catch (err: any) {
       const message = err?.message || String(err);
       await setGoogleAdsAccountSyncStatus(account.customer_id, { last_sync_error: message, token_expired: /invalid_grant|invalid_token/i.test(message) }).catch(() => {});
@@ -415,16 +550,27 @@ export async function runTiktokAdsSync(overrides?: { since?: string; until?: str
 
   return Promise.all(accounts.map(async (account): Promise<PaidAdsApiSyncResult> => {
     let rowsSynced = 0;
+    let latestDate: string | null = null;
     try {
       const accessToken = decrypt(account.access_token_encrypted);
       if (!accessToken) throw new Error("Access token trống hoặc giải mã thất bại.");
+      const adIds = new Set<string>();
       for (const chunk of chunks) {
         const rows = await fetchTiktokAdsRows(account.advertiser_id, accessToken, chunk.since, chunk.until, account.brand);
         if (rows.length > 0) await upsertAdsPerformance(rows);
         rowsSynced += rows.length;
+        for (const r of rows) if (typeof r.extra?.ad_id === "string") adIds.add(r.extra.ad_id as string);
+        for (const r of rows) if (!latestDate || r.date > latestDate) latestDate = r.date;
+      }
+      // Thumbnails after the numbers are safely stored; never fails the sync.
+      try {
+        const thumbs = await fetchTiktokAdThumbnailMap(account.advertiser_id, accessToken, Array.from(adIds));
+        await upsertAdCreatives(Array.from(thumbs, ([ad_id, thumbnail_url]) => ({ ad_id, thumbnail_url })), "tiktok");
+      } catch (err: any) {
+        console.error(`TikTok Ads → lưu thumbnail (${account.advertiser_id}) lỗi:`, err.message || err);
       }
       await setTiktokAdsAccountSyncStatus(account.advertiser_id, { last_synced_at: new Date().toISOString(), last_sync_error: null, token_expired: false });
-      return { account_id: account.advertiser_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced };
+      return { account_id: account.advertiser_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced, latest_date: latestDate };
     } catch (err: any) {
       const message = err?.message || String(err);
       await setTiktokAdsAccountSyncStatus(account.advertiser_id, { last_sync_error: message, token_expired: /access token|invalid token|unauthorized/i.test(message) }).catch(() => {});
