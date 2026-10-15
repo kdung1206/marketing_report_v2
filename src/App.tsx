@@ -1052,6 +1052,16 @@ export default function App() {
     return defaultComments;
   };
 
+  // The comments editor (Control Panel → Biên tập nhận xét) has its OWN brand and
+  // week, independent of the dashboard's selectedBrand/selectedTimeline. Those
+  // two are pushed to the server as the "live presentation" state that Viewers
+  // follow (see pushActiveStateToServer), so sharing them meant that picking a
+  // week to edit also moved what Viewers were looking at. Starts from the
+  // dashboard's current selection, then moves on its own.
+  const [editBrand, setEditBrand] = useState<"Livotec" | "Karofi">(selectedBrand);
+  const [editTimelineId, setEditTimelineId] = useState<string>(selectedTimeline.id);
+  const editTimeline = timelines.find((t) => t.id === editTimelineId) || selectedTimeline;
+
   // Control Panel Draft Comments States (allows editing before publishing)
   const [draftComments, setDraftComments] = useState<BrandComments>(() => {
     return { ...DEFAULT_COMMENTS_LIVOTEC };
@@ -1273,12 +1283,12 @@ export default function App() {
     }
   }, [currentUser, activeTab]);
 
-  // Synchronize draftComments with published comments for current brand & week
+  // Synchronize draftComments with published comments for the EDITOR's brand & week
   useEffect(() => {
-    const active = getActiveComments(selectedTimeline.id, selectedBrand);
+    const active = getActiveComments(editTimeline.id, editBrand);
     setDraftComments(JSON.parse(JSON.stringify(active)));
     setHasUnpublishedChanges(false);
-  }, [selectedTimeline.id, selectedBrand, publishedComments]);
+  }, [editTimeline.id, editBrand, publishedComments]);
 
   // Push live presentation active display state to server
   const pushActiveStateToServer = async (
@@ -2492,7 +2502,7 @@ export default function App() {
       const result = await safeFetchJson("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: marketingData, brand: selectedBrand }),
+        body: JSON.stringify({ data: marketingData, brand: editBrand }),
       });
       if (result.success) {
         const aiAnalysis = result.analysis;
@@ -2516,7 +2526,7 @@ export default function App() {
 
         setDraftComments(updatedDraft);
         setHasUnpublishedChanges(true);
-        triggerNotification("success", `AI đã phân tích dữ liệu thực tế của ${selectedBrand} và điền các gợi ý vào biểu mẫu thành công! Bạn có thể chỉnh sửa thêm trước khi xuất bản.`);
+        triggerNotification("success", `AI đã phân tích dữ liệu thực tế của ${editBrand} và điền các gợi ý vào biểu mẫu thành công! Bạn có thể chỉnh sửa thêm trước khi xuất bản.`);
       } else {
         throw new Error(result.error || "Không nhận được phân tích từ AI.");
       }
@@ -2551,16 +2561,16 @@ export default function App() {
   // Publish Draft to live reporting dashboard and save to server
   const handlePublish = async () => {
     const updatedWeekComments = {
-      ...(publishedComments[selectedTimeline.id] || {
+      ...(publishedComments[editTimeline.id] || {
         Livotec: DEFAULT_COMMENTS_LIVOTEC,
         Karofi: DEFAULT_COMMENTS_KAROFI,
       }),
-      [selectedBrand]: draftComments,
+      [editBrand]: draftComments,
     };
 
     const newPublishedComments = {
       ...publishedComments,
-      [selectedTimeline.id]: updatedWeekComments,
+      [editTimeline.id]: updatedWeekComments,
     };
 
     try {
@@ -2568,7 +2578,7 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          week: selectedTimeline.id,
+          week: editTimeline.id,
           comments: updatedWeekComments,
         }),
       });
@@ -2576,7 +2586,7 @@ export default function App() {
         setPublishedComments(newPublishedComments);
         localStorage.setItem("marketing_published_comments", JSON.stringify(newPublishedComments));
         setHasUnpublishedChanges(false);
-        triggerNotification("success", `Đã xuất bản và lưu nhận định thành công cho tuần ${selectedTimeline.label}!`);
+        triggerNotification("success", `Đã xuất bản và lưu nhận định thành công cho tuần ${editTimeline.label}!`);
       } else {
         triggerNotification("error", "Có lỗi xảy ra khi lưu nhận định lên máy chủ.");
       }
@@ -2586,7 +2596,7 @@ export default function App() {
       setPublishedComments(newPublishedComments);
       localStorage.setItem("marketing_published_comments", JSON.stringify(newPublishedComments));
       setHasUnpublishedChanges(false);
-      triggerNotification("success", `Đã lưu nhận định thành công tại thiết bị này (đang chạy ngoại tuyến) cho tuần ${selectedTimeline.label}!`);
+      triggerNotification("success", `Đã lưu nhận định thành công tại thiết bị này (đang chạy ngoại tuyến) cho tuần ${editTimeline.label}!`);
     }
   };
 
@@ -5556,15 +5566,14 @@ export default function App() {
                         Biên tập nhận định & Đề xuất tuần này
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Đang sửa nhận xét cho nhãn hàng <strong className="text-indigo-600">{selectedBrand.toUpperCase()}</strong> · tuần{" "}
-                        <strong className="text-indigo-600">{selectedTimeline.label}</strong>
+                        Đang sửa nhận xét cho nhãn hàng <strong className="text-indigo-600">{editBrand.toUpperCase()}</strong> · tuần{" "}
+                        <strong className="text-indigo-600">{editTimeline.label}</strong>
                       </p>
 
-                      {/* Brand + week pickers. The header's week selector and the
-                          brand toggle only exist on the dashboard tab, so without
-                          these the editor was stuck on whatever brand/week was
-                          last selected there. Switching reloads the draft for that
-                          brand/week (see the draftComments sync effect), so warn
+                      {/* Brand + week pickers for the EDITOR only (editBrand/editTimelineId).
+                          Deliberately separate from the dashboard's selection so
+                          choosing what to edit never changes the live view Viewers
+                          follow. Switching reloads that brand/week's draft, so warn
                           before discarding unpublished edits. */}
                       <div className="flex flex-wrap items-center gap-2 pt-1.5">
                         <div className="flex rounded-lg border border-slate-200/60 bg-slate-100/80 p-0.5">
@@ -5573,12 +5582,12 @@ export default function App() {
                               key={brand}
                               type="button"
                               onClick={() => {
-                                if (brand === selectedBrand) return;
+                                if (brand === editBrand) return;
                                 if (hasUnpublishedChanges && !window.confirm("Bạn có thay đổi chưa xuất bản — chuyển thương hiệu sẽ bỏ các thay đổi này. Tiếp tục?")) return;
-                                setSelectedBrand(brand);
+                                setEditBrand(brand);
                               }}
                               className={`rounded-md px-3 py-1 text-[11px] font-bold transition-all ${
-                                selectedBrand === brand ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                editBrand === brand ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
                               }`}
                             >
                               {brand.toUpperCase()}
@@ -5589,12 +5598,12 @@ export default function App() {
                           <Calendar className="h-3.5 w-3.5 text-slate-400" />
                           <select
                             id="comments_timeline_select"
-                            value={selectedTimeline.id}
+                            value={editTimeline.id}
                             onChange={(e) => {
                               const found = timelines.find((t) => t.id === e.target.value);
-                              if (!found || found.id === selectedTimeline.id) return;
+                              if (!found || found.id === editTimeline.id) return;
                               if (hasUnpublishedChanges && !window.confirm("Bạn có thay đổi chưa xuất bản — chuyển tuần sẽ bỏ các thay đổi này. Tiếp tục?")) return;
-                              setSelectedTimeline(found);
+                              setEditTimelineId(found.id);
                             }}
                             className="cursor-pointer bg-transparent pr-2 font-medium text-slate-800 focus:outline-none"
                           >
@@ -5814,7 +5823,7 @@ export default function App() {
                   <div className="border-t border-slate-100 pt-5 flex items-center justify-end gap-3">
                     <button
                       onClick={() => {
-                        const active = getActiveComments(selectedTimeline.id, selectedBrand);
+                        const active = getActiveComments(editTimeline.id, editBrand);
                         setDraftComments(JSON.parse(JSON.stringify(active)));
                         setHasUnpublishedChanges(false);
                         triggerNotification("success", "Đã hủy bỏ toàn bộ các thay đổi nháp.");
