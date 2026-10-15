@@ -77,6 +77,17 @@ function bucketChannel(raw: string): string {
   return (NAMED_CHANNELS as readonly string[]).includes(raw) ? raw : "Khác";
 }
 
+// Organic vs Paid for the "Nguồn traffic" table, from GA4's default channel
+// group names. "Display" and "Cross-network" are paid in GA4's own definition;
+// Direct, Referral, Email, Affiliates, Unassigned... are neither, so "Khác".
+type ChannelType = "Organic" | "Paid" | "Khác";
+const CHANNEL_TYPE_COLORS: Record<ChannelType, string> = { Organic: "#059669", Paid: "#6366f1", Khác: "#94a3b8" };
+function classifyChannelType(raw: string): ChannelType {
+  if (/^organic/i.test(raw)) return "Organic";
+  if (/^paid/i.test(raw) || /^(display|cross-network)$/i.test(raw)) return "Paid";
+  return "Khác";
+}
+
 interface Ga4PageSummaryRow {
   account_id: string;
   page_path: string;
@@ -451,47 +462,39 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
     return Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
   }, [channelScoped]);
 
-  const channelTotals = useMemo(() => {
-    const totals = new Map<string, number>(CHANNEL_ORDER.map((c) => [c, 0]));
-    // "Time on page" per channel = sum(engagement seconds) / sum(users) over
-    // rows that have both (rows synced before the columns existed are null
-    // until the daily sync's rolling window rewrites them) — both are additive,
-    // so this is exact, not an average of averages. Same definition as the
-    // Top pages table.
-    const engagementByChannel = new Map<string, { seconds: number; users: number }>();
+  // "Nguồn traffic" table: every raw GA4 channel on its own row, biggest first,
+  // each tagged Organic / Paid / Khác — instead of the fixed 6-bucket order that
+  // folded Paid Social, Display, Email... into one "Khác" row. Same
+  // channelScoped rows as the stacked chart above, so the two never disagree.
+  const channelDetail = useMemo(() => {
+    const byChannel = new Map<string, { sessions: number; seconds: number; users: number }>();
     channelScoped.forEach((r) => {
-      const bucket = bucketChannel(r.channel);
-      totals.set(bucket, (totals.get(bucket) || 0) + n(r.sessions));
+      const entry = byChannel.get(r.channel) || { sessions: 0, seconds: 0, users: 0 };
+      entry.sessions += n(r.sessions);
       if (r.engagement_seconds != null && r.total_users != null) {
-        const entry = engagementByChannel.get(bucket) || { seconds: 0, users: 0 };
         entry.seconds += r.engagement_seconds;
         entry.users += r.total_users;
-        engagementByChannel.set(bucket, entry);
       }
+      byChannel.set(r.channel, entry);
     });
-    const grandTotal = Array.from(totals.values()).reduce((s, v) => s + v, 0);
-    return CHANNEL_ORDER.map((channel) => {
-      const sessions = totals.get(channel) || 0;
-      const e = engagementByChannel.get(channel);
-      return { channel, sessions, share: grandTotal ? sessions / grandTotal : 0, timeOnPageSeconds: e && e.users ? e.seconds / e.users : null };
-    });
-  }, [channelScoped]);
-
-  // Raw GA4 channel names bucketed into "Khác" (Paid Social, Display, Email,
-  // Affiliates, Unassigned, ...) — "Khác" can dominate the total in practice
-  // (GA4's channel grouping puts a lot of real traffic outside the 5 named
-  // groups), so this breaks it back open for the "Nguồn traffic" table
-  // instead of leaving it a mystery bucket.
-  const khacBreakdown = useMemo(() => {
-    const totals = new Map<string, number>();
-    channelScoped.forEach((r) => {
-      if (bucketChannel(r.channel) !== "Khác") return;
-      totals.set(r.channel, (totals.get(r.channel) || 0) + n(r.sessions));
-    });
-    return Array.from(totals.entries())
-      .map(([channel, sessions]) => ({ channel, sessions }))
+    const total = Array.from(byChannel.values()).reduce((sum, e) => sum + e.sessions, 0);
+    return Array.from(byChannel.entries())
+      .map(([channel, e]) => ({
+        channel,
+        type: classifyChannelType(channel),
+        sessions: e.sessions,
+        share: total ? e.sessions / total : 0,
+        timeOnPageSeconds: e.users ? e.seconds / e.users : null,
+      }))
       .sort((a, b) => b.sessions - a.sessions);
   }, [channelScoped]);
+
+  const channelTypeTotals = useMemo(() => {
+    const totals: Record<ChannelType, number> = { Organic: 0, Paid: 0, Khác: 0 };
+    channelDetail.forEach((c) => (totals[c.type] += c.sessions));
+    const grand = totals.Organic + totals.Paid + totals.Khác;
+    return (["Organic", "Paid", "Khác"] as ChannelType[]).map((type) => ({ type, sessions: totals[type], share: grand ? totals[type] / grand : 0 }));
+  }, [channelDetail]);
 
   const sessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.sessions), 0);
   // Site-wide "Time on page" = total engagement seconds / total users over the
@@ -822,22 +825,41 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
 
                 <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm lg:col-span-2">
                   <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Nguồn traffic (giai đoạn đã chọn)</span>
+                  <div className="mb-3 grid grid-cols-3 gap-2">
+                    {channelTypeTotals.map((t) => (
+                      <div key={t.type} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_TYPE_COLORS[t.type] }} />
+                          {t.type}
+                        </span>
+                        <span className="block font-mono text-sm font-bold text-slate-900">{fmt(t.sessions)}</span>
+                        <span className="block text-[10px] text-slate-400">{fmtPercent(t.share)}</span>
+                      </div>
+                    ))}
+                  </div>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-slate-400">
                         <th className="pb-2 font-medium">Kênh</th>
-                        <th className="pb-2 font-medium text-right">Sessions</th>
+                        <th className="pb-2 font-medium text-right">Sessions ↓</th>
                         <th className="pb-2 font-medium text-right" title="Thời gian tương tác trung bình trên mỗi user (phút:giây) = tổng thời gian tương tác ÷ users (GA4)">Time on page</th>
                         <th className="pb-2 font-medium text-right">Tỉ trọng</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {channelTotals.map((row) => (
+                      {channelDetail.map((row) => (
                         <tr key={row.channel} className="border-b border-slate-50 last:border-0">
                           <td className="py-2">
                             <span className="inline-flex items-center gap-1.5">
-                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_COLORS[row.channel] }} />
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_TYPE_COLORS[row.type] }} />
                               {row.channel}
+                              <span
+                                className={`rounded px-1 py-0.5 text-[9px] font-semibold ${
+                                  row.type === "Organic" ? "bg-emerald-50 text-emerald-700" : row.type === "Paid" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-500"
+                                }`}
+                              >
+                                {row.type}
+                              </span>
                             </span>
                           </td>
                           <td className="py-2 text-right font-mono">{fmt(row.sessions)}</td>
@@ -846,26 +868,21 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                             <div className="flex items-center justify-end gap-2">
                               <span className="font-mono">{fmtPercent2(row.share)}</span>
                               <span className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-100">
-                                <span className="block h-full rounded-full" style={{ width: `${(row.share * 100).toFixed(0)}%`, backgroundColor: CHANNEL_COLORS[row.channel] }} />
+                                <span className="block h-full rounded-full" style={{ width: `${(row.share * 100).toFixed(0)}%`, backgroundColor: CHANNEL_TYPE_COLORS[row.type] }} />
                               </span>
                             </div>
                           </td>
                         </tr>
                       ))}
+                      {channelDetail.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-4 text-center text-slate-400">
+                            Chưa có dữ liệu.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
-                  {khacBreakdown.length > 0 && (
-                    <p className="pt-3 text-[11px] leading-relaxed text-slate-400">
-                      <span className="font-semibold text-slate-500">Khác</span> gồm:{" "}
-                      {khacBreakdown.map((k, i) => (
-                        <React.Fragment key={k.channel}>
-                          {i > 0 && ", "}
-                          {k.channel} ({fmt(k.sessions)})
-                        </React.Fragment>
-                      ))}
-                      .
-                    </p>
-                  )}
                 </div>
               </div>
 
