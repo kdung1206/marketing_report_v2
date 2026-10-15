@@ -105422,6 +105422,79 @@ async function listGoogleAdsCandidates(accessToken) {
   );
   return Array.from(found.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
+async function googleAdsStream(customerId, loginCustomerId, accessToken, query) {
+  const res = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${stripCustomerId(customerId)}/googleAds:searchStream`, {
+    method: "POST",
+    headers: googleAdsHeaders(accessToken, loginCustomerId),
+    body: JSON.stringify({ query })
+  });
+  const body = await readResponseBody(res);
+  if (!res.ok || body?.error) throw new Error(extractGoogleAdsApiError(body, `HTTP ${res.status}`));
+  return (Array.isArray(body) ? body : []).flatMap((batch) => batch.results || []);
+}
+var GOOGLE_AD_CREATIVE_FIELDS_FULL = [
+  "ad_group_ad.ad.id",
+  "ad_group_ad.ad.image_ad.image_url",
+  "ad_group_ad.ad.video_ad.video.asset",
+  "ad_group_ad.ad.video_responsive_ad.videos",
+  "ad_group_ad.ad.responsive_display_ad.marketing_images",
+  "ad_group_ad.ad.demand_gen_multi_asset_ad.marketing_images",
+  "ad_group_ad.ad.demand_gen_video_responsive_ad.videos"
+];
+var GOOGLE_AD_CREATIVE_FIELDS_BASIC = GOOGLE_AD_CREATIVE_FIELDS_FULL.slice(0, 4);
+async function fetchGoogleAdThumbnailMap(customerId, loginCustomerId, accessToken) {
+  let results;
+  try {
+    results = await googleAdsStream(customerId, loginCustomerId, accessToken, `SELECT ${GOOGLE_AD_CREATIVE_FIELDS_FULL.join(", ")} FROM ad_group_ad WHERE ad_group_ad.status != 'REMOVED'`);
+  } catch (err) {
+    console.error(`Google Ads \u2192 ad creatives \u0111\u1EA7y \u0111\u1EE7 (${customerId}) l\u1ED7i, th\u1EED b\u1EA3n r\xFAt g\u1ECDn:`, err.message || err);
+    results = await googleAdsStream(customerId, loginCustomerId, accessToken, `SELECT ${GOOGLE_AD_CREATIVE_FIELDS_BASIC.join(", ")} FROM ad_group_ad WHERE ad_group_ad.status != 'REMOVED'`);
+  }
+  const direct = /* @__PURE__ */ new Map();
+  const adAssets = /* @__PURE__ */ new Map();
+  for (const r2 of results) {
+    const ad = r2.adGroupAd?.ad;
+    if (!ad?.id) continue;
+    const adId = String(ad.id);
+    if (ad.imageAd?.imageUrl) direct.set(adId, ad.imageAd.imageUrl);
+    const assets = [];
+    if (ad.videoAd?.video?.asset) assets.push(ad.videoAd.video.asset);
+    for (const v of ad.videoResponsiveAd?.videos || []) if (v.asset) assets.push(v.asset);
+    for (const v of ad.demandGenVideoResponsiveAd?.videos || []) if (v.asset) assets.push(v.asset);
+    for (const m2 of ad.responsiveDisplayAd?.marketingImages || []) if (m2.asset) assets.push(m2.asset);
+    for (const m2 of ad.demandGenMultiAssetAd?.marketingImages || []) if (m2.asset) assets.push(m2.asset);
+    if (assets.length > 0) adAssets.set(adId, assets);
+  }
+  const wanted = Array.from(new Set(Array.from(adAssets.values()).flat()));
+  const assetUrl = /* @__PURE__ */ new Map();
+  for (let i2 = 0; i2 < wanted.length; i2 += 100) {
+    const names = wanted.slice(i2, i2 + 100).map((n) => `'${n.replace(/'/g, "")}'`).join(", ");
+    try {
+      const rows = await googleAdsStream(
+        customerId,
+        loginCustomerId,
+        accessToken,
+        `SELECT asset.resource_name, asset.youtube_video_asset.youtube_video_id, asset.image_asset.full_size.url FROM asset WHERE asset.resource_name IN (${names})`
+      );
+      for (const r2 of rows) {
+        const name = r2.asset?.resourceName;
+        const yt = r2.asset?.youtubeVideoAsset?.youtubeVideoId;
+        const img = r2.asset?.imageAsset?.fullSize?.url;
+        if (name && yt) assetUrl.set(name, `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`);
+        else if (name && img) assetUrl.set(name, img);
+      }
+    } catch (err) {
+      console.error(`Google Ads \u2192 assets (${customerId}) l\u1ED7i:`, err.message || err);
+    }
+  }
+  const out = new Map(direct);
+  for (const [adId, names] of adAssets) {
+    if (out.has(adId)) continue;
+    const hit = names.map((n) => assetUrl.get(n)).find(Boolean);
+    if (hit) out.set(adId, hit);
+  }
+  return out;
+}
 async function fetchGoogleAdsRows(customerId, loginCustomerId, accessToken, since, until, brand) {
   const cleanCustomerId = stripCustomerId(customerId);
   const query = `
@@ -105481,7 +105554,8 @@ async function fetchGoogleAdsRows(customerId, loginCustomerId, accessToken, sinc
         conversions: result.metrics?.conversions != null ? Math.round(Number(result.metrics.conversions)) : null,
         extra: {
           customer_id: customerId,
-          campaign_type: result.campaign?.advertisingChannelType || null
+          campaign_type: result.campaign?.advertisingChannelType || null,
+          ad_id: result.adGroupAd?.ad?.id ? String(result.adGroupAd.ad.id) : null
         }
       });
     }
@@ -105697,6 +105771,12 @@ async function runGoogleAdsSync(overrides) {
         if (rows.length > 0) await upsertAdsPerformance(rows);
         rowsSynced += rows.length;
         for (const r2 of rows) if (!latestDate || r2.date > latestDate) latestDate = r2.date;
+      }
+      try {
+        const thumbs = await fetchGoogleAdThumbnailMap(account.customer_id, account.login_customer_id, accessToken);
+        await upsertAdCreatives(Array.from(thumbs, ([ad_id, thumbnail_url]) => ({ ad_id, thumbnail_url })), "google");
+      } catch (err) {
+        console.error(`Google Ads \u2192 l\u01B0u thumbnail (${account.customer_id}) l\u1ED7i:`, err.message || err);
       }
       await setGoogleAdsAccountSyncStatus(account.customer_id, { last_synced_at: (/* @__PURE__ */ new Date()).toISOString(), last_sync_error: null, token_expired: false });
       return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced, latest_date: latestDate };
@@ -130014,10 +130094,6 @@ app.get("/api/fb/insights", requireAuth(), async (req, res) => {
   }
 });
 var ADS_CHANNELS = ["facebook", "google", "tiktok"];
-var MAX_UPLOAD_ROWS = 2e4;
-function isValidAdsPerformanceRow(r2) {
-  return r2 && typeof r2 === "object" && ADS_CHANNELS.includes(r2.channel) && typeof r2.campaign_name === "string" && typeof r2.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r2.date);
-}
 app.get("/api/ads-performance", requireAuth(), async (req, res) => {
   try {
     const channels = typeof req.query.channels === "string" && req.query.channels.length > 0 ? req.query.channels.split(",").map((s2) => s2.trim()).filter((c) => ADS_CHANNELS.includes(c)) : void 0;
@@ -130027,37 +130103,6 @@ app.get("/api/ads-performance", requireAuth(), async (req, res) => {
     const rows = await getAdsPerformance({ channels, brand, since, until });
     const creatives = await getAdCreatives(rows.map((r2) => typeof r2.extra?.ad_id === "string" ? r2.extra.ad_id : ""));
     res.json({ success: true, rows, creatives });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-app.post("/api/ads-performance/upload", requireAuth("Editor"), async (req, res) => {
-  try {
-    const { rows } = req.body;
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ success: false, error: "Kh\xF4ng c\xF3 d\xF2ng d\u1EEF li\u1EC7u n\xE0o \u0111\u1EC3 l\u01B0u." });
-    }
-    if (rows.length > MAX_UPLOAD_ROWS) {
-      return res.status(400).json({
-        success: false,
-        error: `File c\xF3 ${rows.length} d\xF2ng, v\u01B0\u1EE3t qu\xE1 gi\u1EDBi h\u1EA1n ${MAX_UPLOAD_ROWS} d\xF2ng/l\u1EA7n t\u1EA3i l\xEAn. H\xE3y chia nh\u1ECF theo kho\u1EA3ng th\u1EDDi gian r\u1ED3i t\u1EA3i l\xEAn t\u1EEBng ph\u1EA7n.`
-      });
-    }
-    const invalid = rows.filter((r2) => !isValidAdsPerformanceRow(r2));
-    if (invalid.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: `${invalid.length}/${rows.length} d\xF2ng thi\u1EBFu channel/campaign_name/date h\u1EE3p l\u1EC7.`
-      });
-    }
-    await upsertAdsPerformance(rows);
-    await logAction(
-      req.session,
-      req,
-      "upload-ads-performance",
-      `T\u1EA3i l\xEAn ${rows.length} d\xF2ng s\u1ED1 li\u1EC7u qu\u1EA3ng c\xE1o (${rows[0].channel})`
-    );
-    res.json({ success: true, count: rows.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

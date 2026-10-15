@@ -1670,26 +1670,6 @@ app.get("/api/fb/insights", requireAuth(), async (req, res) => {
 
 const ADS_CHANNELS: AdsChannel[] = ["facebook", "google", "tiktok"];
 
-// Real exports seen so far top out around 3-4k rows (a month of TikTok
-// ad-level data for one brand). Capped well above that rather than left
-// unbounded — the only other limit on this route is the 20mb express.json()
-// body cap (see app.use(express.json(...)) above), and a single .upsert()
-// call with tens of thousands of rows risks a slow/oversized request before
-// it ever gets that big. Reject with a clear message rather than letting a
-// huge payload silently eat most of the request's time budget.
-const MAX_UPLOAD_ROWS = 20000;
-
-function isValidAdsPerformanceRow(r: any): r is AdsPerformanceRow {
-  return (
-    r &&
-    typeof r === "object" &&
-    ADS_CHANNELS.includes(r.channel) &&
-    typeof r.campaign_name === "string" &&
-    typeof r.date === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(r.date)
-  );
-}
-
 // GET /api/ads-performance?channels=facebook,google&brand=Livotec&since=&until=
 // Any logged-in role can read it — same visibility as /api/fb/insights.
 app.get("/api/ads-performance", requireAuth(), async (req, res) => {
@@ -1708,45 +1688,6 @@ app.get("/api/ads-performance", requireAuth(), async (req, res) => {
     // row), so ship just the ones these rows reference as an ad_id -> url map.
     const creatives = await getAdCreatives(rows.map((r) => (typeof r.extra?.ad_id === "string" ? (r.extra.ad_id as string) : "")));
     res.json({ success: true, rows, creatives });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// POST /api/ads-performance/upload — Google/TikTok manual upload. Rows are
-// parsed client-side (src/lib/adsImport.ts: parseGoogleAdsExport /
-// parseTiktokAdsExport) and posted here already normalized — this route only
-// validates shape and upserts, same "parse in browser → POST normalized JSON"
-// pattern as the existing offline spreadsheet sync (parseSpreadsheetFile +
-// POST /api/sync-data).
-app.post("/api/ads-performance/upload", requireAuth("Editor"), async (req, res) => {
-  try {
-    const { rows } = req.body;
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ success: false, error: "Không có dòng dữ liệu nào để lưu." });
-    }
-    if (rows.length > MAX_UPLOAD_ROWS) {
-      return res.status(400).json({
-        success: false,
-        error: `File có ${rows.length} dòng, vượt quá giới hạn ${MAX_UPLOAD_ROWS} dòng/lần tải lên. Hãy chia nhỏ theo khoảng thời gian rồi tải lên từng phần.`,
-      });
-    }
-    const invalid = rows.filter((r) => !isValidAdsPerformanceRow(r));
-    if (invalid.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: `${invalid.length}/${rows.length} dòng thiếu channel/campaign_name/date hợp lệ.`,
-      });
-    }
-
-    await upsertAdsPerformance(rows as AdsPerformanceRow[]);
-    await logAction(
-      (req as any).session,
-      req,
-      "upload-ads-performance",
-      `Tải lên ${rows.length} dòng số liệu quảng cáo (${rows[0].channel})`
-    );
-    res.json({ success: true, count: rows.length });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

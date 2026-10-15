@@ -201,6 +201,98 @@ export async function listGoogleAdsCandidates(accessToken: string): Promise<Goog
   return Array.from(found.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Creative pictures for the Digital Ads Report's "Top Ads" cards — Google
+// counterpart of facebookAdsSync.ts's fetchAdThumbnailMap. Google has no single
+// "thumbnail" field; what an ad shows depends on its type:
+//   Video ads (in-stream / responsive video, Demand Gen) -> the YouTube video's
+//     frame: https://i.ytimg.com/vi/<id>/hqdefault.jpg
+//   Image / responsive display / Demand Gen image ads -> the image asset's url
+//   Search ads (and Performance Max, which has no ads) -> no picture exists;
+//     the card keeps its placeholder, which is correct, not a bug.
+// Assets are referenced by resource name on the ad, so it's two queries: ads ->
+// asset resource names, then assets -> youtube id / image url. Best-effort: a
+// failure here never fails the sync.
+async function googleAdsStream(customerId: string, loginCustomerId: string | null, accessToken: string, query: string): Promise<any[]> {
+  const res = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${stripCustomerId(customerId)}/googleAds:searchStream`, {
+    method: "POST",
+    headers: googleAdsHeaders(accessToken, loginCustomerId),
+    body: JSON.stringify({ query }),
+  });
+  const body = await readResponseBody(res);
+  if (!res.ok || body?.error) throw new Error(extractGoogleAdsApiError(body, `HTTP ${res.status}`));
+  return (Array.isArray(body) ? body : []).flatMap((batch: any) => batch.results || []);
+}
+
+const GOOGLE_AD_CREATIVE_FIELDS_FULL = [
+  "ad_group_ad.ad.id",
+  "ad_group_ad.ad.image_ad.image_url",
+  "ad_group_ad.ad.video_ad.video.asset",
+  "ad_group_ad.ad.video_responsive_ad.videos",
+  "ad_group_ad.ad.responsive_display_ad.marketing_images",
+  "ad_group_ad.ad.demand_gen_multi_asset_ad.marketing_images",
+  "ad_group_ad.ad.demand_gen_video_responsive_ad.videos",
+];
+// Fallback if the API version rejects one of the newer field paths above —
+// these three cover the common YouTube/display cases.
+const GOOGLE_AD_CREATIVE_FIELDS_BASIC = GOOGLE_AD_CREATIVE_FIELDS_FULL.slice(0, 4);
+
+async function fetchGoogleAdThumbnailMap(customerId: string, loginCustomerId: string | null, accessToken: string): Promise<Map<string, string>> {
+  let results: any[];
+  try {
+    results = await googleAdsStream(customerId, loginCustomerId, accessToken, `SELECT ${GOOGLE_AD_CREATIVE_FIELDS_FULL.join(", ")} FROM ad_group_ad WHERE ad_group_ad.status != 'REMOVED'`);
+  } catch (err: any) {
+    console.error(`Google Ads → ad creatives đầy đủ (${customerId}) lỗi, thử bản rút gọn:`, err.message || err);
+    results = await googleAdsStream(customerId, loginCustomerId, accessToken, `SELECT ${GOOGLE_AD_CREATIVE_FIELDS_BASIC.join(", ")} FROM ad_group_ad WHERE ad_group_ad.status != 'REMOVED'`);
+  }
+
+  const direct = new Map<string, string>(); // adId -> ready image url
+  const adAssets = new Map<string, string[]>(); // adId -> asset resource names, best first
+  for (const r of results) {
+    const ad = r.adGroupAd?.ad;
+    if (!ad?.id) continue;
+    const adId = String(ad.id);
+    if (ad.imageAd?.imageUrl) direct.set(adId, ad.imageAd.imageUrl);
+    const assets: string[] = [];
+    if (ad.videoAd?.video?.asset) assets.push(ad.videoAd.video.asset);
+    for (const v of ad.videoResponsiveAd?.videos || []) if (v.asset) assets.push(v.asset);
+    for (const v of ad.demandGenVideoResponsiveAd?.videos || []) if (v.asset) assets.push(v.asset);
+    for (const m of ad.responsiveDisplayAd?.marketingImages || []) if (m.asset) assets.push(m.asset);
+    for (const m of ad.demandGenMultiAssetAd?.marketingImages || []) if (m.asset) assets.push(m.asset);
+    if (assets.length > 0) adAssets.set(adId, assets);
+  }
+
+  const wanted = Array.from(new Set(Array.from(adAssets.values()).flat()));
+  const assetUrl = new Map<string, string>(); // asset resource name -> picture url
+  for (let i = 0; i < wanted.length; i += 100) {
+    const names = wanted.slice(i, i + 100).map((n) => `'${n.replace(/'/g, "")}'`).join(", ");
+    try {
+      const rows = await googleAdsStream(
+        customerId,
+        loginCustomerId,
+        accessToken,
+        `SELECT asset.resource_name, asset.youtube_video_asset.youtube_video_id, asset.image_asset.full_size.url FROM asset WHERE asset.resource_name IN (${names})`
+      );
+      for (const r of rows) {
+        const name = r.asset?.resourceName;
+        const yt = r.asset?.youtubeVideoAsset?.youtubeVideoId;
+        const img = r.asset?.imageAsset?.fullSize?.url;
+        if (name && yt) assetUrl.set(name, `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`);
+        else if (name && img) assetUrl.set(name, img);
+      }
+    } catch (err: any) {
+      console.error(`Google Ads → assets (${customerId}) lỗi:`, err.message || err);
+    }
+  }
+
+  const out = new Map<string, string>(direct);
+  for (const [adId, names] of adAssets) {
+    if (out.has(adId)) continue;
+    const hit = names.map((n) => assetUrl.get(n)).find(Boolean);
+    if (hit) out.set(adId, hit);
+  }
+  return out;
+}
+
 async function fetchGoogleAdsRows(
   customerId: string,
   loginCustomerId: string | null,
@@ -270,6 +362,7 @@ async function fetchGoogleAdsRows(
         extra: {
           customer_id: customerId,
           campaign_type: result.campaign?.advertisingChannelType || null,
+          ad_id: result.adGroupAd?.ad?.id ? String(result.adGroupAd.ad.id) : null,
         },
       });
     }
@@ -530,6 +623,13 @@ export async function runGoogleAdsSync(overrides?: { since?: string; until?: str
         if (rows.length > 0) await upsertAdsPerformance(rows);
         rowsSynced += rows.length;
         for (const r of rows) if (!latestDate || r.date > latestDate) latestDate = r.date;
+      }
+      // Pictures after the numbers are safely stored; never fails the sync.
+      try {
+        const thumbs = await fetchGoogleAdThumbnailMap(account.customer_id, account.login_customer_id, accessToken);
+        await upsertAdCreatives(Array.from(thumbs, ([ad_id, thumbnail_url]) => ({ ad_id, thumbnail_url })), "google");
+      } catch (err: any) {
+        console.error(`Google Ads → lưu thumbnail (${account.customer_id}) lỗi:`, err.message || err);
       }
       await setGoogleAdsAccountSyncStatus(account.customer_id, { last_synced_at: new Date().toISOString(), last_sync_error: null, token_expired: false });
       return { account_id: account.customer_id, account_name: account.account_name, ok: true, rows_synced: rowsSynced, latest_date: latestDate };

@@ -25,7 +25,6 @@ import FacebookConnectAdmin from "./components/FacebookConnectAdmin";
 import FacebookPagesAdmin from "./components/FacebookPagesAdmin";
 import DigitalAdsReport from "./components/DigitalAdsReport";
 import FbAdAccountsAdmin from "./components/FbAdAccountsAdmin";
-import AdsUploadAdmin from "./components/AdsUploadAdmin";
 import TiktokAccountsAdmin from "./components/TiktokAccountsAdmin";
 import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
 import DriveBackupAdmin from "./components/DriveBackupAdmin";
@@ -6609,7 +6608,6 @@ export default function App() {
                 <FacebookConnectAdmin onImported={() => window.location.reload()} />
                 <FacebookPagesAdmin />
                 <FbAdAccountsAdmin />
-                <AdsUploadAdmin channel="facebook" />
               </div>
             )}
             {controlPanelSection === "platform-connections" && platformSubTab === "google" && (
@@ -6618,7 +6616,6 @@ export default function App() {
                 {currentUser && currentUser.role === "Admin" && <GoogleWebsiteAccountsAdmin />}
                 {currentUser && currentUser.role === "Admin" && <GoogleAdsConnectAdmin onImported={() => window.location.reload()} />}
                 {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="google" />}
-                <AdsUploadAdmin channel="google" />
               </div>
             )}
             {controlPanelSection === "platform-connections" && platformSubTab === "tiktok" && (
@@ -6626,7 +6623,6 @@ export default function App() {
                 {currentUser && currentUser.role === "Admin" && <TiktokAccountsAdmin />}
                 {currentUser && currentUser.role === "Admin" && <TiktokAdsConnectAdmin onImported={() => window.location.reload()} />}
                 {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="tiktok" />}
-                <AdsUploadAdmin channel="tiktok" />
               </div>
             )}
 

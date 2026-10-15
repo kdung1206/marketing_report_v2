@@ -261,7 +261,7 @@ export interface AdCreativeRow {
   thumbnail_url: string;
 }
 
-export async function upsertAdCreatives(rows: AdCreativeRow[], channel: "facebook" | "tiktok" = "facebook"): Promise<void> {
+export async function upsertAdCreatives(rows: AdCreativeRow[], channel: "facebook" | "google" | "tiktok" = "facebook"): Promise<void> {
   if (rows.length === 0) return;
   const stamped = rows.map((r) => ({ ad_id: r.ad_id, channel, thumbnail_url: r.thumbnail_url, updated_at: new Date().toISOString() }));
 
