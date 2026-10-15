@@ -105442,6 +105442,32 @@ var GOOGLE_AD_CREATIVE_FIELDS_FULL = [
   "ad_group_ad.ad.demand_gen_video_responsive_ad.videos"
 ];
 var GOOGLE_AD_CREATIVE_FIELDS_BASIC = GOOGLE_AD_CREATIVE_FIELDS_FULL.slice(0, 4);
+async function fetchGoogleSearchAdTextMap(customerId, loginCustomerId, accessToken) {
+  const results = await googleAdsStream(
+    customerId,
+    loginCustomerId,
+    accessToken,
+    `SELECT ad_group_ad.ad.id, ad_group_ad.ad.final_urls, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, ad_group_ad.ad.responsive_search_ad.path1, ad_group_ad.ad.responsive_search_ad.path2 FROM ad_group_ad WHERE ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD' AND ad_group_ad.status != 'REMOVED'`
+  );
+  const out = /* @__PURE__ */ new Map();
+  for (const r2 of results) {
+    const ad = r2.adGroupAd?.ad;
+    const rsa = ad?.responsiveSearchAd;
+    if (!ad?.id || !rsa) continue;
+    const headlines = (rsa.headlines || []).map((h2) => h2.text).filter(Boolean).slice(0, 3);
+    const descriptions = (rsa.descriptions || []).map((d) => d.text).filter(Boolean).slice(0, 2);
+    if (headlines.length === 0) continue;
+    let display = "";
+    try {
+      const host = new URL(ad.finalUrls?.[0] || "").hostname.replace(/^www\./, "");
+      display = [host, rsa.path1, rsa.path2].filter(Boolean).join(" \u203A ");
+    } catch {
+      display = "";
+    }
+    out.set(String(ad.id), `ad-text:${JSON.stringify({ h: headlines, d: descriptions, u: display })}`);
+  }
+  return out;
+}
 async function fetchGoogleAdThumbnailMap(customerId, loginCustomerId, accessToken) {
   let results;
   try {
@@ -105492,6 +105518,13 @@ async function fetchGoogleAdThumbnailMap(customerId, loginCustomerId, accessToke
     if (out.has(adId)) continue;
     const hit = names.map((n) => assetUrl.get(n)).find(Boolean);
     if (hit) out.set(adId, hit);
+  }
+  try {
+    for (const [adId, text] of await fetchGoogleSearchAdTextMap(customerId, loginCustomerId, accessToken)) {
+      if (!out.has(adId)) out.set(adId, text);
+    }
+  } catch (err) {
+    console.error(`Google Ads \u2192 n\u1ED9i dung Search ad (${customerId}) l\u1ED7i:`, err.message || err);
   }
   return out;
 }

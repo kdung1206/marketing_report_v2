@@ -262,6 +262,31 @@ const TOP_ADS_GALLERY_SIZE = 8;
 // Conversions/CPC (approved change from the original card demo) — Video
 // views is omitted entirely when the ad has none (most Facebook/Google ads
 // aren't video), rather than showing a misleading "0".
+// Google Search ads have no picture at all, so the server stores the ad's own
+// text instead (thumbnail_url = "ad-text:" + JSON, see paidAdsApiSync.ts's
+// fetchGoogleSearchAdTextMap) and this draws it like a Google results listing:
+// "Ad · domain", blue headline, grey description. Same thumbnail frame as the
+// image cards, so the grid stays uniform.
+const AD_TEXT_PREFIX = "ad-text:";
+const SearchAdPreview: React.FC<{ raw: string }> = ({ raw }) => {
+  let data: { h?: string[]; d?: string[]; u?: string } = {};
+  try {
+    data = JSON.parse(raw.slice(AD_TEXT_PREFIX.length));
+  } catch {
+    // Malformed value — render the empty frame rather than crash the card grid.
+  }
+  return (
+    <div className="absolute inset-0 flex flex-col justify-center gap-0.5 overflow-hidden bg-white px-3 pb-2 pt-7">
+      <div className="flex items-center gap-1 text-[10px] text-slate-600">
+        <span className="rounded border border-slate-400 px-0.5 text-[9px] font-bold leading-none text-slate-700">Ad</span>
+        <span className="truncate">{data.u || ""}</span>
+      </div>
+      <p className="line-clamp-2 text-[13px] font-medium leading-snug text-[#1a0dab]">{(data.h || []).join(" | ") || "(Quảng cáo tìm kiếm)"}</p>
+      <p className="line-clamp-3 text-[11px] leading-snug text-slate-600">{(data.d || []).join(" ")}</p>
+    </div>
+  );
+};
+
 const AdCard: React.FC<{ ad: AdsDrilldownRow }> = ({ ad }) => {
   const [imgFailed, setImgFailed] = useState(false);
   const traffic = React.useContext(AdTrafficContext);
@@ -293,7 +318,9 @@ const AdCard: React.FC<{ ad: AdsDrilldownRow }> = ({ ad }) => {
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md">
       <div className="relative flex aspect-[16/11] shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
-        {ad.thumbnail_url && !imgFailed ? (
+        {ad.thumbnail_url?.startsWith(AD_TEXT_PREFIX) ? (
+          <SearchAdPreview raw={ad.thumbnail_url} />
+        ) : ad.thumbnail_url && !imgFailed ? (
           <img
             src={ad.thumbnail_url}
             alt=""

@@ -236,6 +236,39 @@ const GOOGLE_AD_CREATIVE_FIELDS_FULL = [
 // these three cover the common YouTube/display cases.
 const GOOGLE_AD_CREATIVE_FIELDS_BASIC = GOOGLE_AD_CREATIVE_FIELDS_FULL.slice(0, 4);
 
+// Search ads (responsive search ads) have no picture, so what the card shows is
+// the ad copy itself — headlines, descriptions, display URL — stored as
+// "ad-text:" + JSON in the same ad_creatives.thumbnail_url column and drawn like
+// a Google results listing by DigitalAdsReport's SearchAdPreview. Google has no
+// "render this ad" image API (the Ads UI's Preview tool is a web page, not an
+// endpoint), so the text mock-up is the faithful option.
+async function fetchGoogleSearchAdTextMap(customerId: string, loginCustomerId: string | null, accessToken: string): Promise<Map<string, string>> {
+  const results = await googleAdsStream(
+    customerId,
+    loginCustomerId,
+    accessToken,
+    `SELECT ad_group_ad.ad.id, ad_group_ad.ad.final_urls, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, ad_group_ad.ad.responsive_search_ad.path1, ad_group_ad.ad.responsive_search_ad.path2 FROM ad_group_ad WHERE ad_group_ad.ad.type = 'RESPONSIVE_SEARCH_AD' AND ad_group_ad.status != 'REMOVED'`
+  );
+  const out = new Map<string, string>();
+  for (const r of results) {
+    const ad = r.adGroupAd?.ad;
+    const rsa = ad?.responsiveSearchAd;
+    if (!ad?.id || !rsa) continue;
+    const headlines = (rsa.headlines || []).map((h: any) => h.text).filter(Boolean).slice(0, 3);
+    const descriptions = (rsa.descriptions || []).map((d: any) => d.text).filter(Boolean).slice(0, 2);
+    if (headlines.length === 0) continue;
+    let display = "";
+    try {
+      const host = new URL(ad.finalUrls?.[0] || "").hostname.replace(/^www\./, "");
+      display = [host, rsa.path1, rsa.path2].filter(Boolean).join(" › ");
+    } catch {
+      display = "";
+    }
+    out.set(String(ad.id), `ad-text:${JSON.stringify({ h: headlines, d: descriptions, u: display })}`);
+  }
+  return out;
+}
+
 async function fetchGoogleAdThumbnailMap(customerId: string, loginCustomerId: string | null, accessToken: string): Promise<Map<string, string>> {
   let results: any[];
   try {
@@ -289,6 +322,15 @@ async function fetchGoogleAdThumbnailMap(customerId: string, loginCustomerId: st
     if (out.has(adId)) continue;
     const hit = names.map((n) => assetUrl.get(n)).find(Boolean);
     if (hit) out.set(adId, hit);
+  }
+
+  // Search ads: no picture exists — fall back to their text (best-effort).
+  try {
+    for (const [adId, text] of await fetchGoogleSearchAdTextMap(customerId, loginCustomerId, accessToken)) {
+      if (!out.has(adId)) out.set(adId, text);
+    }
+  } catch (err: any) {
+    console.error(`Google Ads → nội dung Search ad (${customerId}) lỗi:`, err.message || err);
   }
   return out;
 }
