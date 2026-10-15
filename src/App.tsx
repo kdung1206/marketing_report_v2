@@ -5556,8 +5556,56 @@ export default function App() {
                         Biên tập nhận định & Đề xuất tuần này
                       </h3>
                       <p className="text-xs text-slate-500">
-                        Đang sửa nhận xét cho nhãn hàng: <strong className="text-indigo-600">{selectedBrand.toUpperCase()}</strong>
+                        Đang sửa nhận xét cho nhãn hàng <strong className="text-indigo-600">{selectedBrand.toUpperCase()}</strong> · tuần{" "}
+                        <strong className="text-indigo-600">{selectedTimeline.label}</strong>
                       </p>
+
+                      {/* Brand + week pickers. The header's week selector and the
+                          brand toggle only exist on the dashboard tab, so without
+                          these the editor was stuck on whatever brand/week was
+                          last selected there. Switching reloads the draft for that
+                          brand/week (see the draftComments sync effect), so warn
+                          before discarding unpublished edits. */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                        <div className="flex rounded-lg border border-slate-200/60 bg-slate-100/80 p-0.5">
+                          {(["Livotec", "Karofi"] as const).map((brand) => (
+                            <button
+                              key={brand}
+                              type="button"
+                              onClick={() => {
+                                if (brand === selectedBrand) return;
+                                if (hasUnpublishedChanges && !window.confirm("Bạn có thay đổi chưa xuất bản — chuyển thương hiệu sẽ bỏ các thay đổi này. Tiếp tục?")) return;
+                                setSelectedBrand(brand);
+                              }}
+                              className={`rounded-md px-3 py-1 text-[11px] font-bold transition-all ${
+                                selectedBrand === brand ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-900"
+                              }`}
+                            >
+                              {brand.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm">
+                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                          <select
+                            id="comments_timeline_select"
+                            value={selectedTimeline.id}
+                            onChange={(e) => {
+                              const found = timelines.find((t) => t.id === e.target.value);
+                              if (!found || found.id === selectedTimeline.id) return;
+                              if (hasUnpublishedChanges && !window.confirm("Bạn có thay đổi chưa xuất bản — chuyển tuần sẽ bỏ các thay đổi này. Tiếp tục?")) return;
+                              setSelectedTimeline(found);
+                            }}
+                            className="cursor-pointer bg-transparent pr-2 font-medium text-slate-800 focus:outline-none"
+                          >
+                            {timelines.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2">
