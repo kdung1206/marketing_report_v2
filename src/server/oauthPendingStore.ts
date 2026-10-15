@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Storage layer for platform_oauth_pending (see supabase/schema.sql's comment
-// on that table for the full flow). Shared by the Facebook and TikTok Ads
+// on that table for the full flow). Shared by the Facebook, TikTok Ads and Google Ads
 // OAuth-connect routes in app.ts — both need the same "stash a candidate
 // list + a token behind a random id, let the admin pick a subset, write the
 // final rows" shape, just with different candidate payloads and different
@@ -16,7 +16,7 @@ import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { getDatabaseData, saveDatabaseData } from "./appStateStore";
 import { encrypt, decrypt } from "./crypto";
 
-export type OAuthPendingPlatform = "facebook" | "tiktok_ads";
+export type OAuthPendingPlatform = "facebook" | "tiktok_ads" | "google_ads";
 
 export interface OAuthPendingRecord {
   id: string;

@@ -399,7 +399,7 @@ async function fetchGa4DeviceMetrics(accessToken: string, propertyId: string, si
 // channel. Live-shaped like listSearchConsoleTopPages/TopQueries but stored
 // as a snapshot (see replaceSearchConsoleDeviceSummary) since it's cheap and
 // low-cardinality (3 rows), unlike the query/page tables which stay live-only.
-async function fetchSearchConsoleDeviceMetrics(accessToken: string, siteUrl: string, since: string, until: string): Promise<Omit<SearchConsoleDeviceSummaryRow, "account_id">[]> {
+export async function fetchSearchConsoleDeviceMetrics(accessToken: string, siteUrl: string, since: string, until: string): Promise<Omit<SearchConsoleDeviceSummaryRow, "account_id">[]> {
   const res = await fetch(`${SEARCH_CONSOLE_API_BASE}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`, {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },

@@ -104843,6 +104843,16 @@ async function upsertGoogleAdsAccount(input) {
   );
   if (error) throw new Error(`L\u1ED7i l\u01B0u c\u1EA5u h\xECnh Google Ads Account: ${error.message}`);
 }
+async function patchGoogleAdsAccountBrand(customerId, brand) {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections3();
+    const next = google_ads_accounts.map((a) => a.customer_id === customerId ? { ...a, brand } : a);
+    await writeLocalCollections3(store, { google_ads_accounts: next });
+    return;
+  }
+  const { error } = await supabase.from("google_ads_accounts").update({ brand }).eq("customer_id", customerId);
+  if (error) throw new Error(`L\u1ED7i g\xE1n th\u01B0\u01A1ng hi\u1EC7u: ${error.message}`);
+}
 async function deleteGoogleAdsAccount(customerId) {
   if (!isSupabaseConfigured) {
     const { store, google_ads_accounts } = await readLocalCollections3();
@@ -105350,6 +105360,67 @@ async function refreshGoogleAdsToken(refreshToken) {
     grant_type: "refresh_token",
     refresh_token: refreshToken
   });
+}
+function googleAdsHeaders(accessToken, loginCustomerId) {
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    "developer-token": GOOGLE_ADS_DEVELOPER_TOKEN
+  };
+  if (loginCustomerId) headers["login-customer-id"] = stripCustomerId(loginCustomerId);
+  return headers;
+}
+async function googleAdsSearch(accessToken, customerId, loginCustomerId, query) {
+  const res = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${stripCustomerId(customerId)}/googleAds:search`, {
+    method: "POST",
+    headers: googleAdsHeaders(accessToken, loginCustomerId),
+    body: JSON.stringify({ query })
+  });
+  const body = await readResponseBody(res);
+  if (!res.ok || body?.error) {
+    throw new Error(extractGoogleAdsApiError(body, `Google Ads API tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${res.status}`));
+  }
+  return body?.results || [];
+}
+async function listGoogleAdsCandidates(accessToken) {
+  const listRes = await fetch(`${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`, { headers: googleAdsHeaders(accessToken) });
+  const listBody = await readResponseBody(listRes);
+  if (!listRes.ok || listBody?.error) {
+    throw new Error(extractGoogleAdsApiError(listBody, `Google Ads listAccessibleCustomers tr\u1EA3 v\u1EC1 l\u1ED7i HTTP ${listRes.status}`));
+  }
+  const accessibleIds = (listBody?.resourceNames || []).map((r2) => stripCustomerId(r2));
+  const found = /* @__PURE__ */ new Map();
+  const upsertCandidate = (c) => {
+    const existing = found.get(c.id);
+    if (!existing || existing.loginCustomerId && !c.loginCustomerId) found.set(c.id, c);
+  };
+  await Promise.all(
+    accessibleIds.map(async (id) => {
+      try {
+        const [row] = await googleAdsSearch(accessToken, id, null, "SELECT customer.id, customer.descriptive_name, customer.manager, customer.status FROM customer LIMIT 1");
+        const customer = row?.customer;
+        if (!customer) return;
+        if (!customer.manager) {
+          if (customer.status === "ENABLED") upsertCandidate({ id, name: customer.descriptiveName || id, loginCustomerId: null });
+          return;
+        }
+        const clients = await googleAdsSearch(
+          accessToken,
+          id,
+          id,
+          "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.status, customer_client.level FROM customer_client WHERE customer_client.level > 0"
+        );
+        for (const c of clients) {
+          const cc = c.customerClient;
+          if (!cc || cc.manager || cc.status !== "ENABLED") continue;
+          upsertCandidate({ id: String(cc.id), name: cc.descriptiveName || String(cc.id), loginCustomerId: id });
+        }
+      } catch (err) {
+        console.error(`Google Ads: b\u1ECF qua account ${id} khi li\u1EC7t k\xEA:`, err.message);
+      }
+    })
+  );
+  return Array.from(found.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 async function fetchGoogleAdsRows(customerId, loginCustomerId, accessToken, since, until, brand) {
   const cleanCustomerId = stripCustomerId(customerId);
@@ -128277,7 +128348,7 @@ function escapeHtml3(text) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 var PAGESPEED_WARN_THRESHOLD = 50;
-async function runAccountCheck(account) {
+async function runAccountCheck(account, fullDigest) {
   const origin = deriveOrigin(account.gsc_site_url);
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const alertLines = [];
@@ -128346,26 +128417,37 @@ async function runAccountCheck(account) {
     sitemapCheckError = err.message || String(err);
     console.error(`technicalSeoSync: l\u1ED7i ki\u1EC3m tra Search Console Sitemaps API cho account ${account.id}:`, sitemapCheckError);
   }
+  const previousChecks = await getTechnicalSeoChecks([account.id]);
+  const prevErrorKeys = new Set(previousChecks.filter((c) => c.status === "error").map((c) => `${c.check_type}|${c.url}`));
+  const isNew = (type, url) => fullDigest || !prevErrorKeys.has(`${type}|${url}`);
+  const currentErrorKeys = new Set(rows.filter((r2) => r2.status === "error").map((r2) => `${r2.check_type}|${r2.url}`));
+  const resolvedCount = Array.from(prevErrorKeys).filter((k) => !currentErrorKeys.has(k)).length;
   await upsertTechnicalSeoChecks(rows);
   const brandLabel = account.brand ? ` (${escapeHtml3(account.brand)})` : "";
-  if (sitemapFailures.length > 0) {
+  const reportedSitemapFailures = sitemapFailures.filter((f3) => isNew("broken_link", f3.url));
+  if (reportedSitemapFailures.length > 0) {
     alertLines.push(
-      `\u{1F534}\u{1F534} <b>Sitemap kh\xF4ng t\u1EA3i \u0111\u01B0\u1EE3c</b>${brandLabel}: ${sitemapFailures.map((f3) => `${escapeHtml3(f3.url)} (${escapeHtml3(f3.error)})`).join(", ")}. ` + (urls.length === 0 ? "Kh\xF4ng th\u1EC3 qu\xE9t to\xE0n b\u1ED9 trang do sitemap l\u1ED7i." : "")
+      `\u{1F534}\u{1F534} <b>Sitemap kh\xF4ng t\u1EA3i \u0111\u01B0\u1EE3c</b>${brandLabel}: ${reportedSitemapFailures.map((f3) => `${escapeHtml3(f3.url)} (${escapeHtml3(f3.error)})`).join(", ")}. ` + (urls.length === 0 ? "Kh\xF4ng th\u1EC3 qu\xE9t to\xE0n b\u1ED9 trang do sitemap l\u1ED7i." : "")
     );
   }
-  if (brokenCount > 0) {
-    const examples = crawlResults.filter((r2) => !r2.ok).slice(0, 5).map((r2) => `${escapeHtml3(r2.url)} \u2014 HTTP ${r2.status_code ?? "l\u1ED7i k\u1EBFt n\u1ED1i"}`);
+  const reportedBroken = crawlResults.filter((r2) => !r2.ok && isNew("broken_link", r2.url));
+  if (reportedBroken.length > 0) {
+    const examples = reportedBroken.slice(0, 5).map((r2) => `${escapeHtml3(r2.url)} \u2014 HTTP ${r2.status_code ?? "l\u1ED7i k\u1EBFt n\u1ED1i"}`);
     alertLines.push(
-      `\u{1F534} <b>${brokenCount} URL l\u1ED7i</b>${brandLabel} (${origin}):
-${examples.map((e2) => `  ${e2}`).join("\n")}${brokenCount > 5 ? `
-  \u2026 v\xE0 ${brokenCount - 5} URL kh\xE1c` : ""}`
+      `\u{1F534} <b>${reportedBroken.length} URL l\u1ED7i ${fullDigest ? "\u0111ang t\u1ED3n t\u1EA1i" : "m\u1EDBi"}</b>${brandLabel} (${origin}):
+${examples.map((e2) => `  ${e2}`).join("\n")}${reportedBroken.length > 5 ? `
+  \u2026 v\xE0 ${reportedBroken.length - 5} URL kh\xE1c` : ""}`
     );
   }
-  if (pagespeedStatus === "error") {
+  if (pagespeedStatus === "error" && isNew("pagespeed", origin)) {
     alertLines.push(`\u{1F7E1} <b>PageSpeed \u0111i\u1EC3m th\u1EA5p</b>${brandLabel}: ${pagespeed.performance_score}/100 (trang ch\u1EE7, mobile) \u2014 LCP ${pagespeed.lcp_ms ? Math.round(pagespeed.lcp_ms) : "?"}ms.`);
   }
-  if (sitemapIssues > 0) {
-    alertLines.push(`\u{1F7E0} <b>${sitemapIssues} sitemap c\xF3 c\u1EA3nh b\xE1o/l\u1ED7i</b>${brandLabel} theo Search Console.`);
+  const reportedSitemapIssues = rows.filter((r2) => r2.check_type === "sitemap" && r2.status === "error" && isNew("sitemap", r2.url));
+  if (reportedSitemapIssues.length > 0) {
+    alertLines.push(`\u{1F7E0} <b>${reportedSitemapIssues.length} sitemap c\xF3 c\u1EA3nh b\xE1o/l\u1ED7i</b>${brandLabel} theo Search Console.`);
+  }
+  if (resolvedCount > 0) {
+    alertLines.push(`\u2705 \u0110\xE3 kh\u1EAFc ph\u1EE5c ${resolvedCount} v\u1EA5n \u0111\u1EC1 so v\u1EDBi l\u1EA7n ki\u1EC3m tra tr\u01B0\u1EDBc${brandLabel}.`);
   }
   return {
     result: {
@@ -128381,13 +128463,14 @@ ${examples.map((e2) => `  ${e2}`).join("\n")}${brokenCount > 5 ? `
     alertLines
   };
 }
-async function runTechnicalSeoSync() {
+async function runTechnicalSeoSync(options = {}) {
+  const fullDigest = options.fullDigest ?? new Date(Date.now() + 7 * 36e5).getUTCDay() === 1;
   const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active && a.gsc_site_url);
   const results = [];
   const allAlertLines = [];
   for (const account of accounts) {
     try {
-      const { result, alertLines } = await runAccountCheck(account);
+      const { result, alertLines } = await runAccountCheck(account, fullDigest);
       results.push(result);
       allAlertLines.push(...alertLines);
     } catch (err) {
@@ -129898,39 +129981,14 @@ app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
         error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN ch\u01B0a \u0111\u01B0\u1EE3c c\u1EA5u h\xECnh \u0111\u1EA7y \u0111\u1EE7."
       });
     }
-    const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.replace(/\D/g, "") : "";
-    const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
-    if (!customerId || !accountName) {
-      return res.status(400).json({ success: false, error: "Thi\u1EBFu Customer ID ho\u1EB7c t\xEAn Google Ads Account." });
-    }
-    if (customerId.length !== 10) {
-      return res.status(400).json({ success: false, error: "Customer ID Google Ads ph\u1EA3i g\u1ED3m 10 ch\u1EEF s\u1ED1." });
-    }
-    const loginCustomerId = typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim() ? req.query.login_customer_id.replace(/\D/g, "") : null;
-    if (loginCustomerId && loginCustomerId.length !== 10) {
-      return res.status(400).json({ success: false, error: "Manager ID ph\u1EA3i g\u1ED3m 10 ch\u1EEF s\u1ED1, kh\xF4ng t\xEDnh d\u1EA5u g\u1EA1ch ngang." });
-    }
-    const payload = {
-      customerId,
-      accountName,
-      brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
-      loginCustomerId,
-      username: req.session.username
-    };
     const params = new URLSearchParams({
       client_id: GOOGLE_ADS_CLIENT_ID,
       redirect_uri: GOOGLE_ADS_REDIRECT_URI,
       response_type: "code",
       scope: GOOGLE_ADS_SCOPES.join(" "),
-      state: signOAuthState(payload),
+      state: signOAuthState({ username: req.session.username }),
       access_type: "offline",
       prompt: "select_account consent"
-    });
-    console.info("Google Ads OAuth start", {
-      clientId: GOOGLE_ADS_CLIENT_ID,
-      redirectUri: GOOGLE_ADS_REDIRECT_URI,
-      customerId,
-      loginCustomerId: payload.loginCustomerId
     });
     res.json({ success: true, authorizeUrl: `${GOOGLE_ADS_AUTHORIZE_URL}?${params.toString()}` });
   } catch (err) {
@@ -129953,21 +130011,64 @@ app.get("/api/google-ads/oauth/callback", async (req, res) => {
     if (!tokens.refresh_token) {
       throw new Error("Google kh\xF4ng tr\u1EA3 v\u1EC1 refresh_token \u2014 vui l\xF2ng th\u1EED k\u1EBFt n\u1ED1i l\u1EA1i v\xE0 duy\u1EC7t \u0111\u1EA7y \u0111\u1EE7 m\xE0n h\xECnh xin quy\u1EC1n.");
     }
-    await upsertGoogleAdsAccount({
-      customer_id: payload.customerId,
-      account_name: payload.accountName,
-      brand: payload.brand,
-      login_customer_id: payload.loginCustomerId,
-      access_token_encrypted: encrypt(tokens.access_token),
-      refresh_token_encrypted: encrypt(tokens.refresh_token),
-      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
-      is_active: true
-    });
-    await logAction({ username: payload.username, role: "Admin" }, req, "connect-google-ads-account", `K\u1EBFt n\u1ED1i Google Ads ${payload.accountName}`);
-    res.redirect(302, "/?googleAdsConnected=1");
+    const candidates = await listGoogleAdsCandidates(tokens.access_token);
+    const pendingId = await createOAuthPending(
+      "google_ads",
+      JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, expires_in: tokens.expires_in }),
+      {
+        accounts: candidates.map((c) => ({ id: c.id, name: c.name, loginCustomerId: c.loginCustomerId, brandGuess: detectBrandFromName(c.name) }))
+      }
+    );
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-google-ads-oauth", `\u0110\u0103ng nh\u1EADp Google Ads th\xE0nh c\xF4ng \u2014 ${candidates.length} Account kh\u1EA3 d\u1EE5ng`);
+    res.redirect(302, `/?gAdsPendingId=${encodeURIComponent(pendingId)}`);
   } catch (err) {
     console.error("GET /api/google-ads/oauth/callback error:", err);
     res.status(500).send(`K\u1EBFt n\u1ED1i Google Ads th\u1EA5t b\u1EA1i: ${err.message}`);
+  }
+});
+app.post("/api/google-ads/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending || pending.platform !== "google_ads") {
+      return res.status(404).json({ success: false, error: "Li\xEAn k\u1EBFt \u0111\xE3 h\u1EBFt h\u1EA1n ho\u1EB7c kh\xF4ng t\u1ED3n t\u1EA1i \u2014 vui l\xF2ng k\u1EBFt n\u1ED1i l\u1EA1i." });
+    }
+    const candidates = pending.candidates;
+    const tokens = JSON.parse(pending.token);
+    const selected = Array.isArray(req.body?.accounts) ? req.body.accounts : [];
+    let imported = 0;
+    for (const sel of selected) {
+      const candidate = candidates.accounts.find((a) => a.id === sel.id);
+      if (!candidate) continue;
+      await upsertGoogleAdsAccount({
+        customer_id: candidate.id,
+        account_name: candidate.name,
+        brand: sel.brand || null,
+        login_customer_id: candidate.loginCustomerId,
+        access_token_encrypted: encrypt(tokens.access_token),
+        refresh_token_encrypted: encrypt(tokens.refresh_token),
+        access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1e3).toISOString(),
+        is_active: true
+      });
+      imported++;
+    }
+    await deleteOAuthPending(req.params.id);
+    await logAction(req.session, req, "complete-google-ads-oauth", `Nh\u1EADp ${imported} Account t\u1EEB Google Ads OAuth`);
+    res.json({ success: true, accountsImported: imported });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.patch("/api/google-ads/accounts/:customer_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand kh\xF4ng h\u1EE3p l\u1EC7 (ch\u1EC9 nh\u1EADn Livotec, Karofi, ho\u1EB7c null)." });
+    }
+    await patchGoogleAdsAccountBrand(req.params.customer_id, brand);
+    await logAction(req.session, req, "set-google-ads-account-brand", `G\xE1n brand "${brand}" cho Google Ads Account ${req.params.customer_id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 app.get("/api/google-ads/accounts", requireAuth("Admin"), async (req, res) => {
@@ -130702,6 +130803,42 @@ app.get("/api/google-website/keywords", requireAuth(), async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+app.get("/api/google-website/gsc-breakdown", requireAuth(), async (req, res) => {
+  try {
+    const brand = typeof req.query.brand === "string" ? req.query.brand : "";
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date(Date.now() - 3 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1e3).toISOString().slice(0, 10);
+    const wantQueries = req.query.queries !== "0";
+    const wantPages = req.query.pages !== "0";
+    const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active && a.gsc_site_url && (!brand || a.brand === brand));
+    const perAccount = await Promise.all(
+      accounts.map(async (account) => {
+        const accessToken = await getFreshAccessToken(account);
+        const [queries, pages, devices] = await Promise.all([
+          wantQueries ? listSearchConsoleTopQueries(accessToken, account.gsc_site_url, since, until, 250) : Promise.resolve([]),
+          wantPages ? listSearchConsoleTopPages(accessToken, account.gsc_site_url, since, until, 250) : Promise.resolve([]),
+          fetchSearchConsoleDeviceMetrics(accessToken, account.gsc_site_url, since, until)
+        ]);
+        return {
+          queries: queries.map((r2) => ({ account_id: account.id, ...r2 })),
+          pages: pages.map((r2) => ({ account_id: account.id, ...r2 })),
+          devices: devices.map((r2) => ({ account_id: account.id, ...r2 }))
+        };
+      })
+    );
+    const byClicks = (a, b) => b.clicks - a.clicks || b.impressions - a.impressions;
+    res.json({
+      success: true,
+      since,
+      until,
+      queries: perAccount.flatMap((a) => a.queries).sort(byClicks),
+      pages: perAccount.flatMap((a) => a.pages).sort(byClicks),
+      devices: perAccount.flatMap((a) => a.devices).sort(byClicks)
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 async function canEditCampaign(campaignId, session) {
   if (session.role === "Admin") return true;
   return isCampaignMember(campaignId, session.username);
@@ -131242,7 +131379,7 @@ app.post("/api/technical-seo/sync-now", requireAuth("Editor"), async (req, res) 
     res.status(500).json({ success: false, error: err.message });
   }
 });
-app.get("/api/cron/technical-seo-weekly", async (req, res) => {
+app.get(["/api/cron/technical-seo-daily", "/api/cron/technical-seo-weekly"], async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -131250,7 +131387,7 @@ app.get("/api/cron/technical-seo-weekly", async (req, res) => {
     const results = await runTechnicalSeoSync();
     res.json({ success: true, results });
   } catch (err) {
-    console.error("GET /api/cron/technical-seo-weekly error:", err);
+    console.error("GET /api/cron/technical-seo-daily error:", err);
     res.status(500).json({ error: err.message });
   }
 });

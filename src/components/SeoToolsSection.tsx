@@ -604,7 +604,7 @@ export default function SeoToolsSection({ selectedBrand }: { selectedBrand: "Liv
           </button>
         </div>
         <p className="pb-3 text-[11px] text-slate-400">
-          Quét sitemap tìm URL lỗi (404/500), điểm PageSpeed trang chủ, và tình trạng sitemap theo Search Console — cron tự chạy hàng tuần.
+          Quét sitemap tìm URL lỗi (404/500), điểm PageSpeed trang chủ, và tình trạng sitemap theo Search Console — tự chạy mỗi ngày (6h sáng giờ VN), gửi cảnh báo Telegram khi phát sinh lỗi mới.
         </p>
 
         {pagespeedCheck && (

@@ -113,6 +113,93 @@ async function refreshGoogleAdsToken(refreshToken: string): Promise<GoogleTokenR
   });
 }
 
+export interface GoogleAdsCandidate {
+  id: string; // 10-digit customer id, no dashes
+  name: string;
+  loginCustomerId: string | null; // manager (MCC) to send as login-customer-id; null = accessed directly
+}
+
+function googleAdsHeaders(accessToken: string, loginCustomerId?: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${accessToken}`,
+    "developer-token": GOOGLE_ADS_DEVELOPER_TOKEN,
+  };
+  if (loginCustomerId) headers["login-customer-id"] = stripCustomerId(loginCustomerId);
+  return headers;
+}
+
+async function googleAdsSearch(accessToken: string, customerId: string, loginCustomerId: string | null, query: string): Promise<any[]> {
+  const res = await fetch(`${GOOGLE_ADS_API_BASE}/customers/${stripCustomerId(customerId)}/googleAds:search`, {
+    method: "POST",
+    headers: googleAdsHeaders(accessToken, loginCustomerId),
+    body: JSON.stringify({ query }),
+  });
+  const body = await readResponseBody(res);
+  if (!res.ok || body?.error) {
+    throw new Error(extractGoogleAdsApiError(body, `Google Ads API trả về lỗi HTTP ${res.status}`));
+  }
+  return body?.results || [];
+}
+
+// "Which Google Ads accounts can this login pull data from?" — the Google
+// counterpart of Facebook's /me/accounts + /me/adaccounts and TikTok's
+// advertiser_ids list, so the admin ticks accounts instead of typing
+// Customer/Manager IDs by hand.
+//   1. customers:listAccessibleCustomers → the accounts this user was invited
+//      to directly (usually the MCC manager, sometimes a client account).
+//   2. each one's name/manager flag via `customer`; for managers, every
+//      enabled client below them via `customer_client`.
+// Only non-manager (leaf) accounts are returned: managers hold no ad data
+// themselves. A client reached through a manager carries that manager's id as
+// loginCustomerId (required by the API for MCC access); one the user can
+// access directly needs none.
+export async function listGoogleAdsCandidates(accessToken: string): Promise<GoogleAdsCandidate[]> {
+  const listRes = await fetch(`${GOOGLE_ADS_API_BASE}/customers:listAccessibleCustomers`, { headers: googleAdsHeaders(accessToken) });
+  const listBody = await readResponseBody(listRes);
+  if (!listRes.ok || listBody?.error) {
+    throw new Error(extractGoogleAdsApiError(listBody, `Google Ads listAccessibleCustomers trả về lỗi HTTP ${listRes.status}`));
+  }
+  const accessibleIds: string[] = (listBody?.resourceNames || []).map((r: string) => stripCustomerId(r));
+
+  const found = new Map<string, GoogleAdsCandidate>();
+  const upsertCandidate = (c: GoogleAdsCandidate) => {
+    const existing = found.get(c.id);
+    // Direct access (no MCC hop) wins over reaching the same account via a manager.
+    if (!existing || (existing.loginCustomerId && !c.loginCustomerId)) found.set(c.id, c);
+  };
+
+  await Promise.all(
+    accessibleIds.map(async (id) => {
+      try {
+        const [row] = await googleAdsSearch(accessToken, id, null, "SELECT customer.id, customer.descriptive_name, customer.manager, customer.status FROM customer LIMIT 1");
+        const customer = row?.customer;
+        if (!customer) return;
+        if (!customer.manager) {
+          if (customer.status === "ENABLED") upsertCandidate({ id, name: customer.descriptiveName || id, loginCustomerId: null });
+          return;
+        }
+        const clients = await googleAdsSearch(
+          accessToken,
+          id,
+          id,
+          "SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager, customer_client.status, customer_client.level FROM customer_client WHERE customer_client.level > 0"
+        );
+        for (const c of clients) {
+          const cc = c.customerClient;
+          if (!cc || cc.manager || cc.status !== "ENABLED") continue;
+          upsertCandidate({ id: String(cc.id), name: cc.descriptiveName || String(cc.id), loginCustomerId: id });
+        }
+      } catch (err: any) {
+        // One inaccessible/disabled account must not hide the others.
+        console.error(`Google Ads: bỏ qua account ${id} khi liệt kê:`, err.message);
+      }
+    })
+  );
+
+  return Array.from(found.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 async function fetchGoogleAdsRows(
   customerId: string,
   loginCustomerId: string | null,

@@ -32,16 +32,17 @@
 // checks above already cover "is anything broken / slow / not properly
 // submitted".
 //
-// Runs on its own weekly cron (GET /api/cron/technical-seo-weekly, see
-// vercel.json) rather than piggybacking on the daily facebook-sync cron:
-// crawling a few hundred URLs plus a PageSpeed call is genuinely slow (this
-// is network-bound, not cheap like the backlink/recurring-task checks that
-// do piggyback there), and site health doesn't change minute-to-minute the
-// way ad spend or follower counts do.
+// Runs on its own DAILY cron (GET /api/cron/technical-seo-daily, see
+// vercel.json) rather than piggybacking on the facebook-sync cron: crawling a
+// few hundred URLs plus a PageSpeed call is genuinely slow (this is
+// network-bound, not cheap like the backlink/recurring-task checks that do
+// piggyback there). It was weekly originally; daily means a broken page is
+// caught within a day, and Telegram stays quiet by only alerting on NEW
+// problems (plus a Monday reminder of what's still outstanding).
 // ---------------------------------------------------------------------------
 import { getGoogleWebsiteAccounts, GoogleWebsiteAccountConfig } from "./googleWebsiteStore";
 import { getFreshAccessToken } from "./googleWebsiteSync";
-import { upsertTechnicalSeoChecks, pruneStaleTechnicalSeoChecks, TechnicalSeoCheck, TechnicalSeoCheckType } from "./technicalSeoStore";
+import { getTechnicalSeoChecks, upsertTechnicalSeoChecks, pruneStaleTechnicalSeoChecks, TechnicalSeoCheck, TechnicalSeoCheckType } from "./technicalSeoStore";
 import { sendTelegramMessage, isTelegramConfigured } from "./telegramNotifier";
 
 const SEARCH_CONSOLE_API_BASE = "https://www.googleapis.com/webmasters/v3";
@@ -270,7 +271,7 @@ export interface TechnicalSeoRunResult {
 
 const PAGESPEED_WARN_THRESHOLD = 50; // Google's own "poor" cutoff for the performance category
 
-async function runAccountCheck(account: GoogleWebsiteAccountConfig): Promise<{ result: TechnicalSeoRunResult; alertLines: string[] }> {
+async function runAccountCheck(account: GoogleWebsiteAccountConfig, fullDigest: boolean): Promise<{ result: TechnicalSeoRunResult; alertLines: string[] }> {
   const origin = deriveOrigin(account.gsc_site_url!);
   const now = new Date().toISOString();
   const alertLines: string[] = [];
@@ -356,26 +357,43 @@ async function runAccountCheck(account: GoogleWebsiteAccountConfig): Promise<{ r
     console.error(`technicalSeoSync: lỗi kiểm tra Search Console Sitemaps API cho account ${account.id}:`, sitemapCheckError);
   }
 
+  // The run is daily now, so the same unresolved problem must not re-alert
+  // every morning: compare against the previous run's stored state (read
+  // BEFORE the upsert overwrites it) and only alert on problems that weren't
+  // already errors — unless this is the weekly reminder run (fullDigest),
+  // which re-lists everything still outstanding.
+  const previousChecks = await getTechnicalSeoChecks([account.id]);
+  const prevErrorKeys = new Set(previousChecks.filter((c) => c.status === "error").map((c) => `${c.check_type}|${c.url}`));
+  const isNew = (type: TechnicalSeoCheckType, url: string) => fullDigest || !prevErrorKeys.has(`${type}|${url}`);
+  const currentErrorKeys = new Set(rows.filter((r) => r.status === "error").map((r) => `${r.check_type}|${r.url}`));
+  const resolvedCount = Array.from(prevErrorKeys).filter((k) => !currentErrorKeys.has(k)).length;
+
   await upsertTechnicalSeoChecks(rows);
 
   const brandLabel = account.brand ? ` (${escapeHtml(account.brand)})` : "";
-  if (sitemapFailures.length > 0) {
+  const reportedSitemapFailures = sitemapFailures.filter((f) => isNew("broken_link", f.url));
+  if (reportedSitemapFailures.length > 0) {
     alertLines.push(
-      `🔴🔴 <b>Sitemap không tải được</b>${brandLabel}: ${sitemapFailures.map((f) => `${escapeHtml(f.url)} (${escapeHtml(f.error)})`).join(", ")}. ` +
+      `🔴🔴 <b>Sitemap không tải được</b>${brandLabel}: ${reportedSitemapFailures.map((f) => `${escapeHtml(f.url)} (${escapeHtml(f.error)})`).join(", ")}. ` +
         (urls.length === 0 ? "Không thể quét toàn bộ trang do sitemap lỗi." : "")
     );
   }
-  if (brokenCount > 0) {
-    const examples = crawlResults.filter((r) => !r.ok).slice(0, 5).map((r) => `${escapeHtml(r.url)} — HTTP ${r.status_code ?? "lỗi kết nối"}`);
+  const reportedBroken = crawlResults.filter((r) => !r.ok && isNew("broken_link", r.url));
+  if (reportedBroken.length > 0) {
+    const examples = reportedBroken.slice(0, 5).map((r) => `${escapeHtml(r.url)} — HTTP ${r.status_code ?? "lỗi kết nối"}`);
     alertLines.push(
-      `🔴 <b>${brokenCount} URL lỗi</b>${brandLabel} (${origin}):\n${examples.map((e) => `  ${e}`).join("\n")}${brokenCount > 5 ? `\n  … và ${brokenCount - 5} URL khác` : ""}`
+      `🔴 <b>${reportedBroken.length} URL lỗi ${fullDigest ? "đang tồn tại" : "mới"}</b>${brandLabel} (${origin}):\n${examples.map((e) => `  ${e}`).join("\n")}${reportedBroken.length > 5 ? `\n  … và ${reportedBroken.length - 5} URL khác` : ""}`
     );
   }
-  if (pagespeedStatus === "error") {
+  if (pagespeedStatus === "error" && isNew("pagespeed", origin)) {
     alertLines.push(`🟡 <b>PageSpeed điểm thấp</b>${brandLabel}: ${pagespeed.performance_score}/100 (trang chủ, mobile) — LCP ${pagespeed.lcp_ms ? Math.round(pagespeed.lcp_ms) : "?"}ms.`);
   }
-  if (sitemapIssues > 0) {
-    alertLines.push(`🟠 <b>${sitemapIssues} sitemap có cảnh báo/lỗi</b>${brandLabel} theo Search Console.`);
+  const reportedSitemapIssues = rows.filter((r) => r.check_type === "sitemap" && r.status === "error" && isNew("sitemap", r.url));
+  if (reportedSitemapIssues.length > 0) {
+    alertLines.push(`🟠 <b>${reportedSitemapIssues.length} sitemap có cảnh báo/lỗi</b>${brandLabel} theo Search Console.`);
+  }
+  if (resolvedCount > 0) {
+    alertLines.push(`✅ Đã khắc phục ${resolvedCount} vấn đề so với lần kiểm tra trước${brandLabel}.`);
   }
 
   return {
@@ -393,14 +411,18 @@ async function runAccountCheck(account: GoogleWebsiteAccountConfig): Promise<{ r
   };
 }
 
-export async function runTechnicalSeoSync(): Promise<TechnicalSeoRunResult[]> {
+// Runs daily (see vercel.json). Telegram only gets problems that are NEW since
+// the previous run, plus a "still outstanding" reminder every Monday
+// (fullDigest) so a long-unfixed issue isn't forgotten after its first alert.
+export async function runTechnicalSeoSync(options: { fullDigest?: boolean } = {}): Promise<TechnicalSeoRunResult[]> {
+  const fullDigest = options.fullDigest ?? new Date(Date.now() + 7 * 3600_000).getUTCDay() === 1; // Monday in Vietnam time
   const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active && a.gsc_site_url);
   const results: TechnicalSeoRunResult[] = [];
   const allAlertLines: string[] = [];
 
   for (const account of accounts) {
     try {
-      const { result, alertLines } = await runAccountCheck(account);
+      const { result, alertLines } = await runAccountCheck(account, fullDigest);
       results.push(result);
       allAlertLines.push(...alertLines);
     } catch (err: any) {

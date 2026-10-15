@@ -98,6 +98,7 @@ import {
   getGoogleAdsAccounts,
   upsertGoogleAdsAccount,
   deleteGoogleAdsAccount,
+  patchGoogleAdsAccountBrand,
   getTiktokAdsAccounts,
   upsertTiktokAdsAccount,
   deleteTiktokAdsAccount,
@@ -112,6 +113,7 @@ import { getCampaignAdsLinks, createCampaignAdsLink, deleteCampaignAdsLink, getC
 import { runFacebookAdsSync } from "./facebookAdsSync";
 import {
   exchangeGoogleAdsCode,
+  listGoogleAdsCandidates,
   GOOGLE_ADS_AUTHORIZE_URL,
   GOOGLE_ADS_CLIENT_ID,
   GOOGLE_ADS_REDIRECT_URI,
@@ -164,6 +166,7 @@ import {
   listSearchConsoleSites,
   listSearchConsoleTopPages,
   listSearchConsoleTopQueries,
+  fetchSearchConsoleDeviceMetrics,
   getFreshAccessToken,
   runGoogleWebsiteSync,
   isGoogleWebsiteConfigured,
@@ -1851,6 +1854,12 @@ function getAdsSyncOverrides(body: any): { since?: string; until?: string } | un
     : undefined;
 }
 
+// Google Ads connect — same "log in once → tick the accounts to import" flow
+// as Facebook/TikTok Ads (no more typing Customer ID / Manager ID / name by
+// hand before the OAuth redirect). The callback lists every account the
+// Google login can reach (see listGoogleAdsCandidates), stashes them behind a
+// pending id, and POST .../pending/:id/complete writes the ticked ones.
+
 // GET /api/google-ads/oauth/start — Admin-only OAuth start for paid Google Ads.
 app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
   try {
@@ -1860,46 +1869,15 @@ app.get("/api/google-ads/oauth/start", requireAuth("Admin"), (req, res) => {
         error: "GOOGLE_ADS_CLIENT_ID / GOOGLE_ADS_CLIENT_SECRET / GOOGLE_ADS_REDIRECT_URI / GOOGLE_ADS_DEVELOPER_TOKEN chưa được cấu hình đầy đủ.",
       });
     }
-    const customerId = typeof req.query.customer_id === "string" ? req.query.customer_id.replace(/\D/g, "") : "";
-    const accountName = typeof req.query.account_name === "string" ? req.query.account_name.trim() : "";
-    if (!customerId || !accountName) {
-      return res.status(400).json({ success: false, error: "Thiếu Customer ID hoặc tên Google Ads Account." });
-    }
-    if (customerId.length !== 10) {
-      return res.status(400).json({ success: false, error: "Customer ID Google Ads phải gồm 10 chữ số." });
-    }
-    const loginCustomerId =
-      typeof req.query.login_customer_id === "string" && req.query.login_customer_id.trim()
-        ? req.query.login_customer_id.replace(/\D/g, "")
-        : null;
-    if (loginCustomerId && loginCustomerId.length !== 10) {
-      return res.status(400).json({ success: false, error: "Manager ID phải gồm 10 chữ số, không tính dấu gạch ngang." });
-    }
-
-    const payload = {
-      customerId,
-      accountName,
-      brand: typeof req.query.brand === "string" ? req.query.brand.trim() : null,
-      loginCustomerId,
-      username: (req as any).session.username,
-    };
     const params = new URLSearchParams({
       client_id: GOOGLE_ADS_CLIENT_ID,
       redirect_uri: GOOGLE_ADS_REDIRECT_URI,
       response_type: "code",
       scope: GOOGLE_ADS_SCOPES.join(" "),
-      state: signOAuthState(payload),
+      state: signOAuthState({ username: (req as any).session.username }),
       access_type: "offline",
       prompt: "select_account consent",
     });
-
-    console.info("Google Ads OAuth start", {
-      clientId: GOOGLE_ADS_CLIENT_ID,
-      redirectUri: GOOGLE_ADS_REDIRECT_URI,
-      customerId,
-      loginCustomerId: payload.loginCustomerId,
-    });
-
     res.json({ success: true, authorizeUrl: `${GOOGLE_ADS_AUTHORIZE_URL}?${params.toString()}` });
   } catch (err: any) {
     console.error("GET /api/google-ads/oauth/start error:", err);
@@ -1915,13 +1893,7 @@ app.get("/api/google-ads/oauth/callback", async (req, res) => {
   const { code, state, error: oauthError } = req.query as Record<string, string | undefined>;
   if (oauthError) return res.status(400).send(`Kết nối Google Ads bị hủy hoặc lỗi: ${oauthError}`);
 
-  const payload = verifyOAuthState<{
-    customerId: string;
-    accountName: string;
-    brand: string | null;
-    loginCustomerId: string | null;
-    username: string;
-  }>(state);
+  const payload = verifyOAuthState<{ username: string }>(state);
   if (!payload || typeof code !== "string") {
     return res.status(400).send("Liên kết xác thực Google Ads không hợp lệ hoặc đã hết hạn — vui lòng thử lại từ Control Panel.");
   }
@@ -1931,21 +1903,75 @@ app.get("/api/google-ads/oauth/callback", async (req, res) => {
     if (!tokens.refresh_token) {
       throw new Error("Google không trả về refresh_token — vui lòng thử kết nối lại và duyệt đầy đủ màn hình xin quyền.");
     }
-    await upsertGoogleAdsAccount({
-      customer_id: payload.customerId,
-      account_name: payload.accountName,
-      brand: payload.brand,
-      login_customer_id: payload.loginCustomerId,
-      access_token_encrypted: encrypt(tokens.access_token),
-      refresh_token_encrypted: encrypt(tokens.refresh_token),
-      access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-      is_active: true,
-    });
-    await logAction({ username: payload.username, role: "Admin" }, req, "connect-google-ads-account", `Kết nối Google Ads ${payload.accountName}`);
-    res.redirect(302, "/?googleAdsConnected=1");
+    const candidates = await listGoogleAdsCandidates(tokens.access_token);
+
+    // One Google login = one refresh token shared by every account imported from it.
+    const pendingId = await createOAuthPending(
+      "google_ads",
+      JSON.stringify({ access_token: tokens.access_token, refresh_token: tokens.refresh_token, expires_in: tokens.expires_in }),
+      {
+        accounts: candidates.map((c) => ({ id: c.id, name: c.name, loginCustomerId: c.loginCustomerId, brandGuess: detectBrandFromName(c.name) })),
+      }
+    );
+
+    await logAction({ username: payload.username, role: "Admin" }, req, "connect-google-ads-oauth", `Đăng nhập Google Ads thành công — ${candidates.length} Account khả dụng`);
+    res.redirect(302, `/?gAdsPendingId=${encodeURIComponent(pendingId)}`);
   } catch (err: any) {
     console.error("GET /api/google-ads/oauth/callback error:", err);
     res.status(500).send(`Kết nối Google Ads thất bại: ${err.message}`);
+  }
+});
+
+// POST /api/google-ads/oauth/pending/:id/complete — writes the admin's ticked
+// accounts into google_ads_accounts, each with its own login_customer_id
+// (the MCC it was reached through) but the one shared token pair.
+app.post("/api/google-ads/oauth/pending/:id/complete", requireAuth("Admin"), async (req, res) => {
+  try {
+    const pending = await getOAuthPending(req.params.id);
+    if (!pending || pending.platform !== "google_ads") {
+      return res.status(404).json({ success: false, error: "Liên kết đã hết hạn hoặc không tồn tại — vui lòng kết nối lại." });
+    }
+    const candidates = pending.candidates as { accounts: { id: string; name: string; loginCustomerId: string | null }[] };
+    const tokens = JSON.parse(pending.token) as { access_token: string; refresh_token: string; expires_in: number };
+    const selected: { id: string; brand: string | null }[] = Array.isArray(req.body?.accounts) ? req.body.accounts : [];
+
+    let imported = 0;
+    for (const sel of selected) {
+      const candidate = candidates.accounts.find((a) => a.id === sel.id);
+      if (!candidate) continue;
+      await upsertGoogleAdsAccount({
+        customer_id: candidate.id,
+        account_name: candidate.name,
+        brand: sel.brand || null,
+        login_customer_id: candidate.loginCustomerId,
+        access_token_encrypted: encrypt(tokens.access_token),
+        refresh_token_encrypted: encrypt(tokens.refresh_token),
+        access_token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+        is_active: true,
+      });
+      imported++;
+    }
+
+    await deleteOAuthPending(req.params.id);
+    await logAction((req as any).session, req, "complete-google-ads-oauth", `Nhập ${imported} Account từ Google Ads OAuth`);
+    res.json({ success: true, accountsImported: imported });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/google-ads/accounts/:customer_id/brand — manual brand override.
+app.patch("/api/google-ads/accounts/:customer_id/brand", requireAuth("Admin"), async (req, res) => {
+  try {
+    const { brand } = req.body || {};
+    if (brand !== "Livotec" && brand !== "Karofi" && brand !== null) {
+      return res.status(400).json({ success: false, error: "Brand không hợp lệ (chỉ nhận Livotec, Karofi, hoặc null)." });
+    }
+    await patchGoogleAdsAccountBrand(req.params.customer_id, brand);
+    await logAction((req as any).session, req, "set-google-ads-account-brand", `Gán brand "${brand}" cho Google Ads Account ${req.params.customer_id}`);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -2903,6 +2929,51 @@ app.get("/api/google-website/keywords", requireAuth(), async (req, res) => {
   }
 });
 
+// GET /api/google-website/gsc-breakdown?brand=&since=&until= — live Search
+// Console top queries + top pages + device split for the Website Report's Search Console tab
+// ("Cụm từ tìm kiếm" / "Trang hàng đầu" cards), each with its own
+// user-selectable period independent of the page-level since/until. Fetched
+// per request, never stored (same as GET /api/google-website/keywords).
+// Sorted by clicks desc and capped, so the UI can show the head of the list.
+app.get("/api/google-website/gsc-breakdown", requireAuth(), async (req, res) => {
+  try {
+    const brand = typeof req.query.brand === "string" ? req.query.brand : "";
+    const until = typeof req.query.until === "string" && req.query.until ? req.query.until : new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const since = typeof req.query.since === "string" && req.query.since ? req.query.since : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const wantQueries = req.query.queries !== "0";
+    const wantPages = req.query.pages !== "0";
+
+    const accounts = (await getGoogleWebsiteAccounts()).filter((a) => a.is_active && a.gsc_site_url && (!brand || a.brand === brand));
+    const perAccount = await Promise.all(
+      accounts.map(async (account) => {
+        const accessToken = await getFreshAccessToken(account);
+        const [queries, pages, devices] = await Promise.all([
+          wantQueries ? listSearchConsoleTopQueries(accessToken, account.gsc_site_url!, since, until, 250) : Promise.resolve([]),
+          wantPages ? listSearchConsoleTopPages(accessToken, account.gsc_site_url!, since, until, 250) : Promise.resolve([]),
+          fetchSearchConsoleDeviceMetrics(accessToken, account.gsc_site_url!, since, until),
+        ]);
+        return {
+          queries: queries.map((r) => ({ account_id: account.id, ...r })),
+          pages: pages.map((r) => ({ account_id: account.id, ...r })),
+          devices: devices.map((r) => ({ account_id: account.id, ...r })),
+        };
+      })
+    );
+
+    const byClicks = (a: { clicks: number; impressions: number }, b: { clicks: number; impressions: number }) => b.clicks - a.clicks || b.impressions - a.impressions;
+    res.json({
+      success: true,
+      since,
+      until,
+      queries: perAccount.flatMap((a) => a.queries).sort(byClicks),
+      pages: perAccount.flatMap((a) => a.pages).sort(byClicks),
+      devices: perAccount.flatMap((a) => a.devices).sort(byClicks),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Campaign Calendar & Campaign Task module (Phase 1 — MVP). See
 // `task cần làm/campaign task/tong-hop-campaign-calendar-task.md` for the
@@ -3578,7 +3649,9 @@ app.post("/api/technical-seo/sync-now", requireAuth("Editor"), async (req, res) 
   }
 });
 
-app.get("/api/cron/technical-seo-weekly", async (req, res) => {
+// Daily cron (was weekly — the old -weekly path stays as an alias so an
+// already-deployed schedule or a manual curl keeps working).
+app.get(["/api/cron/technical-seo-daily", "/api/cron/technical-seo-weekly"], async (req, res) => {
   try {
     if (!isValidCronRequest(req)) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -3586,7 +3659,7 @@ app.get("/api/cron/technical-seo-weekly", async (req, res) => {
     const results = await runTechnicalSeoSync();
     res.json({ success: true, results });
   } catch (err: any) {
-    console.error("GET /api/cron/technical-seo-weekly error:", err);
+    console.error("GET /api/cron/technical-seo-daily error:", err);
     res.status(500).json({ error: err.message });
   }
 });

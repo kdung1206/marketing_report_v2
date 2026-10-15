@@ -465,6 +465,19 @@ export async function upsertGoogleAdsAccount(input: {
   if (error) throw new Error(`Lỗi lưu cấu hình Google Ads Account: ${error.message}`);
 }
 
+// Manual brand correction — same as patchTiktokAdsAccountBrand below.
+export async function patchGoogleAdsAccountBrand(customerId: string, brand: string | null): Promise<void> {
+  if (!isSupabaseConfigured) {
+    const { store, google_ads_accounts } = await readLocalCollections();
+    const next = google_ads_accounts.map((a) => (a.customer_id === customerId ? { ...a, brand } : a));
+    await writeLocalCollections(store, { google_ads_accounts: next });
+    return;
+  }
+
+  const { error } = await supabase.from("google_ads_accounts").update({ brand }).eq("customer_id", customerId);
+  if (error) throw new Error(`Lỗi gán thương hiệu: ${error.message}`);
+}
+
 export async function deleteGoogleAdsAccount(customerId: string): Promise<void> {
   if (!isSupabaseConfigured) {
     const { store, google_ads_accounts } = await readLocalCollections();

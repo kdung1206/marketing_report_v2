@@ -173,6 +173,47 @@ function positionBadgeColor(position: number): string {
   return "text-slate-500 bg-slate-100";
 }
 
+interface GscQueryRow extends KeywordRow {}
+interface GscPageRow {
+  account_id: string;
+  page: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+interface GscDeviceRow {
+  account_id: string;
+  device: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+// Khung thời gian cho Device / Cụm từ tìm kiếm / Trang hàng đầu. Mặc định 28
+// ngày: đúng preset mặc định của chính Search Console, gồm đúng 4 tuần tròn
+// (không lệch cuối tuần/ngày thường), đủ mới để hành động mà vẫn đủ lượng
+// impressions để CTR/vị trí không nhiễu. 7 ngày để soi biến động nhanh, 90
+// ngày (~3 tháng) để xem xu hướng ổn định.
+const GSC_RANGE_OPTIONS = [
+  { days: 7, label: "7 ngày" },
+  { days: 28, label: "28 ngày" },
+  { days: 90, label: "3 tháng" },
+] as const;
+const DEFAULT_GSC_RANGE_DAYS = 28;
+const GSC_TABLE_PREVIEW_ROWS = 15;
+
+// "https://karofi.com/may-loc-nuoc.html?x=1" -> "/may-loc-nuoc.html?x=1"
+function shortPagePath(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.pathname}${u.search}` || "/";
+  } catch {
+    return url;
+  }
+}
+
 const n = (v: number | null | undefined) => v || 0;
 const fmt = (v: number) => new Intl.NumberFormat("vi-VN").format(Math.round(v));
 const fmtCompact = (v: number) => new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(v);
@@ -235,6 +276,62 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
   const [keywords, setKeywords] = useState<KeywordRow[]>([]);
   const [keywordsLoading, setKeywordsLoading] = useState(true);
   const [keywordsError, setKeywordsError] = useState<string | null>(null);
+
+  // Search Console tab: Device / Cụm từ tìm kiếm / Trang hàng đầu share one
+  // selectable period (independent of since/until above) and are fetched
+  // live, only once the tab is actually opened.
+  const [gscRangeDays, setGscRangeDays] = useState<number>(DEFAULT_GSC_RANGE_DAYS);
+  const [gscBreakdownQueries, setGscBreakdownQueries] = useState<GscQueryRow[]>([]);
+  const [gscBreakdownPages, setGscBreakdownPages] = useState<GscPageRow[]>([]);
+  const [gscBreakdownDevices, setGscBreakdownDevices] = useState<GscDeviceRow[]>([]);
+  const [gscBreakdownLoading, setGscBreakdownLoading] = useState(false);
+  const [gscBreakdownError, setGscBreakdownError] = useState<string | null>(null);
+  const [showAllQueries, setShowAllQueries] = useState(false);
+  const [showAllPages, setShowAllPages] = useState(false);
+  const gscBreakdownRange = useMemo(() => ({ since: todayStr(-3 - (gscRangeDays - 1)), until: todayStr(-3) }), [gscRangeDays]);
+  const gscRangeLabel = `${GSC_RANGE_OPTIONS.find((o) => o.days === gscRangeDays)?.label ?? `${gscRangeDays} ngày`} gần nhất`;
+
+  useEffect(() => {
+    if (activeSection !== "search-console") return;
+    let cancelled = false;
+    (async () => {
+      setGscBreakdownLoading(true);
+      setGscBreakdownError(null);
+      try {
+        const params = new URLSearchParams({ brand: selectedBrand, since: gscBreakdownRange.since, until: gscBreakdownRange.until });
+        const result = await safeFetchJson(`/api/google-website/gsc-breakdown?${params.toString()}`);
+        if (cancelled) return;
+        if (result.success) {
+          setGscBreakdownQueries(result.queries || []);
+          setGscBreakdownPages(result.pages || []);
+          // One row per device even when a brand has several GSC accounts.
+          const byDevice = new Map<string, GscDeviceRow>();
+          (result.devices || []).forEach((d: GscDeviceRow) => {
+            const prev = byDevice.get(d.device);
+            if (!prev) {
+              byDevice.set(d.device, { ...d });
+              return;
+            }
+            const impressions = prev.impressions + d.impressions;
+            prev.clicks += d.clicks;
+            prev.position = impressions > 0 ? (prev.position * prev.impressions + d.position * d.impressions) / impressions : prev.position;
+            prev.impressions = impressions;
+            prev.ctr = impressions > 0 ? prev.clicks / impressions : 0;
+          });
+          setGscBreakdownDevices(Array.from(byDevice.values()).sort((a, b) => b.clicks - a.clicks));
+        } else {
+          setGscBreakdownError(result.error || "Không tải được báo cáo Search Console chi tiết.");
+        }
+      } catch (err: any) {
+        if (!cancelled) setGscBreakdownError(err.message || "Không tải được báo cáo Search Console chi tiết.");
+      } finally {
+        if (!cancelled) setGscBreakdownLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, selectedBrand, gscBreakdownRange]);
 
   const brandAccounts = useMemo(() => accounts.filter((a) => a.brand === selectedBrand), [accounts, selectedBrand]);
   const accountIds = useMemo(() => brandAccounts.map((a) => a.id), [brandAccounts]);
@@ -1076,41 +1173,73 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                 <PlatformStat icon={TrendingUp} label="Vị trí trung bình" value={avgPosition.toFixed(1)} color="text-sky-600 bg-sky-50 border-sky-200" />
               </div>
 
-              <div className="h-80 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Clicks & Impressions theo ngày</span>
-                <ResponsiveContainer width="100%" height="85%">
-                  <BarChart data={gscByDate}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis tickFormatter={fmtCompact} />
-                    <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-                    <Legend />
-                    <Bar dataKey="clicks" name="Clicks" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="impressions" name="Impressions" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="h-60 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block pb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Clicks & Impressions theo ngày</span>
+                  <ResponsiveContainer width="100%" height="88%">
+                    <BarChart data={gscByDate}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis tickFormatter={fmtCompact} />
+                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                      <Legend />
+                      <Bar dataKey="clicks" name="Clicks" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="impressions" name="Impressions" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="h-60 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block pb-2 text-xs font-bold uppercase tracking-wide text-slate-400">CTR & Vị trí trung bình theo ngày</span>
+                  <ResponsiveContainer width="100%" height="88%">
+                    <LineChart data={gscByDate}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                      <YAxis yAxisId="ctr" tickFormatter={fmtPercent} />
+                      <YAxis yAxisId="position" orientation="right" reversed />
+                      <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                      <Legend />
+                      <Line yAxisId="ctr" type="monotone" dataKey="ctr" name="CTR" stroke="#0ea5e9" strokeWidth={2} dot={false} />
+                      <Line yAxisId="position" type="monotone" dataKey="position" name="Vị trí trung bình" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
 
-              <div className="h-64 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">CTR & Vị trí trung bình theo ngày</span>
-                <ResponsiveContainer width="100%" height="85%">
-                  <LineChart data={gscByDate}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                    <YAxis yAxisId="ctr" tickFormatter={fmtPercent} />
-                    <YAxis yAxisId="position" orientation="right" reversed />
-                    <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-                    <Legend />
-                    <Line yAxisId="ctr" type="monotone" dataKey="ctr" name="CTR" stroke="#0ea5e9" strokeWidth={2} dot={false} />
-                    <Line yAxisId="position" type="monotone" dataKey="position" name="Vị trí trung bình" stroke="#f59e0b" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
+              {/* Khung thời gian dùng chung cho 3 nhóm: Device / Cụm từ tìm kiếm / Trang hàng đầu */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
+                <div>
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Khung thời gian báo cáo chi tiết</span>
+                  <span className="block text-[11px] text-slate-400">
+                    Áp dụng cho Device, Cụm từ tìm kiếm và Trang hàng đầu · {gscBreakdownRange.since} → {gscBreakdownRange.until} (dữ liệu Search Console trễ ~3 ngày)
+                  </span>
+                </div>
+                <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                  {GSC_RANGE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.days}
+                      type="button"
+                      onClick={() => setGscRangeDays(opt.days)}
+                      className={`rounded-md px-3 py-1 text-xs font-semibold transition ${
+                        gscRangeDays === opt.days ? "bg-slate-900 text-white shadow-sm" : "text-slate-600 hover:bg-white"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {gscBreakdownError && (
+                <div className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {gscBreakdownError}
+                </div>
+              )}
 
               {/* Mục D: Search Console's own Device dimension (organic-only, khác GA4 Device) */}
               <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
                 <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Device (Search Console)</span>
-                <span className="block pb-3 text-[11px] text-slate-400">30 ngày gần nhất</span>
+                <span className="block pb-3 text-[11px] text-slate-400">{gscRangeLabel}</span>
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-slate-400">
@@ -1121,20 +1250,28 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                     </tr>
                   </thead>
                   <tbody>
-                    {gscDeviceBreakdown.map((row) => (
-                      <tr key={row.device} className="border-b border-slate-50 last:border-0">
-                        <td className="py-2">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DEVICE_COLORS[row.device?.toUpperCase()] || "#94a3b8" }} />
-                            {row.device}
-                          </span>
+                    {gscBreakdownLoading && (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-center text-slate-400">
+                          Đang tải...
                         </td>
-                        <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
-                        <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
-                        <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
                       </tr>
-                    ))}
-                    {gscDeviceBreakdown.length === 0 && (
+                    )}
+                    {!gscBreakdownLoading &&
+                      gscBreakdownDevices.map((row) => (
+                        <tr key={row.device} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: DEVICE_COLORS[row.device?.toUpperCase()] || "#94a3b8" }} />
+                              {row.device}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                          <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                          <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                        </tr>
+                      ))}
+                    {!gscBreakdownLoading && gscBreakdownDevices.length === 0 && (
                       <tr>
                         <td colSpan={4} className="py-4 text-center text-slate-400">
                           Chưa có dữ liệu.
@@ -1143,6 +1280,122 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Cụm từ tìm kiếm hàng đầu</span>
+                  <span className="block pb-3 text-[11px] text-slate-400">
+                    {gscRangeLabel} · sắp xếp theo Clicks · {gscBreakdownQueries.length} cụm từ
+                  </span>
+                  <div className={showAllQueries ? "max-h-[32rem] overflow-y-auto" : ""}>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-slate-400">
+                          <th className="pb-2 font-medium">Cụm từ</th>
+                          <th className="pb-2 font-medium text-right">Clicks</th>
+                          <th className="pb-2 font-medium text-right">Impr.</th>
+                          <th className="pb-2 font-medium text-right">CTR</th>
+                          <th className="pb-2 font-medium text-right">Vị trí</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gscBreakdownLoading && (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-center text-slate-400">
+                              Đang tải...
+                            </td>
+                          </tr>
+                        )}
+                        {!gscBreakdownLoading &&
+                          gscBreakdownQueries.slice(0, showAllQueries ? 250 : GSC_TABLE_PREVIEW_ROWS).map((row, i) => (
+                            <tr key={`${row.account_id}-${row.query}-${i}`} className="border-b border-slate-50 last:border-0">
+                              <td className="py-2 pr-2">
+                                <span className="break-words">{row.query}</span>
+                                {isBrandQuery(row.query) && <span className="ml-1.5 rounded bg-indigo-50 px-1 py-0.5 text-[10px] font-semibold text-indigo-600">Brand</span>}
+                              </td>
+                              <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                              <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                              <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                              <td className="py-2 text-right">
+                                <span className={`rounded px-1.5 py-0.5 font-mono font-semibold ${positionBadgeColor(row.position)}`}>{row.position.toFixed(1)}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        {!gscBreakdownLoading && gscBreakdownQueries.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-center text-slate-400">
+                              Chưa có dữ liệu.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {gscBreakdownQueries.length > GSC_TABLE_PREVIEW_ROWS && (
+                    <button type="button" onClick={() => setShowAllQueries((v) => !v)} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">
+                      {showAllQueries ? "Thu gọn" : `Xem tất cả (${gscBreakdownQueries.length})`}
+                    </button>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Trang hàng đầu</span>
+                  <span className="block pb-3 text-[11px] text-slate-400">
+                    {gscRangeLabel} · sắp xếp theo Clicks · {gscBreakdownPages.length} trang
+                  </span>
+                  <div className={showAllPages ? "max-h-[32rem] overflow-y-auto" : ""}>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-slate-400">
+                          <th className="pb-2 font-medium">Trang</th>
+                          <th className="pb-2 font-medium text-right">Clicks</th>
+                          <th className="pb-2 font-medium text-right">Impr.</th>
+                          <th className="pb-2 font-medium text-right">CTR</th>
+                          <th className="pb-2 font-medium text-right">Vị trí</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gscBreakdownLoading && (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-center text-slate-400">
+                              Đang tải...
+                            </td>
+                          </tr>
+                        )}
+                        {!gscBreakdownLoading &&
+                          gscBreakdownPages.slice(0, showAllPages ? 250 : GSC_TABLE_PREVIEW_ROWS).map((row, i) => (
+                            <tr key={`${row.account_id}-${row.page}-${i}`} className="border-b border-slate-50 last:border-0">
+                              <td className="max-w-[16rem] py-2 pr-2">
+                                <a href={row.page} target="_blank" rel="noreferrer" title={row.page} className="block break-all text-slate-700 hover:text-indigo-600 hover:underline">
+                                  {shortPagePath(row.page)}
+                                </a>
+                                <span className="text-[10px] text-slate-400">{classifyPageType(row.page)}</span>
+                              </td>
+                              <td className="py-2 text-right font-mono">{fmt(row.clicks)}</td>
+                              <td className="py-2 text-right font-mono">{fmt(row.impressions)}</td>
+                              <td className="py-2 text-right font-mono">{fmtPercent(row.ctr)}</td>
+                              <td className="py-2 text-right">
+                                <span className={`rounded px-1.5 py-0.5 font-mono font-semibold ${positionBadgeColor(row.position)}`}>{row.position.toFixed(1)}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        {!gscBreakdownLoading && gscBreakdownPages.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-center text-slate-400">
+                              Chưa có dữ liệu.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {gscBreakdownPages.length > GSC_TABLE_PREVIEW_ROWS && (
+                    <button type="button" onClick={() => setShowAllPages((v) => !v)} className="mt-2 text-xs font-semibold text-indigo-600 hover:underline">
+                      {showAllPages ? "Thu gọn" : `Xem tất cả (${gscBreakdownPages.length})`}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}

@@ -31,6 +31,7 @@ import YoutubeAccountsAdmin from "./components/YoutubeAccountsAdmin";
 import DriveBackupAdmin from "./components/DriveBackupAdmin";
 import PaidAdsApiAccountsAdmin from "./components/PaidAdsApiAccountsAdmin";
 import TiktokAdsConnectAdmin from "./components/TiktokAdsConnectAdmin";
+import GoogleAdsConnectAdmin from "./components/GoogleAdsConnectAdmin";
 import GoogleWebsiteAccountsAdmin from "./components/GoogleWebsiteAccountsAdmin";
 import WebsiteReport from "./components/WebsiteReport";
 import CampaignManagement from "./components/CampaignManagement";
@@ -709,7 +710,23 @@ export default function App() {
   // strip it so a manual refresh afterwards doesn't re-trigger this.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("tiktokConnected") === "1") {
+    const pendingSubTab: PlatformSubTab | null = params.get("fbPendingId")
+      ? "facebook"
+      : params.get("ttAdsPendingId")
+      ? "tiktok"
+      : params.get("gAdsPendingId")
+      ? "google"
+      : null;
+    if (pendingSubTab) {
+      // OAuth callbacks (Facebook / TikTok Ads / Google Ads) redirect to "/?<x>PendingId=…".
+      // Land on the platform's tab, and leave the param in place on purpose:
+      // the Connect component mounted there reads and strips it itself, and
+      // it only mounts after this state change — stripping here would lose
+      // the pending id before it ever sees it.
+      setActiveTab("control-panel");
+      setControlPanelSection("platform-connections");
+      setPlatformSubTab(pendingSubTab);
+    } else if (params.get("tiktokConnected") === "1") {
       setActiveTab("control-panel");
       setControlPanelSection("platform-connections");
       setPlatformSubTab("tiktok");
@@ -6599,6 +6616,7 @@ export default function App() {
               <div className="space-y-6">
                 {currentUser && currentUser.role === "Admin" && <YoutubeAccountsAdmin />}
                 {currentUser && currentUser.role === "Admin" && <GoogleWebsiteAccountsAdmin />}
+                {currentUser && currentUser.role === "Admin" && <GoogleAdsConnectAdmin onImported={() => window.location.reload()} />}
                 {currentUser && currentUser.role === "Admin" && <PaidAdsApiAccountsAdmin platform="google" />}
                 <AdsUploadAdmin channel="google" />
               </div>

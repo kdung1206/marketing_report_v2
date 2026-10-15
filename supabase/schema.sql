@@ -313,13 +313,19 @@ alter table tiktok_ads_accounts enable row level security;
 -- expired row as valid regardless.
 create table if not exists platform_oauth_pending (
   id text primary key,
-  platform text not null check (platform in ('facebook', 'tiktok_ads')),
+  platform text not null check (platform in ('facebook', 'tiktok_ads', 'google_ads')),
   token_encrypted text not null,
   candidates jsonb not null,
   created_at timestamptz not null default now()
 );
 
 alter table platform_oauth_pending enable row level security;
+
+-- Migration for databases created before Google Ads joined this flow (the
+-- inline CHECK above only applies to a fresh create). Safe to re-run.
+alter table platform_oauth_pending drop constraint if exists platform_oauth_pending_platform_check;
+alter table platform_oauth_pending add constraint platform_oauth_pending_platform_check
+  check (platform in ('facebook', 'tiktok_ads', 'google_ads'));
 
 -- One row per channel/campaign/ad group/ad/day. Upserted on the composite key
 -- below so a re-upload (Google/TikTok) or a re-sync (Facebook) safely
