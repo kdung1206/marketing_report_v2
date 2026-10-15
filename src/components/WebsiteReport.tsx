@@ -58,34 +58,33 @@ interface Ga4ChannelSessionsDailyRow {
   total_users: number | null;
 }
 
-// Named groups the "Tổng hợp" tab's channel chart/table show individually —
-// everything else GA4 reports (Paid Social, Display, Email, Affiliates,
-// (not set)...) is bucketed into "Khác" (decision from Website Report
-// redesign mục A: keep the chart readable rather than one line per GA4
-// channel, most of which carry near-zero sessions for these two sites).
-const NAMED_CHANNELS = ["Organic Search", "Paid Search", "Direct", "Organic Social", "Referral"] as const;
-const CHANNEL_ORDER = [...NAMED_CHANNELS, "Khác"] as const;
-const CHANNEL_COLORS: Record<string, string> = {
-  "Organic Search": "#059669",
-  "Paid Search": "#6366f1",
-  Direct: "#0ea5e9",
-  "Organic Social": "#ec4899",
-  Referral: "#f59e0b",
-  Khác: "#94a3b8",
-};
-function bucketChannel(raw: string): string {
-  return (NAMED_CHANNELS as readonly string[]).includes(raw) ? raw : "Khác";
+// Traffic-source groups for the "Tổng hợp" tab — the same five GA4 comparisons
+// the Analytics UI offers ("Lưu lượng truy cập trực tiếp / tự nhiên / có trả
+// phí / thông qua lượt giới thiệu và đơn vị liên kết / thông qua email, SMS và
+// thông báo đẩy"), each defined by GA4's default channel group names, plus
+// "Khác" for the rest (Unassigned, AI Assistant, ...). Used by the stacked
+// chart and the group summary card; the table next to them lists the raw
+// channels underneath.
+type TrafficGroupKey = "Direct" | "Organic" | "Paid" | "Referral" | "Email" | "Khác";
+const TRAFFIC_GROUPS: { key: TrafficGroupKey; label: string; hint: string; color: string; test: (channel: string) => boolean }[] = [
+  { key: "Direct", label: "Truy cập trực tiếp", hint: "Direct", color: "#0ea5e9", test: (c) => /^direct$/i.test(c) },
+  { key: "Organic", label: "Tự nhiên", hint: "Organic Search, Social, Video, Shopping", color: "#059669", test: (c) => /^organic/i.test(c) },
+  { key: "Paid", label: "Có trả phí", hint: "Paid Search, Social, Video, Shopping, Other, Display, Cross-network, Audio", color: "#6366f1", test: (c) => /^(paid|display$|cross-network$|audio$)/i.test(c) },
+  { key: "Referral", label: "Giới thiệu & liên kết", hint: "Referral, Affiliates", color: "#f59e0b", test: (c) => /^(referral|affiliates)$/i.test(c) },
+  { key: "Email", label: "Email, SMS & thông báo đẩy", hint: "Email, SMS, Mobile Push Notifications", color: "#ec4899", test: (c) => /^(email|sms|mobile push notifications)$/i.test(c) },
+];
+const OTHER_GROUP = { key: "Khác" as TrafficGroupKey, label: "Khác", hint: "Unassigned, AI Assistant, ...", color: "#94a3b8" };
+function groupOfChannel(raw: string): { key: TrafficGroupKey; label: string; color: string } {
+  return TRAFFIC_GROUPS.find((g) => g.test(raw)) || OTHER_GROUP;
 }
+const ALL_TRAFFIC_GROUPS = [...TRAFFIC_GROUPS, OTHER_GROUP];
 
-// Organic vs Paid for the "Nguồn traffic" table, from GA4's default channel
-// group names. "Display" and "Cross-network" are paid in GA4's own definition;
-// Direct, Referral, Email, Affiliates, Unassigned... are neither, so "Khác".
+// Organic vs Paid badge on the raw-channel table.
 type ChannelType = "Organic" | "Paid" | "Khác";
 const CHANNEL_TYPE_COLORS: Record<ChannelType, string> = { Organic: "#059669", Paid: "#6366f1", Khác: "#94a3b8" };
 function classifyChannelType(raw: string): ChannelType {
-  if (/^organic/i.test(raw)) return "Organic";
-  if (/^paid/i.test(raw) || /^(display|cross-network)$/i.test(raw)) return "Paid";
-  return "Khác";
+  const key = groupOfChannel(raw).key;
+  return key === "Organic" ? "Organic" : key === "Paid" ? "Paid" : "Khác";
 }
 
 interface Ga4PageSummaryRow {
@@ -448,15 +447,16 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
       .sort((a, b) => (a.date < b.date ? -1 : 1));
   }, [gscScoped]);
 
-  // Per-channel sessions over time, one column per named group + "Khác" — for
-  // the "Sessions theo kênh" stacked chart. Channel totals (below) reuse the
-  // same rows so the chart and the "Nguồn traffic" table never disagree.
+  // Sessions over time per traffic-source group (see TRAFFIC_GROUPS) — feeds the
+  // stacked "Sessions theo nguồn lưu lượng" chart. Built from the same
+  // channelScoped rows as the group card and the raw-channel table below, so
+  // the three never disagree.
   const channelByDate = useMemo(() => {
     const byDate = new Map<string, Record<string, any>>();
     channelScoped.forEach((r) => {
-      const bucket = bucketChannel(r.channel);
-      const entry = byDate.get(r.date) || Object.fromEntries([["date", r.date], ...CHANNEL_ORDER.map((c) => [c, 0])]);
-      entry[bucket] += n(r.sessions);
+      const group = groupOfChannel(r.channel).label;
+      const entry = byDate.get(r.date) || Object.fromEntries([["date", r.date], ...ALL_TRAFFIC_GROUPS.map((g) => [g.label, 0])]);
+      entry[group] += n(r.sessions);
       byDate.set(r.date, entry);
     });
     return Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -489,12 +489,38 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
       .sort((a, b) => b.sessions - a.sessions);
   }, [channelScoped]);
 
-  const channelTypeTotals = useMemo(() => {
-    const totals: Record<ChannelType, number> = { Organic: 0, Paid: 0, Khác: 0 };
-    channelDetail.forEach((c) => (totals[c.type] += c.sessions));
-    const grand = totals.Organic + totals.Paid + totals.Khác;
-    return (["Organic", "Paid", "Khác"] as ChannelType[]).map((type) => ({ type, sessions: totals[type], share: grand ? totals[type] / grand : 0 }));
-  }, [channelDetail]);
+  // One row per traffic-source group, biggest first (empty groups dropped).
+  const trafficGroupDetail = useMemo(() => {
+    const total = channelDetail.reduce((sum, c) => sum + c.sessions, 0);
+    const acc = new Map<TrafficGroupKey, { sessions: number; seconds: number; users: number; channels: string[] }>();
+    channelScoped.forEach((r) => {
+      const key = groupOfChannel(r.channel).key;
+      const e = acc.get(key) || { sessions: 0, seconds: 0, users: 0, channels: [] };
+      e.sessions += n(r.sessions);
+      if (r.engagement_seconds != null && r.total_users != null) {
+        e.seconds += r.engagement_seconds;
+        e.users += r.total_users;
+      }
+      acc.set(key, e);
+    });
+    const channelsByGroup = new Map<TrafficGroupKey, string[]>();
+    channelDetail.forEach((c) => {
+      const key = groupOfChannel(c.channel).key;
+      channelsByGroup.set(key, [...(channelsByGroup.get(key) || []), c.channel]);
+    });
+    return ALL_TRAFFIC_GROUPS.map((g) => {
+      const e = acc.get(g.key);
+      return {
+        ...g,
+        sessions: e?.sessions || 0,
+        share: total && e ? e.sessions / total : 0,
+        timeOnPageSeconds: e && e.users ? e.seconds / e.users : null,
+        channels: channelsByGroup.get(g.key) || [],
+      };
+    })
+      .filter((g) => g.sessions > 0)
+      .sort((a, b) => b.sessions - a.sessions);
+  }, [channelScoped, channelDetail]);
 
   const sessionsTotal = ga4Scoped.reduce((s, r) => s + n(r.sessions), 0);
   // Site-wide "Time on page" = total engagement seconds / total users over the
@@ -805,38 +831,76 @@ export default function WebsiteReport({ selectedBrand, setSelectedBrand, onCreat
                 </ul>
               </div>
 
-              {/* 3. Sessions theo kênh + Nguồn traffic, cạnh nhau để so sánh trực tiếp */}
+              {/* 3. Cột trái: biểu đồ + báo cáo theo nhóm nguồn lưu lượng; cột phải: bảng kênh chi tiết.
+                  Hai cột cao tương đương nên không còn khoảng trống bên dưới biểu đồ trên desktop. */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-                <div className="h-80 rounded-xl border border-slate-100 bg-white p-4 shadow-sm lg:col-span-3">
-                  <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Sessions theo kênh</span>
-                  <ResponsiveContainer width="100%" height="85%">
-                    <BarChart data={channelByDate}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                      <YAxis tickFormatter={fmtCompact} />
-                      <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
-                      <Legend />
-                      {CHANNEL_ORDER.map((channel) => (
-                        <Bar key={channel} dataKey={channel} name={channel} stackId="channel" fill={CHANNEL_COLORS[channel]} />
-                      ))}
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="flex flex-col gap-4 lg:col-span-3">
+                  <div className="h-72 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <span className="block pb-3 text-xs font-bold uppercase tracking-wide text-slate-400">Sessions theo nguồn lưu lượng</span>
+                    <ResponsiveContainer width="100%" height="88%">
+                      <BarChart data={channelByDate}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                        <YAxis tickFormatter={fmtCompact} />
+                        <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }} />
+                        <Legend />
+                        {ALL_TRAFFIC_GROUPS.map((g) => (
+                          <Bar key={g.key} dataKey={g.label} name={g.label} stackId="channel" fill={g.color} />
+                        ))}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="flex-1 rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-400">Báo cáo theo nguồn lưu lượng</span>
+                    <span className="block pb-3 text-[11px] text-slate-400">Phân nhóm theo định nghĩa so sánh của GA4 · giai đoạn đã chọn</span>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-slate-400">
+                          <th className="pb-2 font-medium">Nguồn lưu lượng</th>
+                          <th className="pb-2 font-medium text-right">Sessions ↓</th>
+                          <th className="pb-2 font-medium text-right" title="Thời gian tương tác trung bình trên mỗi user (phút:giây) = tổng thời gian tương tác ÷ users (GA4)">Time on page</th>
+                          <th className="pb-2 font-medium text-right">Tỉ trọng</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trafficGroupDetail.map((g) => (
+                          <tr key={g.key} className="border-b border-slate-50 last:border-0">
+                            <td className="py-2">
+                              <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: g.color }} />
+                                {g.label}
+                              </span>
+                              <span className="block pl-3.5 text-[10px] text-slate-400" title={g.channels.join(", ")}>
+                                {g.channels.length > 0 ? g.channels.join(", ") : g.hint}
+                              </span>
+                            </td>
+                            <td className="py-2 text-right font-mono">{fmt(g.sessions)}</td>
+                            <td className="py-2 text-right font-mono">{fmtDuration(g.timeOnPageSeconds)}</td>
+                            <td className="py-2 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="font-mono">{fmtPercent2(g.share)}</span>
+                                <span className="h-1.5 w-12 overflow-hidden rounded-full bg-slate-100">
+                                  <span className="block h-full rounded-full" style={{ width: `${(g.share * 100).toFixed(0)}%`, backgroundColor: g.color }} />
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {trafficGroupDetail.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="py-4 text-center text-slate-400">
+                              Chưa có dữ liệu.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm lg:col-span-2">
                   <span className="block pb-4 text-xs font-bold uppercase tracking-wide text-slate-400">Nguồn traffic (giai đoạn đã chọn)</span>
-                  <div className="mb-3 grid grid-cols-3 gap-2">
-                    {channelTypeTotals.map((t) => (
-                      <div key={t.type} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-                        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CHANNEL_TYPE_COLORS[t.type] }} />
-                          {t.type}
-                        </span>
-                        <span className="block font-mono text-sm font-bold text-slate-900">{fmt(t.sessions)}</span>
-                        <span className="block text-[10px] text-slate-400">{fmtPercent(t.share)}</span>
-                      </div>
-                    ))}
-                  </div>
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-slate-100 text-left text-slate-400">
